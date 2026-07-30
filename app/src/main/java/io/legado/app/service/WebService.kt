@@ -33,6 +33,9 @@ import splitties.systemservices.powerManager
 import splitties.systemservices.wifiManager
 import java.io.IOException
 
+/**
+ * Web服务，在设备上启动HTTP和WebSocket服务，支持通过局域网访问阅读、管理书籍等功能。
+ */
 class WebService : BaseService() {
 
     companion object {

@@ -9,16 +9,21 @@ import io.legado.app.model.analyzeRule.AnalyzeUrl
 import kotlin.coroutines.coroutineContext
 
 /**
- * 字典规则
+ * 字典规则实体，定义在线字典查询的URL和内容解析规则
  */
 @Entity(tableName = "dictRules")
 data class DictRule(
+    // 字典名称
     @PrimaryKey
     var name: String = "",
+    // 查询URL规则，{key}会被替换为查询关键词
     var urlRule: String = "",
+    // 结果提取规则
     var showRule: String = "",
+    // 是否启用
     @ColumnInfo(defaultValue = "1")
     var enabled: Boolean = true,
+    // 排序号
     @ColumnInfo(defaultValue = "0")
     var sortNumber: Int = 0
 ) {

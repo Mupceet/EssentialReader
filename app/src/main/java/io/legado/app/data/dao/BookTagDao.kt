@@ -9,8 +9,13 @@ import androidx.room.Update
 import io.legado.app.data.entities.BookTag
 import kotlinx.coroutines.flow.Flow
 
+/**
+ * 书籍标签数据访问对象，管理书籍标签的增删改查。
+ * 标签ID使用位掩码设计，支持多标签组合。
+ */
 @Dao
 interface BookTagDao {
+    /** 获取所有标签的数据流，按排序字段排列 */
     @Query("select * from book_tags order by `order`")
     fun flowSelect(): Flow<List<BookTag>>
 

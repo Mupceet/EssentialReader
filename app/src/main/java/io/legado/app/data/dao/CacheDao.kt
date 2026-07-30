@@ -6,9 +6,14 @@ import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import io.legado.app.data.entities.Cache
 
+/**
+ * 缓存数据访问对象，管理键值对缓存的存取和过期清理。
+ * 支持按key查询缓存值，以及清理过期缓存和特定书源的变量缓存。
+ */
 @Dao
 interface CacheDao {
 
+    /** 根据key获取缓存对象 */
     @Query("select * from caches where `key` = :key")
     fun get(key: String): Cache?
 

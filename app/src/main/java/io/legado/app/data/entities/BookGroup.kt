@@ -9,19 +9,29 @@ import io.legado.app.R
 import io.legado.app.help.config.AppConfig
 import kotlinx.parcelize.Parcelize
 
+/**
+ * 书籍分组实体，用于书架上的书籍分类管理
+ */
 @Suppress("ConstPropertyName")
 @Parcelize
 @Entity(tableName = "book_groups")
 data class BookGroup(
+    // 分组ID（使用位掩码标识）
     @PrimaryKey
     val groupId: Long = 0b1,
+    // 分组名称
     var groupName: String = "",
+    // 分组封面
     var cover: String? = null,
+    // 排序顺序
     var order: Int = 0,
+    // 是否允许刷新
     @ColumnInfo(defaultValue = "1")
     var enableRefresh: Boolean = true,
+    // 是否显示
     @ColumnInfo(defaultValue = "1")
     var show: Boolean = true,
+    // 书籍排序方式，-1表示使用默认排序
     @ColumnInfo(defaultValue = "-1")
     var bookSort: Int = -1
 ) : Parcelable {

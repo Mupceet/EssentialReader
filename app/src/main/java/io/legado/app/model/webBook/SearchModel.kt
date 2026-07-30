@@ -32,6 +32,9 @@ import java.util.concurrent.Executors
 import kotlin.coroutines.coroutineContext
 import kotlin.math.min
 
+/**
+ * 搜索模型，管理多书源并发搜索的流程控制，支持分页搜索、结果合并和搜索状态管理。
+ */
 class SearchModel(private val scope: CoroutineScope, private val callBack: CallBack) {
     val threadCount = AppConfig.threadCount
     private var searchPool: ExecutorCoroutineDispatcher? = null

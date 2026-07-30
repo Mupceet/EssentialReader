@@ -40,6 +40,9 @@ import kotlinx.coroutines.currentCoroutineContext
 import splitties.init.appCtx
 import java.io.File
 
+/**
+ * 封面处理模块，负责书籍封面的加载、缓存、裁剪和模糊效果处理。
+ */
 @Keep
 @Suppress("ConstPropertyName")
 object BookCover {

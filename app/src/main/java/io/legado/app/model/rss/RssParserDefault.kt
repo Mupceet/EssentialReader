@@ -8,6 +8,9 @@ import org.xmlpull.v1.XmlPullParserFactory
 import java.io.IOException
 import java.io.StringReader
 
+/**
+ * 默认RSS解析器，使用标准XML Pull解析方式解析RSS/Atom订阅源。
+ */
 @Suppress("unused")
 object RssParserDefault {
 

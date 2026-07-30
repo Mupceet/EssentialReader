@@ -4,9 +4,13 @@ import androidx.room.*
 import io.legado.app.data.entities.Server
 import kotlinx.coroutines.flow.Flow
 
+/**
+ * 服务器配置数据访问对象，管理WebDav等服务器配置的增删改查。
+ */
 @Dao
 interface ServerDao {
 
+    /** 观察所有服务器配置的数据流，按排序号排列 */
     @Query("select * from servers order by sortNumber")
     fun observeAll(): Flow<List<Server>>
 

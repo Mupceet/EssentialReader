@@ -19,6 +19,9 @@ import io.legado.app.utils.startForegroundServiceCompat
 import io.legado.app.utils.toastOnUi
 import splitties.init.appCtx
 
+/**
+ * 朗读控制模块，管理TTS本地朗读和HTTP在线朗读的启动、暂停、停止等操作。
+ */
 object ReadAloud {
     private var aloudClass: Class<*> = getReadAloudClass()
     val ttsEngine get() = ReadBook.book?.getTtsEngine() ?: AppConfig.ttsEngine

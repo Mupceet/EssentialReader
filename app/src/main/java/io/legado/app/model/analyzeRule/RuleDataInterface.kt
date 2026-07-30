@@ -1,5 +1,8 @@
 package io.legado.app.model.analyzeRule
 
+/**
+ * 规则数据接口，定义规则解析过程中变量存取和Put/Get操作的标准接口。
+ */
 interface RuleDataInterface {
 
     val variableMap: HashMap<String, String>

@@ -7,6 +7,9 @@ import io.legado.app.data.appDb
 import io.legado.app.utils.splitNotBlank
 
 
+/**
+ * 书源部分字段视图实体，通过DatabaseView从book_sources表中提取常用字段，减少查询开销
+ */
 @DatabaseView(
     """select bookSourceUrl, bookSourceName, bookSourceGroup, customOrder, enabled, enabledExplore, 
     (loginUrl is not null and trim(loginUrl) <> '') hasLoginUrl, lastUpdateTime, respondTime, weight, 

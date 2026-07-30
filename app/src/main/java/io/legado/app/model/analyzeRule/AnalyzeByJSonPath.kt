@@ -6,6 +6,9 @@ import com.jayway.jsonpath.ReadContext
 import io.legado.app.utils.printOnDebug
 
 
+/**
+ * JSONPath规则解析器，基于JsonPath对JSON数据进行提取和查询。
+ */
 @Suppress("RegExpRedundantEscape")
 @Keep
 class AnalyzeByJSonPath(json: Any) {

@@ -3,9 +3,13 @@ package io.legado.app.data.dao
 import androidx.room.*
 import io.legado.app.data.entities.RssReadRecord
 
+/**
+ * RSS阅读记录数据访问对象，管理RSS文章已读记录的存储和查询。
+ */
 @Dao
 interface RssReadRecordDao {
 
+    /** 插入阅读记录（忽略重复） */
     @Insert(onConflict = OnConflictStrategy.IGNORE)
     fun insertRecord(vararg rssReadRecord: RssReadRecord)
 

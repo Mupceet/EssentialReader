@@ -10,6 +10,9 @@ import io.legado.app.service.CheckSourceService
 import io.legado.app.utils.startService
 import splitties.init.appCtx
 
+/**
+ * 书源校验入口，提供书源有效性检测的配置和启动功能，支持超时设置和并发校验。
+ */
 object CheckSource {
     var keyword = "我的"
 

@@ -29,6 +29,9 @@ import java.nio.charset.Charset
 import java.time.LocalDate
 import kotlin.math.max
 
+/**
+ * 书架书籍实体，存储书籍的元信息、阅读进度、阅读配置等
+ */
 @Parcelize
 @TypeConverters(Book.Converters::class)
 @Entity(

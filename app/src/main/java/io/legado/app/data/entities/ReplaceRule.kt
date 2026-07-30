@@ -16,6 +16,9 @@ import splitties.init.appCtx
 import java.util.regex.Pattern
 import java.util.regex.PatternSyntaxException
 
+/**
+ * 替换规则实体，用于书籍章节标题和正文的文本替换净化
+ */
 @Parcelize
 @Entity(
     tableName = "replace_rules",

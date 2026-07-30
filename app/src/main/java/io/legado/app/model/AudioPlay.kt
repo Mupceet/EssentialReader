@@ -28,6 +28,9 @@ import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.cancelChildren
 import splitties.init.appCtx
 
+/**
+ * 音频播放控制器，负责音频书籍的播放、暂停、章节切换、播放模式管理等功能。
+ */
 @SuppressLint("StaticFieldLeak")
 @Suppress("unused")
 object AudioPlay : CoroutineScope by MainScope() {

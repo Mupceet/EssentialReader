@@ -15,9 +15,14 @@ import io.legado.app.help.book.isNotShelf
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 
+/**
+ * 书籍数据访问对象，管理书架上的书籍增删改查操作。
+ * 支持按分组、类型、关键词等条件筛选，以及书籍进度分组更新。
+ */
 @Dao
 interface BookDao {
 
+    /** 根据分组ID获取对应的书籍列表数据流 */
     fun flowByGroup(groupId: Long, sumGroupId: Long, hideNetNone: Boolean): Flow<List<Book>> {
         return when (groupId) {
             BookGroup.IdRoot -> flowRoot().map { list ->

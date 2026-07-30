@@ -9,16 +9,21 @@ import kotlinx.parcelize.Parcelize
 import org.json.JSONObject
 
 /**
- * 服务器
+ * 服务器配置实体，用于WebDav等同步服务器的连接配置
  */
 @Parcelize
 @Entity(tableName = "servers")
 data class Server(
+    // 服务器ID
     @PrimaryKey
     var id: Long = System.currentTimeMillis(),
+    // 服务器名称
     var name: String = "",
+    // 服务器类型
     var type: TYPE = TYPE.WEBDAV,
+    // 配置JSON
     var config: String? = null,
+    // 排序号
     var sortNumber: Int = 0
 ) : Parcelable {
 

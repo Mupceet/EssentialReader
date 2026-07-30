@@ -17,9 +17,14 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 
+/**
+ * 书源数据访问对象，管理书源的增删改查操作。
+ * 支持按名称、分组、URL等条件搜索，以及启用/禁用、排序、分组管理等。
+ */
 @Dao
 interface BookSourceDao {
 
+    /** 获取所有书源（精简字段）数据流，按自定义排序 */
     @Query("select * from book_sources_part order by customOrder asc")
     fun flowAll(): Flow<List<BookSourcePart>>
 

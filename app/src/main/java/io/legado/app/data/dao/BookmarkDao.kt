@@ -5,9 +5,14 @@ import io.legado.app.data.entities.Bookmark
 import kotlinx.coroutines.flow.Flow
 
 
+/**
+ * 书签数据访问对象，管理阅读书签的增删改查。
+ * 支持按书籍名称、作者、关键词搜索书签。
+ */
 @Dao
 interface BookmarkDao {
 
+    /** 获取所有书签，按书名、作者、章节索引排序 */
     @get:Query(
         """
         select * from bookmarks order by bookName collate localized, bookAuthor collate localized, chapterIndex, chapterPos

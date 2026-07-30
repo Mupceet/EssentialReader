@@ -39,6 +39,9 @@ import kotlinx.coroutines.sync.withLock
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.coroutines.CoroutineContext
 
+/**
+ * 缓存下载控制器，管理书籍章节的离线缓存，支持多书并发缓存、暂停和进度跟踪。
+ */
 object CacheBook {
 
     val cacheBookMap = ConcurrentHashMap<String, CacheBookModel>()

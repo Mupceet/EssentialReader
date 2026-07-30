@@ -28,6 +28,9 @@ import java.io.File
 import java.io.FileOutputStream
 import kotlin.math.min
 
+/**
+ * 图片提供模块，负责从本地书籍（EPUB/MOBI/PDF）中提取内置图片，支持图片缓存和缩放。
+ */
 object ImageProvider {
 
     private val errorBitmap: Bitmap by lazy {

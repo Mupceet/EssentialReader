@@ -10,6 +10,9 @@ import org.jsoup.select.Elements
 import org.seimicrawler.xpath.JXDocument
 import org.seimicrawler.xpath.JXNode
 
+/**
+ * XPath规则解析器，基于XPath语法对HTML/XML文档进行节点查询和内容提取。
+ */
 @Keep
 class AnalyzeByXPath(doc: Any) {
     private var jxNode: Any = parse(doc)

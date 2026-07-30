@@ -4,6 +4,9 @@ import androidx.room.Entity
 import androidx.room.Index
 import androidx.room.PrimaryKey
 
+/**
+ * 书籍搜索关键词实体，记录书籍搜索历史及使用频次
+ */
 @Entity(tableName = "book_search_keywords", indices = [(Index(value = ["word"], unique = true))])
 data class BookSearchKeyword(
     /** 搜索关键词 */

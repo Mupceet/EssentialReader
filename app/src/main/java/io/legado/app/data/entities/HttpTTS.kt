@@ -10,15 +10,19 @@ import io.legado.app.utils.readLong
 import io.legado.app.utils.readString
 
 /**
- * 在线朗读引擎
+ * 在线朗读引擎实体，配置HTTP接口的文本转语音(TTS)服务
  */
 @Entity(tableName = "httpTTS")
 data class HttpTTS(
     @PrimaryKey
     val id: Long = System.currentTimeMillis(),
+    // 引擎名称
     var name: String = "",
+    // 请求URL
     var url: String = "",
+    // 内容类型
     var contentType: String? = null,
+    // 并发率
     @ColumnInfo(defaultValue = "0")
     override var concurrentRate: String? = "0",
     override var loginUrl: String? = null,
@@ -28,6 +32,7 @@ data class HttpTTS(
     @ColumnInfo(defaultValue = "0")
     override var enabledCookieJar: Boolean? = false,
     var loginCheckJs: String? = null,
+    // 最后更新时间
     @ColumnInfo(defaultValue = "0")
     var lastUpdateTime: Long = System.currentTimeMillis()
 ) : BaseSource {

@@ -10,6 +10,9 @@ import me.ag2s.umdlib.umd.UmdReader
 import java.io.File
 import java.io.InputStream
 
+/**
+ * UMD文件解析器，负责解析UMD格式书籍的目录结构和章节内容。
+ */
 class UmdFile(var book: Book) {
     companion object : BaseLocalBookParse {
         private var uFile: UmdFile? = null

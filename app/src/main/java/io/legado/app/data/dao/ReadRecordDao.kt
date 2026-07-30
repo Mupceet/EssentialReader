@@ -4,9 +4,14 @@ import androidx.room.*
 import io.legado.app.data.entities.ReadRecord
 import io.legado.app.data.entities.ReadRecordShow
 
+/**
+ * 阅读记录数据访问对象，管理阅读时长记录的增删改查。
+ * 支持按书籍名称汇总阅读时长，以及按设备ID查询阅读时间。
+ */
 @Dao
 interface ReadRecordDao {
 
+    /** 获取所有阅读记录 */
     @get:Query("select * from readRecord")
     val all: List<ReadRecord>
 

@@ -41,6 +41,9 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Semaphore
 import kotlin.math.min
 
+/**
+ * 漫画阅读控制器，负责漫画章节的图片加载、分页滚动、预加载和阅读进度管理。
+ */
 @Suppress("MemberVisibilityCanBePrivate")
 object ReadManga : CoroutineScope by MainScope() {
     var inBookshelf = false

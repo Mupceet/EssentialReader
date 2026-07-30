@@ -15,6 +15,9 @@ import splitties.init.appCtx
 import java.util.Locale
 import kotlin.coroutines.coroutineContext
 
+/**
+ * 基于规则解析RSS，使用书源规则引擎对RSS源进行文章标题、摘要、链接等信息的提取。
+ */
 @Keep
 object RssParserByRule {
 

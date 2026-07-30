@@ -19,6 +19,9 @@ import java.util.regex.Pattern
 import java.util.regex.PatternSyntaxException
 import kotlin.math.min
 
+/**
+ * TXT文本文件解析器，负责解析TXT格式书籍的目录结构和章节正文内容。
+ */
 class TextFile(private var book: Book) {
 
     @Suppress("ConstPropertyName")

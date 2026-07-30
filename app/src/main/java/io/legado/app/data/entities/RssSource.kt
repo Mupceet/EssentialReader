@@ -10,6 +10,9 @@ import io.legado.app.constant.AppPattern
 import io.legado.app.utils.splitNotBlank
 import kotlinx.parcelize.Parcelize
 
+/**
+ * RSS源实体，定义RSS订阅源的URL、解析规则、文章列表规则等配置
+ */
 @Parcelize
 @Entity(tableName = "rssSources", indices = [(Index(value = ["sourceUrl"], unique = false))])
 data class RssSource(

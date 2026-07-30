@@ -4,9 +4,14 @@ import androidx.room.*
 import io.legado.app.data.entities.RssStar
 import kotlinx.coroutines.flow.Flow
 
+/**
+ * RSS收藏数据访问对象，管理RSS文章收藏的增删改查。
+ * 支持按分组、来源和链接进行收藏管理。
+ */
 @Dao
 interface RssStarDao {
 
+    /** 获取所有收藏，按收藏时间倒序 */
     @get:Query("select * from rssStars order by starTime desc")
     val all: List<RssStar>
 

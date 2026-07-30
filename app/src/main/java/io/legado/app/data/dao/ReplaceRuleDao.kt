@@ -16,9 +16,14 @@ import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 
 
+/**
+ * 替换规则数据访问对象，管理文本替换规则的增删改查。
+ * 支持按分组、名称搜索，以及按作用域（正文/标题）筛选启用的规则。
+ */
 @Dao
 interface ReplaceRuleDao {
 
+    /** 获取所有替换规则数据流，按排序号排列 */
     @Query("SELECT * FROM replace_rules ORDER BY sortOrder ASC")
     fun flowAll(): Flow<List<ReplaceRule>>
 

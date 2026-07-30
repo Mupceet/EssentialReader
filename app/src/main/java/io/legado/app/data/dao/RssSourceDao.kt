@@ -15,9 +15,14 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 
+/**
+ * RSS订阅源数据访问对象，管理RSS订阅源的增删改查。
+ * 支持按名称、URL、分组搜索，以及启用/禁用和排序管理。
+ */
 @Dao
 interface RssSourceDao {
 
+    /** 根据订阅源URL获取订阅源 */
     @Query("select * from rssSources where sourceUrl = :key")
     fun getByKey(key: String): RssSource?
 
