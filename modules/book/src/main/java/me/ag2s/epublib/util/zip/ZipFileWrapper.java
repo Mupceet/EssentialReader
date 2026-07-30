@@ -50,7 +50,7 @@ public class ZipFileWrapper {
         if (zipFile instanceof java.util.zip.ZipFile) {
             return ((ZipFile) zipFile).getComment();
         } else if (zipFile instanceof AndroidZipFile) {
-            return ((AndroidZipFile) zipFile).getName();
+            return ((AndroidZipFile) zipFile).getComment();
         } else {
             return null;
         }
@@ -80,6 +80,9 @@ public class ZipFileWrapper {
     }
 
     public InputStream getInputStream(ZipEntryWrapper entry) throws IOException {
+        if (entry == null) {
+            return null;
+        }
         checkType();
         if (zipFile instanceof java.util.zip.ZipFile) {
             return ((ZipFile) zipFile).getInputStream(entry.getZipEntry());

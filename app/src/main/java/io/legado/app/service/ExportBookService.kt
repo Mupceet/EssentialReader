@@ -219,8 +219,10 @@ class ExportBookService : BaseService() {
         kotlin.runCatching {
             LocalBook.getChapterList(book)
         }.onSuccess {
-            appDb.bookChapterDao.delByBook(book.bookUrl)
-            appDb.bookChapterDao.insert(*it.toTypedArray())
+            appDb.runInTransaction {
+                appDb.bookChapterDao.delByBook(book.bookUrl)
+                appDb.bookChapterDao.insert(*it.toTypedArray())
+            }
             appDb.bookDao.update(book)
             ReadBook.onChapterListUpdated(book)
         }

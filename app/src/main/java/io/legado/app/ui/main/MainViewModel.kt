@@ -172,8 +172,10 @@ class MainViewModel(application: Application) : BaseViewModel(application) {
                 appDb.bookDao.replace(oldBook, book)
                 BookHelp.updateCacheFolder(oldBook, book)
             }
-            appDb.bookChapterDao.delByBook(bookUrl)
-            appDb.bookChapterDao.insert(*toc.toTypedArray())
+            appDb.runInTransaction {
+                appDb.bookChapterDao.delByBook(bookUrl)
+                appDb.bookChapterDao.insert(*toc.toTypedArray())
+            }
             ReadBook.onChapterListUpdated(book)
             addDownload(source, book)
         }.onFailure {

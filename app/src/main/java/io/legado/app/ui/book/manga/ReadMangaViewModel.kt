@@ -126,8 +126,10 @@ class ReadMangaViewModel(application: Application) : BaseViewModel(application) 
                 appDb.bookDao.replace(oldBook, book)
                 BookHelp.updateCacheFolder(oldBook, book)
             }
-            appDb.bookChapterDao.delByBook(oldBook.bookUrl)
-            appDb.bookChapterDao.insert(*cList.toTypedArray())
+            appDb.runInTransaction {
+                appDb.bookChapterDao.delByBook(oldBook.bookUrl)
+                appDb.bookChapterDao.insert(*cList.toTypedArray())
+            }
             ReadManga.onChapterListUpdated(book)
             return true
         }.onFailure {
