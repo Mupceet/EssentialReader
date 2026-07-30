@@ -3,14 +3,9 @@ package io.legado.app.data.dao
 import androidx.room.*
 import io.legado.app.data.entities.SearchBook
 
-/**
- * 搜索书籍数据访问对象，管理搜索结果书籍的缓存和查询。
- * 支持按书名/作者查找、换源搜索以及过期清理。
- */
 @Dao
 interface SearchBookDao {
 
-    /** 根据书籍URL获取缓存的搜索结果 */
     @Query("select * from searchBooks where bookUrl = :bookUrl")
     fun getSearchBook(bookUrl: String): SearchBook?
 

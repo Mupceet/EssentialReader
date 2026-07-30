@@ -5,14 +5,9 @@ import io.legado.app.data.entities.DictRule
 import kotlinx.coroutines.flow.Flow
 
 
-/**
- * 字典规则数据访问对象，管理文本替换/字典规则的增删改查。
- * 支持按排序号排列和启用状态筛选。
- */
 @Dao
 interface DictRuleDao {
 
-    /** 获取所有字典规则，按排序号排列 */
     @get:Query("select * from dictRules order by sortNumber")
     val all: List<DictRule>
 

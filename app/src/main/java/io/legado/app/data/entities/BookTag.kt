@@ -6,18 +6,12 @@ import androidx.room.Entity
 import androidx.room.PrimaryKey
 import kotlinx.parcelize.Parcelize
 
-/**
- * 书籍标签实体，用于书籍的标签分类管理
- */
 @Parcelize
 @Entity(tableName = "book_tags")
 data class BookTag(
-    // 标签ID（使用位掩码标识）
     @PrimaryKey
     val tagId: Long = 0b1,
-    // 标签名称
     var name: String = "",
-    // 排序顺序
     var order: Int = 0
 ) : Parcelable {
 

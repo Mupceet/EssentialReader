@@ -7,38 +7,23 @@ import io.legado.app.utils.GSON
 import io.legado.app.utils.fromJsonObject
 import kotlinx.parcelize.IgnoredOnParcel
 
-/**
- * RSS文章实体，存储RSS订阅源获取的文章内容
- */
 @Entity(
     tableName = "rssArticles",
     primaryKeys = ["origin", "link"]
 )
 data class RssArticle(
-    // RSS源URL
     override var origin: String = "",
-    // 分类
     var sort: String = "",
-    // 标题
     var title: String = "",
-    // 排序号
     var order: Long = 0,
-    // 文章链接
     override var link: String = "",
-    // 发布日期
     var pubDate: String? = null,
-    // 描述
     var description: String? = null,
-    // 正文内容
     var content: String? = null,
-    // 图片
     var image: String? = null,
-    // 分组
     @ColumnInfo(defaultValue = "默认分组")
     var group: String = "默认分组",
-    // 是否已读
     var read: Boolean = false,
-    // 自定义变量
     override var variable: String? = null
 ) : BaseRssArticle {
 

@@ -15,9 +15,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlin.coroutines.CoroutineContext
 import kotlin.coroutines.coroutineContext
 
-/**
- * RSS订阅源管理模块，负责解析RSS订阅源并获取文章列表，支持规则解析和默认解析两种方式。
- */
 @Suppress("MemberVisibilityCanBePrivate")
 object Rss {
 

@@ -148,10 +148,12 @@ public class EpubReader {
     private Resource processPackageResource(String packageResourceHref, EpubBook book,
                                             Resources resources) {
         Resource packageResource = resources.remove(packageResourceHref);
-        try {
-            PackageDocumentReader.read(packageResource, this, book, resources);
-        } catch (Exception e) {
-            Log.e(TAG, e.getMessage(), e);
+        if (packageResource != null) {
+            try {
+                PackageDocumentReader.read(packageResource, this, book, resources);
+            } catch (Exception e) {
+                Log.e(TAG, e.getMessage(), e);
+            }
         }
         return packageResource;
     }

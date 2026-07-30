@@ -30,9 +30,6 @@ import java.net.URI
 import java.net.URLDecoder
 import java.nio.charset.Charset
 
-/**
- * EPUB文件解析器，负责解析EPUB格式书籍的目录结构、章节内容和内置图片。
- */
 class EpubFile(var book: Book) {
 
     companion object : BaseLocalBookParse {

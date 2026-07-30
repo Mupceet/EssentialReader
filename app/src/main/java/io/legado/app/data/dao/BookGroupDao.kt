@@ -11,14 +11,9 @@ import io.legado.app.constant.BookType
 import io.legado.app.data.entities.BookGroup
 import kotlinx.coroutines.flow.Flow
 
-/**
- * 书籍分组数据访问对象，管理书架分组（如全部、本地、音频、自定义分组等）的增删改查。
- * 分组ID使用位掩码设计，支持多分组组合。
- */
 @Dao
 interface BookGroupDao {
 
-    /** 根据分组ID查询分组 */
     @Query("select * from book_groups where groupId = :id")
     fun getByID(id: Long): BookGroup?
 

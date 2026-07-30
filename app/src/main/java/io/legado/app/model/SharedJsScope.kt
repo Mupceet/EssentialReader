@@ -20,9 +20,6 @@ import java.io.File
 import java.lang.ref.WeakReference
 import kotlin.coroutines.CoroutineContext
 
-/**
- * JS作用域共享模块，管理Rhino脚本引擎的共享作用域，支持跨书源的JavaScript对象缓存和复用。
- */
 object SharedJsScope {
 
     private val cacheFolder = File(appCtx.cacheDir, "shareJs")

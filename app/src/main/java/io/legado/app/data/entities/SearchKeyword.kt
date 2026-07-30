@@ -7,9 +7,6 @@ import androidx.room.PrimaryKey
 import kotlinx.parcelize.Parcelize
 
 
-/**
- * 搜索关键词实体，记录搜索历史及使用频次
- */
 @Parcelize
 @Entity(tableName = "search_keywords", indices = [(Index(value = ["word"], unique = true))])
 data class SearchKeyword(

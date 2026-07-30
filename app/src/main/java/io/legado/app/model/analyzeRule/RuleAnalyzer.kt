@@ -1,8 +1,6 @@
 package io.legado.app.model.analyzeRule
 
-/**
- * 通用的规则切分处理器，将书源规则字符串按分隔符切分为多个规则片段，支持嵌套规则和代码块识别。
- */
+//通用的规则切分处理
 class RuleAnalyzer(data: String, code: Boolean = false) {
 
     private var queue: String = data //被处理字符串

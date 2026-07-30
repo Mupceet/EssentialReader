@@ -25,9 +25,6 @@ import kotlinx.coroutines.sync.Semaphore
 import kotlin.coroutines.CoroutineContext
 import kotlin.coroutines.coroutineContext
 
-/**
- * 网络书籍管理模块，负责在线书源的搜索、书籍信息获取、目录获取和正文获取等核心功能。
- */
 @Suppress("MemberVisibilityCanBePrivate")
 object WebBook {
 

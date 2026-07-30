@@ -4,14 +4,9 @@ import androidx.room.*
 import io.legado.app.data.entities.RssArticle
 import kotlinx.coroutines.flow.Flow
 
-/**
- * RSS文章数据访问对象，管理RSS订阅文章的增删改查。
- * 支持按订阅源和分类查询文章，以及清理旧文章。
- */
 @Dao
 interface RssArticleDao {
 
-    /** 根据来源和链接获取单篇文章 */
     @Query("select * from rssArticles where origin = :origin and link = :link")
     fun get(origin: String, link: String): RssArticle?
 

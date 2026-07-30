@@ -7,13 +7,9 @@ import androidx.room.Query
 import androidx.room.Update
 import io.legado.app.data.entities.BookChapter
 
-/**
- * 书籍章节数据访问对象，管理章节的查询、插入、更新和删除操作。
- */
 @Dao
 interface BookChapterDao {
 
-    /** 根据书籍URL和关键词搜索章节 */
     @Query("SELECT * FROM chapters where bookUrl = :bookUrl and title like '%'||:key||'%' order by `index`")
     fun search(bookUrl: String, key: String): List<BookChapter>
 

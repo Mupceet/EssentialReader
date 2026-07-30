@@ -17,9 +17,6 @@ import kotlinx.coroutines.CoroutineScope
 import java.text.SimpleDateFormat
 import java.util.*
 
-/**
- * 调试工具模块，提供书源调试功能，支持规则调试、日志记录和调试信息收集。
- */
 object Debug {
     var callback: Callback? = null
     private var debugSource: String? = null

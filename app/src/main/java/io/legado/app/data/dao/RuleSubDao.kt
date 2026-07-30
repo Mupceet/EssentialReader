@@ -4,13 +4,9 @@ import androidx.room.*
 import io.legado.app.data.entities.RuleSub
 import kotlinx.coroutines.flow.Flow
 
-/**
- * 规则订阅数据访问对象，管理规则订阅地址的增删改查。
- */
 @Dao
 interface RuleSubDao {
 
-    /** 获取所有规则订阅，按自定义排序 */
     @get:Query("select * from ruleSubs order by customOrder")
     val all: List<RuleSub>
 

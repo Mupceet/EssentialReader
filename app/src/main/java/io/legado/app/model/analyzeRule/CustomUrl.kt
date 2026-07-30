@@ -3,9 +3,6 @@ package io.legado.app.model.analyzeRule
 import io.legado.app.utils.GSON
 import io.legado.app.utils.fromJsonObject
 
-/**
- * 自定义URL协议解析器，支持解析legado://自定义URL协议，用于在应用内通过URL传递参数和操作指令。
- */
 @Suppress("unused")
 class CustomUrl(url: String) {
 

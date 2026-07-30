@@ -221,8 +221,10 @@ class BookInfoViewModel(application: Application) : BaseViewModel(application) {
             execute(scope) {
                 LocalBook.getChapterList(book).let {
                     appDb.bookDao.update(book)
-                    appDb.bookChapterDao.delByBook(book.bookUrl)
-                    appDb.bookChapterDao.insert(*it.toTypedArray())
+                    appDb.runInTransaction {
+                        appDb.bookChapterDao.delByBook(book.bookUrl)
+                        appDb.bookChapterDao.insert(*it.toTypedArray())
+                    }
                     ReadBook.onChapterListUpdated(book)
                     bookData.postValue(book)
                     chapterListData.postValue(it)
@@ -247,8 +249,10 @@ class BookInfoViewModel(application: Application) : BaseViewModel(application) {
                         if (oldBook.bookUrl != book.bookUrl) {
                             BookHelp.updateCacheFolder(oldBook, book)
                         }
-                        appDb.bookChapterDao.delByBook(oldBook.bookUrl)
-                        appDb.bookChapterDao.insert(*it.toTypedArray())
+                        appDb.runInTransaction {
+                            appDb.bookChapterDao.delByBook(oldBook.bookUrl)
+                            appDb.bookChapterDao.insert(*it.toTypedArray())
+                        }
                         ReadBook.onChapterListUpdated(book)
                     }
                     bookData.postValue(book)

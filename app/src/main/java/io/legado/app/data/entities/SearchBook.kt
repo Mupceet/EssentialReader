@@ -15,9 +15,6 @@ import io.legado.app.utils.fromJsonObject
 import kotlinx.parcelize.IgnoredOnParcel
 import kotlinx.parcelize.Parcelize
 
-/**
- * 搜索结果书籍实体，存储从书源搜索到的书籍信息，支持多源去重合并
- */
 @Parcelize
 @Entity(
     tableName = "searchBooks",
@@ -31,12 +28,10 @@ import kotlinx.parcelize.Parcelize
     ))]
 )
 data class SearchBook(
-    // 书籍URL
     @PrimaryKey
     override var bookUrl: String = "",
     /** 书源 */
     var origin: String = "",
-    // 书源名称
     var originName: String = "",
     /** BookType */
     var type: Int = BookType.text,
@@ -49,17 +44,12 @@ data class SearchBook(
     var latestChapterTitle: String? = null,
     /** 目录页Url (toc=table of Contents) */
     var tocUrl: String = "",
-    // 搜索时间
     var time: Long = System.currentTimeMillis(),
     override var variable: String? = null,
-    // 书源排序
     var originOrder: Int = 0,
-    // 章节字数文本
     var chapterWordCountText: String? = null,
-    // 章节字数
     @ColumnInfo(defaultValue = "-1")
     var chapterWordCount: Int = -1,
-    // 响应时间
     @ColumnInfo(defaultValue = "-1")
     var respondTime: Int = -1
 ) : Parcelable, BaseBook, Comparable<SearchBook> {

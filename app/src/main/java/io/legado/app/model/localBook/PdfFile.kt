@@ -21,9 +21,6 @@ import java.io.InputStream
 import kotlin.math.ceil
 
 
-/**
- * PDF文件解析器，负责解析PDF格式书籍的页面渲染，将每页转换为图片供阅读器展示。
- */
 class PdfFile(var book: Book) {
     companion object : BaseLocalBookParse {
         private var pFile: PdfFile? = null

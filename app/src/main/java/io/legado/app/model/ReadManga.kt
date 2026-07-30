@@ -41,9 +41,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Semaphore
 import kotlin.math.min
 
-/**
- * 漫画阅读控制器，负责漫画章节的图片加载、分页滚动、预加载和阅读进度管理。
- */
 @Suppress("MemberVisibilityCanBePrivate")
 object ReadManga : CoroutineScope by MainScope() {
     var inBookshelf = false
@@ -177,7 +174,7 @@ object ReadManga : CoroutineScope by MainScope() {
 
     private fun loadContent(index: Int) {
         Coroutine.async {
-            val book = book!!
+            val book = ReadManga.book ?: return@async
             val chapter = appDb.bookChapterDao.getChapter(book.bookUrl, index) ?: return@async
             if (addLoading(index)) {
                 BookHelp.getContent(book, chapter)?.let {
@@ -480,8 +477,10 @@ object ReadManga : CoroutineScope by MainScope() {
                     appDb.bookDao.replace(oldBook, book)
                     BookHelp.updateCacheFolder(oldBook, book)
                 }
-                appDb.bookChapterDao.delByBook(oldBook.bookUrl)
-                appDb.bookChapterDao.insert(*cList.toTypedArray())
+                appDb.runInTransaction {
+                    appDb.bookChapterDao.delByBook(oldBook.bookUrl)
+                    appDb.bookChapterDao.insert(*cList.toTypedArray())
+                }
                 onChapterListUpdated(book, false)
                 nextMangaChapter ?: loadContent(durChapterIndex + 1)
             }

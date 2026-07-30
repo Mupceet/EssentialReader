@@ -4,11 +4,12 @@ import io.legado.app.data.entities.BaseSource
 import io.legado.app.exception.ConcurrentException
 import io.legado.app.model.analyzeRule.AnalyzeUrl.ConcurrentRecord
 import kotlinx.coroutines.delay
+import java.util.concurrent.ConcurrentHashMap
 
 class ConcurrentRateLimiter(val source: BaseSource?) {
 
     companion object {
-        private val concurrentRecordMap = hashMapOf<String, ConcurrentRecord>()
+        private val concurrentRecordMap = ConcurrentHashMap<String, ConcurrentRecord>()
     }
 
     /**
@@ -22,18 +23,10 @@ class ConcurrentRateLimiter(val source: BaseSource?) {
             return null
         }
         val rateIndex = concurrentRate.indexOf("/")
-        var fetchRecord = concurrentRecordMap[source.getKey()]
-        if (fetchRecord == null) {
-            synchronized(concurrentRecordMap) {
-                fetchRecord = concurrentRecordMap[source.getKey()]
-                if (fetchRecord == null) {
-                    fetchRecord = ConcurrentRecord(rateIndex > 0, System.currentTimeMillis(), 1)
-                    concurrentRecordMap[source.getKey()] = fetchRecord
-                    return fetchRecord
-                }
-            }
+        val fetchRecord = concurrentRecordMap.computeIfAbsent(source.getKey()) {
+            ConcurrentRecord(rateIndex > 0, System.currentTimeMillis(), 1)
         }
-        val waitTime: Int = synchronized(fetchRecord!!) {
+        val waitTime: Int = synchronized(fetchRecord) {
             try {
                 if (!fetchRecord.isConcurrent) {
                     //并发控制非 次数/毫秒

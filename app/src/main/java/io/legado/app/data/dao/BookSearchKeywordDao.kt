@@ -4,14 +4,9 @@ import androidx.room.*
 import io.legado.app.data.entities.BookSearchKeyword
 import kotlinx.coroutines.flow.Flow
 
-/**
- * 书籍搜索关键词数据访问对象，管理书籍搜索历史关键词的增删改查。
- * 与SearchKeywordDao类似，但专门用于书籍搜索场景。
- */
 @Dao
 interface BookSearchKeywordDao {
 
-    /** 获取所有书籍搜索关键词 */
     @get:Query("SELECT * FROM book_search_keywords")
     val all: List<BookSearchKeyword>
 

@@ -48,45 +48,26 @@ Legado 是一款**免费开源**的 Android 平台电子书阅读器。软件本
 
 ```
 app/
-├── ui/              # 界面层
-│   ├── main/        # 主界面（bookshelf书架, explore发现, my我的, rss订阅）
-│   ├── book/        # 书籍相关（audio音频, bookmark书签, cache缓存, changecover换封面, changesource换源, explore发现, group分组, import导入, info信息, manage管理, manga漫画, read阅读, search搜索, searchContent内容搜索, source书源）
-│   ├── about/       # 关于
-│   ├── association/ # 关联导入
-│   ├── config/      # 应用配置
-│   ├── dict/        # 词典管理
-│   ├── replace/     # 替换规则管理
-│   ├── rss/         # RSS订阅
-│   ├── browser/     # 内置浏览器
-│   ├── file/        # 文件管理
-│   ├── font/        # 字体管理
-│   ├── login/       # 登录管理
-│   ├── qrcode/      # 二维码扫描
-│   ├── welcome/     # 欢迎页
-│   └── widget/      # 通用UI组件
-├── model/           # 业务逻辑层
-│   ├── analyzeRule/ # 规则解析引擎
-│   ├── localBook/   # 本地书籍
-│   ├── remote/      # 远程书籍
-│   ├── rss/         # RSS处理
-│   └── webBook/     # 网页书籍
-├── data/            # 数据层
-│   ├── entities/    # 数据实体
-│   └── dao/         # 数据访问对象
-├── service/         # 后台服务
-├── api/             # API层（REST Controller + ContentProvider）
-├── help/            # 工具类/配置
-│   ├── book/        # 书籍帮助类（BookContent, BookHelp, ContentHelp, ContentProcessor）
-│   ├── http/        # HTTP帮助类（HttpHelper, CookieManager, CookieStore, Cronet）
-│   ├── source/      # 书源帮助类（SourceHelp, SourceVerificationHelp）
-│   ├── storage/     # 存储帮助类（Backup, BackupAES, BackupConfig, ImportOldData, Restore）
-│   ├── coroutine/   # 协程帮助类（Coroutine, CompositeCoroutine, CoroutineContainer）
-│   ├── crypto/      # 加密帮助类（AsymmetricCrypto, Sign, SymmetricCryptoAndroid）
-│   ├── exoplayer/   # 播放器帮助类（ExoPlayerHelper, InputStreamDataSource）
-│   ├── glide/       # 图片加载帮助类（ImageLoader, GlideHeaders）
-│   ├── rhino/       # JS引擎帮助类（NativeBaseSource）
-│   └── update/      # 更新帮助类（AppUpdate, AppUpdateGitHub, AppReleaseInfo）
-└── localBook/       # 本地书籍支持（PdfFile, UmdFile, MobiFile）
+├── ui/           # 界面层
+│   ├── main/     # 主界面（书架/发现/我的）
+│   ├── book/     # 书籍相关（阅读/管理/导入/搜索/缓存/漫画/音频/书签/分组/标签/书源/替换/词典/关联/登录/二维码/浏览器/字体/文件/欢迎/关于）
+│   ├── config/   # 应用配置
+│   ├── rss/      # RSS订阅
+│   ├── replace/  # 替换规则管理
+│   ├── dict/     # 词典管理
+│   ├── widget/   # 通用UI组件
+│   └── ...
+├── model/        # 业务逻辑层
+│   ├── analyzeRule/  # 规则解析引擎
+│   ├── localBook/    # 本地书籍
+│   ├── remote/       # 远程书籍
+│   ├── rss/          # RSS处理
+│   └── webBook/      # 网页书籍
+├── data/         # 数据层
+│   ├── entities/     # 数据实体
+│   └── dao/          # 数据访问对象
+├── service/      # 后台服务
+└── help/         # 工具类/配置
 ```
 
 ---
@@ -444,9 +425,6 @@ app/
 
 - **TXT**：纯文本文件
 - **EPUB**：EPUB电子书
-- **PDF**：PDF文件（PdfFile支持）
-- **UMD**：UMD文件（UmdFile支持）
-- **MOBI**：MOBI文件（MobiFile支持）
 
 #### 3.7.2 导入方式
 
@@ -595,20 +573,6 @@ app/
 
 #### 3.14.3 API
 
-**REST API（BookController）**：
-- 通过 `api/` 目录提供REST API接口
-- **BookController**：书籍相关API（查询、保存、删除等）
-- **BookSourceController**：书源相关API（导入、导出、管理）
-- **ReplaceRuleController**：替换规则API
-- **RssSourceController**：RSS源API
-
-**ContentProvider**：
-- **ReaderProvider**：提供ContentProvider接口，支持外部应用访问阅读数据
-
-**快捷方式**：
-- **ShortCuts**：提供应用快捷方式（静态+动态快捷方式）
-
-**URL Scheme导入**：
 - 通过URL Scheme唤起：`legado://import/{path}?src={url}`
 - 支持各种数据类型的导入
 
@@ -681,7 +645,7 @@ app/
 ### 4.1 数据库概述
 
 数据库名称：`legado.db`  
-数据库版本：79  
+数据库版本：78  
 数据库类型：SQLite (Room)  
 字符集：UTF-8
 
@@ -695,7 +659,6 @@ erDiagram
     Book ||--o{ Bookmark : "bookName, bookAuthor"
     Book }o--|| BookGroup : "group"
     Book }o--|| BookTag : "tags(位掩码)"
-    Book ||--o{ BookSearchKeyword : "bookUrl"
     RssSource ||--o{ RssArticle : "origin"
     RssSource ||--o{ RssStar : "origin"
     RssSource ||--o{ RssReadRecord : "sourceUrl"
@@ -720,14 +683,7 @@ erDiagram
     BookTag {
         Long tagId PK
     }
-    BookSearchKeyword {
-        Long id PK
-        String keyword
-        String bookUrl
-    }
 ```
-
-> **注**：Room AutoMigration 从 v43 到 v79，支持自动数据库迁移。
 
 ### 4.3 数据表清单
 
@@ -741,21 +697,20 @@ erDiagram
 | 6 | replace_rules | ReplaceRule | 替换规则表 |
 | 7 | searchBooks | SearchBook | 搜索书籍表 |
 | 8 | search_keywords | SearchKeyword | 搜索关键词表 |
-| 9 | book_search_keywords | BookSearchKeyword | 书籍搜索关键词表 |
-| 10 | cookies | Cookie | Cookie表 |
-| 11 | rssSources | RssSource | RSS源表 |
-| 12 | bookmarks | Bookmark | 书签表 |
-| 13 | rssArticles | RssArticle | RSS文章表 |
-| 14 | rssReadRecords | RssReadRecord | RSS阅读记录表 |
-| 15 | rssStars | RssStar | RSS收藏表 |
-| 16 | txtTocRules | TxtTocRule | TXT目录规则表 |
-| 17 | readRecord | ReadRecord | 阅读记录表 |
-| 18 | httpTTS | HttpTTS | 在线朗读引擎表 |
-| 19 | caches | Cache | 缓存表 |
-| 20 | ruleSubs | RuleSub | 规则订阅表 |
-| 21 | dictRules | DictRule | 词典规则表 |
-| 22 | keyboardAssists | KeyboardAssist | 键盘辅助表 |
-| 23 | servers | Server | 服务器表 |
+| 9 | cookies | Cookie | Cookie表 |
+| 10 | rssSources | RssSource | RSS源表 |
+| 11 | bookmarks | Bookmark | 书签表 |
+| 12 | rssArticles | RssArticle | RSS文章表 |
+| 13 | rssReadRecords | RssReadRecord | RSS阅读记录表 |
+| 14 | rssStars | RssStar | RSS收藏表 |
+| 15 | txtTocRules | TxtTocRule | TXT目录规则表 |
+| 16 | readRecord | ReadRecord | 阅读记录表 |
+| 17 | httpTTS | HttpTTS | 在线朗读引擎表 |
+| 18 | caches | Cache | 缓存表 |
+| 19 | ruleSubs | RuleSub | 规则订阅表 |
+| 20 | dictRules | DictRule | 词典规则表 |
+| 21 | keyboardAssists | KeyboardAssist | 键盘辅助表 |
+| 22 | servers | Server | 服务器表 |
 
 ### 4.4 视图清单
 
@@ -773,7 +728,7 @@ erDiagram
 |------|------|--------|------|------|
 | bookUrl | String | "" | PK | 详情页URL（本地书源存储完整文件路径） |
 | tocUrl | String | "" | - | 目录页URL |
-| origin | String | BookType.localTag | - | 书源URL，本地书籍为"localTag" |
+| origin | String | "local" | - | 书源URL，本地书籍为"local" |
 | originName | String | "" | - | 书源名称或本地书籍文件名 |
 | name | String | "" | - | 书名 |
 | author | String | "" | - | 作者名称 |
@@ -959,7 +914,7 @@ erDiagram
 | isEnabled | Boolean | true | - | 是否启用 |
 | isRegex | Boolean | true | - | 是否正则表达式匹配 |
 | timeoutMillisecond | Long | 3000 | - | 正则匹配超时时间（毫秒） |
-| sortOrder | Int | Int.MIN_VALUE | - | 规则执行顺序（数据库列名"sortOrder"，Kotlin属性名"order"） |
+| sortOrder | Int | Int.MIN_VALUE | - | 规则执行顺序 |
 
 **索引**：`(id)`
 
@@ -1003,19 +958,7 @@ erDiagram
 
 **索引**：`(word)` UNIQUE
 
-#### 4.5.9 book_search_keywords（书籍搜索关键词表）
-
-**用途**：存储书籍搜索关键词历史及使用频次
-
-| 字段 | 类型 | 默认值 | 约束 | 说明 |
-|------|------|--------|------|------|
-| word | String | "" | PK, UNIQUE | 搜索关键词 |
-| usage | Int | 1 | - | 使用次数 |
-| lastUseTime | Long | System.currentTimeMillis() | - | 最后使用时间 |
-
-**索引**：`(word)` UNIQUE
-
-#### 4.5.10 cookies（Cookie表）
+#### 4.5.9 cookies（Cookie表）
 
 **用途**：存储网站Cookie
 
@@ -1026,7 +969,7 @@ erDiagram
 
 **索引**：`(url)` UNIQUE
 
-#### 4.5.11 rssSources（RSS源表）
+#### 4.5.10 rssSources（RSS源表）
 
 **用途**：存储RSS订阅源配置
 
@@ -1070,7 +1013,7 @@ erDiagram
 
 **索引**：`(sourceUrl)`
 
-#### 4.5.12 bookmarks（书签表）
+#### 4.5.11 bookmarks（书签表）
 
 **用途**：存储阅读书签
 
@@ -1087,7 +1030,7 @@ erDiagram
 
 **索引**：`(bookName, bookAuthor)`
 
-#### 4.5.13 rssArticles（RSS文章表）
+#### 4.5.12 rssArticles（RSS文章表）
 
 **用途**：存储RSS文章列表
 
@@ -1106,7 +1049,7 @@ erDiagram
 | read | Boolean | false | - | 是否已读 |
 | variable | String | null | - | 自定义变量（JSON格式） |
 
-#### 4.5.14 rssReadRecords（RSS阅读记录表）
+#### 4.5.13 rssReadRecords（RSS阅读记录表）
 
 **用途**：存储RSS文章阅读记录
 
@@ -1117,7 +1060,7 @@ erDiagram
 | readTime | Long | null | - | 阅读时间 |
 | read | Boolean | true | - | 是否已读 |
 
-#### 4.5.15 rssStars（RSS收藏表）
+#### 4.5.14 rssStars（RSS收藏表）
 
 **用途**：存储RSS文章收藏
 
@@ -1135,7 +1078,7 @@ erDiagram
 | group | String | "默认分组" | - | 分组 |
 | variable | String | null | - | 自定义变量（JSON格式） |
 
-#### 4.5.16 txtTocRules（TXT目录规则表）
+#### 4.5.15 txtTocRules（TXT目录规则表）
 
 **用途**：存储TXT书籍目录解析规则
 
@@ -1148,7 +1091,7 @@ erDiagram
 | serialNumber | Int | -1 | - | 序列号（执行顺序） |
 | enable | Boolean | true | - | 是否启用 |
 
-#### 4.5.17 readRecord（阅读记录表）
+#### 4.5.16 readRecord（阅读记录表）
 
 **用途**：存储阅读时长统计
 
@@ -1159,7 +1102,7 @@ erDiagram
 | readTime | Long | 0 | - | 阅读时长（毫秒） |
 | lastRead | Long | System.currentTimeMillis() | - | 最后阅读时间 |
 
-#### 4.5.18 httpTTS（在线朗读引擎表）
+#### 4.5.17 httpTTS（在线朗读引擎表）
 
 **用途**：存储在线TTS朗读引擎配置
 
@@ -1178,7 +1121,7 @@ erDiagram
 | loginCheckJs | String | null | - | 登录检测JS |
 | lastUpdateTime | Long | System.currentTimeMillis() | - | 最后更新时间 |
 
-#### 4.5.19 caches（缓存表）
+#### 4.5.18 caches（缓存表）
 
 **用途**：存储通用缓存数据
 
@@ -1190,7 +1133,7 @@ erDiagram
 
 **索引**：`(key)` UNIQUE
 
-#### 4.5.20 ruleSubs（规则订阅表）
+#### 4.5.19 ruleSubs（规则订阅表）
 
 **用途**：存储规则自动订阅配置
 
@@ -1204,7 +1147,7 @@ erDiagram
 | autoUpdate | Boolean | false | - | 是否自动更新 |
 | update | Long | System.currentTimeMillis() | - | 更新时间 |
 
-#### 4.5.21 dictRules（词典规则表）
+#### 4.5.20 dictRules（词典规则表）
 
 **用途**：存储词典查询规则
 
@@ -1216,7 +1159,7 @@ erDiagram
 | enabled | Boolean | true | - | 是否启用 |
 | sortNumber | Int | 0 | - | 排序编号 |
 
-#### 4.5.22 keyboardAssists（键盘辅助表）
+#### 4.5.21 keyboardAssists（键盘辅助表）
 
 **用途**：存储键盘快捷键配置
 
@@ -1227,7 +1170,7 @@ erDiagram
 | value | String | "" | - | 键值（执行动作） |
 | serialNo | Int | 0 | - | 序列号（显示顺序） |
 
-#### 4.5.23 servers（服务器表）
+#### 4.5.22 servers（服务器表）
 
 **用途**：存储外部服务器配置（如WebDAV）
 
@@ -1263,16 +1206,6 @@ erDiagram
 | **CacheBookService** | 书籍缓存服务，前台服务+通知栏，多线程并发下载 |
 | **CheckSourceService** | 书源校验服务，检测书源可用性 |
 | **DownloadService** | 通用下载服务，文件下载 |
-| **ExportBookService** | 书籍导出服务，支持导出书籍为文件 |
-| **WebTileService** | Web快捷方式服务，提供Tile快捷方式 |
-
-### 5.1 朗读服务
-
-| 服务 | 基类 | 说明 |
-|------|------|------|
-| **BaseReadAloudService** | - | 朗读服务基类，提供通用朗读逻辑 |
-| **HttpReadAloudService** | BaseReadAloudService | 在线朗读服务，使用HttpTTS引擎 |
-| **TTSReadAloudService** | BaseReadAloudService | 系统TTS朗读服务，使用Android系统TTS引擎 |
 
 ---
 
@@ -1295,10 +1228,8 @@ erDiagram
 - 插件化规则体系
 
 ### 6.4 数据安全
-- Room数据库自动迁移（v43→v79：支持AutoMigration，持续迭代新增表与字段）
-- 数据库迁移历史：v77→v78（tags列从TEXT转为INTEGER位掩码，新增book_tags表），v78→v79（新增book_search_keywords表）
-- 备份恢复机制（Backup, BackupAES, BackupConfig, Restore）
-- 数据导入（ImportOldData支持旧版本数据迁移）
+- Room数据库自动迁移（v77→v78：tags列从TEXT转为INTEGER位掩码，新增book_tags表）
+- 备份恢复机制
 - 离线缓存支持
 
 ---
@@ -1307,5 +1238,4 @@ erDiagram
 
 - 阅读3.0：重构架构，引入规则引擎，支持Web API
 - 3.26+：新增书籍评分功能（0-5分心形图标）、标签位掩码存储系统、标签管理页面、批量标签管理、名称重复检查、书架列表标签换行显示
-- v78→v79：数据库版本升级至79，新增book_search_keywords表，新增ExportBookService/WebTileService/HttpReadAloudService/TTSReadAloudService服务，完善API层（BookController/BookSourceController/ReplaceRuleController/RssSourceController/ReaderProvider/ShortCuts），新增帮助类模块（book/http/source/storage/coroutine/crypto/exoplayer/glide/rhino/update），新增本地书籍格式支持（PDF/UMD/MOBI），完善模块架构（新增about/association/searchContent/manage模块）
 - 持续迭代中，详见更新日志

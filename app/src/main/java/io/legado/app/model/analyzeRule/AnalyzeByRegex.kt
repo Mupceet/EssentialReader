@@ -3,9 +3,6 @@ package io.legado.app.model.analyzeRule
 import androidx.annotation.Keep
 import java.util.regex.Pattern
 
-/**
- * 正则表达式规则解析器，使用正则表达式对文本内容进行提取和匹配。
- */
 @Keep
 object AnalyzeByRegex {
 

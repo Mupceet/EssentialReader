@@ -17,9 +17,6 @@ import io.legado.app.utils.NetworkUtils
 import io.legado.app.utils.isContentScheme
 import kotlinx.coroutines.runBlocking
 
-/**
- * WebDAV远程书籍管理器，负责通过WebDAV协议连接远程存储，获取书籍列表和文件操作。
- */
 class RemoteBookWebDav(
     val rootBookUrl: String,
     val authorization: Authorization,

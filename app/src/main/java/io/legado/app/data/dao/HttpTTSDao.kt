@@ -4,14 +4,9 @@ import androidx.room.*
 import io.legado.app.data.entities.HttpTTS
 import kotlinx.coroutines.flow.Flow
 
-/**
- * HTTP TTS朗读引擎数据访问对象，管理自定义TTS引擎的增删改查。
- * 支持按名称排序和默认引擎的清理。
- */
 @Dao
 interface HttpTTSDao {
 
-    /** 获取所有TTS引擎，按名称排序 */
     @get:Query("select * from httpTTS order by name")
     val all: List<HttpTTS>
 

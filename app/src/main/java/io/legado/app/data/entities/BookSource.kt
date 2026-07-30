@@ -21,9 +21,6 @@ import io.legado.app.utils.fromJsonObject
 import io.legado.app.utils.splitNotBlank
 import kotlinx.parcelize.Parcelize
 
-/**
- * 书源实体，定义网络书源的URL、搜索规则、发现规则、正文规则等配置
- */
 @Suppress("unused")
 @Parcelize
 @TypeConverters(BookSource.Converters::class)

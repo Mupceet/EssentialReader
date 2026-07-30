@@ -20,9 +20,6 @@ import java.io.File
 import java.io.FileOutputStream
 import java.io.InputStream
 
-/**
- * MOBI文件解析器，负责解析MOBI/KF6/KF8格式书籍的目录结构和章节内容。
- */
 class MobiFile(var book: Book) {
 
     companion object : BaseLocalBookParse {

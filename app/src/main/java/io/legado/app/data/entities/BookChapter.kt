@@ -26,9 +26,6 @@ import kotlinx.parcelize.IgnoredOnParcel
 import kotlinx.parcelize.Parcelize
 import splitties.init.appCtx
 
-/**
- * 书籍章节实体，存储每章的URL、标题、序号、VIP状态、起止位置等信息
- */
 @Parcelize
 @Entity(
     tableName = "chapters",

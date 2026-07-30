@@ -57,10 +57,6 @@ import kotlin.math.max
 import kotlin.math.min
 
 
-/**
- * 阅读核心控制器，管理书籍阅读的全生命周期。
- * 负责章节加载、页面布局、进度保存、翻页控制、内容替换净化等核心阅读功能。
- */
 @Suppress("MemberVisibilityCanBePrivate")
 object ReadBook : CoroutineScope by MainScope() {
     var book: Book? = null
@@ -574,7 +570,7 @@ object ReadBook : CoroutineScope by MainScope() {
         success: (() -> Unit)? = null
     ) {
         Coroutine.async {
-            val book = book!!
+            val book = ReadBook.book ?: return@async
             val chapter = appDb.bookChapterDao.getChapter(book.bookUrl, index) ?: return@async
             if (addLoading(index)) {
                 BookHelp.getContent(book, chapter)?.let {
@@ -605,8 +601,8 @@ object ReadBook : CoroutineScope by MainScope() {
     ) = withContext(IO) {
         if (addLoading(index)) {
             try {
-                val book = book!!
-                val chapter = appDb.bookChapterDao.getChapter(book.bookUrl, index)!!
+                val book = ReadBook.book ?: return@withContext
+                val chapter = appDb.bookChapterDao.getChapter(book.bookUrl, index) ?: return@withContext
                 val content = BookHelp.getContent(book, chapter) ?: downloadAwait(chapter)
                 contentLoadFinishAwait(book, chapter, content, upContent, resetPageOffset)
                 success?.invoke()
@@ -666,7 +662,7 @@ object ReadBook : CoroutineScope by MainScope() {
     }
 
     private suspend fun downloadAwait(chapter: BookChapter): String {
-        val book = book!!
+        val book = ReadBook.book ?: return "加载正文失败\n书籍未设置"
         val bookSource = bookSource
         if (bookSource != null) {
             return CacheBook.getOrCreate(bookSource, book).downloadAwait(chapter)
@@ -882,8 +878,10 @@ object ReadBook : CoroutineScope by MainScope() {
                     appDb.bookDao.replace(oldBook, book)
                     BookHelp.updateCacheFolder(oldBook, book)
                 }
-                appDb.bookChapterDao.delByBook(oldBook.bookUrl)
-                appDb.bookChapterDao.insert(*cList.toTypedArray())
+                appDb.runInTransaction {
+                    appDb.bookChapterDao.delByBook(oldBook.bookUrl)
+                    appDb.bookChapterDao.insert(*cList.toTypedArray())
+                }
                 onChapterListUpdated(book, false)
                 nextTextChapter ?: loadContent(durChapterIndex + 1)
             }
