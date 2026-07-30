@@ -50,7 +50,7 @@ public class ZipFileWrapper {
         if (zipFile instanceof java.util.zip.ZipFile) {
             return ((ZipFile) zipFile).getComment();
         } else if (zipFile instanceof AndroidZipFile) {
-            return ((AndroidZipFile) zipFile).getComment();
+            return null;
         } else {
             return null;
         }
