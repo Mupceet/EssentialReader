@@ -58,6 +58,9 @@ public class AndroidZipFile implements ZipConstants {
     // The entries of this zip file when initialized and not yet closed.
     private HashMap<String, AndroidZipEntry> entries;
 
+    // The global comment of this zip file.
+    private String comment;
+
     private boolean closed = false;
 
     /**
@@ -214,6 +217,14 @@ public class AndroidZipFile implements ZipConstants {
         if (PfdHelper.skipBytes(pfd, ENDOFF - ENDSIZ) != ENDOFF - ENDSIZ)
             throw new EOFException(name);
         int centralOffset = readLeInt(pfd, ebs);
+
+        // Read global comment from End of Central Directory
+        int commentLen = readLeShort(pfd, ebs);
+        if (commentLen > 0) {
+            byte[] commentBuf = new byte[commentLen];
+            PfdHelper.readFully(pfd, commentBuf);
+            comment = new String(commentBuf, 0, commentLen);
+        }
 
         entries = new HashMap<>(count + count / 2);
         //raf.seek(centralOffset);
@@ -405,6 +416,13 @@ public class AndroidZipFile implements ZipConstants {
      */
     public String getName() {
         return name;
+    }
+
+    /**
+     * Returns the global comment of this zip file, or null if not present.
+     */
+    public String getComment() {
+        return comment;
     }
 
     /**
