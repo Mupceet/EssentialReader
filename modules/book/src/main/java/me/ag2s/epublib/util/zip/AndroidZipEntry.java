@@ -140,7 +140,6 @@ public class AndroidZipEntry implements ZipConstants, Cloneable {
                     | (cal.get(Calendar.MINUTE)) << 5
                     | (cal.get(Calendar.SECOND)) >> 1;
         }
-        dostime = (int) (dostime / 1000L);
         this.known |= KNOWN_TIME;
     }
 
