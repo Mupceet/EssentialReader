@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TXT目录规则管理</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f5f5f5; color: #333; }
+        .container { max-width: 800px; margin: 0 auto; padding: 20px; }
+        h1 { font-size: 24px; margin-bottom: 20px; color: #1a1a1a; }
+        .toolbar { display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; }
+        .btn { padding: 10px 20px; border: none; border-radius: 6px; cursor: pointer; font-size: 14px; transition: opacity 0.2s; }
+        .btn:hover { opacity: 0.85; }
+        .btn-primary { background: #4a90d9; color: #fff; }
+        .btn-success { background: #27ae60; color: #fff; }
+        .btn-danger { background: #e74c3c; color: #fff; }
+        .btn-secondary { background: #95a5a6; color: #fff; }
+        .btn-sm { padding: 6px 12px; font-size: 12px; }
+        table { width: 100%; border-collapse: collapse; background: #fff; border-radius: 8px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+        th, td { padding: 12px 16px; text-align: left; border-bottom: 1px solid #eee; }
+        th { background: #fafafa; font-weight: 600; font-size: 13px; color: #666; }
+        td { font-size: 14px; }
+        tr:hover { background: #f8f9fa; }
+        .actions { display: flex; gap: 6px; }
+        .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 100; justify-content: center; align-items: center; }
+        .modal-overlay.active { display: flex; }
+        .modal { background: #fff; border-radius: 12px; padding: 24px; width: 90%; max-width: 500px; box-shadow: 0 8px 30px rgba(0,0,0,0.15); }
+        .modal h2 { font-size: 20px; margin-bottom: 20px; }
+        .form-group { margin-bottom: 16px; }
+        .form-group label { display: block; font-size: 13px; color: #666; margin-bottom: 6px; font-weight: 500; }
+        .form-group input, .form-group textarea { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px; outline: none; transition: border-color 0.2s; }
+        .form-group input:focus, .form-group textarea:focus { border-color: #4a90d9; }
+        .form-group textarea { resize: vertical; min-height: 80px; font-family: monospace; }
+        .form-group .checkbox-wrap { display: flex; align-items: center; gap: 8px; }
+        .form-group .checkbox-wrap input[type="checkbox"] { width: auto; }
+        .modal-footer { display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px; }
+        .badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 500; }
+        .badge-enabled { background: #e8f5e9; color: #27ae60; }
+        .badge-disabled { background: #fce4ec; color: #e74c3c; }
+        .empty { text-align: center; padding: 40px; color: #999; }
+        .loading { text-align: center; padding: 40px; color: #999; }
+        .toast { position: fixed; top: 20px; right: 20px; padding: 12px 20px; border-radius: 8px; color: #fff; font-size: 14px; z-index: 200; display: none; }
+        .toast.success { background: #27ae60; }
+        .toast.error { background: #e74c3c; }
+        .toast.show { display: block; animation: fadeIn 0.3s; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>TXT目录规则管理</h1>
+        <div class="toolbar">
+            <button class="btn btn-primary" onclick="showAddModal()">+ 新增规则</button>
+            <button class="btn btn-secondary" onclick="loadRules()">刷新列表</button>
+        </div>
+
+        <table id="ruleTable">
+            <thead>
+                <tr>
+                    <th>名称</th>
+                    <th>规则</th>
+                    <th>示例</th>
+                    <th>序号</th>
+                    <th>状态</th>
+                    <th>操作</th>
+                </tr>
+            </thead>
+            <tbody id="ruleBody">
+                <tr><td colspan="6" class="loading">加载中...</td></tr>
+            </tbody>
+        </table>
+    </div>
+
+    <!-- 添加/编辑弹窗 -->
+    <div class="modal-overlay" id="modalOverlay">
+        <div class="modal">
+            <h2 id="modalTitle">新增规则</h2>
+            <input type="hidden" id="ruleId">
+            <div class="form-group">
+                <label>规则名称 *</label>
+                <input type="text" id="ruleName" placeholder="例如：默认章节规则">
+            </div>
+            <div class="form-group">
+                <label>目录规则（正则表达式） *</label>
+                <textarea id="ruleRegex" placeholder="例如：^\\s*第.{1,8}[章节卷集部篇回].*$"></textarea>
+            </div>
+            <div class="form-group">
+                <label>匹配示例</label>
+                <input type="text" id="ruleExample" placeholder="例如：第一章 楔子">
+            </div>
+            <div class="form-group">
+                <label>排序序号</label>
+                <input type="number" id="ruleSerialNumber" placeholder="自动分配">
+            </div>
+            <div class="form-group">
+                <div class="checkbox-wrap">
+                    <input type="checkbox" id="ruleEnable" checked>
+                    <label for="ruleEnable" style="margin-bottom:0">启用</label>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeModal()">取消</button>
+                <button class="btn btn-success" onclick="saveRule()">保存</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="toast" id="toast"></div>
+
+    <script>
+        function showToast(msg, type) {
+            var t = document.getElementById('toast');
+            t.textContent = msg;
+            t.className = 'toast ' + type + ' show';
+            setTimeout(function() { t.className = 'toast'; }, 2500);
+        }
+
+        function loadRules() {
+            document.getElementById('ruleBody').innerHTML = '<tr><td colspan="6" class="loading">加载中...</td></tr>';
+            fetch('/getTxtTocRules')
+                .then(function(r) { return r.json(); })
+                .then(function(data) {
+                    if (!data.isSuccess) {
+                        document.getElementById('ruleBody').innerHTML = '<tr><td colspan="6" class="empty">暂无规则</td></tr>';
+                        return;
+                    }
+                    var rules = JSON.parse(data.data);
+                    if (!rules || rules.length === 0) {
+                        document.getElementById('ruleBody').innerHTML = '<tr><td colspan="6" class="empty">暂无规则，点击"新增规则"添加</td></tr>';
+                        return;
+                    }
+                    var html = '';
+                    rules.forEach(function(rule) {
+                        var badge = rule.enable
+                            ? '<span class="badge badge-enabled">启用</span>'
+                            : '<span class="badge badge-disabled">禁用</span>';
+                        html += '<tr>'
+                            + '<td>' + escapeHtml(rule.name) + '</td>'
+                            + '<td><code>' + escapeHtml(rule.rule) + '</code></td>'
+                            + '<td>' + (rule.example ? escapeHtml(rule.example) : '-') + '</td>'
+                            + '<td>' + rule.serialNumber + '</td>'
+                            + '<td>' + badge + '</td>'
+                            + '<td class="actions">'
+                            + '<button class="btn btn-primary btn-sm" onclick="editRule(' + rule.id + ')">编辑</button>'
+                            + '<button class="btn btn-danger btn-sm" onclick="deleteRule(' + rule.id + ')">删除</button>'
+                            + '</td>'
+                            + '</tr>';
+                    });
+                    document.getElementById('ruleBody').innerHTML = html;
+                })
+                .catch(function(err) {
+                    document.getElementById('ruleBody').innerHTML = '<tr><td colspan="6" class="empty">加载失败: ' + err + '</td></tr>';
+                });
+        }
+
+        function showAddModal() {
+            document.getElementById('modalTitle').textContent = '新增规则';
+            document.getElementById('ruleId').value = '';
+            document.getElementById('ruleName').value = '';
+            document.getElementById('ruleRegex').value = '';
+            document.getElementById('ruleExample').value = '';
+            document.getElementById('ruleSerialNumber').value = '';
+            document.getElementById('ruleEnable').checked = true;
+            document.getElementById('modalOverlay').classList.add('active');
+        }
+
+        function editRule(id) {
+            fetch('/getTxtTocRules')
+                .then(function(r) { return r.json(); })
+                .then(function(data) {
+                    var rules = JSON.parse(data.data);
+                    var rule = rules.find(function(r) { return r.id == id; });
+                    if (!rule) { showToast('未找到规则', 'error'); return; }
+                    document.getElementById('modalTitle').textContent = '编辑规则';
+                    document.getElementById('ruleId').value = rule.id;
+                    document.getElementById('ruleName').value = rule.name;
+                    document.getElementById('ruleRegex').value = rule.rule;
+                    document.getElementById('ruleExample').value = rule.example || '';
+                    document.getElementById('ruleSerialNumber').value = rule.serialNumber >= 0 ? rule.serialNumber : '';
+                    document.getElementById('ruleEnable').checked = rule.enable;
+                    document.getElementById('modalOverlay').classList.add('active');
+                });
+        }
+
+        function closeModal() {
+            document.getElementById('modalOverlay').classList.remove('active');
+        }
+
+        function saveRule() {
+            var name = document.getElementById('ruleName').value.trim();
+            var ruleRegex = document.getElementById('ruleRegex').value.trim();
+            var example = document.getElementById('ruleExample').value.trim();
+            var serialNumber = parseInt(document.getElementById('ruleSerialNumber').value) || -1;
+            var enable = document.getElementById('ruleEnable').checked;
+            var id = document.getElementById('ruleId').value;
+
+            if (!name) { showToast('请输入规则名称', 'error'); return; }
+            if (!ruleRegex) { showToast('请输入目录规则', 'error'); return; }
+
+            var ruleData = {
+                id: id ? parseInt(id) : Date.now(),
+                name: name,
+                rule: ruleRegex,
+                example: example || null,
+                serialNumber: serialNumber,
+                enable: enable
+            };
+
+            var formData = new FormData();
+            formData.append('postData', JSON.stringify(ruleData));
+
+            fetch('/saveTxtTocRule', { method: 'POST', body: formData })
+                .then(function(r) { return r.json(); })
+                .then(function(data) {
+                    if (data.isSuccess) {
+                        showToast('保存成功', 'success');
+                        closeModal();
+                        loadRules();
+                    } else {
+                        showToast('保存失败: ' + data.errorMsg, 'error');
+                    }
+                })
+                .catch(function(err) {
+                    showToast('请求失败: ' + err, 'error');
+                });
+        }
+
+        function deleteRule(id) {
+            if (!confirm('确定要删除这条规则吗？')) return;
+            var formData = new FormData();
+            formData.append('postData', JSON.stringify({ id: id }));
+
+            fetch('/deleteTxtTocRule', { method: 'POST', body: formData })
+                .then(function(r) { return r.json(); })
+                .then(function(data) {
+                    if (data.isSuccess) {
+                        showToast('删除成功', 'success');
+                        loadRules();
+                    } else {
+                        showToast('删除失败: ' + data.errorMsg, 'error');
+                    }
+                })
+                .catch(function(err) {
+                    showToast('请求失败: ' + err, 'error');
+                });
+        }
+
+        function escapeHtml(str) {
+            if (!str) return '';
+            return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+        }
+
+        // 点击遮罩关闭
+        document.getElementById('modalOverlay').addEventListener('click', function(e) {
+            if (e.target === this) closeModal();
+        });
+
+        // 初始加载
+        loadRules();
+    </script>
+</body>
+</html>

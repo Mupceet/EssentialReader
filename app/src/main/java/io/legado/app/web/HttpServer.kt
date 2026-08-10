@@ -7,6 +7,7 @@ import io.legado.app.api.controller.BookController
 import io.legado.app.api.controller.BookSourceController
 import io.legado.app.api.controller.ReplaceRuleController
 import io.legado.app.api.controller.RssSourceController
+import io.legado.app.api.controller.TxtTocRuleController
 import io.legado.app.help.coroutine.Coroutine
 import io.legado.app.service.WebService
 import io.legado.app.utils.GSON
@@ -68,6 +69,8 @@ class HttpServer(port: Int) : NanoHTTPD(port) {
                             "/saveReplaceRule" -> ReplaceRuleController.saveRule(postData)
                             "/deleteReplaceRule" -> ReplaceRuleController.delete(postData)
                             "/testReplaceRule" -> ReplaceRuleController.testRule(postData)
+                            "/saveTxtTocRule" -> TxtTocRuleController.saveRule(postData)
+                            "/deleteTxtTocRule" -> TxtTocRuleController.delete(postData)
                             else -> null
                         }
                     }
@@ -89,6 +92,7 @@ class HttpServer(port: Int) : NanoHTTPD(port) {
                         "/getRssSource" -> RssSourceController.getSource(parameters)
                         "/getRssSources" -> RssSourceController.sources
                         "/getReplaceRules" -> ReplaceRuleController.allRules
+                        "/getTxtTocRules" -> TxtTocRuleController.allRules
                         else -> null
                     }
                 }
