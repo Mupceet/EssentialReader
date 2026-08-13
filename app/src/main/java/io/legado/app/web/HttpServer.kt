@@ -51,7 +51,7 @@ class HttpServer(port: Int) : NanoHTTPD(port) {
                 Method.POST -> {
                     val files = HashMap<String, String>()
                     session.parseBody(files)
-                    val postData = files["postData"]
+                    val postData = files["postData"] ?: session.parms["postData"]
 
                     returnData = runBlocking {
                         when (uri) {

@@ -38,6 +38,7 @@ object TxtTocRuleController {
                     rule.serialNumber = appDb.txtTocRuleDao.maxOrder + 1
                 }
                 appDb.txtTocRuleDao.insert(rule)
+                returnData.setData("")
             }
         }
         return returnData
@@ -52,6 +53,7 @@ object TxtTocRuleController {
             returnData.setErrorMsg("格式不对")
         } else {
             appDb.txtTocRuleDao.delete(rule)
+            returnData.setData("")
         }
         return returnData
     }
