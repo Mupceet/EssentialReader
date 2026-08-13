@@ -34,9 +34,6 @@ object TxtTocRuleController {
             } else if (rule.rule.isBlank()) {
                 returnData.setErrorMsg("目录规则不能为空")
             } else {
-                if (rule.serialNumber < 0) {
-                    rule.serialNumber = appDb.txtTocRuleDao.maxOrder + 1
-                }
                 appDb.txtTocRuleDao.insert(rule)
                 returnData.setData("")
             }
