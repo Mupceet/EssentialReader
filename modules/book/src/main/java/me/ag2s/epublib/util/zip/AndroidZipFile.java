@@ -219,11 +219,11 @@ public class AndroidZipFile implements ZipConstants {
         int centralOffset = readLeInt(pfd, ebs);
 
         // Read global comment from End of Central Directory
-        int commentLen = readLeShort(pfd, ebs);
-        if (commentLen > 0) {
-            byte[] commentBuf = new byte[commentLen];
+        int globalCommentLen = readLeShort(pfd, ebs);
+        if (globalCommentLen > 0) {
+            byte[] commentBuf = new byte[globalCommentLen];
             PfdHelper.readFully(pfd, commentBuf);
-            comment = new String(commentBuf, 0, commentLen);
+            comment = new String(commentBuf, 0, globalCommentLen);
         }
 
         entries = new HashMap<>(count + count / 2);
