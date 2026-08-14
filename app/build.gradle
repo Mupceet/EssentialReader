@@ -34,6 +34,16 @@ android {
     }
 
     signingConfigs {
+        debug {
+            storeFile file('./debug.keystore')
+            storePassword 'android'
+            keyAlias 'androiddebugkey'
+            keyPassword 'android'
+            enableV1Signing = true
+            enableV2Signing = true
+            enableV3Signing = true
+            enableV4Signing = true
+        }
         if (project.hasProperty("RELEASE_STORE_FILE")) {
             myConfig {
                 storeFile file(RELEASE_STORE_FILE)
@@ -90,9 +100,7 @@ android {
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro', 'cronet-proguard-rules.pro'
         }
         debug {
-            if (project.hasProperty("RELEASE_STORE_FILE")) {
-                signingConfig signingConfigs.myConfig
-            }
+            signingConfig signingConfigs.debug
             manifestPlaceholders.put("app_name", "@string/app_name")
 
             applicationIdSuffix '.debug'
