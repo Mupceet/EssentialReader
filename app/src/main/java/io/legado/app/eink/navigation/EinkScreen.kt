@@ -8,7 +8,8 @@ package io.legado.app.eink.navigation
  */
 sealed interface EinkScreen {
 
-    data object Bookshelf : EinkScreen
+    /** 首页（书架/我的 双 Tab，顶部搜索框 + 底部通用操作栏） */
+    data object Home : EinkScreen
 
     data object Search : EinkScreen
 

@@ -28,6 +28,16 @@ internal interface EInkPalette {
     val outline: Color
     val error: Color
     val onError: Color
+
+    /**
+     * Content color for disabled controls ("gray out").
+     *
+     * A dedicated mid-gray role: in the high-contrast palettes
+     * [onSurfaceVariant] is pure black/white, which cannot express
+     * "disabled" — disabled state must read as a real gray level,
+     * never as alpha blending (ghosting on E-Ink).
+     */
+    val disabledContent: Color
 }
 
 /**
@@ -85,6 +95,7 @@ object EInkColors {
         override val outline = PureBlack
         override val error = PureBlack
         override val onError = PureWhite
+        override val disabledContent = Gray09
     }
 
     /**
@@ -109,6 +120,7 @@ object EInkColors {
         override val outline = Gray03 // Dark gray for borders
         override val error = PureBlack
         override val onError = PureWhite
+        override val disabledContent = Gray09
     }
 
     /**
@@ -132,6 +144,7 @@ object EInkColors {
         override val outline = PureWhite
         override val error = PureWhite
         override val onError = PureBlack
+        override val disabledContent = Gray10
     }
 
     /**
@@ -155,5 +168,6 @@ object EInkColors {
         override val outline = Gray12 // Light gray for borders
         override val error = PureWhite
         override val onError = PureBlack
+        override val disabledContent = Gray10
     }
 }

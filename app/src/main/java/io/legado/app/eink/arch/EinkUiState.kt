@@ -49,7 +49,7 @@ import androidx.compose.runtime.Immutable
  * 示例:
  * ```
  * @Composable
- * fun BookshelfRoute(viewModel: BookshelfViewModel = viewModel()) {
+ * fun HomeRoute(viewModel: BookshelfViewModel = viewModel()) {
  *     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
  *     BookshelfScreen(
  *         state = uiState,

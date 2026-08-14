@@ -47,6 +47,9 @@ data class EInkColorScheme(
     val outline: Color,
     val error: Color,
     val onError: Color,
+
+    /** Content color for disabled controls — a real gray level, never alpha. */
+    val disabledContent: Color,
 )
 
 /**
@@ -119,6 +122,7 @@ private fun EInkPalette.toColorScheme(): EInkColorScheme = EInkColorScheme(
     outline = outline,
     error = error,
     onError = onError,
+    disabledContent = disabledContent,
 )
 
 /**

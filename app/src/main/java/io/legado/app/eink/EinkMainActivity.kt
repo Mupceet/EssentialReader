@@ -3,7 +3,9 @@ package io.legado.app.eink
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.material3.Surface
 import androidx.compose.ui.Modifier
 import io.legado.app.eink.theme.EInkTheme
@@ -15,8 +17,8 @@ import io.legado.app.eink.theme.EInkTheme
  * 所有 E-Ink 屏幕通过 Compose 状态路由（[EinkApp]）管理，
  * 避免多个 Activity 之间的传统 Android 页面转场。
  *
- * 注意: 此 Activity 暂未注册到 AndroidManifest.xml，
- * 将在 Phase 2 完成书架+阅读闭环后正式启用。
+ * 根布局以 [safeDrawingPadding] 避让系统栏（状态栏/导航栏/挖孔），
+ * 保证顶部搜索框与底部操作栏不被系统栏遮挡或抢占触摸。
  */
 class EinkMainActivity : ComponentActivity() {
 
@@ -24,7 +26,11 @@ class EinkMainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         setContent {
             EInkTheme {
-                Surface(modifier = Modifier.fillMaxSize()) {
+                Surface(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .safeDrawingPadding()
+                ) {
                     EinkApp()
                 }
             }

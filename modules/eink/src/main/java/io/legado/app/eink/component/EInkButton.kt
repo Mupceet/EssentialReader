@@ -171,7 +171,7 @@ object EInkButtonDefaults {
             containerColor = colors.primary,
             contentColor = colors.onPrimary,
             disabledContainerColor = colors.surfaceVariant,
-            disabledContentColor = colors.onSurfaceVariant
+            disabledContentColor = colors.disabledContent
         )
     }
 
@@ -182,7 +182,7 @@ object EInkButtonDefaults {
             containerColor = Color.Transparent,
             contentColor = colors.primary,
             disabledContainerColor = Color.Transparent,
-            disabledContentColor = colors.onSurfaceVariant
+            disabledContentColor = colors.disabledContent
         )
     }
 
@@ -193,7 +193,7 @@ object EInkButtonDefaults {
             containerColor = Color.Transparent,
             contentColor = colors.primary,
             disabledContainerColor = Color.Transparent,
-            disabledContentColor = colors.onSurfaceVariant
+            disabledContentColor = colors.disabledContent
         )
     }
 

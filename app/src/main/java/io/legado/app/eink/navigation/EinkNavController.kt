@@ -47,7 +47,7 @@ class EinkNavController internal constructor(
          * 创建并记住一个 [EinkNavController]。
          */
         @Composable
-        fun remember(initial: EinkScreen = EinkScreen.Bookshelf): EinkNavController =
+        fun remember(initial: EinkScreen = EinkScreen.Home): EinkNavController =
             remember(initial) { EinkNavController(initial) }
     }
 }
