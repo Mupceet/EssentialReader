@@ -11,7 +11,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import io.legado.app.eink.theme.eInkColorScheme
+import io.legado.app.eink.theme.EInkTheme
 
 /**
  * A horizontal divider drawn as a flat filled box — no shadow, no gradient.
@@ -27,7 +27,7 @@ import io.legado.app.eink.theme.eInkColorScheme
 fun EInkHorizontalDivider(
     modifier: Modifier = Modifier,
     thickness: Dp = DefaultDividerThickness,
-    color: Color = eInkColorScheme().outline
+    color: Color = EInkTheme.colorScheme.outline
 ) {
     Box(
         modifier = modifier
@@ -48,7 +48,7 @@ fun EInkHorizontalDivider(
 fun EInkVerticalDivider(
     modifier: Modifier = Modifier,
     thickness: Dp = DefaultDividerThickness,
-    color: Color = eInkColorScheme().outline
+    color: Color = EInkTheme.colorScheme.outline
 ) {
     Box(
         modifier = modifier

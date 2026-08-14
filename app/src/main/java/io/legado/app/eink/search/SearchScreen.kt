@@ -27,8 +27,7 @@ import io.legado.app.eink.component.EInkHorizontalDivider
 import io.legado.app.eink.component.EInkText
 import io.legado.app.eink.component.EInkTopBar
 import io.legado.app.eink.theme.EInkSpacing
-import io.legado.app.eink.theme.eInkColorScheme
-import io.legado.app.eink.theme.eInkTypography
+import io.legado.app.eink.theme.EInkTheme
 
 /**
  * 搜索 Route。
@@ -108,7 +107,7 @@ private fun SearchInputBar(
             value = searchKey,
             onValueChange = onKeyChange,
             singleLine = true,
-            textStyle = TextStyle(fontSize = 16.sp, color = eInkColorScheme().onSurface),
+            textStyle = TextStyle(fontSize = 16.sp, color = EInkTheme.colorScheme.onSurface),
             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
             keyboardActions = KeyboardActions(onSearch = { onSearch(searchKey) }),
             modifier = Modifier.weight(1f),
@@ -121,7 +120,7 @@ private fun SearchInputBar(
                         EInkText(
                             text = "书名 / 作者",
                             fontSize = 16.sp,
-                            color = eInkColorScheme().outline
+                            color = EInkTheme.colorScheme.outline
                         )
                     }
                     innerTextField()
@@ -133,7 +132,7 @@ private fun SearchInputBar(
             modifier = Modifier
                 .clickable { onSearch(searchKey) }
                 .padding(start = EInkSpacing.m),
-            style = eInkTypography().labelLarge
+            style = EInkTheme.typography.labelLarge
         )
     }
 }
@@ -158,15 +157,15 @@ private fun ResultItem(book: SearchBook, inShelf: Boolean) {
             EInkText(
                 text = book.name,
                 modifier = Modifier.weight(1f),
-                style = eInkTypography().bodyMedium,
+                style = EInkTheme.typography.bodyMedium,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
             if (inShelf) {
                 EInkText(
                     text = "已在书架",
-                    style = eInkTypography().labelMedium,
-                    color = eInkColorScheme().onSurfaceVariant,
+                    style = EInkTheme.typography.labelMedium,
+                    color = EInkTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(start = EInkSpacing.s)
                 )
             }
@@ -179,16 +178,16 @@ private fun ResultItem(book: SearchBook, inShelf: Boolean) {
                     append(it)
                 }
             },
-            style = eInkTypography().bodySmall,
-            color = eInkColorScheme().onSurfaceVariant,
+            style = EInkTheme.typography.bodySmall,
+            color = EInkTheme.colorScheme.onSurfaceVariant,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis
         )
         book.latestChapterTitle?.takeIf { it.isNotBlank() }?.let {
             EInkText(
                 text = it,
-                style = eInkTypography().bodySmall,
-                color = eInkColorScheme().onSurfaceVariant,
+                style = EInkTheme.typography.bodySmall,
+                color = EInkTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
@@ -214,13 +213,13 @@ private fun HistoryList(
             ) {
                 EInkText(
                     text = "搜索历史",
-                    style = eInkTypography().labelLarge,
+                    style = EInkTheme.typography.labelLarge,
                     modifier = Modifier.weight(1f)
                 )
                 EInkText(
                     text = "清空",
-                    style = eInkTypography().labelMedium,
-                    color = eInkColorScheme().onSurfaceVariant,
+                    style = EInkTheme.typography.labelMedium,
+                    color = EInkTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.clickable(onClick = onClearHistory)
                 )
             }
@@ -228,7 +227,7 @@ private fun HistoryList(
         items(history, key = { it.word }) { keyword ->
             EInkText(
                 text = keyword.word,
-                style = eInkTypography().bodyMedium,
+                style = EInkTheme.typography.bodyMedium,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier
@@ -244,6 +243,6 @@ private fun HistoryList(
 @Composable
 private fun CenterMessage(message: String) {
     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        EInkText(text = message, style = eInkTypography().bodyLarge)
+        EInkText(text = message, style = EInkTheme.typography.bodyLarge)
     }
 }

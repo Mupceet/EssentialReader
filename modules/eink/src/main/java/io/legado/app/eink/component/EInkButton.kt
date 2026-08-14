@@ -21,7 +21,7 @@ import androidx.compose.ui.unit.dp
 import io.legado.app.eink.modifier.staticClickable
 import io.legado.app.eink.theme.EInkShapes
 import io.legado.app.eink.theme.EInkSpacing
-import io.legado.app.eink.theme.eInkColorScheme
+import io.legado.app.eink.theme.EInkTheme
 
 /**
  * E-Ink optimized button component with zero elevation and high contrast styling.
@@ -166,7 +166,7 @@ object EInkButtonDefaults {
 
     @Composable
     fun primaryColors(): EInkButtonColors {
-        val colors = eInkColorScheme()
+        val colors = EInkTheme.colorScheme
         return EInkButtonColors(
             containerColor = colors.primary,
             contentColor = colors.onPrimary,
@@ -177,7 +177,7 @@ object EInkButtonDefaults {
 
     @Composable
     fun outlinedColors(): EInkButtonColors {
-        val colors = eInkColorScheme()
+        val colors = EInkTheme.colorScheme
         return EInkButtonColors(
             containerColor = Color.Transparent,
             contentColor = colors.primary,
@@ -188,7 +188,7 @@ object EInkButtonDefaults {
 
     @Composable
     fun textColors(): EInkButtonColors {
-        val colors = eInkColorScheme()
+        val colors = EInkTheme.colorScheme
         return EInkButtonColors(
             containerColor = Color.Transparent,
             contentColor = colors.primary,
@@ -210,7 +210,7 @@ object EInkButtonDefaults {
     @Composable
     fun outlinedBorder() = BorderStroke(
         width = ThinBorder,
-        color = eInkColorScheme().outline
+        color = EInkTheme.colorScheme.outline
     )
 }
 

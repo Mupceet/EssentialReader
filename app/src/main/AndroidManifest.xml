@@ -43,7 +43,7 @@
         </activity>
         <!-- E-Ink 版本入口 -->
         <activity
-            android:name=".eink.EinkMainActivity"
+            android:name=".eink.EInkMainActivity"
             android:exported="true"
             android:label="阅读(E-Ink)">
             <intent-filter>

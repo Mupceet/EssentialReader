@@ -10,8 +10,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import io.legado.app.eink.theme.EInkSpacing
-import io.legado.app.eink.theme.eInkColorScheme
-import io.legado.app.eink.theme.eInkTypography
+import io.legado.app.eink.theme.EInkTheme
 
 /**
  * Static loading indicator for E-Ink displays.
@@ -29,7 +28,7 @@ import io.legado.app.eink.theme.eInkTypography
 fun EInkLoading(
     text: String = "加载中...",
     modifier: Modifier = Modifier,
-    color: Color = eInkColorScheme().onSurfaceVariant
+    color: Color = EInkTheme.colorScheme.onSurfaceVariant
 ) {
     Column(
         modifier = modifier,
@@ -38,7 +37,7 @@ fun EInkLoading(
     ) {
         EInkText(
             text = text,
-            style = eInkTypography().titleMedium,
+            style = EInkTheme.typography.titleMedium,
             color = color
         )
     }

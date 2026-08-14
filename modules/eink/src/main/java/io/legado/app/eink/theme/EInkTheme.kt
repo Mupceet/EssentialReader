@@ -4,6 +4,7 @@ import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.staticCompositionLocalOf
@@ -126,17 +127,46 @@ private fun EInkPalette.toColorScheme(): EInkColorScheme = EInkColorScheme(
 )
 
 /**
+ * E-Ink theme accessor object (mirrors `MaterialTheme.colorScheme` usage).
+ *
+ * Read the active scheme / typography / content color via
+ * [colorScheme], [typography] and [contentColor]; the theme itself is applied
+ * by the [EInkTheme] composable function.
+ */
+object EInkTheme {
+
+    /** The active [EInkColorScheme]. */
+    val colorScheme: EInkColorScheme
+        @Composable
+        @ReadOnlyComposable
+        get() = LocalEInkColorScheme.current
+
+    /** The active [EInkTypographySystem]. */
+    val typography: EInkTypographySystem
+        @Composable
+        @ReadOnlyComposable
+        get() = LocalEInkTypography.current
+
+    /** The current E-Ink content color for the subtree. */
+    val contentColor: Color
+        @Composable
+        @ReadOnlyComposable
+        get() = LocalEInkContentColor.current
+}
+
+/**
  * Main E-Ink theme composable.
  *
  * What it does:
  *  1. Resolves the color scheme from [colorVariant] / [darkTheme].
  *  2. Publishes the scheme, typography and the "on-surface" content color via
  *     the three `Local*` composition locals so descendants can read them
- *     through [eInkColorScheme], [eInkTypography] and [eInkContentColor].
+ *     through [EInkTheme.colorScheme], [EInkTheme.typography] and
+ *     [EInkTheme.contentColor].
  *  3. **Globally disables ripple/indication** by providing
  *     `LocalIndication provides NoIndication` at the root. This is the key
  *     mechanism that prevents animated ripples (which cause full-screen
- *     refreshes on E-Ink) for any component that consults `LocalIndication`.
+ *     refreshes on E-Ink) for any component that consults [LocalIndication].
  *
  * @param colorVariant The color scheme variant to use (HighContrast or Grayscale)
  * @param darkTheme Whether to use dark theme colors
@@ -154,7 +184,7 @@ fun EInkTheme(
     CompositionLocalProvider(
         LocalEInkColorScheme provides colorScheme,
         LocalEInkTypography provides typography,
-        // The content color that descendants read via eInkContentColor();
+        // The content color that descendants read via EInkTheme.contentColor;
         // defaults to onBackground so it is meaningful without manual wiring.
         LocalEInkContentColor provides colorScheme.onBackground,
         // Globally disable ripple indication at the theme root.
@@ -217,15 +247,3 @@ val LocalEInkTypography = compositionLocalOf<EInkTypographySystem> {
  * text/icons inherit the correct on-* color.
  */
 val LocalEInkContentColor = staticCompositionLocalOf { Color.Unspecified }
-
-/** Returns the current [EInkColorScheme]. Must be called inside [EInkTheme]. */
-@Composable
-fun eInkColorScheme(): EInkColorScheme = LocalEInkColorScheme.current
-
-/** Returns the current [EInkTypographySystem]. Must be called inside [EInkTheme]. */
-@Composable
-fun eInkTypography(): EInkTypographySystem = LocalEInkTypography.current
-
-/** Returns the current E-Ink content color for the subtree. */
-@Composable
-fun eInkContentColor(): Color = LocalEInkContentColor.current

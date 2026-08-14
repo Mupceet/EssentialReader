@@ -17,8 +17,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import io.legado.app.eink.theme.EInkSpacing
-import io.legado.app.eink.theme.eInkColorScheme
-import io.legado.app.eink.theme.eInkTypography
+import io.legado.app.eink.theme.EInkTheme
 
 /**
  * E-Ink 顶栏（Foundation 实现，无 Material3 依赖）。
@@ -41,7 +40,7 @@ fun EInkTopBar(
     onBack: (() -> Unit)? = null,
     actions: @Composable RowScope.() -> Unit = {}
 ) {
-    val colors = eInkColorScheme()
+    val colors = EInkTheme.colorScheme
 
     Column(modifier = modifier.fillMaxWidth()) {
         Row(
@@ -64,13 +63,13 @@ fun EInkTopBar(
                 ) {
                     BasicText(
                         text = BackGlyph,
-                        style = eInkTypography().titleMedium.copy(color = colors.onSurface)
+                        style = EInkTheme.typography.titleMedium.copy(color = colors.onSurface)
                     )
                 }
             }
             BasicText(
                 text = title,
-                style = eInkTypography().titleMedium.copy(color = colors.onSurface),
+                style = EInkTheme.typography.titleMedium.copy(color = colors.onSurface),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier

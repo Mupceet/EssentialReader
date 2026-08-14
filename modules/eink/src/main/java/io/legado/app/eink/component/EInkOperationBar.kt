@@ -21,8 +21,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import io.legado.app.eink.theme.EInkShapes
 import io.legado.app.eink.theme.EInkSpacing
-import io.legado.app.eink.theme.eInkColorScheme
-import io.legado.app.eink.theme.eInkTypography
+import io.legado.app.eink.theme.EInkTheme
 
 /**
  * 底部通用操作栏（参考微信读书墨水屏版）。
@@ -99,7 +98,7 @@ private fun TabItem(
     selected: Boolean,
     onClick: () -> Unit
 ) {
-    val colors = eInkColorScheme()
+    val colors = EInkTheme.colorScheme
     val backgroundColor = if (selected) colors.primary else Color.Transparent
     val contentColor = if (selected) colors.onPrimary else colors.onSurface
 
@@ -116,7 +115,7 @@ private fun TabItem(
     ) {
         BasicText(
             text = label,
-            style = eInkTypography().labelLarge.copy(color = contentColor),
+            style = EInkTheme.typography.labelLarge.copy(color = contentColor),
             maxLines = 1,
             overflow = TextOverflow.Ellipsis
         )
@@ -130,7 +129,7 @@ private fun PageArrow(
     onClickLabel: String,
     onClick: () -> Unit
 ) {
-    val scheme = eInkColorScheme()
+    val scheme = EInkTheme.colorScheme
     val color = if (enabled) scheme.onSurface else scheme.disabledContent
 
     Box(
@@ -146,7 +145,7 @@ private fun PageArrow(
     ) {
         BasicText(
             text = glyph,
-            style = eInkTypography().titleLarge.copy(color = color)
+            style = EInkTheme.typography.titleLarge.copy(color = color)
         )
     }
 }

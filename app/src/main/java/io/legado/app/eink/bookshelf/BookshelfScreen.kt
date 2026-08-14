@@ -19,10 +19,9 @@ import androidx.compose.ui.unit.dp
 import io.legado.app.data.entities.Book
 import io.legado.app.eink.component.EInkHorizontalDivider
 import io.legado.app.eink.component.EInkLoading
-import io.legado.app.eink.modifier.eInkPageSwipe
+import io.legado.app.eink.modifier.EInkPageSwipe
 import io.legado.app.eink.theme.EInkSpacing
-import io.legado.app.eink.theme.eInkColorScheme
-import io.legado.app.eink.theme.eInkTypography
+import io.legado.app.eink.theme.EInkTheme
 
 /**
  * 无状态书架列表 Screen — 纯渲染。
@@ -35,7 +34,7 @@ import io.legado.app.eink.theme.eInkTypography
  * 列表不支持自由滚动（E-Ink 分页模式，参考微信读书墨水屏版）：
  *  - `userScrollEnabled = false` 禁用拖动/惯性滚动；
  *  - `overscrollEffect = null` 去除边缘回弹（拉伸/发光）效果；
- *  - 上下滑动手势经 [eInkPageSwipe] 识别为整页翻页，
+ *  - 上下滑动手势经 [EInkPageSwipe] 识别为整页翻页，
  *    与底部操作栏 ▲▼ 按钮触发同一动作。
  *
  * 列表项遵循规范 §41: title + secondary text + metadata + divider。
@@ -74,7 +73,7 @@ private fun BookList(
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
-            .eInkPageSwipe(
+            .EInkPageSwipe(
                 onPageUp = onPageUp,
                 onPageDown = onPageDown
             ),
@@ -100,23 +99,23 @@ private fun BookListItem(book: Book, onClick: () -> Unit) {
         // 书名
         EInkText(
             text = book.name,
-            style = eInkTypography().titleMedium,
+            style = EInkTheme.typography.titleMedium,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis
         )
         // 作者
         EInkText(
             text = book.getRealAuthor(),
-            style = eInkTypography().bodySmall,
-            color = eInkColorScheme().onSurfaceVariant,
+            style = EInkTheme.typography.bodySmall,
+            color = EInkTheme.colorScheme.onSurfaceVariant,
             maxLines = 1
         )
         // 阅读进度
         book.durChapterTitle?.let { title ->
             EInkText(
                 text = title,
-                style = eInkTypography().labelMedium,
-                color = eInkColorScheme().onSurfaceVariant,
+                style = EInkTheme.typography.labelMedium,
+                color = EInkTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
@@ -127,6 +126,6 @@ private fun BookListItem(book: Book, onClick: () -> Unit) {
 @Composable
 private fun EmptyBookshelf(modifier: Modifier = Modifier) {
     Box(modifier = modifier, contentAlignment = Alignment.Center) {
-        EInkText("书架为空", style = eInkTypography().bodyLarge)
+        EInkText("书架为空", style = EInkTheme.typography.bodyLarge)
     }
 }

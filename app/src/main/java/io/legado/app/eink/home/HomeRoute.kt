@@ -33,8 +33,7 @@ import io.legado.app.eink.component.EInkHorizontalDivider
 import io.legado.app.eink.component.EInkOperationBar
 import io.legado.app.eink.theme.EInkShapes
 import io.legado.app.eink.theme.EInkSpacing
-import io.legado.app.eink.theme.eInkColorScheme
-import io.legado.app.eink.theme.eInkTypography
+import io.legado.app.eink.theme.EInkTheme
 import kotlinx.coroutines.launch
 
 /** 首页 Tab 下标。 */
@@ -138,7 +137,7 @@ internal fun HomeScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(eInkColorScheme().background)
+            .background(EInkTheme.colorScheme.background)
     ) {
         SearchHintBar(onClick = onSearchClick)
         EInkHorizontalDivider()
@@ -180,7 +179,7 @@ private fun SearchHintBar(onClick: () -> Unit) {
                 .height(SearchInputHeight)
                 .border(
                     width = 1.dp,
-                    color = eInkColorScheme().outline,
+                    color = EInkTheme.colorScheme.outline,
                     shape = EInkShapes.small
                 )
                 .padding(horizontal = EInkSpacing.m),
@@ -188,8 +187,8 @@ private fun SearchHintBar(onClick: () -> Unit) {
         ) {
             EInkText(
                 text = "搜索书名 / 作者",
-                style = eInkTypography().bodyMedium,
-                color = eInkColorScheme().onSurfaceVariant
+                style = EInkTheme.typography.bodyMedium,
+                color = EInkTheme.colorScheme.onSurfaceVariant
             )
         }
     }

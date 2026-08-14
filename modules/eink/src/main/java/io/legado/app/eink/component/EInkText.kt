@@ -11,8 +11,7 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.sp
-import io.legado.app.eink.theme.eInkColorScheme
-import io.legado.app.eink.theme.eInkTypography
+import io.legado.app.eink.theme.EInkTheme
 
 /**
  * Absolute minimum font size enforced across all E-Ink text.
@@ -53,7 +52,7 @@ val MIN_FONT_SIZE: TextUnit = 14.sp
 fun EInkText(
     text: String,
     modifier: Modifier = Modifier,
-    color: Color = eInkColorScheme().onSurface,
+    color: Color = EInkTheme.colorScheme.onSurface,
     fontSize: TextUnit = TextUnit.Unspecified,
     fontWeight: FontWeight? = null,
     textAlign: TextAlign? = null,
@@ -61,7 +60,7 @@ fun EInkText(
     overflow: TextOverflow = TextOverflow.Clip,
     softWrap: Boolean = true,
     maxLines: Int = Int.MAX_VALUE,
-    style: TextStyle = eInkTypography().bodyMedium
+    style: TextStyle = EInkTheme.typography.bodyMedium
 ) {
     // Three-way minimum font size fallback with correct TextUnit.Unspecified handling.
     val enforcedFontSize: TextUnit = when {
@@ -100,13 +99,13 @@ fun EInkText(
 fun EInkHeadline(
     text: String,
     modifier: Modifier = Modifier,
-    color: Color = eInkColorScheme().onSurface
+    color: Color = EInkTheme.colorScheme.onSurface
 ) {
     EInkText(
         text = text,
         modifier = modifier,
         color = color,
-        style = eInkTypography().headlineMedium
+        style = EInkTheme.typography.headlineMedium
     )
 }
 
@@ -117,13 +116,13 @@ fun EInkHeadline(
 fun EInkTitle(
     text: String,
     modifier: Modifier = Modifier,
-    color: Color = eInkColorScheme().onSurface
+    color: Color = EInkTheme.colorScheme.onSurface
 ) {
     EInkText(
         text = text,
         modifier = modifier,
         color = color,
-        style = eInkTypography().titleLarge
+        style = EInkTheme.typography.titleLarge
     )
 }
 
@@ -134,13 +133,13 @@ fun EInkTitle(
 fun EInkBodyText(
     text: String,
     modifier: Modifier = Modifier,
-    color: Color = eInkColorScheme().onSurface
+    color: Color = EInkTheme.colorScheme.onSurface
 ) {
     EInkText(
         text = text,
         modifier = modifier,
         color = color,
-        style = eInkTypography().bodyLarge
+        style = EInkTheme.typography.bodyLarge
     )
 }
 
@@ -151,12 +150,12 @@ fun EInkBodyText(
 fun EInkLabel(
     text: String,
     modifier: Modifier = Modifier,
-    color: Color = eInkColorScheme().onSurface
+    color: Color = EInkTheme.colorScheme.onSurface
 ) {
     EInkText(
         text = text,
         modifier = modifier,
         color = color,
-        style = eInkTypography().labelLarge
+        style = EInkTheme.typography.labelLarge
     )
 }

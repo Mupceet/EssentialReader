@@ -13,8 +13,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import io.legado.app.eink.component.EInkHorizontalDivider
 import io.legado.app.eink.theme.EInkSpacing
-import io.legado.app.eink.theme.eInkColorScheme
-import io.legado.app.eink.theme.eInkTypography
+import io.legado.app.eink.theme.EInkTheme
 
 /**
  * 无状态「我的」页 — 首页第二个 Tab。
@@ -30,7 +29,7 @@ internal fun MineScreen(
     Column(modifier = Modifier.fillMaxSize()) {
         EInkText(
             text = "我的",
-            style = eInkTypography().titleLarge,
+            style = EInkTheme.typography.titleLarge,
             modifier = Modifier.padding(
                 horizontal = EInkSpacing.m,
                 vertical = EInkSpacing.m
@@ -53,12 +52,12 @@ private fun MineEntry(label: String, onClick: () -> Unit) {
             .padding(horizontal = EInkSpacing.m, vertical = EInkSpacing.l),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        EInkText(text = label, style = eInkTypography().bodyLarge)
+        EInkText(text = label, style = EInkTheme.typography.bodyLarge)
         Spacer(modifier = Modifier.weight(1f))
         EInkText(
             text = ">",
-            style = eInkTypography().titleMedium,
-            color = eInkColorScheme().onSurfaceVariant
+            style = EInkTheme.typography.titleMedium,
+            color = EInkTheme.colorScheme.onSurfaceVariant
         )
     }
 }

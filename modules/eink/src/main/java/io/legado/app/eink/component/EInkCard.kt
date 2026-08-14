@@ -17,7 +17,7 @@ import androidx.compose.ui.unit.dp
 import io.legado.app.eink.modifier.staticClickable
 import io.legado.app.eink.theme.EInkShapes
 import io.legado.app.eink.theme.EInkSpacing
-import io.legado.app.eink.theme.eInkColorScheme
+import io.legado.app.eink.theme.EInkTheme
 
 /**
  * E-Ink optimized card with zero elevation and border-based visual separation.
@@ -139,7 +139,7 @@ object EInkCardDefaults {
 
     @Composable
     fun colors(): EInkCardColors {
-        val colors = eInkColorScheme()
+        val colors = EInkTheme.colorScheme
         return EInkCardColors(
             containerColor = colors.surface,
             contentColor = colors.onSurface,
@@ -150,7 +150,7 @@ object EInkCardDefaults {
 
     @Composable
     fun elevatedColors(): EInkCardColors {
-        val colors = eInkColorScheme()
+        val colors = EInkTheme.colorScheme
         return EInkCardColors(
             containerColor = colors.primaryContainer,
             contentColor = colors.onPrimaryContainer,
@@ -161,7 +161,7 @@ object EInkCardDefaults {
 
     @Composable
     fun outlinedColors(): EInkCardColors {
-        val colors = eInkColorScheme()
+        val colors = EInkTheme.colorScheme
         return EInkCardColors(
             containerColor = Color.Transparent,
             contentColor = colors.onSurface,
@@ -173,25 +173,25 @@ object EInkCardDefaults {
     @Composable
     fun border() = BorderStroke(
         width = ThinBorder,
-        color = eInkColorScheme().outline
+        color = EInkTheme.colorScheme.outline
     )
 
     @Composable
     fun elevatedBorder() = BorderStroke(
         width = MediumBorder,
-        color = eInkColorScheme().primary
+        color = EInkTheme.colorScheme.primary
     )
 
     @Composable
     fun outlinedBorder() = BorderStroke(
         width = ThinBorder,
-        color = eInkColorScheme().outline
+        color = EInkTheme.colorScheme.outline
     )
 
     @Composable
     fun disabledBorder() = BorderStroke(
         width = ThinBorder,
-        color = eInkColorScheme().onSurfaceVariant
+        color = EInkTheme.colorScheme.onSurfaceVariant
     )
 
     fun contentPadding() = PaddingValues(EInkSpacing.m)

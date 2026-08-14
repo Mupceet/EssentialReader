@@ -10,8 +10,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import io.legado.app.eink.booksource.BookSourceRoute
 import io.legado.app.eink.home.HomeRoute
-import io.legado.app.eink.navigation.EinkNavController
-import io.legado.app.eink.navigation.EinkScreen
+import io.legado.app.eink.navigation.EInkNavController
+import io.legado.app.eink.navigation.EInkScreen
 import io.legado.app.eink.search.SearchRoute
 import io.legado.app.eink.settings.SettingsRoute
 import io.legado.app.eink.toc.TocRoute
@@ -20,12 +20,12 @@ import io.legado.app.eink.toc.TocRoute
  * E-Ink 应用根 Composable。
  *
  * 1. 通过 when 分支直接替换屏幕内容（无动画过渡，规范 §12, §44）
- * 2. 导航状态由 [EinkNavController] 管理（UDF: state hoisted to controller）
+ * 2. 导航状态由 [EInkNavController] 管理（UDF: state hoisted to controller）
  * 3. 用 [rememberSaveableStateHolder] 按屏保留 rememberSaveable 状态
  */
 @Composable
-fun EinkApp(
-    controller: EinkNavController = EinkNavController.remember()
+fun EInkApp(
+    controller: EInkNavController = EInkNavController.remember()
 ) {
     // 单 Activity 架构：系统返回键优先 pop 导航栈，根页面时交还系统（退出应用）
     BackHandler(enabled = controller.canPop) {
@@ -40,38 +40,38 @@ fun EinkApp(
 
     stateHolder.SaveableStateProvider(key = screen.toString()) {
         when (screen) {
-            is EinkScreen.Home -> {
+            is EInkScreen.Home -> {
                 HomeRoute(
                     onBookClick = { bookUrl ->
                         // 阅读界面接入前，点击书籍进入目录
-                        controller.navigate(EinkScreen.Toc(bookUrl))
+                        controller.navigate(EInkScreen.Toc(bookUrl))
                     },
-                    onSearch = { controller.navigate(EinkScreen.Search) },
-                    onBookSource = { controller.navigate(EinkScreen.BookSource) },
-                    onSettings = { controller.navigate(EinkScreen.Settings) },
+                    onSearch = { controller.navigate(EInkScreen.Search) },
+                    onBookSource = { controller.navigate(EInkScreen.BookSource) },
+                    onSettings = { controller.navigate(EInkScreen.Settings) },
                 )
             }
 
-            is EinkScreen.Search -> {
+            is EInkScreen.Search -> {
                 SearchRoute(onBack = { controller.pop() })
             }
 
-            is EinkScreen.BookSource -> {
+            is EInkScreen.BookSource -> {
                 BookSourceRoute(onBack = { controller.pop() })
             }
 
-            is EinkScreen.Settings -> {
+            is EInkScreen.Settings -> {
                 SettingsRoute(onBack = { controller.pop() })
             }
 
-            is EinkScreen.Toc -> {
+            is EInkScreen.Toc -> {
                 TocRoute(
                     bookUrl = screen.bookUrl,
                     onBack = { controller.pop() }
                 )
             }
 
-            is EinkScreen.Reader -> {
+            is EInkScreen.Reader -> {
                 PlaceholderScreen("阅读器（待接入 ReadBook 引擎）")
             }
         }

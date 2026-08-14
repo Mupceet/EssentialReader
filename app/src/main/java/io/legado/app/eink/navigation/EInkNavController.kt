@@ -12,24 +12,24 @@ import androidx.compose.runtime.setValue
  * 管理屏幕栈，页面切换通过直接替换状态完成
  * （规范 §12, §44: 页面 transition 统一为 NONE，无动画过渡）。
  */
-class EinkNavController internal constructor(
-    initial: EinkScreen,
+class EInkNavController internal constructor(
+    initial: EInkScreen,
 ) {
-    private var backStack: MutableList<EinkScreen> = mutableListOf(initial)
+    private var backStack: MutableList<EInkScreen> = mutableListOf(initial)
     private var currentScreen by mutableStateOf(initial)
 
-    val screen: EinkScreen
+    val screen: EInkScreen
         get() = currentScreen
 
     val canPop: Boolean
         get() = backStack.size > 1
 
-    fun navigate(screen: EinkScreen) {
+    fun navigate(screen: EInkScreen) {
         backStack.add(screen)
         currentScreen = screen
     }
 
-    fun navigateAndClear(screen: EinkScreen) {
+    fun navigateAndClear(screen: EInkScreen) {
         backStack.clear()
         backStack.add(screen)
         currentScreen = screen
@@ -44,10 +44,10 @@ class EinkNavController internal constructor(
 
     companion object {
         /**
-         * 创建并记住一个 [EinkNavController]。
+         * 创建并记住一个 [EInkNavController]。
          */
         @Composable
-        fun remember(initial: EinkScreen = EinkScreen.Home): EinkNavController =
-            remember(initial) { EinkNavController(initial) }
+        fun remember(initial: EInkScreen = EInkScreen.Home): EInkNavController =
+            remember(initial) { EInkNavController(initial) }
     }
 }

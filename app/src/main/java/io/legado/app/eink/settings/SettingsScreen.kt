@@ -25,8 +25,7 @@ import io.legado.app.eink.component.EInkText
 import io.legado.app.eink.component.EInkTopBar
 import io.legado.app.eink.theme.EInkShapes
 import io.legado.app.eink.theme.EInkSpacing
-import io.legado.app.eink.theme.eInkColorScheme
-import io.legado.app.eink.theme.eInkTypography
+import io.legado.app.eink.theme.EInkTheme
 
 /**
  * 设置动作回调集（Route 提供，Screen 只调用）。
@@ -143,7 +142,7 @@ internal fun SettingsScreen(
         ) {
             EInkText(
                 text = "恢复全部默认值",
-                style = eInkTypography().bodyMedium,
+                style = EInkTheme.typography.bodyMedium,
                 modifier = Modifier.weight(1f)
             )
             StaticBorderButton(text = "恢复", onClick = actions.onReset)
@@ -155,8 +154,8 @@ internal fun SettingsScreen(
 private fun SectionHeader(title: String) {
     EInkText(
         text = title,
-        style = eInkTypography().labelLarge,
-        color = eInkColorScheme().onSurfaceVariant,
+        style = EInkTheme.typography.labelLarge,
+        color = EInkTheme.colorScheme.onSurfaceVariant,
         modifier = Modifier
             .fillMaxWidth()
             .padding(
@@ -186,13 +185,13 @@ private fun StepperItem(
     ) {
         EInkText(
             text = label,
-            style = eInkTypography().bodyMedium,
+            style = EInkTheme.typography.bodyMedium,
             modifier = Modifier.weight(1f)
         )
         StaticBorderButton(text = "－", onClick = onDecrement)
         EInkText(
             text = value,
-            style = eInkTypography().bodyMedium,
+            style = EInkTheme.typography.bodyMedium,
             modifier = Modifier.padding(horizontal = EInkSpacing.m)
         )
         StaticBorderButton(text = "＋", onClick = onIncrement)
@@ -207,13 +206,13 @@ private fun StaticBorderButton(text: String, onClick: () -> Unit) {
     Box(
         modifier = Modifier
             .sizeIn(minWidth = 36.dp, minHeight = 36.dp)
-            .border(BorderStroke(1.dp, eInkColorScheme().outline), EInkShapes.small)
+            .border(BorderStroke(1.dp, EInkTheme.colorScheme.outline), EInkShapes.small)
             .clickable(onClick = onClick),
         contentAlignment = Alignment.Center
     ) {
         EInkText(
             text = text,
-            style = eInkTypography().titleMedium,
+            style = EInkTheme.typography.titleMedium,
             modifier = Modifier.padding(
                 horizontal = EInkSpacing.m,
                 vertical = EInkSpacing.xs

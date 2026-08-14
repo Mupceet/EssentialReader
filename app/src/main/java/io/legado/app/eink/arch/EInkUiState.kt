@@ -91,4 +91,4 @@ import androidx.compose.runtime.Immutable
  * 帮助 Compose 编译器进行稳定推断，减少不必要的重组（E-Ink 上重组成本极高）。
  */
 @Immutable
-annotation class EinkImmutable
+annotation class EInkImmutable

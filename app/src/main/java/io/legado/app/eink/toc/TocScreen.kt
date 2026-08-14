@@ -25,8 +25,7 @@ import io.legado.app.eink.component.EInkLoading
 import io.legado.app.eink.component.EInkText
 import io.legado.app.eink.component.EInkTopBar
 import io.legado.app.eink.theme.EInkSpacing
-import io.legado.app.eink.theme.eInkColorScheme
-import io.legado.app.eink.theme.eInkTypography
+import io.legado.app.eink.theme.EInkTheme
 
 /**
  * 目录 Route。
@@ -53,7 +52,7 @@ fun TocRoute(
                     modifier = Modifier
                         .clickable { viewModel.toggleReverse() }
                         .padding(horizontal = EInkSpacing.m),
-                    style = eInkTypography().labelLarge
+                    style = EInkTheme.typography.labelLarge
                 )
             }
         )
@@ -130,12 +129,12 @@ private fun ChapterItem(chapter: BookChapter, isCurrent: Boolean, onClick: () ->
         EInkText(
             text = chapter.title,
             modifier = Modifier.weight(1f),
-            style = eInkTypography().bodyMedium,
+            style = EInkTheme.typography.bodyMedium,
             fontWeight = if (isCurrent) FontWeight.Bold else null,
             color = if (isCurrent) {
-                eInkColorScheme().onSurface
+                EInkTheme.colorScheme.onSurface
             } else {
-                eInkColorScheme().onSurfaceVariant
+                EInkTheme.colorScheme.onSurfaceVariant
             },
             maxLines = 1,
             overflow = TextOverflow.Ellipsis
@@ -143,8 +142,8 @@ private fun ChapterItem(chapter: BookChapter, isCurrent: Boolean, onClick: () ->
         if (isCurrent) {
             EInkText(
                 text = "在读",
-                style = eInkTypography().labelMedium,
-                color = eInkColorScheme().onSurfaceVariant,
+                style = EInkTheme.typography.labelMedium,
+                color = EInkTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(start = EInkSpacing.s)
             )
         }
@@ -154,6 +153,6 @@ private fun ChapterItem(chapter: BookChapter, isCurrent: Boolean, onClick: () ->
 @Composable
 private fun CenterMessage(message: String) {
     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        EInkText(text = message, style = eInkTypography().bodyLarge)
+        EInkText(text = message, style = EInkTheme.typography.bodyLarge)
     }
 }

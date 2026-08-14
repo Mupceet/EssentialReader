@@ -18,7 +18,7 @@ import androidx.compose.ui.unit.dp
  * 位移不做实时跟随：E-Ink 上"手指拖到哪内容跟到哪"会产生大量局部刷新，
  * 且松手后的回弹/吸附在电泳屏上必然残影，因此采用阈值触发 + 整页跳转。
  */
-fun Modifier.eInkPageSwipe(
+fun Modifier.EInkPageSwipe(
     enabled: Boolean = true,
     onPageUp: () -> Unit,
     onPageDown: () -> Unit,

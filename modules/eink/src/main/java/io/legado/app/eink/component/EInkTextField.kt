@@ -30,8 +30,7 @@ import androidx.compose.ui.unit.dp
 import io.legado.app.eink.modifier.rememberNoRippleInteractionSource
 import io.legado.app.eink.theme.EInkShapes
 import io.legado.app.eink.theme.EInkSpacing
-import io.legado.app.eink.theme.eInkColorScheme
-import io.legado.app.eink.theme.eInkTypography
+import io.legado.app.eink.theme.EInkTheme
 
 /**
  * E-Ink optimized text field built on [BasicTextField] (not Material OutlinedTextField).
@@ -73,7 +72,7 @@ fun EInkTextField(
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
     readOnly: Boolean = false,
-    textStyle: TextStyle = eInkTypography().bodyLarge,
+    textStyle: TextStyle = EInkTheme.typography.bodyLarge,
     label: String? = null,
     placeholder: String? = null,
     leadingIcon: (@Composable () -> Unit)? = null,
@@ -119,7 +118,7 @@ fun EInkTextField(
         if (label != null) {
             EInkText(
                 text = label,
-                style = eInkTypography().labelLarge,
+                style = EInkTheme.typography.labelLarge,
                 color = if (isError) colors.errorLabelColor else colors.labelColor,
                 modifier = Modifier.padding(bottom = EInkSpacing.xs)
             )
@@ -180,7 +179,7 @@ fun EInkTextField(
         if (supportingText != null) {
             EInkText(
                 text = supportingText,
-                style = eInkTypography().bodySmall,
+                style = EInkTheme.typography.bodySmall,
                 color = if (isError) colors.errorSupportingTextColor else colors.supportingTextColor,
                 modifier = Modifier.padding(
                     top = EInkSpacing.xs,
@@ -201,7 +200,7 @@ fun EInkOutlinedTextField(
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
     readOnly: Boolean = false,
-    textStyle: TextStyle = eInkTypography().bodyLarge,
+    textStyle: TextStyle = EInkTheme.typography.bodyLarge,
     label: String? = null,
     placeholder: String? = null,
     leadingIcon: (@Composable () -> Unit)? = null,
@@ -271,7 +270,7 @@ object EInkTextFieldDefaults {
 
     @Composable
     fun colors(): EInkTextFieldColors {
-        val colors = eInkColorScheme()
+        val colors = EInkTheme.colorScheme
         return EInkTextFieldColors(
             textColor = colors.onSurface,
             disabledTextColor = colors.onSurfaceVariant,
@@ -292,7 +291,7 @@ object EInkTextFieldDefaults {
 
     @Composable
     fun outlinedColors(): EInkTextFieldColors {
-        val colors = eInkColorScheme()
+        val colors = EInkTheme.colorScheme
         return EInkTextFieldColors(
             textColor = colors.onSurface,
             disabledTextColor = colors.onSurfaceVariant,

@@ -12,8 +12,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import io.legado.app.eink.theme.EInkSpacing
-import io.legado.app.eink.theme.eInkColorScheme
-import io.legado.app.eink.theme.eInkTypography
+import io.legado.app.eink.theme.EInkTheme
 
 /**
  * Dot-style page indicator (static, no animation).
@@ -34,7 +33,7 @@ fun EInkDotPageIndicator(
 ) {
     if (pageCount <= 1) return
 
-    val colors = eInkColorScheme()
+    val colors = EInkTheme.colorScheme
     Row(
         modifier = modifier,
         horizontalArrangement = Arrangement.spacedBy(EInkSpacing.s),
@@ -71,8 +70,8 @@ fun EInkNumberPageIndicator(
 
     EInkText(
         text = "第 $currentPage / $pageCount 页",
-        style = eInkTypography().labelLarge,
-        color = eInkColorScheme().onSurface,
+        style = EInkTheme.typography.labelLarge,
+        color = EInkTheme.colorScheme.onSurface,
         modifier = modifier.padding(EInkSpacing.s)
     )
 }

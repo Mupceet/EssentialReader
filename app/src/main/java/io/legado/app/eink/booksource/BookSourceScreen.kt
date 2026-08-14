@@ -25,8 +25,7 @@ import io.legado.app.eink.component.EInkLoading
 import io.legado.app.eink.component.EInkText
 import io.legado.app.eink.component.EInkTopBar
 import io.legado.app.eink.theme.EInkSpacing
-import io.legado.app.eink.theme.eInkColorScheme
-import io.legado.app.eink.theme.eInkTypography
+import io.legado.app.eink.theme.EInkTheme
 
 /**
  * 书源管理 Route。
@@ -48,14 +47,14 @@ fun BookSourceRoute(
                     modifier = Modifier
                         .clickable { viewModel.enableAll(true) }
                         .padding(horizontal = EInkSpacing.s),
-                    style = eInkTypography().labelLarge
+                    style = EInkTheme.typography.labelLarge
                 )
                 EInkText(
                     text = "全禁",
                     modifier = Modifier
                         .clickable { viewModel.enableAll(false) }
                         .padding(horizontal = EInkSpacing.s),
-                    style = eInkTypography().labelLarge
+                    style = EInkTheme.typography.labelLarge
                 )
             }
         )
@@ -87,7 +86,7 @@ internal fun BookSourceScreen(
                     modifier = Modifier.fillMaxSize(),
                     contentAlignment = Alignment.Center
                 ) {
-                    EInkText("无匹配书源", style = eInkTypography().bodyLarge)
+                    EInkText("无匹配书源", style = EInkTheme.typography.bodyLarge)
                 }
                 else -> SourceList(state, onToggleSource)
             }
@@ -101,7 +100,7 @@ private fun SourceSearchBar(searchKey: String, onSearch: (String) -> Unit) {
         value = searchKey,
         onValueChange = onSearch,
         singleLine = true,
-        textStyle = TextStyle(fontSize = 16.sp, color = eInkColorScheme().onSurface),
+        textStyle = TextStyle(fontSize = 16.sp, color = EInkTheme.colorScheme.onSurface),
         decorationBox = { innerTextField ->
             Row(
                 modifier = Modifier
@@ -119,7 +118,7 @@ private fun SourceSearchBar(searchKey: String, onSearch: (String) -> Unit) {
                         EInkText(
                             text = "搜索书源名称/URL",
                             fontSize = 16.sp,
-                            color = eInkColorScheme().outline
+                            color = EInkTheme.colorScheme.outline
                         )
                     }
                     innerTextField()
@@ -130,7 +129,7 @@ private fun SourceSearchBar(searchKey: String, onSearch: (String) -> Unit) {
                         modifier = Modifier
                             .clickable { onSearch("") }
                             .padding(start = EInkSpacing.s),
-                        style = eInkTypography().labelLarge
+                        style = EInkTheme.typography.labelLarge
                     )
                 }
             }
@@ -164,14 +163,14 @@ private fun SourceItem(source: BookSourcePart, onToggle: () -> Unit) {
         Column(modifier = Modifier.weight(1f)) {
             EInkText(
                 text = source.bookSourceName.ifBlank { source.bookSourceUrl },
-                style = eInkTypography().bodyMedium,
+                style = EInkTheme.typography.bodyMedium,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
             EInkText(
                 text = source.bookSourceGroup ?: "",
-                style = eInkTypography().bodySmall,
-                color = eInkColorScheme().onSurfaceVariant,
+                style = EInkTheme.typography.bodySmall,
+                color = EInkTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
@@ -179,11 +178,11 @@ private fun SourceItem(source: BookSourcePart, onToggle: () -> Unit) {
         // 启用状态（静态方框指示，符合 E-Ink 无动画规范）
         EInkText(
             text = if (source.enabled) "启用" else "禁用",
-            style = eInkTypography().labelMedium,
+            style = EInkTheme.typography.labelMedium,
             color = if (source.enabled) {
-                eInkColorScheme().onSurface
+                EInkTheme.colorScheme.onSurface
             } else {
-                eInkColorScheme().outline
+                EInkTheme.colorScheme.outline
             },
             modifier = Modifier.padding(start = EInkSpacing.s)
         )

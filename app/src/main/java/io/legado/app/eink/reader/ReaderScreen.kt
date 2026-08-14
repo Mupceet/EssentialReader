@@ -25,7 +25,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import io.legado.app.eink.component.EInkLoading
 import io.legado.app.eink.theme.EInkSpacing
-import io.legado.app.eink.theme.eInkColorScheme
+import io.legado.app.eink.theme.EInkTheme
 
 /**
  * 阅读 Route — ViewModel 感知层。
@@ -119,7 +119,7 @@ private fun ReaderContent(state: ReaderUiState) {
             style = TextStyle(
                 fontSize = 18.sp,
                 lineHeight = 32.sp,
-                color = eInkColorScheme().onSurface
+                color = EInkTheme.colorScheme.onSurface
             )
         )
 
@@ -141,7 +141,7 @@ private fun ReaderFooter(state: ReaderUiState) {
             text = state.chapterTitle,
             style = TextStyle(
                 fontSize = 12.sp,
-                color = eInkColorScheme().onSurfaceVariant
+                color = EInkTheme.colorScheme.onSurfaceVariant
             ),
             maxLines = 1,
             modifier = Modifier.weight(1f)
@@ -153,7 +153,7 @@ private fun ReaderFooter(state: ReaderUiState) {
                 style = TextStyle(
                     fontSize = 12.sp,
                     fontWeight = FontWeight.Medium,
-                    color = eInkColorScheme().onSurfaceVariant
+                    color = EInkTheme.colorScheme.onSurfaceVariant
                 )
             )
         }
@@ -173,7 +173,7 @@ private fun ErrorView(message: String, onBack: () -> Unit) {
         )
         EInkText(
             text = message,
-            style = TextStyle(fontSize = 14.sp, color = eInkColorScheme().onSurfaceVariant),
+            style = TextStyle(fontSize = 14.sp, color = EInkTheme.colorScheme.onSurfaceVariant),
             modifier = Modifier.padding(vertical = EInkSpacing.s)
         )
         EInkText(

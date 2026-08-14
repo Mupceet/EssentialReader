@@ -16,13 +16,12 @@ import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
 import io.legado.app.eink.theme.EInkTheme
-import io.legado.app.eink.theme.eInkColorScheme
 
 /**
  * E-Ink 版本单 Activity 入口。
  *
  * 遵循 E-Ink Design System 规范 §54: 推荐单 Activity 架构，
- * 所有 E-Ink 屏幕通过 Compose 状态路由（[EinkApp]）管理，
+ * 所有 E-Ink 屏幕通过 Compose 状态路由（[EInkApp]）管理，
  * 避免多个 Activity 之间的传统 Android 页面转场。
  *
  * 根布局职责（纯 Foundation，无 Material3）:
@@ -32,21 +31,21 @@ import io.legado.app.eink.theme.eInkColorScheme
  *  - 系统栏图标颜色跟随主题背景亮度（浅底黑图标 / 深底白图标），
  *    保证状态栏与纯黑白主题一致。
  */
-class EinkMainActivity : ComponentActivity() {
+class EInkMainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
             EInkTheme {
-                EinkRoot()
+                EInkRoot()
             }
         }
     }
 }
 
 @Composable
-private fun EinkRoot() {
-    val scheme = eInkColorScheme()
+private fun EInkRoot() {
+    val scheme = EInkTheme.colorScheme
 
     // 系统栏图标外观随主题底色亮度切换：亮底 → 深色图标；暗底 → 浅色图标
     val view = LocalView.current
@@ -67,6 +66,6 @@ private fun EinkRoot() {
             .background(scheme.background)
             .safeDrawingPadding()
     ) {
-        EinkApp()
+        EInkApp()
     }
 }
