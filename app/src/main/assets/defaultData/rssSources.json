@@ -1,8 +1,12 @@
 [
   {
+    "articleStyle": 0,
     "customOrder": 2,
     "enableJs": true,
     "enabled": true,
+    "enabledCookieJar": true,
+    "lastUpdateTime": 0,
+    "loadWithBaseUrl": true,
     "singleUrl": true,
     "sourceGroup": "legado",
     "sourceIcon": "https://cdn.jsdelivr.net/gh/gedoor/legado@master/app/src/main/res/mipmap-hdpi/ic_launcher.png",
@@ -10,9 +14,13 @@
     "sourceUrl": "https://www.yuque.com/legado"
   },
   {
+    "articleStyle": 0,
     "customOrder": 3,
     "enableJs": true,
     "enabled": true,
+    "enabledCookieJar": true,
+    "lastUpdateTime": 0,
+    "loadWithBaseUrl": true,
     "singleUrl": true,
     "sourceGroup": "legado",
     "sourceIcon": "http://mmbiz.qpic.cn/mmbiz_png/hpfMV8hEuL2eS6vnCxvTzoOiaCAibV6exBzJWq9xMic9xDg3YXAick87tsfafic0icRwkQ5ibV0bJ84JtSuxhPuEDVquA/0?wx_fmt=png",
@@ -20,9 +28,13 @@
     "sourceUrl": "snssdk1128://user/profile/562564899806367"
   },
   {
+    "articleStyle": 0,
     "customOrder": 4,
     "enableJs": true,
     "enabled": true,
+    "enabledCookieJar": true,
+    "lastUpdateTime": 0,
+    "loadWithBaseUrl": true,
     "singleUrl": true,
     "sourceGroup": "legado",
     "sourceIcon": "https://cdn.jsdelivr.net/gh/mgz0227/meowcloud/icon.png",
@@ -30,9 +42,13 @@
     "sourceUrl": "https://pan.miaogongzi.net"
   },
   {
+    "articleStyle": 0,
     "customOrder": 5,
     "enableJs": true,
     "enabled": true,
+    "enabledCookieJar": true,
+    "lastUpdateTime": 0,
+    "loadWithBaseUrl": true,
     "singleUrl": true,
     "sourceGroup": "legado",
     "sourceIcon": "https://cdn.jsdelivr.net/gh/gedoor/legado@master/app/src/main/res/mipmap-hdpi/ic_launcher.png",

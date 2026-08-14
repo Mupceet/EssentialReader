@@ -1,162 +1,194 @@
 [
   {
     "key": "@css:",
-    "value": "@css:",
-    "serialNo": 0
+    "serialNo": 0,
+    "type": 0,
+    "value": "@css:"
   },
   {
     "key": "<js>",
-    "value": "<js></js>",
-    "serialNo": 1
+    "serialNo": 1,
+    "type": 0,
+    "value": "<js></js>"
   },
   {
     "key": "{{}}",
-    "value": "{{}}",
-    "serialNo": 2
+    "serialNo": 2,
+    "type": 0,
+    "value": "{{}}"
   },
   {
     "key": "##",
-    "value": "##",
-    "serialNo": 3
+    "serialNo": 3,
+    "type": 0,
+    "value": "##"
   },
   {
     "key": "&&",
-    "value": "&&",
-    "serialNo": 4
+    "serialNo": 4,
+    "type": 0,
+    "value": "&&"
   },
   {
     "key": "%%",
-    "value": "%%",
-    "serialNo": 5
+    "serialNo": 5,
+    "type": 0,
+    "value": "%%"
   },
   {
     "key": "||",
-    "value": "||",
-    "serialNo": 6
+    "serialNo": 6,
+    "type": 0,
+    "value": "||"
   },
   {
     "key": "//",
-    "value": "//",
-    "serialNo": 7
+    "serialNo": 7,
+    "type": 0,
+    "value": "//"
   },
   {
     "key": "\\",
-    "value": "\\",
-    "serialNo": 8
+    "serialNo": 8,
+    "type": 0,
+    "value": "\\"
   },
   {
     "key": "$.",
-    "value": "$.",
-    "serialNo": 9
+    "serialNo": 9,
+    "type": 0,
+    "value": "$."
   },
   {
     "key": "@",
-    "value": "@",
-    "serialNo": 10
+    "serialNo": 10,
+    "type": 0,
+    "value": "@"
   },
   {
     "key": ":",
-    "value": ":",
-    "serialNo": 11
+    "serialNo": 11,
+    "type": 0,
+    "value": ":"
   },
   {
     "key": "class",
-    "value": "class",
-    "serialNo": 12
+    "serialNo": 12,
+    "type": 0,
+    "value": "class"
   },
   {
     "key": "text",
-    "value": "text",
-    "serialNo": 13
+    "serialNo": 13,
+    "type": 0,
+    "value": "text"
   },
   {
     "key": "href",
-    "value": "href",
-    "serialNo": 14
+    "serialNo": 14,
+    "type": 0,
+    "value": "href"
   },
   {
     "key": "textNodes",
-    "value": "textNodes",
-    "serialNo": 15
+    "serialNo": 15,
+    "type": 0,
+    "value": "textNodes"
   },
   {
     "key": "ownText",
-    "value": "ownText",
-    "serialNo": 16
+    "serialNo": 16,
+    "type": 0,
+    "value": "ownText"
   },
   {
     "key": "all",
-    "value": "all",
-    "serialNo": 17
+    "serialNo": 17,
+    "type": 0,
+    "value": "all"
   },
   {
     "key": "html",
-    "value": "html",
-    "serialNo": 18
+    "serialNo": 18,
+    "type": 0,
+    "value": "html"
   },
   {
     "key": "[",
-    "value": "[",
-    "serialNo": 19
+    "serialNo": 19,
+    "type": 0,
+    "value": "["
   },
   {
     "key": "]",
-    "value": "]",
-    "serialNo": 20
+    "serialNo": 20,
+    "type": 0,
+    "value": "]"
   },
   {
     "key": "<",
-    "value": "<",
-    "serialNo": 21
+    "serialNo": 21,
+    "type": 0,
+    "value": "<"
   },
   {
     "key": ">",
-    "value": ">",
-    "serialNo": 22
+    "serialNo": 22,
+    "type": 0,
+    "value": ">"
   },
   {
     "key": "#",
-    "value": "#",
-    "serialNo": 23
+    "serialNo": 23,
+    "type": 0,
+    "value": "#"
   },
   {
     "key": "!",
-    "value": "!",
-    "serialNo": 24
+    "serialNo": 24,
+    "type": 0,
+    "value": "!"
   },
   {
     "key": ".",
-    "value": ".",
-    "serialNo": 25
+    "serialNo": 25,
+    "type": 0,
+    "value": "."
   },
   {
     "key": "+",
-    "value": "+",
-    "serialNo": 26
+    "serialNo": 26,
+    "type": 0,
+    "value": "+"
   },
   {
     "key": "-",
-    "value": "-",
-    "serialNo": 27
+    "serialNo": 27,
+    "type": 0,
+    "value": "-"
   },
   {
     "key": "*",
-    "value": "*",
-    "serialNo": 28
+    "serialNo": 28,
+    "type": 0,
+    "value": "*"
   },
   {
     "key": "/",
-    "value": "/",
-    "serialNo": 29
+    "serialNo": 29,
+    "type": 0,
+    "value": "/"
   },
   {
     "key": "=",
-    "value": "=",
-    "serialNo": 30
+    "serialNo": 30,
+    "type": 0,
+    "value": "="
   },
   {
     "key": "useWebView",
-    "value": ",{\"webView\": true}",
-    "serialNo": 31
+    "serialNo": 31,
+    "type": 0,
+    "value": "{'webView': true}"
   }
 ]

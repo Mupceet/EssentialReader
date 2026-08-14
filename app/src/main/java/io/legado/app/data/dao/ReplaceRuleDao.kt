@@ -92,6 +92,9 @@ interface ReplaceRuleDao {
     @Delete
     fun delete(vararg replaceRules: ReplaceRule)
 
+    @Query("delete from replace_rules where id < 0")
+    fun deleteDefault()
+
     private fun dealGroups(list: List<String>): List<String> {
         val groups = linkedSetOf<String>()
         list.forEach {

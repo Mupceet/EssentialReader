@@ -168,4 +168,7 @@ interface BookDao {
 
     @Query("delete from books where type & ${BookType.notShelf} > 0")
     fun deleteNotShelfBook()
+
+    @Query("delete from books where customTag like '%legado%'")
+    fun deleteDefault()
 }
