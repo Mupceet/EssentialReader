@@ -2,7 +2,6 @@ package io.legado.app.eink.home
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -11,7 +10,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
 import io.legado.app.eink.component.EInkText
 import androidx.compose.runtime.Composable
@@ -31,6 +29,8 @@ import io.legado.app.eink.bookshelf.BookshelfScreen
 import io.legado.app.eink.bookshelf.BookshelfViewModel
 import io.legado.app.eink.component.EInkHorizontalDivider
 import io.legado.app.eink.component.EInkOperationBar
+import io.legado.app.eink.component.pageDownEInk
+import io.legado.app.eink.component.pageUpEInk
 import io.legado.app.eink.theme.EInkShapes
 import io.legado.app.eink.theme.EInkSpacing
 import io.legado.app.eink.theme.EInkTheme
@@ -79,16 +79,12 @@ fun HomeRoute(
         derivedStateOf { isBookshelfTab && bookshelfListState.canScrollForward }
     }
 
-    // 翻页动作：底部操作栏 ▲▼ 与列表滑动手势共用（同一行为，零动画整页跳转）
+    // 翻页动作：底部操作栏 ▲▼ 与列表滑动手势共用（项对齐整页跳转，零动画）
     val pageUp: () -> Unit = {
-        scope.launch {
-            bookshelfListState.scrollBy(-pageScrollAmount(bookshelfListState))
-        }
+        scope.launch { bookshelfListState.pageUpEInk() }
     }
     val pageDown: () -> Unit = {
-        scope.launch {
-            bookshelfListState.scrollBy(pageScrollAmount(bookshelfListState))
-        }
+        scope.launch { bookshelfListState.pageDownEInk() }
     }
 
     HomeScreen(
@@ -192,14 +188,6 @@ private fun SearchHintBar(onClick: () -> Unit) {
             )
         }
     }
-}
-
-/**
- * 一页的滚动距离 = 列表视口高度（点击时实时读取）。
- */
-private fun pageScrollAmount(listState: LazyListState): Float {
-    val info = listState.layoutInfo
-    return (info.viewportEndOffset - info.viewportStartOffset).toFloat()
 }
 
 private val SearchBarHeight = 64.dp
