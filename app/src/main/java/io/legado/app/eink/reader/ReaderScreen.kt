@@ -8,7 +8,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.material3.Text
+import io.legado.app.eink.component.EInkText
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -111,7 +111,7 @@ private fun ReaderContent(state: ReaderUiState) {
             )
     ) {
         // 正文区域（占据主要空间）
-        Text(
+        EInkText(
             text = state.pageText,
             modifier = Modifier
                 .fillMaxWidth()
@@ -137,7 +137,7 @@ private fun ReaderFooter(state: ReaderUiState) {
         verticalAlignment = Alignment.CenterVertically
     ) {
         // 章节标题（左）
-        Text(
+        EInkText(
             text = state.chapterTitle,
             style = TextStyle(
                 fontSize = 12.sp,
@@ -148,7 +148,7 @@ private fun ReaderFooter(state: ReaderUiState) {
         )
         // 页码（右）
         if (state.pageIndicator.isNotEmpty()) {
-            Text(
+            EInkText(
                 text = state.pageIndicator,
                 style = TextStyle(
                     fontSize = 12.sp,
@@ -167,16 +167,16 @@ private fun ErrorView(message: String, onBack: () -> Unit) {
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Text(
+        EInkText(
             text = "加载失败",
             style = TextStyle(fontSize = 18.sp, fontWeight = FontWeight.Bold)
         )
-        Text(
+        EInkText(
             text = message,
             style = TextStyle(fontSize = 14.sp, color = eInkColorScheme().onSurfaceVariant),
             modifier = Modifier.padding(vertical = EInkSpacing.s)
         )
-        Text(
+        EInkText(
             text = "[ 返回 ]",
             style = TextStyle(fontSize = 16.sp, fontWeight = FontWeight.Bold),
             modifier = Modifier

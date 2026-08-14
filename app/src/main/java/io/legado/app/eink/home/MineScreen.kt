@@ -7,7 +7,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Text
+import io.legado.app.eink.component.EInkText
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -28,7 +28,7 @@ internal fun MineScreen(
     onSettings: () -> Unit,
 ) {
     Column(modifier = Modifier.fillMaxSize()) {
-        Text(
+        EInkText(
             text = "我的",
             style = eInkTypography().titleLarge,
             modifier = Modifier.padding(
@@ -53,9 +53,9 @@ private fun MineEntry(label: String, onClick: () -> Unit) {
             .padding(horizontal = EInkSpacing.m, vertical = EInkSpacing.l),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Text(text = label, style = eInkTypography().bodyLarge)
+        EInkText(text = label, style = eInkTypography().bodyLarge)
         Spacer(modifier = Modifier.weight(1f))
-        Text(
+        EInkText(
             text = ">",
             style = eInkTypography().titleMedium,
             color = eInkColorScheme().onSurfaceVariant

@@ -3,7 +3,7 @@ package io.legado.app.eink
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.material3.Text
+import io.legado.app.eink.component.EInkText
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.ui.Alignment
@@ -84,6 +84,6 @@ private fun PlaceholderScreen(text: String) {
         modifier = Modifier.fillMaxSize(),
         contentAlignment = Alignment.Center
     ) {
-        Text(text = text)
+        EInkText(text = text)
     }
 }

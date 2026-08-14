@@ -3,7 +3,6 @@ package io.legado.app.eink.search
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -11,29 +10,22 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.BasicTextField
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.foundation.text.KeyboardActions
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import io.legado.app.data.entities.SearchBook
 import io.legado.app.eink.component.EInkHorizontalDivider
+import io.legado.app.eink.component.EInkText
+import io.legado.app.eink.component.EInkTopBar
 import io.legado.app.eink.theme.EInkSpacing
 import io.legado.app.eink.theme.eInkColorScheme
 import io.legado.app.eink.theme.eInkTypography
@@ -41,7 +33,6 @@ import io.legado.app.eink.theme.eInkTypography
 /**
  * 搜索 Route。
  */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SearchRoute(
     onBack: () -> Unit,
@@ -49,25 +40,14 @@ fun SearchRoute(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("搜索") },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
-                    }
-                }
-            )
-        }
-    ) { innerPadding ->
+    Column(modifier = Modifier.fillMaxSize()) {
+        EInkTopBar(title = "搜索", onBack = onBack)
         SearchScreen(
             state = uiState,
             onKeyChange = viewModel::updateKey,
             onSearch = viewModel::search,
             onClearHistory = viewModel::clearHistory,
-            isInBookshelf = viewModel::isInBookshelf,
-            contentPadding = innerPadding
+            isInBookshelf = viewModel::isInBookshelf
         )
     }
 }
@@ -82,7 +62,6 @@ internal fun SearchScreen(
     onSearch: (String) -> Unit,
     onClearHistory: () -> Unit,
     isInBookshelf: (SearchBook) -> Boolean,
-    contentPadding: PaddingValues = PaddingValues(),
 ) {
     Column(modifier = Modifier.fillMaxSize()) {
         SearchInputBar(
@@ -97,16 +76,14 @@ internal fun SearchScreen(
             when {
                 state.results.isNotEmpty() -> ResultList(
                     results = state.results,
-                    isInBookshelf = isInBookshelf,
-                    contentPadding = contentPadding
+                    isInBookshelf = isInBookshelf
                 )
                 state.showEmpty -> CenterMessage("无搜索结果")
                 state.isSearching -> CenterMessage("正在搜索……")
                 state.history.isNotEmpty() -> HistoryList(
                     history = state.history,
                     onClearHistory = onClearHistory,
-                    onSearch = onSearch,
-                    contentPadding = contentPadding
+                    onSearch = onSearch
                 )
                 else -> CenterMessage("输入书名开始搜索")
             }
@@ -131,7 +108,7 @@ private fun SearchInputBar(
             value = searchKey,
             onValueChange = onKeyChange,
             singleLine = true,
-            textStyle = TextStyle(fontSize = 16.sp),
+            textStyle = TextStyle(fontSize = 16.sp, color = eInkColorScheme().onSurface),
             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
             keyboardActions = KeyboardActions(onSearch = { onSearch(searchKey) }),
             modifier = Modifier.weight(1f),
@@ -141,16 +118,17 @@ private fun SearchInputBar(
                     contentAlignment = Alignment.CenterStart
                 ) {
                     if (searchKey.isEmpty()) {
-                        Text(
+                        EInkText(
                             text = "书名 / 作者",
-                            style = TextStyle(fontSize = 16.sp, color = eInkColorScheme().outline)
+                            fontSize = 16.sp,
+                            color = eInkColorScheme().outline
                         )
                     }
                     innerTextField()
                 }
             }
         )
-        Text(
+        EInkText(
             text = if (isSearching) "搜索中" else "搜索",
             modifier = Modifier
                 .clickable { onSearch(searchKey) }
@@ -164,12 +142,8 @@ private fun SearchInputBar(
 private fun ResultList(
     results: List<SearchBook>,
     isInBookshelf: (SearchBook) -> Boolean,
-    contentPadding: PaddingValues,
 ) {
-    LazyColumn(
-        modifier = Modifier.fillMaxSize(),
-        contentPadding = contentPadding
-    ) {
+    LazyColumn(modifier = Modifier.fillMaxSize()) {
         items(results, key = { "${it.origin}-${it.bookUrl}" }) { book ->
             ResultItem(book = book, inShelf = isInBookshelf(book))
             EInkHorizontalDivider()
@@ -181,7 +155,7 @@ private fun ResultList(
 private fun ResultItem(book: SearchBook, inShelf: Boolean) {
     Column(modifier = Modifier.fillMaxWidth().padding(horizontal = EInkSpacing.m, vertical = EInkSpacing.s)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(
+            EInkText(
                 text = book.name,
                 modifier = Modifier.weight(1f),
                 style = eInkTypography().bodyMedium,
@@ -189,7 +163,7 @@ private fun ResultItem(book: SearchBook, inShelf: Boolean) {
                 overflow = TextOverflow.Ellipsis
             )
             if (inShelf) {
-                Text(
+                EInkText(
                     text = "已在书架",
                     style = eInkTypography().labelMedium,
                     color = eInkColorScheme().onSurfaceVariant,
@@ -197,7 +171,7 @@ private fun ResultItem(book: SearchBook, inShelf: Boolean) {
                 )
             }
         }
-        Text(
+        EInkText(
             text = buildString {
                 append(book.author.ifBlank { "佚名" })
                 book.originName.ifBlank { "" }.takeIf { it.isNotEmpty() }?.let {
@@ -211,7 +185,7 @@ private fun ResultItem(book: SearchBook, inShelf: Boolean) {
             overflow = TextOverflow.Ellipsis
         )
         book.latestChapterTitle?.takeIf { it.isNotBlank() }?.let {
-            Text(
+            EInkText(
                 text = it,
                 style = eInkTypography().bodySmall,
                 color = eInkColorScheme().onSurfaceVariant,
@@ -227,12 +201,8 @@ private fun HistoryList(
     history: List<io.legado.app.data.entities.SearchKeyword>,
     onClearHistory: () -> Unit,
     onSearch: (String) -> Unit,
-    contentPadding: PaddingValues,
 ) {
-    LazyColumn(
-        modifier = Modifier.fillMaxSize(),
-        contentPadding = contentPadding
-    ) {
+    LazyColumn(modifier = Modifier.fillMaxSize()) {
         item {
             Row(
                 modifier = Modifier.fillMaxWidth().padding(
@@ -242,12 +212,12 @@ private fun HistoryList(
                 ),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
+                EInkText(
                     text = "搜索历史",
                     style = eInkTypography().labelLarge,
                     modifier = Modifier.weight(1f)
                 )
-                Text(
+                EInkText(
                     text = "清空",
                     style = eInkTypography().labelMedium,
                     color = eInkColorScheme().onSurfaceVariant,
@@ -256,7 +226,7 @@ private fun HistoryList(
             }
         }
         items(history, key = { it.word }) { keyword ->
-            Text(
+            EInkText(
                 text = keyword.word,
                 style = eInkTypography().bodyMedium,
                 maxLines = 1,
@@ -274,6 +244,6 @@ private fun HistoryList(
 @Composable
 private fun CenterMessage(message: String) {
     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        Text(text = message, style = eInkTypography().bodyLarge)
+        EInkText(text = message, style = eInkTypography().bodyLarge)
     }
 }

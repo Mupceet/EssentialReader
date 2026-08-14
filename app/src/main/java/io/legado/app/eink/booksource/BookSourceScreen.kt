@@ -3,7 +3,6 @@ package io.legado.app.eink.booksource
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -11,14 +10,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.BasicTextField
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -31,6 +22,8 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import io.legado.app.data.entities.BookSourcePart
 import io.legado.app.eink.component.EInkHorizontalDivider
 import io.legado.app.eink.component.EInkLoading
+import io.legado.app.eink.component.EInkText
+import io.legado.app.eink.component.EInkTopBar
 import io.legado.app.eink.theme.EInkSpacing
 import io.legado.app.eink.theme.eInkColorScheme
 import io.legado.app.eink.theme.eInkTypography
@@ -38,7 +31,6 @@ import io.legado.app.eink.theme.eInkTypography
 /**
  * 书源管理 Route。
  */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun BookSourceRoute(
     onBack: () -> Unit,
@@ -46,39 +38,31 @@ fun BookSourceRoute(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("书源 ${uiState.enabledCount}/${uiState.totalCount}") },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
-                    }
-                },
-                actions = {
-                    Text(
-                        text = "全启",
-                        modifier = Modifier
-                            .clickable { viewModel.enableAll(true) }
-                            .padding(horizontal = EInkSpacing.s),
-                        style = eInkTypography().labelLarge
-                    )
-                    Text(
-                        text = "全禁",
-                        modifier = Modifier
-                            .clickable { viewModel.enableAll(false) }
-                            .padding(horizontal = EInkSpacing.s),
-                        style = eInkTypography().labelLarge
-                    )
-                }
-            )
-        }
-    ) { innerPadding ->
+    Column(modifier = Modifier.fillMaxSize()) {
+        EInkTopBar(
+            title = "书源 ${uiState.enabledCount}/${uiState.totalCount}",
+            onBack = onBack,
+            actions = {
+                EInkText(
+                    text = "全启",
+                    modifier = Modifier
+                        .clickable { viewModel.enableAll(true) }
+                        .padding(horizontal = EInkSpacing.s),
+                    style = eInkTypography().labelLarge
+                )
+                EInkText(
+                    text = "全禁",
+                    modifier = Modifier
+                        .clickable { viewModel.enableAll(false) }
+                        .padding(horizontal = EInkSpacing.s),
+                    style = eInkTypography().labelLarge
+                )
+            }
+        )
         BookSourceScreen(
             state = uiState,
             onSearch = viewModel::search,
-            onToggleSource = viewModel::toggleSource,
-            contentPadding = innerPadding
+            onToggleSource = viewModel::toggleSource
         )
     }
 }
@@ -91,7 +75,6 @@ internal fun BookSourceScreen(
     state: BookSourceUiState,
     onSearch: (String) -> Unit,
     onToggleSource: (BookSourcePart) -> Unit,
-    contentPadding: PaddingValues = PaddingValues(),
 ) {
     Column(modifier = Modifier.fillMaxSize()) {
         // 搜索栏
@@ -104,9 +87,9 @@ internal fun BookSourceScreen(
                     modifier = Modifier.fillMaxSize(),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text("无匹配书源", style = eInkTypography().bodyLarge)
+                    EInkText("无匹配书源", style = eInkTypography().bodyLarge)
                 }
-                else -> SourceList(state, onToggleSource, contentPadding)
+                else -> SourceList(state, onToggleSource)
             }
         }
     }
@@ -118,7 +101,7 @@ private fun SourceSearchBar(searchKey: String, onSearch: (String) -> Unit) {
         value = searchKey,
         onValueChange = onSearch,
         singleLine = true,
-        textStyle = TextStyle(fontSize = 16.sp),
+        textStyle = TextStyle(fontSize = 16.sp, color = eInkColorScheme().onSurface),
         decorationBox = { innerTextField ->
             Row(
                 modifier = Modifier
@@ -133,15 +116,16 @@ private fun SourceSearchBar(searchKey: String, onSearch: (String) -> Unit) {
                     contentAlignment = Alignment.CenterStart
                 ) {
                     if (searchKey.isEmpty()) {
-                        Text(
+                        EInkText(
                             text = "搜索书源名称/URL",
-                            style = TextStyle(fontSize = 16.sp, color = eInkColorScheme().outline)
+                            fontSize = 16.sp,
+                            color = eInkColorScheme().outline
                         )
                     }
                     innerTextField()
                 }
                 if (searchKey.isNotEmpty()) {
-                    Text(
+                    EInkText(
                         text = "清除",
                         modifier = Modifier
                             .clickable { onSearch("") }
@@ -159,12 +143,8 @@ private fun SourceSearchBar(searchKey: String, onSearch: (String) -> Unit) {
 private fun SourceList(
     state: BookSourceUiState,
     onToggleSource: (BookSourcePart) -> Unit,
-    contentPadding: PaddingValues,
 ) {
-    LazyColumn(
-        modifier = Modifier.fillMaxSize(),
-        contentPadding = contentPadding
-    ) {
+    LazyColumn(modifier = Modifier.fillMaxSize()) {
         items(state.sources, key = { it.bookSourceUrl }) { source ->
             SourceItem(source = source, onToggle = { onToggleSource(source) })
             EInkHorizontalDivider()
@@ -182,13 +162,13 @@ private fun SourceItem(source: BookSourcePart, onToggle: () -> Unit) {
         verticalAlignment = Alignment.CenterVertically
     ) {
         Column(modifier = Modifier.weight(1f)) {
-            Text(
+            EInkText(
                 text = source.bookSourceName.ifBlank { source.bookSourceUrl },
                 style = eInkTypography().bodyMedium,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
-            Text(
+            EInkText(
                 text = source.bookSourceGroup ?: "",
                 style = eInkTypography().bodySmall,
                 color = eInkColorScheme().onSurfaceVariant,
@@ -197,7 +177,7 @@ private fun SourceItem(source: BookSourcePart, onToggle: () -> Unit) {
             )
         }
         // 启用状态（静态方框指示，符合 E-Ink 无动画规范）
-        Text(
+        EInkText(
             text = if (source.enabled) "启用" else "禁用",
             style = eInkTypography().labelMedium,
             color = if (source.enabled) {

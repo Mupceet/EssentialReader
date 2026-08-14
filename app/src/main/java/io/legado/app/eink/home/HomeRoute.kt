@@ -13,7 +13,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.material3.Text
+import io.legado.app.eink.component.EInkText
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
@@ -186,7 +186,7 @@ private fun SearchHintBar(onClick: () -> Unit) {
                 .padding(horizontal = EInkSpacing.m),
             contentAlignment = Alignment.CenterStart
         ) {
-            Text(
+            EInkText(
                 text = "搜索书名 / 作者",
                 style = eInkTypography().bodyMedium,
                 color = eInkColorScheme().onSurfaceVariant

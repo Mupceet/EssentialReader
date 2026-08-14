@@ -10,7 +10,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.material3.Text
+import io.legado.app.eink.component.EInkText
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -98,14 +98,14 @@ private fun BookListItem(book: Book, onClick: () -> Unit) {
             .padding(horizontal = EInkSpacing.m, vertical = EInkSpacing.s)
     ) {
         // 书名
-        Text(
+        EInkText(
             text = book.name,
             style = eInkTypography().titleMedium,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis
         )
         // 作者
-        Text(
+        EInkText(
             text = book.getRealAuthor(),
             style = eInkTypography().bodySmall,
             color = eInkColorScheme().onSurfaceVariant,
@@ -113,7 +113,7 @@ private fun BookListItem(book: Book, onClick: () -> Unit) {
         )
         // 阅读进度
         book.durChapterTitle?.let { title ->
-            Text(
+            EInkText(
                 text = title,
                 style = eInkTypography().labelMedium,
                 color = eInkColorScheme().onSurfaceVariant,
@@ -127,6 +127,6 @@ private fun BookListItem(book: Book, onClick: () -> Unit) {
 @Composable
 private fun EmptyBookshelf(modifier: Modifier = Modifier) {
     Box(modifier = modifier, contentAlignment = Alignment.Center) {
-        Text("书架为空", style = eInkTypography().bodyLarge)
+        EInkText("书架为空", style = eInkTypography().bodyLarge)
     }
 }
