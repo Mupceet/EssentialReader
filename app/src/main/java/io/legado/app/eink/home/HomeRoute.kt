@@ -10,10 +10,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.lazy.rememberLazyListState
 import io.legado.app.eink.component.EInkText
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
@@ -29,8 +27,8 @@ import io.legado.app.eink.bookshelf.BookshelfScreen
 import io.legado.app.eink.bookshelf.BookshelfViewModel
 import io.legado.app.eink.component.EInkHorizontalDivider
 import io.legado.app.eink.component.EInkOperationBar
-import io.legado.app.eink.component.pageDownEInk
-import io.legado.app.eink.component.pageUpEInk
+
+import io.legado.app.eink.component.rememberEInkPagedListState
 import io.legado.app.eink.theme.EInkShapes
 import io.legado.app.eink.theme.EInkSpacing
 import io.legado.app.eink.theme.EInkTheme
@@ -67,24 +65,21 @@ fun HomeRoute(
     // 仅切换 UI 局部状态（当前 Tab），按 UDF 约定保留在 composable
     var selectedTab by rememberSaveable { mutableIntStateOf(HomeTabs.BOOKSHELF) }
 
-    // 书架列表状态提升到首页，供底部操作栏翻页箭头驱动
-    val bookshelfListState = rememberLazyListState()
+    // 书架固定页分页：首次布局测出一页项数，之后按该项数整页跳转
+    val pager = rememberEInkPagedListState()
     val scope = rememberCoroutineScope()
+    val totalBooks = uiState.books.size
 
     val isBookshelfTab = selectedTab == HomeTabs.BOOKSHELF
-    val canPageUp by remember(isBookshelfTab) {
-        derivedStateOf { isBookshelfTab && bookshelfListState.canScrollBackward }
-    }
-    val canPageDown by remember(isBookshelfTab) {
-        derivedStateOf { isBookshelfTab && bookshelfListState.canScrollForward }
-    }
+    val canPageUp = isBookshelfTab && pager.canPageUp()
+    val canPageDown = isBookshelfTab && pager.canPageDown(totalBooks)
 
-    // 翻页动作：底部操作栏 ▲▼ 与列表滑动手势共用（项对齐整页跳转，零动画）
+    // 翻页动作：底部操作栏 ▲▼ 与列表滑动手势共用（固定页项数，零动画整页跳转）
     val pageUp: () -> Unit = {
-        scope.launch { bookshelfListState.pageUpEInk() }
+        scope.launch { pager.pageUp() }
     }
     val pageDown: () -> Unit = {
-        scope.launch { bookshelfListState.pageDownEInk() }
+        scope.launch { pager.pageDown(totalBooks) }
     }
 
     HomeScreen(
@@ -99,7 +94,7 @@ fun HomeRoute(
             BookshelfScreen(
                 state = uiState,
                 onBookClick = onBookClick,
-                listState = bookshelfListState,
+                listState = pager.listState,
                 onPageUp = pageUp,
                 onPageDown = pageDown
             )
