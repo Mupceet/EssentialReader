@@ -80,27 +80,33 @@ fun HomeRoute(
         derivedStateOf { isBookshelfTab && bookshelfListState.canScrollForward }
     }
 
+    // 翻页动作：底部操作栏 ▲▼ 与列表滑动手势共用（同一行为，零动画整页跳转）
+    val pageUp: () -> Unit = {
+        scope.launch {
+            bookshelfListState.scrollBy(-pageScrollAmount(bookshelfListState))
+        }
+    }
+    val pageDown: () -> Unit = {
+        scope.launch {
+            bookshelfListState.scrollBy(pageScrollAmount(bookshelfListState))
+        }
+    }
+
     HomeScreen(
         selectedTab = selectedTab,
         onSelectTab = { selectedTab = it },
         canPageUp = canPageUp,
         canPageDown = canPageDown,
-        onPageUp = {
-            scope.launch {
-                bookshelfListState.scrollBy(-pageScrollAmount(bookshelfListState))
-            }
-        },
-        onPageDown = {
-            scope.launch {
-                bookshelfListState.scrollBy(pageScrollAmount(bookshelfListState))
-            }
-        },
+        onPageUp = pageUp,
+        onPageDown = pageDown,
         onSearchClick = onSearch,
         bookshelf = {
             BookshelfScreen(
                 state = uiState,
                 onBookClick = onBookClick,
-                listState = bookshelfListState
+                listState = bookshelfListState,
+                onPageUp = pageUp,
+                onPageDown = pageDown
             )
         },
         mine = {

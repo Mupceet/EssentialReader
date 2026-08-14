@@ -19,6 +19,7 @@ import androidx.compose.ui.unit.dp
 import io.legado.app.data.entities.Book
 import io.legado.app.eink.component.EInkHorizontalDivider
 import io.legado.app.eink.component.EInkLoading
+import io.legado.app.eink.modifier.eInkPageSwipe
 import io.legado.app.eink.theme.EInkSpacing
 import io.legado.app.eink.theme.eInkColorScheme
 import io.legado.app.eink.theme.eInkTypography
@@ -31,7 +32,12 @@ import io.legado.app.eink.theme.eInkTypography
  *
  * [listState] 由外层提升，供首页底部操作栏的翻页箭头驱动。
  *
- * 使用 LazyColumn（规范 §40 允许 LazyColumn，但禁止 animateItem）。
+ * 列表不支持自由滚动（E-Ink 分页模式，参考微信读书墨水屏版）：
+ *  - `userScrollEnabled = false` 禁用拖动/惯性滚动；
+ *  - `overscrollEffect = null` 去除边缘回弹（拉伸/发光）效果；
+ *  - 上下滑动手势经 [eInkPageSwipe] 识别为整页翻页，
+ *    与底部操作栏 ▲▼ 按钮触发同一动作。
+ *
  * 列表项遵循规范 §41: title + secondary text + metadata + divider。
  */
 @Composable
@@ -39,6 +45,8 @@ internal fun BookshelfScreen(
     state: BookshelfUiState,
     onBookClick: (String) -> Unit,
     listState: LazyListState = rememberLazyListState(),
+    onPageUp: () -> Unit = {},
+    onPageDown: () -> Unit = {},
 ) {
     Box(modifier = Modifier.fillMaxSize()) {
         when {
@@ -47,7 +55,9 @@ internal fun BookshelfScreen(
             else -> BookList(
                 books = state.books,
                 onBookClick = onBookClick,
-                listState = listState
+                listState = listState,
+                onPageUp = onPageUp,
+                onPageDown = onPageDown
             )
         }
     }
@@ -57,11 +67,20 @@ internal fun BookshelfScreen(
 private fun BookList(
     books: List<Book>,
     onBookClick: (String) -> Unit,
-    listState: LazyListState
+    listState: LazyListState,
+    onPageUp: () -> Unit,
+    onPageDown: () -> Unit
 ) {
     LazyColumn(
-        modifier = Modifier.fillMaxSize(),
-        state = listState
+        modifier = Modifier
+            .fillMaxSize()
+            .eInkPageSwipe(
+                onPageUp = onPageUp,
+                onPageDown = onPageDown
+            ),
+        state = listState,
+        userScrollEnabled = false,
+        overscrollEffect = null
     ) {
         items(books, key = { it.bookUrl }) { book ->
             BookListItem(book = book, onClick = { onBookClick(book.bookUrl) })
