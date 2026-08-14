@@ -1,14 +1,10 @@
 package io.legado.app.eink.home
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import io.legado.app.eink.component.EInkText
 import androidx.compose.runtime.Composable
@@ -20,16 +16,15 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import io.legado.app.eink.bookshelf.BookshelfScreen
 import io.legado.app.eink.bookshelf.BookshelfViewModel
 import io.legado.app.eink.component.EInkHorizontalDivider
 import io.legado.app.eink.component.EInkOperationBar
+import io.legado.app.eink.component.EInkSearchHintBar
 
 import io.legado.app.eink.component.rememberEInkPagedListState
-import io.legado.app.eink.theme.EInkShapes
 import io.legado.app.eink.theme.EInkSpacing
 import io.legado.app.eink.theme.EInkTheme
 import kotlinx.coroutines.launch
@@ -130,7 +125,7 @@ internal fun HomeScreen(
             .fillMaxSize()
             .background(EInkTheme.colorScheme.background)
     ) {
-        SearchHintBar(onClick = onSearchClick)
+        EInkSearchHintBar(onClick = onSearchClick)
         EInkHorizontalDivider()
         Box(modifier = Modifier.weight(1f)) {
             if (selectedTab == HomeTabs.BOOKSHELF) {
@@ -150,40 +145,3 @@ internal fun HomeScreen(
         )
     }
 }
-
-/**
- * 顶部固定搜索框（提示样式，点击进入搜索页）。
- */
-@Composable
-private fun SearchHintBar(onClick: () -> Unit) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(SearchBarHeight)
-            .clickable(onClick = onClick)
-            .padding(horizontal = EInkSpacing.m),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(SearchInputHeight)
-                .border(
-                    width = 1.dp,
-                    color = EInkTheme.colorScheme.outline,
-                    shape = EInkShapes.small
-                )
-                .padding(horizontal = EInkSpacing.m),
-            contentAlignment = Alignment.CenterStart
-        ) {
-            EInkText(
-                text = "搜索书名 / 作者",
-                style = EInkTheme.typography.bodyMedium,
-                color = EInkTheme.colorScheme.onSurfaceVariant
-            )
-        }
-    }
-}
-
-private val SearchBarHeight = 64.dp
-private val SearchInputHeight = 44.dp

@@ -135,6 +135,12 @@ class SearchViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
+    /** 停止进行中的搜索（保留已得结果） */
+    fun stopSearch() {
+        searchModel.cancelSearch()
+        _uiState.update { it.copy(isSearching = false) }
+    }
+
     /** 清空搜索历史 */
     fun clearHistory() {
         viewModelScope.launch {

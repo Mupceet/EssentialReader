@@ -72,6 +72,12 @@ class EInkPagedListState(val listState: LazyListState) {
         pageStart -= pageItemCount
         listState.scrollToItem(pageStart)
     }
+
+    /** 重置到第一页（发起新搜索/切换数据集时调用）。 */
+    suspend fun resetToFirstPage() {
+        pageStart = 0
+        listState.scrollToItem(0)
+    }
 }
 
 /**

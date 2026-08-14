@@ -42,6 +42,7 @@ import io.legado.app.eink.theme.EInkTheme
  * @param tabs Tab 标签文案列表（从左到右）
  * @param selectedTabIndex 当前选中的 Tab 下标
  * @param onTabSelect 点击 Tab 回调，参数为下标
+ * @param navigationIcon 最左侧导航槽（如返回按钮），非首页常用；与 Tab 可并存
  * @param pageUpEnabled 上翻（向列表上方翻一页）是否可用
  * @param pageDownEnabled 下翻是否可用
  * @param onPageUp 点击上翻箭头
@@ -53,6 +54,7 @@ fun EInkOperationBar(
     selectedTabIndex: Int,
     onTabSelect: (Int) -> Unit,
     modifier: Modifier = Modifier,
+    navigationIcon: (@Composable () -> Unit)? = null,
     pageUpEnabled: Boolean = false,
     pageDownEnabled: Boolean = false,
     onPageUp: () -> Unit = {},
@@ -68,6 +70,7 @@ fun EInkOperationBar(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(EInkSpacing.m)
         ) {
+            navigationIcon?.invoke()
             tabs.forEachIndexed { index, label ->
                 TabItem(
                     label = label,

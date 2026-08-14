@@ -1,19 +1,15 @@
 package io.legado.app.eink.component
 
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import io.legado.app.eink.theme.EInkSpacing
@@ -51,21 +47,7 @@ fun EInkTopBar(
             verticalAlignment = Alignment.CenterVertically
         ) {
             if (onBack != null) {
-                Box(
-                    modifier = Modifier
-                        .size(BackTouchTarget)
-                        .clickable(
-                            role = Role.Button,
-                            onClickLabel = "返回",
-                            onClick = onBack
-                        ),
-                    contentAlignment = Alignment.Center
-                ) {
-                    BasicText(
-                        text = BackGlyph,
-                        style = EInkTheme.typography.titleMedium.copy(color = colors.onSurface)
-                    )
-                }
+                EInkBackButton(onClick = onBack)
             }
             BasicText(
                 text = title,
@@ -87,8 +69,3 @@ fun EInkTopBar(
 
 /** 顶栏高度（与底部操作栏一致）。 */
 private val BarHeight = 56.dp
-
-/** 返回按钮触控目标（48dp）。 */
-private val BackTouchTarget = 48.dp
-
-private const val BackGlyph = "←"
