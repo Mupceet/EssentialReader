@@ -41,6 +41,17 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+        <!-- E-Ink 版本入口 -->
+        <activity
+            android:name=".eink.EinkMainActivity"
+            android:exported="true"
+            android:label="阅读(E-Ink)">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
         <!-- 图标1 -->
         <activity
             android:name=".ui.welcome.Launcher1"

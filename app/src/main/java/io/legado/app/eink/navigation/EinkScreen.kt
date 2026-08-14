@@ -10,13 +10,15 @@ sealed interface EinkScreen {
 
     data object Bookshelf : EinkScreen
 
-    data class Reader(val bookUrl: String) : EinkScreen
-
-    data class Toc(val bookUrl: String) : EinkScreen
-
     data object Search : EinkScreen
 
     data object BookSource : EinkScreen
 
-    data class ReaderSettings(val bookUrl: String) : EinkScreen
+    data object Settings : EinkScreen
+
+    /** 目录（阅读界面接入前作为书籍详情入口） */
+    data class Toc(val bookUrl: String) : EinkScreen
+
+    /** 阅读器（Phase 后续接入 ReadBook 引擎） */
+    data class Reader(val bookUrl: String) : EinkScreen
 }
