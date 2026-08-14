@@ -9,6 +9,7 @@ plugins {
     alias libs.plugins.android.application
     alias libs.plugins.kotlin.android
     alias libs.plugins.kotlin.parcelize
+    alias libs.plugins.kotlin.compose
     alias libs.plugins.room
     alias libs.plugins.ksp
     alias libs.plugins.google.services
@@ -71,6 +72,7 @@ android {
     buildFeatures {
         buildConfig = true
         viewBinding = true
+        compose = true
     }
     buildTypes {
         release {
@@ -155,6 +157,17 @@ android {
 }
 
 dependencies {
+    // E-Ink Compose Design System library
+    implementation project(':modules:eink')
+    // Compose (BOM-managed, no Material3 — per E-Ink spec)
+    implementation platform(libs.compose.bom)
+    implementation libs.compose.ui
+    implementation libs.compose.foundation
+    implementation libs.compose.material3
+    implementation libs.activity.compose
+    debugImplementation libs.compose.ui.tooling
+    debugImplementation libs.compose.ui.tooling.preview
+
     //compileOnly "com.android.tools.build:gradle:$agp_version"
     //noinspection GradleDependency,GradlePackageUpdate
     //coreLibraryDesugaring('com.android.tools:desugar_jdk_libs_nio:2.0.4')
