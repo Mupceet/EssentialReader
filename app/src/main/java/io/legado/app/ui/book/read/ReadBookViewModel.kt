@@ -91,12 +91,20 @@ class ReadBookViewModel(application: Application) : BaseViewModel(application) {
                 else -> appDb.bookDao.getBook(bookUrl)
             } ?: ReadBook.book
             when {
-                book != null -> initBook(book)
-                else -> {
-                    ReadBook.upMsg(context.getString(R.string.no_book))
-                    AppLog.put("未找到书籍\nbookUrl:$bookUrl")
+            book != null -> {
+                initBook(book)
+                // 书签跳转：如果 intent 包含 chapterIndex，则跳转到书签位置
+                val chapterIndex = intent.getIntExtra("chapterIndex", -1)
+                if (chapterIndex >= 0) {
+                    val chapterPos = intent.getIntExtra("chapterPos", 0)
+                    ReadBook.openChapter(chapterIndex, chapterPos)
                 }
             }
+            else -> {
+                ReadBook.upMsg(context.getString(R.string.no_book))
+                AppLog.put("未找到书籍\nbookUrl:$bookUrl")
+            }
+        }
         }.onSuccess {
             success?.invoke()
         }.onError {

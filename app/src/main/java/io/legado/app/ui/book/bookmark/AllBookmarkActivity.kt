@@ -1,5 +1,6 @@
 package io.legado.app.ui.book.bookmark
 
+import android.content.Intent
 import android.os.Bundle
 import android.view.Menu
 import android.view.MenuItem
@@ -11,14 +12,18 @@ import io.legado.app.constant.AppLog
 import io.legado.app.data.appDb
 import io.legado.app.data.entities.Bookmark
 import io.legado.app.databinding.ActivityAllBookmarkBinding
+import io.legado.app.ui.book.read.ReadBookActivity
 import io.legado.app.ui.file.HandleFileContract
 import io.legado.app.utils.applyNavigationBarPadding
 import io.legado.app.utils.showDialogFragment
+import io.legado.app.utils.toastOnUi
 import io.legado.app.utils.viewbindingdelegate.viewBinding
 import kotlinx.coroutines.Dispatchers.IO
+import kotlinx.coroutines.Dispatchers.Main
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /**
  * 所有书签
@@ -76,7 +81,23 @@ class AllBookmarkActivity : VMBaseActivity<ActivityAllBookmarkBinding, AllBookma
     }
 
     override fun onItemClick(bookmark: Bookmark, position: Int) {
-        showDialogFragment(BookmarkDialog(bookmark, position))
+        lifecycleScope.launch(IO) {
+            val book = appDb.bookDao.getBook(bookmark.bookName, bookmark.bookAuthor)
+            withContext(Main) {
+                if (book != null) {
+                    val intent = Intent(this@AllBookmarkActivity, ReadBookActivity::class.java).apply {
+                        putExtra("bookUrl", book.bookUrl)
+                        putExtra("chapterIndex", bookmark.chapterIndex)
+                        putExtra("chapterPos", bookmark.chapterPos)
+                        putExtra("inBookshelf", true)
+                        putExtra("chapterChanged", true)
+                    }
+                    startActivity(intent)
+                } else {
+                    toastOnUi("未找到书籍")
+                }
+            }
+        }
     }
 
 }
