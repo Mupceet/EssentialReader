@@ -48,7 +48,7 @@ android {
         }
     }
     defaultConfig {
-        applicationId "io.legado.app"
+        applicationId "io.legado.app.eink"
         minSdk 21
         targetSdk 36
         versionCode 10000 + gitCommits
