@@ -1,4 +1,4 @@
-package io.legado.app.eink.bookshelf
+package io.legado.app.eink.widget
 
 import android.graphics.Bitmap
 import android.graphics.drawable.Drawable
@@ -7,17 +7,24 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.produceState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -36,7 +43,7 @@ internal val EInkCoverWidth = 66.dp
 internal val EInkCoverHeight = 90.dp
 
 /**
- * E-Ink 书籍封面。
+ * E-Ink 书籍封面（书架/搜索结果等列表项复用）。
  *
  * 复用应用内 Glide（[ImageLoader.loadBitmap]）加载封面图，按 [EInkCoverWidth] ×
  * [EInkCoverHeight] 裁剪显示；**封面始终有正常显示**：
@@ -140,5 +147,36 @@ private fun EInkDefaultCover(
                 )
             }
         }
+    }
+}
+
+/** 信息行图标尺寸（同 View 版 @dimen/desc_icon_size = 18dp）。 */
+private val DescIconSize = 18.dp
+
+/**
+ * 图标 + 文字信息行：与 View 版书架/搜索列表项一致，用图标区分
+ * 作者 / 当前进度章节 / 最新章节等信息行。
+ */
+@Composable
+internal fun EInkInfoRow(
+    iconRes: Int,
+    text: String,
+    style: TextStyle,
+) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Image(
+            painter = painterResource(iconRes),
+            contentDescription = null,
+            modifier = Modifier.size(DescIconSize),
+            colorFilter = ColorFilter.tint(EInkTheme.colorScheme.onSurfaceVariant)
+        )
+        Spacer(modifier = Modifier.width(EInkSpacing.xs))
+        EInkText(
+            text = text,
+            style = style,
+            color = EInkTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
     }
 }
