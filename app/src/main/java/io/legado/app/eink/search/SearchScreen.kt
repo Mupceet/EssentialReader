@@ -219,17 +219,7 @@ private fun ResultItem(book: SearchBook, inShelf: Boolean) {
                     style = EInkTheme.typography.labelMedium
                 )
             }
-            // 分类/字数（参考 View 版 LabelsBar；无则省略）
-            book.getKindList().takeIf { it.isNotEmpty() }?.let { kinds ->
-                EInkText(
-                    text = kinds.joinToString(" / "),
-                    style = EInkTheme.typography.labelMedium,
-                    color = EInkTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.padding(top = EInkSpacing.xxs)
-                )
-            }
+
             // 简介（参考 View 版 tv_introduce；无简介显示"暂无简介"）
             EInkText(
                 text = book.trimIntro(LocalContext.current),
