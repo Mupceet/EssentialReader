@@ -562,30 +562,45 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application),
         resetPageOffset: Boolean,
         success: (() -> Unit)?
     ) {
+        if (relativePosition != 0) {
+            // ±1 预载章节回调：View 版只刷新离屏预载页，不更新当前显示
+            success?.invoke()
+            return
+        }
         val chapter = ReadBook.curTextChapter
-        if (chapter != null && chapter.pages.isNotEmpty()) {
-            val pageIndex = ReadBook.durPageIndex.coerceIn(0, chapter.lastIndex)
-            val page = chapter.getPage(pageIndex)
-            if (page != null) {
-                _uiState.update {
-                    it.copy(
-                        textPage = page,
-                        pageVersion = it.pageVersion + 1,
-                        chapterTitle = page.title,
-                        pageIndex = pageIndex,
-                        pageCount = chapter.pageSize,
-                        chapterIndex = ReadBook.durChapterIndex,
-                        chapterSize = ReadBook.chapterSize,
-                        readProgress = page.readProgress,
-                        isLoading = false,
-                        error = null,
-                    )
-                }
+        if (chapter == null || chapter.pages.isEmpty()) {
+            // 章节尚未挂载或尚未排出任何页面
+            if (ReadBook.msg != null) {
+                _uiState.update { it.copy(isLoading = false, error = ReadBook.msg) }
             }
             success?.invoke()
-        } else if (ReadBook.msg != null) {
-            _uiState.update { it.copy(isLoading = false, error = ReadBook.msg) }
+            return
         }
+        val pageIndex = ReadBook.durPageIndex
+        if (pageIndex < 0) {
+            // 流式排版尚未到达阅读位置：保持现状（加载中/旧页），
+            // 等待包含 durChapterPos 的页面排出，禁止回退第 0 页（章节首页闪现）
+            success?.invoke()
+            return
+        }
+        val page = chapter.getPage(pageIndex)
+        if (page != null) {
+            _uiState.update {
+                it.copy(
+                    textPage = page,
+                    pageVersion = it.pageVersion + 1,
+                    chapterTitle = page.title,
+                    pageIndex = pageIndex,
+                    pageCount = chapter.pageSize,
+                    chapterIndex = ReadBook.durChapterIndex,
+                    chapterSize = ReadBook.chapterSize,
+                    readProgress = page.readProgress,
+                    isLoading = false,
+                    error = null,
+                )
+            }
+        }
+        success?.invoke()
     }
 
     override suspend fun upContentAwait(
