@@ -2,7 +2,6 @@ package io.legado.app.eink.search
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -20,6 +19,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -170,8 +170,7 @@ private fun ResultItem(book: SearchBook, inShelf: Boolean) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = EInkSpacing.m, vertical = EInkSpacing.s),
-        verticalAlignment = Alignment.CenterVertically
+            .padding(horizontal = EInkSpacing.m, vertical = EInkSpacing.s)
     ) {
         // 封面（与首页书架一致；无封面时显示文字占位封面）
         EInkBookCover(
@@ -186,25 +185,33 @@ private fun ResultItem(book: SearchBook, inShelf: Boolean) {
         Column(
             modifier = Modifier
                 .weight(1f)
-                // 与封面等高，信息行间距平均分布
-                .height(EInkCoverHeight)
-                .padding(vertical = EInkSpacing.xxs),
-            verticalArrangement = Arrangement.SpaceBetween
+                .padding(vertical = EInkSpacing.xxs)
         ) {
-            // 标题
-            EInkText(
-                text = book.name,
-                style = EInkTheme.typography.titleMedium,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-            // 作者（不再拼接书源信息，与首页一致）
+            // 标题行：标题 + 右侧"已在书架"
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                EInkText(
+                    text = book.name,
+                    modifier = Modifier.weight(1f),
+                    style = EInkTheme.typography.titleMedium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                if (inShelf) {
+                    EInkText(
+                        text = "已在书架",
+                        style = EInkTheme.typography.labelMedium,
+                        color = EInkTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(start = EInkSpacing.s)
+                    )
+                }
+            }
+            // 作者（移除书源信息，与首页一致）
             EInkInfoRow(
                 iconRes = R.drawable.ic_author,
                 text = book.author.ifBlank { "佚名" },
                 style = EInkTheme.typography.bodySmall
             )
-            // 最新章节
+            // 最新章节（有则显示）
             book.latestChapterTitle?.takeIf { it.isNotBlank() }?.let { title ->
                 EInkInfoRow(
                     iconRes = R.drawable.ic_book_last,
@@ -212,14 +219,25 @@ private fun ResultItem(book: SearchBook, inShelf: Boolean) {
                     style = EInkTheme.typography.labelMedium
                 )
             }
-        }
-        // 右侧"已在书架"提示保留
-        if (inShelf) {
-            Spacer(modifier = Modifier.width(EInkSpacing.s))
+            // 分类/字数（参考 View 版 LabelsBar；无则省略）
+            book.getKindList().takeIf { it.isNotEmpty() }?.let { kinds ->
+                EInkText(
+                    text = kinds.joinToString(" / "),
+                    style = EInkTheme.typography.labelMedium,
+                    color = EInkTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.padding(top = EInkSpacing.xxs)
+                )
+            }
+            // 简介（参考 View 版 tv_introduce；无简介显示"暂无简介"）
             EInkText(
-                text = "已在书架",
-                style = EInkTheme.typography.labelMedium,
-                color = EInkTheme.colorScheme.onSurfaceVariant
+                text = book.trimIntro(LocalContext.current),
+                style = EInkTheme.typography.bodySmall,
+                color = EInkTheme.colorScheme.onSurfaceVariant,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.padding(top = EInkSpacing.xxs)
             )
         }
     }
