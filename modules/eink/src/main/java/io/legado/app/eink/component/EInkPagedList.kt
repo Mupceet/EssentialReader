@@ -80,14 +80,21 @@ class EInkPagedListState(val listState: LazyListState) {
     }
 
     /**
-     * 安全滚动到页首下标：列表尚未挂载或当前没有 item 时，
-     * [LazyListState.scrollToItem] 会在 remeasure 时抛
-     * `IndexOutOfBoundsException`（如搜索刚开始/无结果返回空列表），
-     * 此时仅更新页位，等待列表实际有内容后再自然落到首页。
+     * 安全滚动到页首下标。
+     *
+     * 列表尚未挂载或当前没有 item 时，[LazyListState.scrollToItem] 会在 remeasure
+     * 时抛 `IndexOutOfBoundsException`（如搜索刚开始/无结果返回空列表），因此先判断
+     * 列表确有内容再滚动；同时存在竞态：读取 [LazyListState.layoutInfo] 之后、滚动
+     * 真正生效之前，数据集可能已被切换为空（重复搜索时旧结果→清空），滚动同样会抛
+     * 越界。此时列表为空本就无需滚动，新数据到达后列表自然从首页开始，故捕获忽略。
      */
     private suspend fun scrollToPageStart(index: Int) {
         if (listState.layoutInfo.totalItemsCount > 0) {
-            listState.scrollToItem(index)
+            try {
+                listState.scrollToItem(index)
+            } catch (_: IndexOutOfBoundsException) {
+                // 数据集切换竞态：忽略即可，空列表无需滚动。
+            }
         }
     }
 }
