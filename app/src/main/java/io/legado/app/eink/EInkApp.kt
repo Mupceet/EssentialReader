@@ -1,5 +1,6 @@
 package io.legado.app.eink
 
+import android.app.Application
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -10,8 +11,13 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.lifecycle.HasDefaultViewModelProviderFactory
+import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.ViewModelStore
 import androidx.lifecycle.ViewModelStoreOwner
+import androidx.lifecycle.viewmodel.CreationExtras
+import androidx.lifecycle.viewmodel.MutableCreationExtras
 import androidx.lifecycle.viewmodel.compose.LocalViewModelStoreOwner
 import io.legado.app.eink.bookdetail.BookDetailRoute
 import io.legado.app.eink.booksource.BookSourceRoute
@@ -47,10 +53,21 @@ fun EInkApp(
 
     // 按当前栈条目提供 ViewModelStoreOwner：ViewModel 作用域随条目隔离，
     // 退出界面再进入时 ViewModel 全新（如搜索历史/结果不再残留）。
-    val viewModelStoreOwner = remember(controller) {
-        object : ViewModelStoreOwner {
+    // 实现 HasDefaultViewModelProviderFactory 以便 AndroidViewModel(application)
+    // 等构造方式仍可正常创建。
+    val app = LocalContext.current.applicationContext as Application
+    val viewModelStoreOwner = remember(controller, app) {
+        object : ViewModelStoreOwner, HasDefaultViewModelProviderFactory {
             override val viewModelStore: ViewModelStore
                 get() = controller.currentViewModelStore
+
+            override val defaultViewModelProviderFactory: ViewModelProvider.Factory
+                get() = ViewModelProvider.AndroidViewModelFactory.getInstance(app)
+
+            override val defaultViewModelCreationExtras: CreationExtras
+                get() = MutableCreationExtras().apply {
+                    this[ViewModelProvider.AndroidViewModelFactory.APPLICATION_KEY] = app
+                }
         }
     }
 
