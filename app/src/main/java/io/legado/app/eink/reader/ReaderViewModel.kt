@@ -647,7 +647,8 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application),
         super.onCleared()
         stopAutoPlay()
         if (ReadBook.callBack === this) {
-            ReadBook.saveCurrentBookProgress()
+            // 落库阅读进度（更新 durChapterTime，书架按最后阅读排序据此置顶）
+            ReadBook.saveRead()
             ReadBook.unregister(this)
         }
     }

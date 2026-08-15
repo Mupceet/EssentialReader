@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import io.legado.app.eink.component.EInkText
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
@@ -75,6 +76,14 @@ fun HomeRoute(
     }
     val pageDown: () -> Unit = {
         scope.launch { pager.pageDown(totalBooks) }
+    }
+
+    // 数据变化（最后阅读排序更新/增删）后把实际滚动拉回页首：
+    // LazyColumn 按 key 锚定，原地重排会让首可见项漂移（新首项被顶到
+    // 可视区之上），与分页状态脱钩；从阅读页返回时 pager 为新实例
+    // （pageStart=0），这里同时负责把恢复的滚动位置对齐回第一页
+    LaunchedEffect(uiState.books) {
+        pager.realignToPageStart(uiState.books.size)
     }
 
     HomeScreen(

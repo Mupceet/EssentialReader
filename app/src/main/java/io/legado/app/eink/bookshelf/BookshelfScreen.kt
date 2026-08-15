@@ -90,7 +90,11 @@ private fun BookList(
         userScrollEnabled = false,
         overscrollEffect = null
     ) {
-        items(books, key = { it.bookUrl }) { book ->
+        // 不用 key：按 key 锚定时列表原地重排（最后阅读排序置顶）会让视口
+        // 跟随原首可见项漂移、再被分页对齐拉回，整个列表抖动；按下标锚定
+        // 视口不动，仅内容变化的项重绘。列表项无跨重排保留的内部状态，
+        // 无需 key
+        items(books) { book ->
             BookListItem(book = book, onClick = { onBookClick(book.bookUrl) })
             EInkHorizontalDivider()
         }

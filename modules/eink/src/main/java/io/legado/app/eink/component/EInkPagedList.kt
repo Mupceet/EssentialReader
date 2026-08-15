@@ -86,6 +86,37 @@ class EInkPagedListState(val listState: LazyListState) {
     }
 
     /**
+     * 数据集变化后把实际滚动位置拉回 [pageStart]。
+     *
+     * LazyColumn 按 key 锚定，列表原地重排（如按最后阅读时间排序更新）时，
+     * 首可见项会跟随原 key 漂移，与 [pageStart] 脱钩：新页首被顶到可视区
+     * 之上、翻页可用状态与实际位置不一致。每次数据更新后调用本方法，
+     * 恢复"实际位置 = 页首"不变式；列表缩短时页首同步收敛到最后一个
+     * 完整页起点。
+     */
+    suspend fun realignToPageStart(totalItems: Int) {
+        if (pageItemCount <= 0) return
+        if (totalItems <= 0) {
+            pageStart = 0
+            return
+        }
+        val maxStart = ((totalItems - 1) / pageItemCount) * pageItemCount
+        if (pageStart > maxStart) {
+            pageStart = maxStart
+        }
+        if (listState.layoutInfo.totalItemsCount > 0 &&
+            (listState.firstVisibleItemIndex != pageStart ||
+                    listState.firstVisibleItemScrollOffset != 0)
+        ) {
+            try {
+                listState.scrollToItem(pageStart)
+            } catch (_: IndexOutOfBoundsException) {
+                // 数据集切换竞态：忽略即可
+            }
+        }
+    }
+
+    /**
      * 安全滚动到页首下标。
      *
      * 列表尚未挂载或当前没有 item 时，[LazyListState.scrollToItem] 会在 remeasure
