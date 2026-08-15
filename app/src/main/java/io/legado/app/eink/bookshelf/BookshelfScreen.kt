@@ -128,8 +128,18 @@ private fun BookListItem(book: Book, onClick: () -> Unit) {
                 color = EInkTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1
             )
-            // 阅读进度
+            // 当前进度章节
             book.durChapterTitle?.let { title ->
+                EInkText(
+                    text = title,
+                    style = EInkTheme.typography.labelMedium,
+                    color = EInkTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+            // 最新章节
+            book.latestChapterTitle?.let { title ->
                 EInkText(
                     text = title,
                     style = EInkTheme.typography.labelMedium,
