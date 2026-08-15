@@ -9,6 +9,7 @@ import androidx.compose.runtime.Stable
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalCursorBlinkEnabled
 import androidx.compose.ui.text.TextStyle
 import io.legado.app.eink.modifier.NoIndication
 
@@ -189,6 +190,9 @@ fun EInkTheme(
         LocalEInkContentColor provides colorScheme.onBackground,
         // Globally disable ripple indication at the theme root.
         LocalIndication provides NoIndication,
+        // Static (non-blinking) text cursor: blinking is motion and causes
+        // needless E-Ink refreshes, so the caret stays visible at full alpha.
+        LocalCursorBlinkEnabled provides false,
     ) {
         content()
     }
