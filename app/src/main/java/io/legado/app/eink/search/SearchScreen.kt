@@ -66,7 +66,9 @@ fun SearchRoute(
         if (key.isBlank()) return
         keyboard?.hide()
         viewModel.search(key)
-        scope.launch { pager.resetToFirstPage() }
+        // 只重置分页计数；列表被清空后会自然回到首页，不要在数据切换期滚动
+        //（scrollToItem 会与测量竞争，导致越界或 layout state is not idle 崩溃）。
+        pager.resetPaging()
     }
 
     val isResultListVisible = uiState.results.isNotEmpty() || uiState.isSearching

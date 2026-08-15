@@ -73,10 +73,16 @@ class EInkPagedListState(val listState: LazyListState) {
         scrollToPageStart(pageStart)
     }
 
-    /** 重置到第一页（发起新搜索/切换数据集时调用）。 */
-    suspend fun resetToFirstPage() {
+    /**
+     * 重置分页计数到第一页（不滚动）。
+     *
+     * 发起新搜索等会先清空列表再填充新数据的场景使用：列表被清空后
+     * [LazyListState] 会自然回到首页，无需（也不应）在数据切换期间调用
+     * [scrollToItem]——此时滚动会与测量通道竞争，触发越界或
+     * `layout state is not idle` 崩溃。
+     */
+    fun resetPaging() {
         pageStart = 0
-        scrollToPageStart(0)
     }
 
     /**
