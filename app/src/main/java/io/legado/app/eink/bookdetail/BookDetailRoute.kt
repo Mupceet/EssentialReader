@@ -43,8 +43,8 @@ import io.legado.app.eink.widget.EInkBookCover
 import io.legado.app.eink.widget.EInkInfoRow
 
 /** 详情页封面尺寸（与 View 版 activity_book_info.xml 一致：110 × 160dp）。 */
-private val DetailCoverWidth = 110.dp
-private val DetailCoverHeight = 160.dp
+private val DetailCoverWidth = 130.dp
+private val DetailCoverHeight = 182.dp
 
 /**
  * 书籍详情 Route — ViewModel 感知层。
@@ -81,6 +81,7 @@ fun BookDetailRoute(
         state = uiState,
         onBack = onBack,
         onAddToShelf = viewModel::addToBookshelf,
+        onRemoveFromShelf = viewModel::removeFromBookshelf,
         onOpenToc = { onOpenToc(effectiveBookUrl) },
         onRead = { onRead(effectiveBookUrl) },
         onChangeSource = viewModel::changeSource,
@@ -95,6 +96,7 @@ internal fun BookDetailScreen(
     state: BookDetailUiState,
     onBack: () -> Unit,
     onAddToShelf: () -> Unit,
+    onRemoveFromShelf: () -> Unit,
     onOpenToc: () -> Unit,
     onRead: () -> Unit,
     onChangeSource: () -> Unit,
@@ -174,25 +176,28 @@ internal fun BookDetailScreen(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         ActionButton(
-                            iconRes = if (state.isInBookshelf) R.drawable.ic_book_has else R.drawable.ic_add,
-                            label = if (state.isInBookshelf) "已在书架" else "加入书架",
-                            enabled = !state.isInBookshelf,
-                            onClick = onAddToShelf
+                            iconRes = if (state.isInBookshelf) R.drawable.ic_outline_delete else R.drawable.ic_add,
+                            label = if (state.isInBookshelf) "移出书架" else "加入书架",
+                            onClick = if (state.isInBookshelf) onRemoveFromShelf else onAddToShelf,
+                            modifier = Modifier.weight(1f)
                         )
                         ActionButton(
                             iconRes = R.drawable.ic_toc,
                             label = "查看目录",
-                            onClick = onOpenToc
+                            onClick = onOpenToc,
+                            modifier = Modifier.weight(1f)
                         )
                         ActionButton(
                             iconRes = R.drawable.ic_swap_horiz,
                             label = "切换书源",
-                            onClick = onChangeSource
+                            onClick = onChangeSource,
+                            modifier = Modifier.weight(1f)
                         )
                         ActionButton(
                             iconRes = R.drawable.ic_play_outline_24dp,
                             label = "阅读",
-                            onClick = onRead
+                            onClick = onRead,
+                            modifier = Modifier.weight(1f)
                         )
                     }
                     EInkHorizontalDivider()
@@ -202,14 +207,6 @@ internal fun BookDetailScreen(
                             .fillMaxWidth()
                             .padding(horizontal = EInkSpacing.m, vertical = EInkSpacing.m)
                     ) {
-                        // 当前进度章节
-                        book.durChapterTitle?.takeIf { it.isNotBlank() }?.let {
-                            EInkInfoRow(
-                                iconRes = R.drawable.ic_history,
-                                text = it,
-                                style = EInkTheme.typography.labelMedium
-                            )
-                        }
                         // 最新章节
                         book.latestChapterTitle?.takeIf { it.isNotBlank() }?.let {
                             EInkInfoRow(
@@ -218,7 +215,7 @@ internal fun BookDetailScreen(
                                 style = EInkTheme.typography.labelMedium
                             )
                         }
-                        // 标签/字数
+                        // 字数/标签（紧跟最新章节之后）
                         book.getKindList().takeIf { it.isNotEmpty() }?.let { kinds ->
                             EInkText(
                                 text = kinds.joinToString(" / "),
@@ -229,6 +226,14 @@ internal fun BookDetailScreen(
                                 modifier = Modifier.padding(vertical = EInkSpacing.xxs)
                             )
                         }
+                        // 当前进度章节
+                        book.durChapterTitle?.takeIf { it.isNotBlank() }?.let {
+                            EInkInfoRow(
+                                iconRes = R.drawable.ic_history,
+                                text = it,
+                                style = EInkTheme.typography.labelMedium
+                            )
+                        }
                         // 书源
                         book.originName.takeIf { it.isNotBlank() }?.let {
                             EInkInfoRow(
@@ -237,9 +242,9 @@ internal fun BookDetailScreen(
                                 style = EInkTheme.typography.labelMedium
                             )
                         }
-                        // 简介（完整显示）
+                        // 简介（直接展示内容，不另加"简介"前缀，完整显示）
                         EInkText(
-                            text = "简介：${book.getDisplayIntro()}",
+                            text = book.getDisplayIntro()?.takeIf { it.isNotBlank() } ?: "暂无简介",
                             style = EInkTheme.typography.bodyMedium,
                             color = EInkTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.padding(top = EInkSpacing.m)
@@ -266,28 +271,27 @@ private fun ActionButton(
     iconRes: Int,
     label: String,
     onClick: () -> Unit,
-    enabled: Boolean = true,
+    modifier: Modifier = Modifier,
 ) {
     val colors = EInkTheme.colorScheme
-    val contentColor = if (enabled) colors.onSurface else colors.disabledContent
     Column(
-        modifier = Modifier
+        modifier = modifier
             .defaultMinSize(minWidth = 48.dp, minHeight = 48.dp)
-            .clickable(enabled = enabled, onClick = onClick)
-            .padding(horizontal = EInkSpacing.m, vertical = EInkSpacing.s),
+            .clickable(onClick = onClick)
+            .padding(horizontal = EInkSpacing.s, vertical = EInkSpacing.s),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Image(
             painter = painterResource(iconRes),
             contentDescription = label,
             modifier = Modifier.size(24.dp),
-            colorFilter = ColorFilter.tint(contentColor)
+            colorFilter = ColorFilter.tint(colors.onSurface)
         )
         Spacer(modifier = Modifier.height(EInkSpacing.xs))
         EInkText(
             text = label,
             style = EInkTheme.typography.labelMedium,
-            color = contentColor,
+            color = colors.onSurface,
             maxLines = 1
         )
     }

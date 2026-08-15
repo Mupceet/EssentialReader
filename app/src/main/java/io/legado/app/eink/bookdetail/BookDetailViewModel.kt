@@ -8,6 +8,7 @@ import io.legado.app.constant.BookType
 import io.legado.app.data.appDb
 import io.legado.app.data.entities.Book
 import io.legado.app.eink.arch.UserMessage
+import io.legado.app.help.book.addType
 import io.legado.app.help.book.isLocal
 import io.legado.app.help.book.isNotShelf
 import io.legado.app.help.book.removeType
@@ -122,6 +123,22 @@ class BookDetailViewModel(application: Application) : AndroidViewModel(applicati
             }.onSuccess {
                 _uiState.update { it.copy(isInBookshelf = true) }
                 _messages.emit(UserMessage.from(R.string.eink_added_to_bookshelf))
+            }.onFailure {
+                _messages.emit(UserMessage.from(R.string.eink_operation_failed))
+            }
+        }
+    }
+
+    /** 移出书架（仅已在书架的书）。 */
+    fun removeFromBookshelf() {
+        val book = _uiState.value.book ?: return
+        viewModelScope.launch {
+            runCatching {
+                book.addType(BookType.notShelf)
+                book.save()
+            }.onSuccess {
+                _uiState.update { it.copy(isInBookshelf = false) }
+                _messages.emit(UserMessage.from(R.string.eink_removed_from_bookshelf))
             }.onFailure {
                 _messages.emit(UserMessage.from(R.string.eink_operation_failed))
             }
