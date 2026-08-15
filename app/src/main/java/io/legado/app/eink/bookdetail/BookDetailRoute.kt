@@ -186,9 +186,7 @@ internal fun BookDetailScreen(
                             Column(
                                 modifier = Modifier
                                     .weight(1f)
-                                    .height(DetailCoverHeight)
-                                    .padding(vertical = EInkSpacing.s),
-                                verticalArrangement = Arrangement.SpaceBetween
+                                    .padding(vertical = EInkSpacing.xs)
                             ) {
                                 // 书名
                                 EInkText(
@@ -205,6 +203,41 @@ internal fun BookDetailScreen(
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis
                                 )
+                                // 字数/标签
+                                book.getKindList().takeIf { it.isNotEmpty() }?.let { kinds ->
+                                    EInkText(
+                                        text = kinds.joinToString(" / "),
+                                        style = EInkTheme.typography.labelMedium,
+                                        color = EInkTheme.colorScheme.onSurfaceVariant,
+                                        maxLines = 2,
+                                        overflow = TextOverflow.Ellipsis,
+                                        modifier = Modifier.padding(top = EInkSpacing.xs)
+                                    )
+                                }
+                                // 最新章节
+                                book.latestChapterTitle?.takeIf { it.isNotBlank() }?.let {
+                                    EInkInfoRow(
+                                        iconRes = R.drawable.ic_book_last,
+                                        text = it,
+                                        style = EInkTheme.typography.labelMedium
+                                    )
+                                }
+                                // 当前进度章节
+                                book.durChapterTitle?.takeIf { it.isNotBlank() }?.let {
+                                    EInkInfoRow(
+                                        iconRes = R.drawable.ic_history,
+                                        text = it,
+                                        style = EInkTheme.typography.labelMedium
+                                    )
+                                }
+                                // 书源
+                                book.originName.takeIf { it.isNotBlank() }?.let {
+                                    EInkInfoRow(
+                                        iconRes = R.drawable.ic_web_outline,
+                                        text = it,
+                                        style = EInkTheme.typography.labelMedium
+                                    )
+                                }
                             }
                         }
                         // 操作按钮一排：加入书架/移出书架 / 查看目录 / 切换书源 / 阅读
@@ -241,53 +274,16 @@ internal fun BookDetailScreen(
                             )
                         }
                         EInkHorizontalDivider()
-                        // 信息区
+                        // 简介区（信息已并入顶部，下方仅保留简介）
                         Column(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .padding(horizontal = EInkSpacing.m, vertical = EInkSpacing.m)
                         ) {
-                            // 字数/标签
-                            book.getKindList().takeIf { it.isNotEmpty() }?.let { kinds ->
-                                EInkText(
-                                    text = kinds.joinToString(" / "),
-                                    style = EInkTheme.typography.labelMedium,
-                                    color = EInkTheme.colorScheme.onSurfaceVariant,
-                                    maxLines = 2,
-                                    overflow = TextOverflow.Ellipsis,
-                                    modifier = Modifier.padding(vertical = EInkSpacing.xxs)
-                                )
-                            }
-                            // 最新章节
-                            book.latestChapterTitle?.takeIf { it.isNotBlank() }?.let {
-                                EInkInfoRow(
-                                    iconRes = R.drawable.ic_book_last,
-                                    text = it,
-                                    style = EInkTheme.typography.labelMedium
-                                )
-                            }
-                            // 当前进度章节
-                            book.durChapterTitle?.takeIf { it.isNotBlank() }?.let {
-                                EInkInfoRow(
-                                    iconRes = R.drawable.ic_history,
-                                    text = it,
-                                    style = EInkTheme.typography.labelMedium
-                                )
-                            }
-                            // 书源
-                            book.originName.takeIf { it.isNotBlank() }?.let {
-                                EInkInfoRow(
-                                    iconRes = R.drawable.ic_web_outline,
-                                    text = it,
-                                    style = EInkTheme.typography.labelMedium
-                                )
-                            }
-                            // 简介（直接展示内容，不另加"简介"前缀，完整显示）
                             EInkText(
                                 text = book.getDisplayIntro()?.takeIf { it.isNotBlank() } ?: "暂无简介",
                                 style = EInkTheme.typography.bodyMedium,
-                                color = EInkTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.padding(top = EInkSpacing.m)
+                                color = EInkTheme.colorScheme.onSurfaceVariant
                             )
                         }
                     }
