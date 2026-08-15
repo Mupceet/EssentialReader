@@ -103,7 +103,7 @@ private fun BookListItem(book: Book, onClick: () -> Unit) {
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onClick)
-            .padding(horizontal = EInkSpacing.screenHorizontal, vertical = EInkSpacing.s)
+            .padding(horizontal = EInkSpacing.l, vertical = EInkSpacing.s)
     ) {
         // 左侧封面；无封面/加载失败时 [EInkBookCover] 显示文字占位封面
         EInkBookCover(

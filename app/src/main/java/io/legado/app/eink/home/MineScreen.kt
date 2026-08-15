@@ -49,7 +49,7 @@ private fun MineEntry(label: String, onClick: () -> Unit) {
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onClick)
-            .padding(horizontal = EInkSpacing.screenHorizontal, vertical = EInkSpacing.l),
+            .padding(horizontal = EInkSpacing.l, vertical = EInkSpacing.l),
         verticalAlignment = Alignment.CenterVertically
     ) {
         EInkText(text = label, style = EInkTheme.typography.bodyLarge)

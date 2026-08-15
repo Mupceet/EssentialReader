@@ -176,7 +176,7 @@ private fun ResultItem(book: SearchBook, inShelf: Boolean, onClick: () -> Unit) 
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onClick)
-            .padding(horizontal = EInkSpacing.screenHorizontal, vertical = EInkSpacing.s)
+            .padding(horizontal = EInkSpacing.l, vertical = EInkSpacing.s)
     ) {
         // 封面（与首页书架一致；无封面时显示文字占位封面）
         EInkBookCover(
@@ -295,7 +295,7 @@ private fun HistoryList(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clickable { onSearch(keyword.word) }
-                    .padding(horizontal = EInkSpacing.screenHorizontal, vertical = EInkSpacing.s)
+                    .padding(horizontal = EInkSpacing.l, vertical = EInkSpacing.s)
             )
             EInkHorizontalDivider()
         }

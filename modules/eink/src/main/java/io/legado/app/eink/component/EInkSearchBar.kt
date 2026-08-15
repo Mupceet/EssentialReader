@@ -129,7 +129,7 @@ private fun SearchBarShell(
         modifier = modifier
             .fillMaxWidth()
             .height(SearchBarHeight)
-            .padding(horizontal = EInkSpacing.screenHorizontal),
+            .padding(horizontal = EInkSpacing.l),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Box(
