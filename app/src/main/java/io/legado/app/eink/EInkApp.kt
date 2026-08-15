@@ -2,10 +2,14 @@ package io.legado.app.eink
 
 import android.app.Application
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveableStateHolder
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.HasDefaultViewModelProviderFactory
 import androidx.lifecycle.ViewModelProvider
@@ -70,73 +74,82 @@ fun EInkApp(
 
     stateHolder.SaveableStateProvider(key = entryId) {
         CompositionLocalProvider(LocalViewModelStoreOwner provides viewModelStoreOwner) {
-            when (screen) {
-                is EInkScreen.Home -> {
-                    HomeRoute(
-                        onBookClick = { bookUrl ->
-                            // 书架点击直接进入阅读
-                            controller.navigate(EInkScreen.Reader(bookUrl))
-                        },
-                        onSearch = { controller.navigate(EInkScreen.Search) },
-                        onBookSource = { controller.navigate(EInkScreen.BookSource) },
-                        onSettings = { controller.navigate(EInkScreen.Settings) },
-                    )
-                }
-
-                is EInkScreen.Search -> {
-                    SearchRoute(
-                        onBack = { controller.pop() },
-                        onBookClick = { book ->
-                            controller.navigate(
-                                EInkScreen.BookDetail(book.name, book.author, book.bookUrl)
+            if (screen is EInkScreen.Reader) {
+                // 阅读界面自管系统栏避让（见 ReaderScreen）：页眉紧贴状态栏下方，
+                // 后续支持收起状态栏时，该区域即页眉区域，正文始终从页眉之下开始
+                ReaderRoute(
+                    bookUrl = screen.bookUrl,
+                    onBack = { controller.pop() },
+                    onOpenToc = { bookUrl -> controller.navigate(EInkScreen.Toc(bookUrl)) },
+                    onChangeSource = { bookUrl ->
+                        controller.navigate(EInkScreen.ChangeSource(bookUrl))
+                    },
+                )
+            } else {
+                // 其余界面统一避让系统栏（Edge-to-Edge 下系统栏透明覆盖在背景上）
+                Box(modifier = Modifier.fillMaxSize().safeDrawingPadding()) {
+                    when (screen) {
+                        is EInkScreen.Home -> {
+                            HomeRoute(
+                                onBookClick = { bookUrl ->
+                                    // 书架点击直接进入阅读
+                                    controller.navigate(EInkScreen.Reader(bookUrl))
+                                },
+                                onSearch = { controller.navigate(EInkScreen.Search) },
+                                onBookSource = { controller.navigate(EInkScreen.BookSource) },
+                                onSettings = { controller.navigate(EInkScreen.Settings) },
                             )
                         }
-                    )
-                }
 
-                is EInkScreen.BookDetail -> {
-                    BookDetailRoute(
-                        name = screen.name,
-                        author = screen.author,
-                        bookUrl = screen.bookUrl,
-                        onBack = { controller.pop() },
-                        onOpenToc = { bookUrl -> controller.navigate(EInkScreen.Toc(bookUrl)) },
-                        onRead = { bookUrl -> controller.navigate(EInkScreen.Reader(bookUrl)) },
-                    )
-                }
+                        is EInkScreen.Search -> {
+                            SearchRoute(
+                                onBack = { controller.pop() },
+                                onBookClick = { book ->
+                                    controller.navigate(
+                                        EInkScreen.BookDetail(book.name, book.author, book.bookUrl)
+                                    )
+                                }
+                            )
+                        }
 
-                is EInkScreen.BookSource -> {
-                    BookSourceRoute(onBack = { controller.pop() })
-                }
+                        is EInkScreen.BookDetail -> {
+                            BookDetailRoute(
+                                name = screen.name,
+                                author = screen.author,
+                                bookUrl = screen.bookUrl,
+                                onBack = { controller.pop() },
+                                onOpenToc = { bookUrl -> controller.navigate(EInkScreen.Toc(bookUrl)) },
+                                onRead = { bookUrl -> controller.navigate(EInkScreen.Reader(bookUrl)) },
+                            )
+                        }
 
-                is EInkScreen.Settings -> {
-                    SettingsRoute(onBack = { controller.pop() })
-                }
+                        is EInkScreen.BookSource -> {
+                            BookSourceRoute(onBack = { controller.pop() })
+                        }
 
-                is EInkScreen.Toc -> {
-                    TocRoute(
-                        bookUrl = screen.bookUrl,
-                        onBack = { controller.pop() },
-                        onOpenReader = { bookUrl -> controller.navigate(EInkScreen.Reader(bookUrl)) }
-                    )
-                }
+                        is EInkScreen.Settings -> {
+                            SettingsRoute(onBack = { controller.pop() })
+                        }
 
-                is EInkScreen.Reader -> {
-                    ReaderRoute(
-                        bookUrl = screen.bookUrl,
-                        onBack = { controller.pop() },
-                        onOpenToc = { bookUrl -> controller.navigate(EInkScreen.Toc(bookUrl)) },
-                        onChangeSource = { bookUrl ->
-                            controller.navigate(EInkScreen.ChangeSource(bookUrl))
-                        },
-                    )
-                }
+                        is EInkScreen.Toc -> {
+                            TocRoute(
+                                bookUrl = screen.bookUrl,
+                                onBack = { controller.pop() },
+                                onOpenReader = { bookUrl ->
+                                    controller.navigate(EInkScreen.Reader(bookUrl))
+                                }
+                            )
+                        }
 
-                is EInkScreen.ChangeSource -> {
-                    ChangeSourceRoute(
-                        bookUrl = screen.bookUrl,
-                        onBack = { controller.pop() },
-                    )
+                        is EInkScreen.ChangeSource -> {
+                            ChangeSourceRoute(
+                                bookUrl = screen.bookUrl,
+                                onBack = { controller.pop() },
+                            )
+                        }
+
+                        is EInkScreen.Reader -> Unit // 上方已处理
+                    }
                 }
             }
         }

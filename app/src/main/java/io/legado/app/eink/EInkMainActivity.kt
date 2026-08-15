@@ -4,11 +4,10 @@ import android.app.Activity
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.ui.Modifier
@@ -25,9 +24,11 @@ import io.legado.app.eink.theme.EInkTheme
  * 避免多个 Activity 之间的传统 Android 页面转场。
  *
  * 根布局职责（纯 Foundation，无 Material3）:
- *  - 以 [safeDrawingPadding] 避让系统栏（状态栏/导航栏/挖孔），
- *    保证顶部搜索框与底部操作栏不被系统栏遮挡或抢占触摸；
- *  - 铺设主题背景色；
+ *  - Edge-to-Edge：窗口始终延伸到系统栏后方（[enableEdgeToEdge]），
+ *    系统栏透明覆盖在背景之上，进出各界面窗口尺寸恒定，无内容跳动；
+ *    系统栏避让由各界面自行用 insets padding 完成（阅读界面自管，
+ *    其余界面见 [EInkApp] 的 safeDrawingPadding 包裹）。
+ *  - 铺设主题背景色（延伸到系统栏区域）；
  *  - 系统栏图标颜色跟随主题背景亮度（浅底黑图标 / 深底白图标），
  *    保证状态栏与纯黑白主题一致。
  */
@@ -35,6 +36,7 @@ class EInkMainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        enableEdgeToEdge()
         setContent {
             EInkTheme {
                 EInkRoot()
@@ -47,7 +49,7 @@ class EInkMainActivity : ComponentActivity() {
 private fun EInkRoot() {
     val scheme = EInkTheme.colorScheme
 
-    // 系统栏图标外观随主题底色亮度切换：亮底 → 深色图标；暗底 → 浅色图标
+    // 系统栏图标外观随主题底色切换：亮底 → 深色图标；暗底 → 浅色图标
     val view = LocalView.current
     DisposableEffect(scheme.background) {
         val window = (view.context as? Activity)?.window
@@ -64,7 +66,6 @@ private fun EInkRoot() {
         modifier = Modifier
             .fillMaxSize()
             .background(scheme.background)
-            .safeDrawingPadding()
     ) {
         EInkApp()
     }

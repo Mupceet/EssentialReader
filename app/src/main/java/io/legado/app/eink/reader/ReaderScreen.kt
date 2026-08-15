@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -30,9 +31,6 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import androidx.core.view.WindowCompat
-import androidx.core.view.WindowInsetsCompat
-import androidx.core.view.WindowInsetsControllerCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import io.legado.app.eink.component.EInkText
@@ -44,8 +42,11 @@ import android.view.WindowManager
 /**
  * 阅读 Route — ViewModel 感知层。
  *
+ * 全屏说明：窗口在 Activity 层始终 Edge-to-Edge（进出阅读无布局跳动）；
+ * 阅读时不收起系统状态栏，正常显示原生内容。
+ *
  * 职责：
- * - 全屏（隐藏系统栏，退出时恢复）；按设置保持屏幕常亮；
+ * - 按设置保持屏幕常亮；
  * - 返回键：面板 → 控件 → 退出阅读 的逐级回退；
  * - 一次性消息 → Toast；
  * - 面板开关为 UI 局部状态（remember），排版数据来自 [ReaderUiState]。
@@ -69,18 +70,6 @@ fun ReaderRoute(
     LaunchedEffect(viewModel) {
         viewModel.messages.collect { msg ->
             Toast.makeText(context, msg.format(context), Toast.LENGTH_SHORT).show()
-        }
-    }
-
-    // 阅读全屏：进入隐藏系统栏，退出恢复（零动画，规范 §15）
-    DisposableEffect(Unit) {
-        val window = (view.context as? Activity)?.window
-        val controller = window?.let { WindowCompat.getInsetsController(it, view) }
-        controller?.systemBarsBehavior =
-            WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
-        controller?.hide(WindowInsetsCompat.Type.systemBars())
-        onDispose {
-            controller?.show(WindowInsetsCompat.Type.systemBars())
         }
     }
 
@@ -124,39 +113,42 @@ fun ReaderRoute(
 
         panel?.let { current ->
             val onClose = { panel = null }
-            when (current) {
-                ReaderPanel.LAYOUT -> ReaderPanelContainer(title = "排版设置", onClose = onClose) {
-                    ReaderLayoutPanel(
-                        style = uiState.style,
-                        onAdjustTextSize = viewModel::adjustTextSize,
-                        onAdjustLetterSpacing = viewModel::adjustLetterSpacing,
-                        onAdjustLineSpacing = viewModel::adjustLineSpacing,
-                        onAdjustParagraphSpacing = viewModel::adjustParagraphSpacing,
-                        onSetIndent = viewModel::setIndent,
-                        onAdjustPaddingH = viewModel::adjustPaddingH,
-                        onAdjustPaddingV = viewModel::adjustPaddingV,
-                        onAdjustHeaderPadding = viewModel::adjustHeaderPadding,
-                        onAdjustFooterPadding = viewModel::adjustFooterPadding,
-                    )
-                }
+            // 面板与阅读内容对齐（Edge-to-Edge 下避免被系统栏遮挡）
+            Box(modifier = Modifier.fillMaxSize().safeDrawingPadding()) {
+                when (current) {
+                    ReaderPanel.LAYOUT -> ReaderPanelContainer(title = "排版设置", onClose = onClose) {
+                        ReaderLayoutPanel(
+                            style = uiState.style,
+                            onAdjustTextSize = viewModel::adjustTextSize,
+                            onAdjustLetterSpacing = viewModel::adjustLetterSpacing,
+                            onAdjustLineSpacing = viewModel::adjustLineSpacing,
+                            onAdjustParagraphSpacing = viewModel::adjustParagraphSpacing,
+                            onSetIndent = viewModel::setIndent,
+                            onAdjustPaddingH = viewModel::adjustPaddingH,
+                            onAdjustPaddingV = viewModel::adjustPaddingV,
+                            onAdjustHeaderPadding = viewModel::adjustHeaderPadding,
+                            onAdjustFooterPadding = viewModel::adjustFooterPadding,
+                        )
+                    }
 
-                ReaderPanel.OTHER -> ReaderPanelContainer(title = "其它设置", onClose = onClose) {
-                    ReaderOtherPanel(
-                        state = uiState,
-                        onToggleKeepScreenOn = viewModel::toggleKeepScreenOn,
-                        onToggleShowHeader = viewModel::toggleShowHeader,
-                        onToggleTextBold = viewModel::toggleTextBold,
-                        onAdjustAutoInterval = viewModel::adjustAutoPlayInterval,
-                    )
-                }
+                    ReaderPanel.OTHER -> ReaderPanelContainer(title = "其它设置", onClose = onClose) {
+                        ReaderOtherPanel(
+                            state = uiState,
+                            onToggleKeepScreenOn = viewModel::toggleKeepScreenOn,
+                            onToggleShowHeader = viewModel::toggleShowHeader,
+                            onToggleTextBold = viewModel::toggleTextBold,
+                            onAdjustAutoInterval = viewModel::adjustAutoPlayInterval,
+                        )
+                    }
 
-                ReaderPanel.CACHE -> ReaderPanelContainer(title = "缓存", onClose = onClose) {
-                    ReaderCachePanel(
-                        onCache = { count ->
-                            viewModel.cacheChapters(count)
-                            panel = null
-                        }
-                    )
+                    ReaderPanel.CACHE -> ReaderPanelContainer(title = "缓存", onClose = onClose) {
+                        ReaderCachePanel(
+                            onCache = { count ->
+                                viewModel.cacheChapters(count)
+                                panel = null
+                            }
+                        )
+                    }
                 }
             }
         }
@@ -168,6 +160,10 @@ fun ReaderRoute(
  *
  * 结构：页眉（书名/进度）→ 正文 Canvas（引擎排版区域）→ 页脚（章节/页码）。
  * 操作条覆盖在正文之上，不改变排版区域尺寸（布局稳定，规范 §15）。
+ *
+ * 系统栏避让由本界面自管（[safeDrawingPadding]）：窗口 Edge-to-Edge、
+ * 状态栏阅读时保持可见，页眉紧贴状态栏下方；后续若支持收起状态栏，
+ * 状态栏区域转为页眉区域（页眉上移占位），正文始终从页眉之下开始排版。
  *
  * 手势（规范 §16）：
  * - 操作条可见时：点正文任意处收起操作条；
@@ -205,6 +201,7 @@ internal fun ReaderScreen(
         modifier = Modifier
             .fillMaxSize()
             .background(readerBg)
+            .safeDrawingPadding()
     ) {
         Column(modifier = Modifier.fillMaxSize()) {
             if (state.showHeader) {
