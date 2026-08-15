@@ -22,7 +22,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
 import io.legado.app.R
 import io.legado.app.data.entities.Book
-import io.legado.app.eink.component.EInkHorizontalDivider
 import io.legado.app.eink.component.EInkLoading
 import io.legado.app.eink.modifier.EInkPageSwipe
 import io.legado.app.eink.theme.EInkSpacing
@@ -96,7 +95,6 @@ private fun BookList(
         // 无需 key
         items(books) { book ->
             BookListItem(book = book, onClick = { onBookClick(book.bookUrl) })
-            EInkHorizontalDivider()
         }
     }
 }
