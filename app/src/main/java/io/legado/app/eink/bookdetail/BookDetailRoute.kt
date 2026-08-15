@@ -170,7 +170,13 @@ internal fun BookDetailScreen(
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(horizontal = EInkSpacing.m, vertical = EInkSpacing.m)
+                                .padding(
+                                    start = EInkSpacing.m,
+                                    end = EInkSpacing.m,
+                                    top = DetailCoverHeight / 2,
+                                    bottom = EInkSpacing.l
+                                ),
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
                             EInkBookCover(
                                 url = book.getDisplayCover(),
@@ -211,7 +217,7 @@ internal fun BookDetailScreen(
                                         color = EInkTheme.colorScheme.onSurfaceVariant,
                                         maxLines = 2,
                                         overflow = TextOverflow.Ellipsis,
-                                        modifier = Modifier.padding(top = EInkSpacing.xs)
+                                        modifier = Modifier.padding(top = EInkSpacing.s)
                                     )
                                 }
                                 // 最新章节
@@ -219,7 +225,8 @@ internal fun BookDetailScreen(
                                     EInkInfoRow(
                                         iconRes = R.drawable.ic_book_last,
                                         text = it,
-                                        style = EInkTheme.typography.labelMedium
+                                        style = EInkTheme.typography.labelMedium,
+                                        modifier = Modifier.padding(top = EInkSpacing.s)
                                     )
                                 }
                                 // 当前进度章节
@@ -227,7 +234,8 @@ internal fun BookDetailScreen(
                                     EInkInfoRow(
                                         iconRes = R.drawable.ic_history,
                                         text = it,
-                                        style = EInkTheme.typography.labelMedium
+                                        style = EInkTheme.typography.labelMedium,
+                                        modifier = Modifier.padding(top = EInkSpacing.s)
                                     )
                                 }
                                 // 书源
@@ -235,7 +243,8 @@ internal fun BookDetailScreen(
                                     EInkInfoRow(
                                         iconRes = R.drawable.ic_web_outline,
                                         text = it,
-                                        style = EInkTheme.typography.labelMedium
+                                        style = EInkTheme.typography.labelMedium,
+                                        modifier = Modifier.padding(top = EInkSpacing.s)
                                     )
                                 }
                             }

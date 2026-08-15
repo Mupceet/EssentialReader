@@ -165,8 +165,9 @@ internal fun EInkInfoRow(
     iconRes: Int,
     text: String,
     style: TextStyle,
+    modifier: Modifier = Modifier,
 ) {
-    Row(verticalAlignment = Alignment.CenterVertically) {
+    Row(modifier = modifier, verticalAlignment = Alignment.CenterVertically) {
         Image(
             painter = painterResource(iconRes),
             contentDescription = null,
