@@ -21,12 +21,17 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -37,21 +42,30 @@ import io.legado.app.eink.component.EInkHorizontalDivider
 import io.legado.app.eink.component.EInkLoading
 import io.legado.app.eink.component.EInkOperationBar
 import io.legado.app.eink.component.EInkText
+import io.legado.app.eink.modifier.EInkPageSwipe
 import io.legado.app.eink.theme.EInkSpacing
 import io.legado.app.eink.theme.EInkTheme
 import io.legado.app.eink.widget.EInkBookCover
 import io.legado.app.eink.widget.EInkInfoRow
+import kotlin.math.roundToInt
+import kotlinx.coroutines.launch
 
-/** 详情页封面尺寸（与 View 版 activity_book_info.xml 一致：110 × 160dp）。 */
+/** 详情页封面尺寸（130 × 182dp）。 */
 private val DetailCoverWidth = 130.dp
 private val DetailCoverHeight = 182.dp
+
+/** 跨页重叠量：翻页步进 = 视口高 - 该值，保证跨页处的文字在上下两页都完整可见。 */
+private val PageOverlap = 56.dp
 
 /**
  * 书籍详情 Route — ViewModel 感知层。
  *
- * 布局（用户确认）：无顶栏；封面在内容区顶部，下方书名/作者、操作按钮一排
- * （图标上文字下）、信息区（当前进度/最新章节/标签/书源/简介完整显示）；
- * 返回按钮放底部操作栏。
+ * 布局（用户确认）：无顶栏；顶部封面在左、书名/作者在右；下方操作按钮一排
+ * （图标上文字下，横向均分）；信息区 字数/标签 → 最新章节 → 当前进度章节 →
+ * 书源 → 简介；返回按钮放底部操作栏。
+ *
+ * 翻页：本页非列表，采用接近全屏的步进（视口高 - 重叠量），禁止自由滑动，
+ * 底部 ▲▼ 与上下滑动手势统一触发同一翻页动作；跨页重叠保证文字不被截断。
  */
 @Composable
 fun BookDetailRoute(
@@ -101,6 +115,23 @@ internal fun BookDetailScreen(
     onRead: () -> Unit,
     onChangeSource: () -> Unit,
 ) {
+    // 分页：接近全屏步进 + 跨页重叠；禁止自由滑动，按钮与滑动手势统一翻页。
+    val scrollState = rememberScrollState()
+    val scope = rememberCoroutineScope()
+    val density = LocalDensity.current
+    var viewportHeightPx by remember { mutableIntStateOf(0) }
+    val overlapPx = with(density) { PageOverlap.toPx() }.roundToInt()
+    val pageStep = (viewportHeightPx - overlapPx).coerceAtLeast(1)
+
+    val canPageUp = scrollState.value > 0
+    val canPageDown = viewportHeightPx > 0 && scrollState.value < scrollState.maxValue
+    val pageUp: () -> Unit = {
+        scope.launch { scrollState.scrollTo((scrollState.value - pageStep).coerceAtLeast(0)) }
+    }
+    val pageDown: () -> Unit = {
+        scope.launch { scrollState.scrollTo((scrollState.value + pageStep).coerceAtMost(scrollState.maxValue)) }
+    }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -124,147 +155,161 @@ internal fun BookDetailScreen(
 
             else -> {
                 val book = state.book ?: return
-                Column(
+                Box(
                     modifier = Modifier
                         .weight(1f)
-                        .verticalScroll(rememberScrollState())
+                        .onSizeChanged { viewportHeightPx = it.height }
+                        .EInkPageSwipe(onPageUp = pageUp, onPageDown = pageDown)
                 ) {
-                    // 封面（顶部居中）
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = EInkSpacing.l),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        EInkBookCover(
-                            url = book.getDisplayCover(),
-                            name = book.name,
-                            author = book.getRealAuthor(),
-                            modifier = Modifier
-                                .width(DetailCoverWidth)
-                                .height(DetailCoverHeight),
-                            width = DetailCoverWidth,
-                            height = DetailCoverHeight
-                        )
-                    }
-                    // 书名
-                    EInkText(
-                        text = book.name,
-                        style = EInkTheme.typography.titleLarge,
-                        textAlign = TextAlign.Center,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                    // 作者
-                    EInkText(
-                        text = book.getRealAuthor(),
-                        style = EInkTheme.typography.bodyMedium,
-                        color = EInkTheme.colorScheme.onSurfaceVariant,
-                        textAlign = TextAlign.Center,
-                        maxLines = 1,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(top = EInkSpacing.xs)
-                    )
-                    // 操作按钮一排：加入书架 / 查看目录 / 切换书源 / 阅读
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = EInkSpacing.m, vertical = EInkSpacing.l),
-                        horizontalArrangement = Arrangement.SpaceEvenly,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        ActionButton(
-                            iconRes = if (state.isInBookshelf) R.drawable.ic_outline_delete else R.drawable.ic_add,
-                            label = if (state.isInBookshelf) "移出书架" else "加入书架",
-                            onClick = if (state.isInBookshelf) onRemoveFromShelf else onAddToShelf,
-                            modifier = Modifier.weight(1f)
-                        )
-                        ActionButton(
-                            iconRes = R.drawable.ic_toc,
-                            label = "查看目录",
-                            onClick = onOpenToc,
-                            modifier = Modifier.weight(1f)
-                        )
-                        ActionButton(
-                            iconRes = R.drawable.ic_swap_horiz,
-                            label = "切换书源",
-                            onClick = onChangeSource,
-                            modifier = Modifier.weight(1f)
-                        )
-                        ActionButton(
-                            iconRes = R.drawable.ic_play_outline_24dp,
-                            label = "阅读",
-                            onClick = onRead,
-                            modifier = Modifier.weight(1f)
-                        )
-                    }
-                    EInkHorizontalDivider()
-                    // 信息区
                     Column(
                         modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = EInkSpacing.m, vertical = EInkSpacing.m)
+                            .fillMaxSize()
+                            .verticalScroll(scrollState, enabled = false)
                     ) {
-                        // 最新章节
-                        book.latestChapterTitle?.takeIf { it.isNotBlank() }?.let {
-                            EInkInfoRow(
-                                iconRes = R.drawable.ic_book_last,
-                                text = it,
-                                style = EInkTheme.typography.labelMedium
+                        // 顶部信息：封面在左，书名/作者在右（充分利用空间）
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = EInkSpacing.m, vertical = EInkSpacing.m)
+                        ) {
+                            EInkBookCover(
+                                url = book.getDisplayCover(),
+                                name = book.name,
+                                author = book.getRealAuthor(),
+                                modifier = Modifier
+                                    .width(DetailCoverWidth)
+                                    .height(DetailCoverHeight),
+                                width = DetailCoverWidth,
+                                height = DetailCoverHeight
+                            )
+                            Spacer(modifier = Modifier.width(EInkSpacing.m))
+                            Column(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .height(DetailCoverHeight)
+                                    .padding(vertical = EInkSpacing.s),
+                                verticalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                // 书名
+                                EInkText(
+                                    text = book.name,
+                                    style = EInkTheme.typography.titleLarge,
+                                    maxLines = 2,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                                // 作者
+                                EInkText(
+                                    text = book.getRealAuthor(),
+                                    style = EInkTheme.typography.bodyMedium,
+                                    color = EInkTheme.colorScheme.onSurfaceVariant,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                        }
+                        // 操作按钮一排：加入书架/移出书架 / 查看目录 / 切换书源 / 阅读
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = EInkSpacing.m, vertical = EInkSpacing.s),
+                            horizontalArrangement = Arrangement.SpaceEvenly,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            ActionButton(
+                                iconRes = if (state.isInBookshelf) R.drawable.ic_outline_delete else R.drawable.ic_add,
+                                label = if (state.isInBookshelf) "移出书架" else "加入书架",
+                                onClick = if (state.isInBookshelf) onRemoveFromShelf else onAddToShelf,
+                                modifier = Modifier.weight(1f)
+                            )
+                            ActionButton(
+                                iconRes = R.drawable.ic_toc,
+                                label = "查看目录",
+                                onClick = onOpenToc,
+                                modifier = Modifier.weight(1f)
+                            )
+                            ActionButton(
+                                iconRes = R.drawable.ic_swap_horiz,
+                                label = "切换书源",
+                                onClick = onChangeSource,
+                                modifier = Modifier.weight(1f)
+                            )
+                            ActionButton(
+                                iconRes = R.drawable.ic_play_outline_24dp,
+                                label = "阅读",
+                                onClick = onRead,
+                                modifier = Modifier.weight(1f)
                             )
                         }
-                        // 字数/标签（紧跟最新章节之后）
-                        book.getKindList().takeIf { it.isNotEmpty() }?.let { kinds ->
+                        EInkHorizontalDivider()
+                        // 信息区
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = EInkSpacing.m, vertical = EInkSpacing.m)
+                        ) {
+                            // 字数/标签
+                            book.getKindList().takeIf { it.isNotEmpty() }?.let { kinds ->
+                                EInkText(
+                                    text = kinds.joinToString(" / "),
+                                    style = EInkTheme.typography.labelMedium,
+                                    color = EInkTheme.colorScheme.onSurfaceVariant,
+                                    maxLines = 2,
+                                    overflow = TextOverflow.Ellipsis,
+                                    modifier = Modifier.padding(vertical = EInkSpacing.xxs)
+                                )
+                            }
+                            // 最新章节
+                            book.latestChapterTitle?.takeIf { it.isNotBlank() }?.let {
+                                EInkInfoRow(
+                                    iconRes = R.drawable.ic_book_last,
+                                    text = it,
+                                    style = EInkTheme.typography.labelMedium
+                                )
+                            }
+                            // 当前进度章节
+                            book.durChapterTitle?.takeIf { it.isNotBlank() }?.let {
+                                EInkInfoRow(
+                                    iconRes = R.drawable.ic_history,
+                                    text = it,
+                                    style = EInkTheme.typography.labelMedium
+                                )
+                            }
+                            // 书源
+                            book.originName.takeIf { it.isNotBlank() }?.let {
+                                EInkInfoRow(
+                                    iconRes = R.drawable.ic_web_outline,
+                                    text = it,
+                                    style = EInkTheme.typography.labelMedium
+                                )
+                            }
+                            // 简介（直接展示内容，不另加"简介"前缀，完整显示）
                             EInkText(
-                                text = kinds.joinToString(" / "),
-                                style = EInkTheme.typography.labelMedium,
+                                text = book.getDisplayIntro()?.takeIf { it.isNotBlank() } ?: "暂无简介",
+                                style = EInkTheme.typography.bodyMedium,
                                 color = EInkTheme.colorScheme.onSurfaceVariant,
-                                maxLines = 2,
-                                overflow = TextOverflow.Ellipsis,
-                                modifier = Modifier.padding(vertical = EInkSpacing.xxs)
+                                modifier = Modifier.padding(top = EInkSpacing.m)
                             )
                         }
-                        // 当前进度章节
-                        book.durChapterTitle?.takeIf { it.isNotBlank() }?.let {
-                            EInkInfoRow(
-                                iconRes = R.drawable.ic_history,
-                                text = it,
-                                style = EInkTheme.typography.labelMedium
-                            )
-                        }
-                        // 书源
-                        book.originName.takeIf { it.isNotBlank() }?.let {
-                            EInkInfoRow(
-                                iconRes = R.drawable.ic_web_outline,
-                                text = it,
-                                style = EInkTheme.typography.labelMedium
-                            )
-                        }
-                        // 简介（直接展示内容，不另加"简介"前缀，完整显示）
-                        EInkText(
-                            text = book.getDisplayIntro()?.takeIf { it.isNotBlank() } ?: "暂无简介",
-                            style = EInkTheme.typography.bodyMedium,
-                            color = EInkTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.padding(top = EInkSpacing.m)
-                        )
                     }
                 }
             }
         }
-        // 底部操作栏：左侧返回；详情页无翻页，箭头置灰
+        // 底部操作栏：返回 + 翻页（按钮与滑动手势统一）
         EInkOperationBar(
             tabs = emptyList(),
             selectedTabIndex = 0,
             onTabSelect = {},
-            navigationIcon = { EInkBackButton(onClick = onBack) }
+            navigationIcon = { EInkBackButton(onClick = onBack) },
+            pageUpEnabled = canPageUp,
+            pageDownEnabled = canPageDown,
+            onPageUp = pageUp,
+            onPageDown = pageDown
         )
     }
 }
 
 /**
- * 操作按钮：图标在上、文字在下（触控目标 ≥48dp，禁用时置灰）。
+ * 操作按钮：图标在上、文字在下（触控目标 ≥48dp）。
  */
 @Composable
 private fun ActionButton(
