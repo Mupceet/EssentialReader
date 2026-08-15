@@ -56,7 +56,6 @@ internal fun ReaderTopBar(
     onToggleBookshelf: () -> Unit,
 ) {
     Column(modifier = Modifier.fillMaxWidth()) {
-        EInkHorizontalDivider()
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -89,6 +88,8 @@ internal fun ReaderTopBar(
                 onClick = onToggleBookshelf,
             )
         }
+        // 分隔线在底部：与下方正文分界
+        EInkHorizontalDivider()
     }
 }
 
@@ -123,6 +124,8 @@ internal fun ReaderBottomBar(
     onOpenPanel: (ReaderPanel) -> Unit,
 ) {
     Column(modifier = Modifier.fillMaxWidth()) {
+        // 分隔线在顶部：与上方正文分界
+        EInkHorizontalDivider()
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -142,7 +145,6 @@ internal fun ReaderBottomBar(
             BottomAction(label = "排版", weight = 1f, onClick = { onOpenPanel(ReaderPanel.LAYOUT) })
             BottomAction(label = "其它", weight = 1f, onClick = { onOpenPanel(ReaderPanel.OTHER) })
         }
-        EInkHorizontalDivider()
     }
 }
 

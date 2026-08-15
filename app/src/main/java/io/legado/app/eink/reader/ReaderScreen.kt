@@ -96,6 +96,9 @@ fun ReaderRoute(
     Box(modifier = Modifier.fillMaxSize()) {
         ReaderScreen(
             state = uiState,
+            // 设置面板打开时收起操作条（面板关闭后自动恢复），
+            // 排版调参时才能看清页眉、边距等顶部效果
+            barsVisible = uiState.controlsVisible && panel == null,
             onPrevPage = viewModel::prevPage,
             onNextPage = viewModel::nextPage,
             onCenterTap = viewModel::toggleControls,
@@ -172,6 +175,7 @@ fun ReaderRoute(
 @Composable
 internal fun ReaderScreen(
     state: ReaderUiState,
+    barsVisible: Boolean,
     onPrevPage: () -> Unit,
     onNextPage: () -> Unit,
     onCenterTap: () -> Unit,
@@ -258,7 +262,7 @@ internal fun ReaderScreen(
             )
         }
 
-        if (state.controlsVisible) {
+        if (barsVisible) {
             Box(
                 modifier = Modifier
                     .align(Alignment.TopCenter)
