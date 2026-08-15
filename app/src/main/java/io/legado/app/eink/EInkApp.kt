@@ -8,6 +8,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import io.legado.app.eink.bookdetail.BookDetailRoute
 import io.legado.app.eink.booksource.BookSourceRoute
 import io.legado.app.eink.home.HomeRoute
 import io.legado.app.eink.navigation.EInkNavController
@@ -53,7 +54,25 @@ fun EInkApp(
             }
 
             is EInkScreen.Search -> {
-                SearchRoute(onBack = { controller.pop() })
+                SearchRoute(
+                    onBack = { controller.pop() },
+                    onBookClick = { book ->
+                        controller.navigate(
+                            EInkScreen.BookDetail(book.name, book.author, book.bookUrl)
+                        )
+                    }
+                )
+            }
+
+            is EInkScreen.BookDetail -> {
+                BookDetailRoute(
+                    name = screen.name,
+                    author = screen.author,
+                    bookUrl = screen.bookUrl,
+                    onBack = { controller.pop() },
+                    onOpenToc = { bookUrl -> controller.navigate(EInkScreen.Toc(bookUrl)) },
+                    onRead = { bookUrl -> controller.navigate(EInkScreen.Reader(bookUrl)) },
+                )
             }
 
             is EInkScreen.BookSource -> {

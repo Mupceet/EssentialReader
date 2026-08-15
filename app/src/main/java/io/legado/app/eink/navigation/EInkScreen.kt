@@ -17,7 +17,10 @@ sealed interface EInkScreen {
 
     data object Settings : EInkScreen
 
-    /** 目录（阅读界面接入前作为书籍详情入口） */
+    /** 书籍详情（搜索结果等入口） */
+    data class BookDetail(val name: String, val author: String, val bookUrl: String) : EInkScreen
+
+    /** 目录 */
     data class Toc(val bookUrl: String) : EInkScreen
 
     /** 阅读器（Phase 后续接入 ReadBook 引擎） */

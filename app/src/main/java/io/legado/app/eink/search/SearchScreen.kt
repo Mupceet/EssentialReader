@@ -54,6 +54,7 @@ import kotlinx.coroutines.launch
 @Composable
 fun SearchRoute(
     onBack: () -> Unit,
+    onBookClick: (SearchBook) -> Unit,
     viewModel: SearchViewModel = viewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -108,6 +109,7 @@ fun SearchRoute(
                 isResultListVisible -> ResultList(
                     state = uiState,
                     isInBookshelf = viewModel::isInBookshelf,
+                    onBookClick = onBookClick,
                     pagerListState = pager.listState,
                     onPageUp = pageUp,
                     onPageDown = pageDown
@@ -145,6 +147,7 @@ fun SearchRoute(
 private fun ResultList(
     state: SearchUiState,
     isInBookshelf: (SearchBook) -> Boolean,
+    onBookClick: (SearchBook) -> Unit,
     pagerListState: LazyListState,
     onPageUp: () -> Unit,
     onPageDown: () -> Unit,
@@ -161,17 +164,18 @@ private fun ResultList(
             )
     ) {
         items(state.results, key = { "${it.origin}-${it.bookUrl}" }) { book ->
-            ResultItem(book = book, inShelf = isInBookshelf(book))
+            ResultItem(book = book, inShelf = isInBookshelf(book), onClick = { onBookClick(book) })
             EInkHorizontalDivider()
         }
     }
 }
 
 @Composable
-private fun ResultItem(book: SearchBook, inShelf: Boolean) {
+private fun ResultItem(book: SearchBook, inShelf: Boolean, onClick: () -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .clickable(onClick = onClick)
             .padding(horizontal = EInkSpacing.m, vertical = EInkSpacing.s)
     ) {
         // 封面（与首页书架一致；无封面时显示文字占位封面）

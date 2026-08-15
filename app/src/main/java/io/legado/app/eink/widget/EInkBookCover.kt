@@ -27,6 +27,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.bumptech.glide.Glide
 import com.bumptech.glide.request.target.CustomTarget
@@ -59,12 +60,14 @@ internal fun EInkBookCover(
     name: String,
     author: String? = null,
     modifier: Modifier = Modifier,
+    width: Dp = EInkCoverWidth,
+    height: Dp = EInkCoverHeight,
 ) {
     val context = LocalContext.current.applicationContext
     val useDefaultCover = AppConfig.useDefaultCover
     val density = LocalDensity.current
-    val targetWidthPx = with(density) { EInkCoverWidth.toPx() }.toInt()
-    val targetHeightPx = with(density) { EInkCoverHeight.toPx() }.toInt()
+    val targetWidthPx = with(density) { width.toPx() }.toInt()
+    val targetHeightPx = with(density) { height.toPx() }.toInt()
 
     val coverBitmap by produceState<ImageBitmap?>(
         initialValue = null,
