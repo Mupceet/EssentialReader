@@ -31,16 +31,10 @@
         android:supportsRtl="true"
         android:theme="@style/AppTheme.Light"
         tools:ignore="AllowBackup,GoogleAppIndexingWarning,UnusedAttribute">
-        <!-- 主入口 -->
+        <!-- View 版主界面（不再是启动器入口；E-Ink 独立应用仅保留 E-Ink 入口，仍可内部跳转） -->
         <activity
             android:name=".ui.welcome.WelcomeActivity"
-            android:exported="true">
-            <intent-filter>
-                <action android:name="android.intent.action.MAIN" />
-
-                <category android:name="android.intent.category.LAUNCHER" />
-            </intent-filter>
-        </activity>
+            android:exported="true" />
         <!-- E-Ink 版本入口 -->
         <activity
             android:name=".eink.EInkMainActivity"
