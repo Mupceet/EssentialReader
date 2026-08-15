@@ -34,7 +34,8 @@ import io.legado.app.eink.theme.EInkTheme
 fun TocRoute(
     bookUrl: String,
     onBack: () -> Unit,
-    viewModel: TocViewModel = viewModel()
+    onOpenReader: (String) -> Unit = {},
+    viewModel: TocViewModel = viewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
@@ -59,7 +60,11 @@ fun TocRoute(
         Box(modifier = Modifier.weight(1f)) {
             TocScreen(
                 state = uiState,
-                onChapterClick = { index -> viewModel.openChapter(index) }
+                onChapterClick = { index ->
+                    viewModel.openChapter(index) {
+                        onOpenReader(bookUrl)
+                    }
+                }
             )
         }
     }

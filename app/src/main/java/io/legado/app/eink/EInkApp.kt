@@ -2,15 +2,10 @@ package io.legado.app.eink
 
 import android.app.Application
 import androidx.activity.compose.BackHandler
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxSize
-import io.legado.app.eink.component.EInkText
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveableStateHolder
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.HasDefaultViewModelProviderFactory
 import androidx.lifecycle.ViewModelProvider
@@ -21,9 +16,11 @@ import androidx.lifecycle.viewmodel.MutableCreationExtras
 import androidx.lifecycle.viewmodel.compose.LocalViewModelStoreOwner
 import io.legado.app.eink.bookdetail.BookDetailRoute
 import io.legado.app.eink.booksource.BookSourceRoute
+import io.legado.app.eink.changesource.ChangeSourceRoute
 import io.legado.app.eink.home.HomeRoute
 import io.legado.app.eink.navigation.EInkNavController
 import io.legado.app.eink.navigation.EInkScreen
+import io.legado.app.eink.reader.ReaderRoute
 import io.legado.app.eink.search.SearchRoute
 import io.legado.app.eink.settings.SettingsRoute
 import io.legado.app.eink.toc.TocRoute
@@ -77,8 +74,8 @@ fun EInkApp(
                 is EInkScreen.Home -> {
                     HomeRoute(
                         onBookClick = { bookUrl ->
-                            // 阅读界面接入前，点击书籍进入目录
-                            controller.navigate(EInkScreen.Toc(bookUrl))
+                            // 书架点击直接进入阅读
+                            controller.navigate(EInkScreen.Reader(bookUrl))
                         },
                         onSearch = { controller.navigate(EInkScreen.Search) },
                         onBookSource = { controller.navigate(EInkScreen.BookSource) },
@@ -119,24 +116,29 @@ fun EInkApp(
                 is EInkScreen.Toc -> {
                     TocRoute(
                         bookUrl = screen.bookUrl,
-                        onBack = { controller.pop() }
+                        onBack = { controller.pop() },
+                        onOpenReader = { bookUrl -> controller.navigate(EInkScreen.Reader(bookUrl)) }
                     )
                 }
 
                 is EInkScreen.Reader -> {
-                    PlaceholderScreen("阅读器（待接入 ReadBook 引擎）")
+                    ReaderRoute(
+                        bookUrl = screen.bookUrl,
+                        onBack = { controller.pop() },
+                        onOpenToc = { bookUrl -> controller.navigate(EInkScreen.Toc(bookUrl)) },
+                        onChangeSource = { bookUrl ->
+                            controller.navigate(EInkScreen.ChangeSource(bookUrl))
+                        },
+                    )
+                }
+
+                is EInkScreen.ChangeSource -> {
+                    ChangeSourceRoute(
+                        bookUrl = screen.bookUrl,
+                        onBack = { controller.pop() },
+                    )
                 }
             }
         }
-    }
-}
-
-@Composable
-private fun PlaceholderScreen(text: String) {
-    Box(
-        modifier = Modifier.fillMaxSize(),
-        contentAlignment = Alignment.Center
-    ) {
-        EInkText(text = text)
     }
 }

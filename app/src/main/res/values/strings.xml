@@ -466,6 +466,11 @@
     <string name="eink_book_not_found">未找到书籍</string>
     <string name="eink_operation_failed">操作失败</string>
     <string name="eink_removed_from_bookshelf">已移出书架</string>
+    <string name="eink_reader_auto_page_end">已是最后一页，自动翻页已停止</string>
+    <string name="eink_reader_cache_started">开始缓存章节</string>
+    <string name="eink_reader_local_no_cache">本地书籍无需缓存</string>
+    <string name="eink_change_source_failed">换源失败</string>
+    <string name="eink_change_source_no_result">未找到其它可用书源</string>
     <string name="error_get_book_info">Failed to obtain book information</string>
     <string name="error_get_content">Failed to obtain content</string>
     <string name="error_get_chapter_list">Failed to obtain chapters list</string>

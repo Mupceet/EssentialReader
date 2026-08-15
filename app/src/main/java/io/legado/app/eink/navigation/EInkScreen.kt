@@ -23,6 +23,9 @@ sealed interface EInkScreen {
     /** 目录 */
     data class Toc(val bookUrl: String) : EInkScreen
 
-    /** 阅读器（Phase 后续接入 ReadBook 引擎） */
+    /** 阅读器（复用 View 版 ReadBook/ChapterProvider 渲染引擎） */
     data class Reader(val bookUrl: String) : EInkScreen
+
+    /** 换源（跨书源搜索并切换当前书籍来源） */
+    data class ChangeSource(val bookUrl: String) : EInkScreen
 }

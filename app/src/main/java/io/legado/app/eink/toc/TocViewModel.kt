@@ -83,8 +83,11 @@ class TocViewModel(application: Application) : AndroidViewModel(application) {
         _uiState.update { it.copy(searchKey = key) }
     }
 
-    /** 跳转到指定章节（记录进度到 Book，阅读界面接入后直接读取） */
-    fun openChapter(index: Int) {
+    /**
+     * 跳转到指定章节：记录进度到 Book，完成后回调（用于进入阅读页，
+     * 保证阅读页读取到已更新的进度）。
+     */
+    fun openChapter(index: Int, onSaved: (() -> Unit)? = null) {
         val book = _uiState.value.book ?: return
         viewModelScope.launch(Dispatchers.IO) {
             val chapter = _uiState.value.chapters.getOrNull(index) ?: return@launch
@@ -93,6 +96,7 @@ class TocViewModel(application: Application) : AndroidViewModel(application) {
             book.durChapterTime = System.currentTimeMillis()
             appDb.bookDao.update(book)
             _uiState.update { it.copy(book = book) }
+            onSaved?.invoke()
         }
     }
 }
