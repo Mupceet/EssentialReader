@@ -57,7 +57,19 @@ class BookDetailViewModel(application: Application) : AndroidViewModel(applicati
 
     fun loadBook(name: String, author: String, bookUrl: String) {
         val key = "$name\u0000$author\u0000$bookUrl"
-        if (loadedKey == key) return
+        if (loadedKey == key) {
+            // 同书重进（如从阅读页返回）：静默刷新书架状态与书籍信息，
+            // 不重置加载态（避免闪加载页）；书可能在阅读中被移出/加回书架
+            viewModelScope.launch {
+                _uiState.value.book?.let { current ->
+                    val fresh = appDb.bookDao.getBook(current.bookUrl) ?: return@let
+                    _uiState.update {
+                        it.copy(book = fresh, isInBookshelf = !fresh.isNotShelf)
+                    }
+                }
+            }
+            return
+        }
         loadedKey = key
         _uiState.update { it.copy(isLoading = true, book = null, isUpdating = false) }
         viewModelScope.launch {
