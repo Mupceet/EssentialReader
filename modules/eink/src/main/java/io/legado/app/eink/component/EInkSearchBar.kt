@@ -12,6 +12,10 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
@@ -73,8 +77,14 @@ fun EInkSearchInputBar(
 ) {
     val focusRequester = FocusRequester()
     if (autoFocus) {
+        // 只在该搜索条首次进入时自动聚焦拉起输入法；从详情页等返回时
+        // 不再抢焦点（rememberSaveable 跨返回保留），除非用户主动点击输入框。
+        var autoFocused by rememberSaveable { mutableStateOf(false) }
         LaunchedEffect(focusRequester) {
-            runCatching { focusRequester.requestFocus() }
+            if (!autoFocused) {
+                autoFocused = true
+                runCatching { focusRequester.requestFocus() }
+            }
         }
     }
     SearchBarShell(

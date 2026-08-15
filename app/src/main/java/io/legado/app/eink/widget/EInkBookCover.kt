@@ -2,6 +2,7 @@ package io.legado.app.eink.widget
 
 import android.graphics.Bitmap
 import android.graphics.drawable.Drawable
+import android.util.LruCache
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -44,6 +45,18 @@ internal val EInkCoverWidth = 66.dp
 internal val EInkCoverHeight = 90.dp
 
 /**
+ * 封面位图内存缓存（按字节计，上限 16MB）：从详情页等返回列表时，
+ * 封面直接命中缓存展示，避免重新走 Glide 加载（防止占位封面闪烁）。
+ */
+private val coverBitmapCache = object : LruCache<String, ImageBitmap>(CoverCacheBytes) {
+    override fun sizeOf(key: String, value: ImageBitmap): Int =
+        value.width * value.height * 4
+}
+
+/** 封面缓存字节上限。 */
+private const val CoverCacheBytes = 16 * 1024 * 1024
+
+/**
  * E-Ink 书籍封面（书架/搜索结果等列表项复用）。
  *
  * 复用应用内 Glide（[ImageLoader.loadBitmap]）加载封面图，按 [EInkCoverWidth] ×
@@ -70,20 +83,26 @@ internal fun EInkBookCover(
     val targetHeightPx = with(density) { height.toPx() }.toInt()
 
     val coverBitmap by produceState<ImageBitmap?>(
-        initialValue = null,
+        initialValue = url?.let { coverBitmapCache.get(it) },
         url,
         useDefaultCover
     ) {
-        value = null
-        // 无封面地址或用户选择"使用默认封面"：直接展示文字占位封面。
-        if (url.isNullOrBlank() || useDefaultCover) return@produceState
+        if (url.isNullOrBlank() || useDefaultCover) {
+            // 无封面地址或用户选择"使用默认封面"：直接展示文字占位封面。
+            value = null
+            return@produceState
+        }
+        // 缓存命中：直接复用，不再重新发起加载（返回列表时封面不闪烁）。
+        if (coverBitmapCache.get(url) != null) return@produceState
 
         val target = object : CustomTarget<Bitmap>(targetWidthPx, targetHeightPx) {
             override fun onResourceReady(
                 resource: Bitmap,
                 transition: Transition<in Bitmap>?,
             ) {
-                value = resource.asImageBitmap()
+                val bitmap = resource.asImageBitmap()
+                coverBitmapCache.put(url, bitmap)
+                value = bitmap
             }
 
             override fun onLoadCleared(placeholder: Drawable?) {
