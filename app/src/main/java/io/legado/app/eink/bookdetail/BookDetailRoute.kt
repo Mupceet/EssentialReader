@@ -173,7 +173,7 @@ internal fun BookDetailScreen(
                                 .padding(
                                     start = EInkSpacing.m,
                                     end = EInkSpacing.m,
-                                    top = DetailCoverHeight / 2,
+                                    top = 60.dp,
                                     bottom = EInkSpacing.l
                                 ),
                             verticalAlignment = Alignment.CenterVertically
