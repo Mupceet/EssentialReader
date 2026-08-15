@@ -64,19 +64,31 @@ class EInkPagedListState(val listState: LazyListState) {
     suspend fun pageDown(totalItems: Int) {
         if (!canPageDown(totalItems)) return
         pageStart = (pageStart + pageItemCount).coerceAtMost((totalItems - 1).coerceAtLeast(0))
-        listState.scrollToItem(pageStart)
+        scrollToPageStart(pageStart)
     }
 
     suspend fun pageUp() {
         if (!canPageUp()) return
         pageStart -= pageItemCount
-        listState.scrollToItem(pageStart)
+        scrollToPageStart(pageStart)
     }
 
     /** 重置到第一页（发起新搜索/切换数据集时调用）。 */
     suspend fun resetToFirstPage() {
         pageStart = 0
-        listState.scrollToItem(0)
+        scrollToPageStart(0)
+    }
+
+    /**
+     * 安全滚动到页首下标：列表尚未挂载或当前没有 item 时，
+     * [LazyListState.scrollToItem] 会在 remeasure 时抛
+     * `IndexOutOfBoundsException`（如搜索刚开始/无结果返回空列表），
+     * 此时仅更新页位，等待列表实际有内容后再自然落到首页。
+     */
+    private suspend fun scrollToPageStart(index: Int) {
+        if (listState.layoutInfo.totalItemsCount > 0) {
+            listState.scrollToItem(index)
+        }
     }
 }
 
