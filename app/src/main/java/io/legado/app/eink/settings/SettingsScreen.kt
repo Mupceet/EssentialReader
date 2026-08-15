@@ -137,7 +137,7 @@ internal fun SettingsScreen(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = EInkSpacing.m, vertical = EInkSpacing.s),
+                .padding(horizontal = EInkSpacing.screenHorizontal, vertical = EInkSpacing.s),
             verticalAlignment = Alignment.CenterVertically
         ) {
             EInkText(
@@ -180,7 +180,7 @@ private fun StepperItem(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = EInkSpacing.m, vertical = EInkSpacing.s),
+            .padding(horizontal = EInkSpacing.screenHorizontal, vertical = EInkSpacing.s),
         verticalAlignment = Alignment.CenterVertically
     ) {
         EInkText(

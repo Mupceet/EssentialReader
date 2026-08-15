@@ -123,7 +123,7 @@ private fun ChapterItem(chapter: BookChapter, isCurrent: Boolean, onClick: () ->
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onClick)
-            .padding(horizontal = EInkSpacing.m, vertical = EInkSpacing.s),
+            .padding(horizontal = EInkSpacing.screenHorizontal, vertical = EInkSpacing.s),
         verticalAlignment = Alignment.CenterVertically
     ) {
         EInkText(

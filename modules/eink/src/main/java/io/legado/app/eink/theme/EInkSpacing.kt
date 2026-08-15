@@ -42,4 +42,7 @@ data object EInkSpacing {
 
     /** 48dp — screen-edge / minimum accessibility touch spacing. */
     val xxl: Dp = 48.dp
+
+    /** 屏幕左右边距（墨水屏实测 16dp 偏小，放大为 32dp）。 */
+    val screenHorizontal: Dp = 32.dp
 }

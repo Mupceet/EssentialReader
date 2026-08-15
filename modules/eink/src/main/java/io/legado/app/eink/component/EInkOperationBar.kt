@@ -66,7 +66,7 @@ fun EInkOperationBar(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(BarHeight)
-                .padding(horizontal = EInkSpacing.m),
+                .padding(horizontal = EInkSpacing.screenHorizontal),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(EInkSpacing.m)
         ) {

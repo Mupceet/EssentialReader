@@ -157,7 +157,7 @@ private fun SourceItem(source: BookSourcePart, onToggle: () -> Unit) {
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onToggle)
-            .padding(horizontal = EInkSpacing.m, vertical = EInkSpacing.s),
+            .padding(horizontal = EInkSpacing.screenHorizontal, vertical = EInkSpacing.s),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Column(modifier = Modifier.weight(1f)) {

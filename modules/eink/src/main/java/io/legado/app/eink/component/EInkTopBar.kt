@@ -43,7 +43,7 @@ fun EInkTopBar(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(BarHeight)
-                .padding(horizontal = EInkSpacing.s),
+                .padding(horizontal = EInkSpacing.m),
             verticalAlignment = Alignment.CenterVertically
         ) {
             if (onBack != null) {
