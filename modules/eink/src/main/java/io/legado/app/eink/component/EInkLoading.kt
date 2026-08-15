@@ -9,6 +9,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.TextStyle
 import io.legado.app.eink.theme.EInkSpacing
 import io.legado.app.eink.theme.EInkTheme
 
@@ -28,7 +29,8 @@ import io.legado.app.eink.theme.EInkTheme
 fun EInkLoading(
     text: String = "加载中...",
     modifier: Modifier = Modifier,
-    color: Color = EInkTheme.colorScheme.onSurfaceVariant
+    color: Color = EInkTheme.colorScheme.onSurfaceVariant,
+    textStyle: TextStyle = EInkTheme.typography.titleMedium
 ) {
     Column(
         modifier = modifier,
@@ -37,7 +39,7 @@ fun EInkLoading(
     ) {
         EInkText(
             text = text,
-            style = EInkTheme.typography.titleMedium,
+            style = textStyle,
             color = color
         )
     }

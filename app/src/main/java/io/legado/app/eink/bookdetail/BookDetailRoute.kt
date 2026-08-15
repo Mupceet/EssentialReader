@@ -139,8 +139,13 @@ internal fun BookDetailScreen(
     ) {
         when {
             state.isLoading -> {
-                Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
-                    EInkLoading()
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    EInkLoading(textStyle = EInkTheme.typography.titleLarge)
                 }
             }
 
