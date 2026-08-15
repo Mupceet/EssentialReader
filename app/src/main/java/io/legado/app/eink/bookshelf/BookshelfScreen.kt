@@ -1,5 +1,6 @@
 package io.legado.app.eink.bookshelf
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -9,6 +10,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
@@ -18,7 +20,12 @@ import io.legado.app.eink.component.EInkText
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.text.style.TextOverflow
+import io.legado.app.R
 import io.legado.app.data.entities.Book
 import io.legado.app.eink.component.EInkHorizontalDivider
 import io.legado.app.eink.component.EInkLoading
@@ -121,34 +128,60 @@ private fun BookListItem(book: Book, onClick: () -> Unit) {
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
-            // 作者
-            EInkText(
+            // 作者（图标 + 文字，同 View 版 iv_author）
+            InfoRow(
+                iconRes = R.drawable.ic_author,
                 text = book.getRealAuthor(),
-                style = EInkTheme.typography.bodySmall,
-                color = EInkTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1
+                style = EInkTheme.typography.bodySmall
             )
-            // 当前进度章节
+            // 当前进度章节（同 View 版 iv_read / ic_history）
             book.durChapterTitle?.let { title ->
-                EInkText(
+                InfoRow(
+                    iconRes = R.drawable.ic_history,
                     text = title,
-                    style = EInkTheme.typography.labelMedium,
-                    color = EInkTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
+                    style = EInkTheme.typography.labelMedium
                 )
             }
-            // 最新章节
+            // 最新章节（同 View 版 iv_last / ic_book_last）
             book.latestChapterTitle?.let { title ->
-                EInkText(
+                InfoRow(
+                    iconRes = R.drawable.ic_book_last,
                     text = title,
-                    style = EInkTheme.typography.labelMedium,
-                    color = EInkTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
+                    style = EInkTheme.typography.labelMedium
                 )
             }
         }
+    }
+}
+
+/** 列表项信息行图标尺寸（同 View 版 @dimen/desc_icon_size = 18dp）。 */
+private val DescIconSize = 18.dp
+
+/**
+ * 图标 + 文字信息行：与 View 版书架列表项一致，用图标区分
+ * 作者 / 当前进度章节 / 最新章节三行信息。
+ */
+@Composable
+private fun InfoRow(
+    iconRes: Int,
+    text: String,
+    style: TextStyle,
+) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Image(
+            painter = painterResource(iconRes),
+            contentDescription = null,
+            modifier = Modifier.size(DescIconSize),
+            colorFilter = ColorFilter.tint(EInkTheme.colorScheme.onSurfaceVariant)
+        )
+        Spacer(modifier = Modifier.width(EInkSpacing.xs))
+        EInkText(
+            text = text,
+            style = style,
+            color = EInkTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
     }
 }
 
