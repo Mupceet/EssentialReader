@@ -18,6 +18,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
+import io.legado.app.eink.modifier.rememberImmediatePressState
 import io.legado.app.eink.modifier.staticClickable
 import io.legado.app.eink.theme.EInkShapes
 import io.legado.app.eink.theme.EInkSpacing
@@ -57,8 +58,18 @@ fun EInkButton(
 ) {
     val minSize = if (isEdgeButton) EdgeButtonMinSize else CentralButtonMinSize
 
-    val backgroundColor = if (enabled) colors.containerColor else colors.disabledContainerColor
-    val contentColor = if (enabled) colors.contentColor else colors.disabledContentColor
+    // 按压反馈：按下瞬时反色（容器/内容色互换），抬起恢复。
+    // 即时手势跟踪（不受滚动容器影响）；零涟漪零动画，仅离散状态替换。
+    val press = rememberImmediatePressState()
+    val normalContainer = if (enabled) colors.containerColor else colors.disabledContainerColor
+    val normalContent = if (enabled) colors.contentColor else colors.disabledContentColor
+    val backgroundColor = if (enabled && press.isPressed) normalContent else normalContainer
+    // 透明容器（文字按钮）按压反色时，内容改用表色保证可读
+    val contentColor = if (enabled && press.isPressed) {
+        if (normalContainer == Color.Transparent) EInkTheme.colorScheme.surface else normalContainer
+    } else {
+        normalContent
+    }
 
     Box(
         modifier = modifier
@@ -67,6 +78,7 @@ fun EInkButton(
             .then(
                 if (border != null) Modifier.border(border, shape) else Modifier
             )
+            .then(press.modifier)
             .staticClickable(
                 enabled = enabled,
                 role = Role.Button,
