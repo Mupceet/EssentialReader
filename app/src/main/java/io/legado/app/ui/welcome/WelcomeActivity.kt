@@ -9,6 +9,7 @@ import io.legado.app.constant.PreferKey
 import io.legado.app.constant.Theme
 import io.legado.app.data.appDb
 import io.legado.app.databinding.ActivityWelcomeBinding
+import io.legado.app.eink.EInkMainActivity
 import io.legado.app.help.config.AppConfig
 import io.legado.app.help.config.ThemeConfig
 import io.legado.app.lib.theme.accentColor
@@ -78,9 +79,15 @@ open class WelcomeActivity : BaseActivity<ActivityWelcomeBinding>() {
     }
 
     private fun startMainActivity() {
-        startActivity<MainActivity>()
-        if (getPrefBoolean(PreferKey.defaultToRead) && appDb.bookDao.lastReadBook != null) {
-            startActivity<ReadBookActivity>()
+        if (AppConfig.isEInkPureMode) {
+            // 纯净阅读（墨水屏）主题模式：直接进入墨水屏界面；
+            // 导入导出等管理功能在完整模式（MainActivity）中完成
+            startActivity<EInkMainActivity>()
+        } else {
+            startActivity<MainActivity>()
+            if (getPrefBoolean(PreferKey.defaultToRead) && appDb.bookDao.lastReadBook != null) {
+                startActivity<ReadBookActivity>()
+            }
         }
         finish()
     }

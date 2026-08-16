@@ -1,6 +1,7 @@
 package io.legado.app.eink
 
 import android.app.Application
+import android.content.Intent
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -28,6 +29,9 @@ import io.legado.app.eink.reader.ReaderRoute
 import io.legado.app.eink.search.SearchRoute
 import io.legado.app.eink.settings.SettingsRoute
 import io.legado.app.eink.toc.TocRoute
+import io.legado.app.help.config.AppConfig
+import io.legado.app.ui.main.MainActivity
+import io.legado.app.utils.startActivity
 
 /**
  * E-Ink 应用根 Composable。
@@ -57,6 +61,7 @@ fun EInkApp(
     // 实现 HasDefaultViewModelProviderFactory 以便 AndroidViewModel(application)
     // 等构造方式仍可正常创建。
     val app = LocalContext.current.applicationContext as Application
+    val context = LocalContext.current
     val viewModelStoreOwner = remember(controller, app) {
         object : ViewModelStoreOwner, HasDefaultViewModelProviderFactory {
             override val viewModelStore: ViewModelStore
@@ -91,17 +96,26 @@ fun EInkApp(
                 // 其余界面统一避让系统栏（Edge-to-Edge 下系统栏透明覆盖在背景上）
                 Box(modifier = Modifier.fillMaxSize().safeDrawingPadding()) {
                     when (screen) {
-                        is EInkScreen.Home -> {
-                            HomeRoute(
-                                onBookClick = { bookUrl ->
-                                    // 书架点击直接进入阅读
-                                    controller.navigate(EInkScreen.Reader(bookUrl))
-                                },
-                                onSearch = { controller.navigate(EInkScreen.Search) },
-                                onBookSource = { controller.navigate(EInkScreen.BookSource) },
-                                onSettings = { controller.navigate(EInkScreen.Settings) },
-                            )
-                        }
+                is EInkScreen.Home -> {
+                    HomeRoute(
+                        onBookClick = { bookUrl ->
+                            // 书架点击直接进入阅读
+                            controller.navigate(EInkScreen.Reader(bookUrl))
+                        },
+                        onSearch = { controller.navigate(EInkScreen.Search) },
+                        onBookSource = { controller.navigate(EInkScreen.BookSource) },
+                        onSettings = { controller.navigate(EInkScreen.Settings) },
+                        onOpenFullMode = {
+                            // 完整模式（View UI）：恢复原主题，墨水屏界面退出；
+                            // 导入导出等管理功能在完整模式中完成，
+                            // 再次启用需在完整模式中选择纯净阅读(墨水屏)主题
+                            AppConfig.exitEInkPureMode()
+                            context.startActivity<MainActivity> {
+                                addFlags(Intent.FLAG_ACTIVITY_CLEAR_TASK)
+                            }
+                        },
+                    )
+                }
 
                         is EInkScreen.Search -> {
                             SearchRoute(

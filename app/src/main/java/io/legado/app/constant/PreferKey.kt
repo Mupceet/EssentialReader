@@ -5,6 +5,7 @@ object PreferKey {
     const val language = "language"
     const val fontScale = "fontScale"
     const val themeMode = "themeMode"
+    const val einkPrevThemeMode = "einkPrevThemeMode"
     const val userAgent = "userAgent"
     const val showUnread = "showUnread"
     const val bookGroupStyle = "bookGroupStyle"

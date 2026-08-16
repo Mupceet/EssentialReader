@@ -1,5 +1,6 @@
 package io.legado.app.ui.main.my
 
+import android.content.Intent
 import android.content.SharedPreferences
 import android.os.Bundle
 import android.view.Menu
@@ -11,6 +12,8 @@ import io.legado.app.base.BaseFragment
 import io.legado.app.constant.EventBus
 import io.legado.app.constant.PreferKey
 import io.legado.app.databinding.FragmentMyConfigBinding
+import io.legado.app.eink.EInkMainActivity
+import io.legado.app.help.config.AppConfig
 import io.legado.app.help.config.ThemeConfig
 import io.legado.app.lib.dialogs.selector
 import io.legado.app.lib.prefs.NameListPreference
@@ -103,8 +106,20 @@ class MyFragment() : BaseFragment(R.layout.fragment_my_config), MainFragmentInte
                 }
             }
             findPreference<NameListPreference>(PreferKey.themeMode)?.let {
-                it.setOnPreferenceChangeListener { _, _ ->
-                    view?.post { ThemeConfig.applyDayNight(requireContext()) }
+                it.setOnPreferenceChangeListener { _, newValue ->
+                    // 启用纯净阅读(墨水屏)前先记录当前主题，供退出纯净模式时恢复
+                    val enterPureEInk = newValue == "4"
+                    val prevThemeMode = AppConfig.themeMode ?: "0"
+                    view?.post {
+                        ThemeConfig.applyDayNight(requireContext())
+                        if (enterPureEInk) {
+                            AppConfig.einkPrevThemeMode = prevThemeMode
+                            // 进入墨水屏界面，完整模式界面全部退出
+                            requireActivity().startActivity<EInkMainActivity> {
+                                addFlags(Intent.FLAG_ACTIVITY_CLEAR_TASK)
+                            }
+                        }
+                    }
                     true
                 }
             }

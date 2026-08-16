@@ -34,19 +34,18 @@
         <!-- View 版主界面（不再是启动器入口；E-Ink 独立应用仅保留 E-Ink 入口，仍可内部跳转） -->
         <activity
             android:name=".ui.welcome.WelcomeActivity"
-            android:exported="true" />
-        <!-- E-Ink 版本入口 -->
-        <activity
-            android:name=".eink.EInkMainActivity"
-            android:exported="true"
-            android:label="阅读(E-Ink)"
-            android:windowSoftInputMode="adjustResize">
+            android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
 
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+        <!-- 纯净阅读（墨水屏）模式界面：主题模式为 E-Ink 时由 Welcome 直接进入，无桌面入口 -->
+        <activity
+            android:name=".eink.EInkMainActivity"
+            android:label="纯净阅读(墨水屏)"
+            android:windowSoftInputMode="adjustResize" />
         <!-- 图标1 -->
         <activity
             android:name=".ui.welcome.Launcher1"

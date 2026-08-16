@@ -23,6 +23,7 @@
         <item>亮色主题</item>
         <item>暗色主题</item>
         <item>E-Ink(墨水屏)</item>
+        <item>纯净阅读(墨水屏)</item>
     </string-array>
 
     <string-array name="double_page_title">

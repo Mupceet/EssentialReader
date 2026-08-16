@@ -26,7 +26,31 @@ object AppConfig : SharedPreferences.OnSharedPreferenceChangeListener {
     val isCronet = appCtx.getPrefBoolean(PreferKey.cronet)
     var useAntiAlias = appCtx.getPrefBoolean(PreferKey.antiAlias)
     var userAgent: String = getPrefUserAgent()
-    var isEInkMode = appCtx.getPrefString(PreferKey.themeMode) == "3"
+    // themeMode: 3 = E-Ink 配色主题；4 = 纯净阅读(墨水屏)，两者均启用 E-Ink 配色变体
+    var isEInkMode = appCtx.getPrefString(PreferKey.themeMode) == "3" ||
+            appCtx.getPrefString(PreferKey.themeMode) == "4"
+
+    /** 纯净阅读(墨水屏)：启动时 Welcome 直接进入墨水屏界面 */
+    var isEInkPureMode = appCtx.getPrefString(PreferKey.themeMode) == "4"
+
+    /** 启用纯净阅读(墨水屏)前主题模式的记录，退出纯净模式时恢复 */
+    var einkPrevThemeMode: String
+        get() = appCtx.getPrefString(PreferKey.einkPrevThemeMode, "0") ?: "0"
+        set(value) {
+            appCtx.putPrefString(PreferKey.einkPrevThemeMode, value)
+        }
+
+    /**
+     * 退出纯净阅读(墨水屏)模式：恢复启用前记录的主题模式并刷新 View 主题。
+     */
+    fun exitEInkPureMode() {
+        val prev = einkPrevThemeMode
+        appCtx.putPrefString(PreferKey.themeMode, prev)
+        themeMode = prev
+        isEInkMode = prev == "3" || prev == "4"
+        isEInkPureMode = prev == "4"
+        ThemeConfig.applyDayNight(appCtx)
+    }
     var clickActionTL = appCtx.getPrefInt(PreferKey.clickActionTL, 2)
     var clickActionTC = appCtx.getPrefInt(PreferKey.clickActionTC, 2)
     var clickActionTR = appCtx.getPrefInt(PreferKey.clickActionTR, 1)
@@ -46,7 +70,8 @@ object AppConfig : SharedPreferences.OnSharedPreferenceChangeListener {
         when (key) {
             PreferKey.themeMode -> {
                 themeMode = appCtx.getPrefString(PreferKey.themeMode, "0")
-                isEInkMode = themeMode == "3"
+                isEInkMode = themeMode == "3" || themeMode == "4"
+                isEInkPureMode = themeMode == "4"
             }
 
             PreferKey.clickActionTL -> clickActionTL =
