@@ -42,9 +42,17 @@ class EInkPagedListState(val listState: LazyListState) {
      */
     internal suspend fun measureOnFirstLayout() {
         if (pageItemCount > 0) return
-        val info = snapshotFlow { listState.layoutInfo }
+        val layoutFlow = snapshotFlow { listState.layoutInfo }
             .filter { it.visibleItemsInfo.isNotEmpty() }
-            .first()
+        var info = layoutFlow.first()
+        // 滚动位置可能被 rememberSaveable 恢复到非首项（如从阅读页返回书架）：
+        // 此时首个可见项下标不为 0，逐项计数第一步就会中断，页大小被误测
+        // 为 1，整页翻页退化成逐项翻。新分页实例逻辑上从第一页开始，
+        // 先回到首项再测量。
+        if (listState.firstVisibleItemIndex != 0 || listState.firstVisibleItemScrollOffset != 0) {
+            scrollToPageStart(0)
+            info = layoutFlow.first { it.visibleItemsInfo.first().index == 0 }
+        }
         val viewportEnd = info.viewportEndOffset
         var count = 0
         for (item in info.visibleItemsInfo) {
