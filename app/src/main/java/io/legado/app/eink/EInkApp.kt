@@ -80,7 +80,9 @@ fun EInkApp(
                 ReaderRoute(
                     bookUrl = screen.bookUrl,
                     onBack = { controller.pop() },
-                    onOpenToc = { bookUrl -> controller.navigate(EInkScreen.Toc(bookUrl)) },
+                    onOpenToc = { bookUrl ->
+                        controller.navigate(EInkScreen.Toc(bookUrl, fromReader = true))
+                    },
                     onChangeSource = { bookUrl ->
                         controller.navigate(EInkScreen.ChangeSource(bookUrl))
                     },
@@ -118,7 +120,9 @@ fun EInkApp(
                                 author = screen.author,
                                 bookUrl = screen.bookUrl,
                                 onBack = { controller.pop() },
-                                onOpenToc = { bookUrl -> controller.navigate(EInkScreen.Toc(bookUrl)) },
+                                onOpenToc = { bookUrl ->
+                                    controller.navigate(EInkScreen.Toc(bookUrl, fromReader = false))
+                                },
                                 onRead = { bookUrl -> controller.navigate(EInkScreen.Reader(bookUrl)) },
                             )
                         }
@@ -136,7 +140,14 @@ fun EInkApp(
                                 bookUrl = screen.bookUrl,
                                 onBack = { controller.pop() },
                                 onOpenReader = { bookUrl ->
-                                    controller.navigate(EInkScreen.Reader(bookUrl))
+                                    if (screen.fromReader) {
+                                        // 复用下方既有阅读页：弹出目录即可，
+                                        // 阅读页重新挂载时按新保存的进度跳章
+                                        controller.pop()
+                                    } else {
+                                        // 详情页等路径：目录出栈、阅读页入栈，返回回到详情页
+                                        controller.replaceTop(EInkScreen.Reader(bookUrl))
+                                    }
                                 }
                             )
                         }

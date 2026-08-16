@@ -1,5 +1,6 @@
 package io.legado.app.eink.toc
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
@@ -34,6 +35,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -41,6 +43,7 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import io.legado.app.R
 import io.legado.app.data.entities.BookChapter
 import io.legado.app.eink.component.EInkHorizontalDivider
 import io.legado.app.eink.component.EInkLoading
@@ -66,6 +69,9 @@ private val HandleTouchWidth = 36.dp
 /** 手柄滑块尺寸。 */
 private val HandleThumbWidth = 6.dp
 private val HandleThumbHeight = 48.dp
+
+/** 未缓存章节图标尺寸。 */
+private val IconSize = 16.dp
 
 /**
  * 目录 Route — ViewModel 感知层。
@@ -261,15 +267,19 @@ private fun ChapterList(
             ChapterItem(
                 chapter = chapter,
                 isCurrent = realIndex == state.durChapterIndex,
+                // 本地书与卷章节视为已缓存（与 View 版一致）
+                cached = state.isLocalBook
+                        || chapter.isVolume
+                        || state.cachedFileNames.contains(chapter.getFileName()),
                 onClick = { onChapterClick(realIndex) }
             )
         }
     }
 }
 
-/** 章节条目：当前阅读章节整行反色（黑底白字）更醒目。 */
+/** 章节条目：当前阅读章节整行反色（黑底白字）更醒目；未缓存章节显示云端图标。 */
 @Composable
-private fun ChapterItem(chapter: BookChapter, isCurrent: Boolean, onClick: () -> Unit) {
+private fun ChapterItem(chapter: BookChapter, isCurrent: Boolean, cached: Boolean, onClick: () -> Unit) {
     val scheme = EInkTheme.colorScheme
     Row(
         modifier = Modifier
@@ -278,6 +288,7 @@ private fun ChapterItem(chapter: BookChapter, isCurrent: Boolean, onClick: () ->
             .clickable(onClick = onClick)
             .padding(horizontal = EInkSpacing.l, vertical = EInkSpacing.s),
         verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(EInkSpacing.s),
     ) {
         EInkText(
             text = chapter.title,
@@ -288,12 +299,19 @@ private fun ChapterItem(chapter: BookChapter, isCurrent: Boolean, onClick: () ->
             maxLines = 1,
             overflow = TextOverflow.Ellipsis
         )
+        if (!cached) {
+            // 未下载缓存标记（云图标，与 View 版一致）
+            Image(
+                painter = painterResource(id = R.drawable.ic_outline_cloud_24),
+                contentDescription = "未缓存",
+                modifier = Modifier.size(IconSize),
+            )
+        }
         if (isCurrent) {
             EInkText(
                 text = "在读",
                 style = EInkTheme.typography.labelMedium,
                 color = scheme.surface,
-                modifier = Modifier.padding(start = EInkSpacing.s)
             )
         }
     }

@@ -20,8 +20,13 @@ sealed interface EInkScreen {
     /** 书籍详情（搜索结果等入口） */
     data class BookDetail(val name: String, val author: String, val bookUrl: String) : EInkScreen
 
-    /** 目录 */
-    data class Toc(val bookUrl: String) : EInkScreen
+    /**
+     * 目录。
+     *
+     * @param fromReader 是否自阅读页进入：选章后复用下方既有阅读页（仅弹出目录）；
+     * 否则选章后替换栈顶进入阅读页（返回回到目录的上一级，如详情页）
+     */
+    data class Toc(val bookUrl: String, val fromReader: Boolean = false) : EInkScreen
 
     /** 阅读器（复用 View 版 ReadBook/ChapterProvider 渲染引擎） */
     data class Reader(val bookUrl: String) : EInkScreen

@@ -70,6 +70,23 @@ class EInkNavController internal constructor(
         return true
     }
 
+    /**
+     * 用 [screen] 替换栈顶：当前屏幕出栈、新屏幕入栈。
+     *
+     * 用于"目录页选章进入阅读页"等中间页场景：离开中间页的同时
+     * 从返回堆栈移除自身（返回时回到中间页的上一级）。
+     */
+    fun replaceTop(screen: EInkScreen) {
+        if (backStack.size <= 1) {
+            navigate(screen)
+            return
+        }
+        backStack.removeAt(backStack.lastIndex).viewModelStore.clear()
+        val entry = Entry(nextEntryId++, screen, ViewModelStore())
+        backStack.add(entry)
+        current = entry
+    }
+
     companion object {
         /**
          * 创建并记住一个 [EInkNavController]。

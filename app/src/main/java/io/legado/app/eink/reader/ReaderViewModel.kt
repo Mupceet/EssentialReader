@@ -174,10 +174,16 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application),
             // 永远不会回调（界面停留在加载中）
             withTimeoutOrNull(VIEW_SIZE_TIMEOUT_MS) { viewSizeReady.await() }
 
-            // 换源完成后引擎持有新书（bookUrl 与路由参数不同），优先采用
+            // 换源完成后引擎持有新书（bookUrl 与路由参数不同），优先采用；
+            // 未加书架的搜索书（详情页直接阅读）转 Book 入库（notShelf），
+            // 与 View 版"未加书架直接阅读"行为一致
             val book = ReadBook.book
                 ?.takeIf { loadedBookUrl != null && it.bookUrl != loadedBookUrl }
                 ?: appDb.bookDao.getBook(bookUrl)
+                ?: appDb.searchBookDao.getSearchBook(bookUrl)?.toBook()?.apply {
+                    addType(BookType.notShelf)
+                    save()
+                }
             if (book == null) {
                 _uiState.update {
                     it.copy(isLoading = false, error = "书籍不存在")
@@ -194,8 +200,12 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application),
                     upContent()
                     return@launch
                 }
+                // 章节跳转（目录选章等）：清空旧页面显示加载中，
+                // 内容未缓存时由下载完成的 upContent 回调刷新
+                _uiState.update { it.copy(isLoading = true, textPage = null) }
             } else {
                 ReadBook.resetData(book)
+                _uiState.update { it.copy(isLoading = true, textPage = null) }
             }
             loadedBookUrl = book.bookUrl
             syncBookState(book)
