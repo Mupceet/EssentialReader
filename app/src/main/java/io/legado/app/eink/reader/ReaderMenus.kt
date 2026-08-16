@@ -20,6 +20,10 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -251,25 +255,29 @@ internal fun ReaderPanelContainer(
 }
 
 // ====================================================================
-// 排版参数面板
+// 排版参数面板（6 行：字号/字距/缩进/行距/段距/边距调整入口）
 // ====================================================================
 
+/**
+ * 排版面板。
+ *
+ * 6 行整行步进：字号、字距、缩进、行距、段距，以及"边距调整"入口。
+ * 边距调整在独立的居中弹框（[ReaderMarginDialog]）中进行：
+ * 底部面板会遮挡页眉/页脚，居中弹框四周透明，调整时实时可见效果。
+ */
 @Composable
 internal fun ReaderLayoutPanel(
     style: ReaderTextStyle,
     onAdjustTextSize: (Int) -> Unit,
     onAdjustLetterSpacing: (Float) -> Unit,
+    onAdjustIndent: (Int) -> Unit,
     onAdjustLineSpacing: (Int) -> Unit,
     onAdjustParagraphSpacing: (Int) -> Unit,
-    onSetIndent: (Int) -> Unit,
-    onAdjustPaddingH: (Int) -> Unit,
-    onAdjustPaddingV: (Int) -> Unit,
-    onAdjustHeaderPadding: (Int) -> Unit,
-    onAdjustFooterPadding: (Int) -> Unit,
+    onOpenMargins: () -> Unit,
 ) {
     StepperRow(
-        label = "正文字号",
-        value = "${style.textSize} sp",
+        label = "字号",
+        value = "${style.textSize}sp",
         onDecrement = { onAdjustTextSize(-1) },
         onIncrement = { onAdjustTextSize(1) },
     )
@@ -278,6 +286,12 @@ internal fun ReaderLayoutPanel(
         value = String.format("%.2f", style.letterSpacing),
         onDecrement = { onAdjustLetterSpacing(-0.05f) },
         onIncrement = { onAdjustLetterSpacing(0.05f) },
+    )
+    StepperRow(
+        label = "缩进",
+        value = "${style.indentChars}字",
+        onDecrement = { onAdjustIndent(-1) },
+        onIncrement = { onAdjustIndent(1) },
     )
     StepperRow(
         label = "行距",
@@ -291,37 +305,210 @@ internal fun ReaderLayoutPanel(
         onDecrement = { onAdjustParagraphSpacing(-1) },
         onIncrement = { onAdjustParagraphSpacing(1) },
     )
-    ChipRow(
-        label = "缩进",
-        options = listOf("无", "1字符", "2字符", "3字符", "4字符"),
-        optionValues = listOf(0, 1, 2, 3, 4),
-        selectedValue = style.indentChars,
-        onSelect = onSetIndent,
+    OptionRow(label = "边距调整") { onOpenMargins() }
+}
+
+// ====================================================================
+// 边距调整弹框（屏幕居中，内含 正文/页眉/页脚 三 Tab）
+// ====================================================================
+
+/**
+ * 边距调整弹框：屏幕居中的卡片，四周透明 —— 页眉/页脚/正文边距
+ * 调整时实时可见效果（±2dp）。
+ *
+ * 内含三个 Tab：正文 / 页眉 / 页脚，每个 Tab 各 4 行整行步进：
+ * 上边距、下边距、左边距、右边距。
+ */
+@Composable
+internal fun ReaderMarginDialog(
+    style: ReaderTextStyle,
+    onAdjustPaddingTop: (Int) -> Unit,
+    onAdjustPaddingBottom: (Int) -> Unit,
+    onAdjustPaddingLeft: (Int) -> Unit,
+    onAdjustPaddingRight: (Int) -> Unit,
+    onAdjustHeaderPaddingTop: (Int) -> Unit,
+    onAdjustHeaderPaddingBottom: (Int) -> Unit,
+    onAdjustHeaderPaddingLeft: (Int) -> Unit,
+    onAdjustHeaderPaddingRight: (Int) -> Unit,
+    onAdjustFooterPaddingTop: (Int) -> Unit,
+    onAdjustFooterPaddingBottom: (Int) -> Unit,
+    onAdjustFooterPaddingLeft: (Int) -> Unit,
+    onAdjustFooterPaddingRight: (Int) -> Unit,
+    onClose: () -> Unit,
+) {
+    var selectedTab by remember { mutableIntStateOf(0) }
+    Box(modifier = Modifier.fillMaxSize()) {
+        // 透明点击区：关闭弹框
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .staticClickable(role = Role.Button, onClickLabel = "关闭", onClick = onClose),
+        )
+        Column(
+            modifier = Modifier
+                .align(Alignment.Center)
+                .fillMaxWidth(0.86f)
+                .background(EInkTheme.colorScheme.surface)
+                .border(
+                    width = 1.dp,
+                    color = EInkTheme.colorScheme.outline,
+                )
+                // 消费弹框内空白处点击，避免透传到关闭层
+                .staticClickable(onClick = {}),
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = EInkSpacing.l, vertical = EInkSpacing.s),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                EInkText(
+                    text = "边距调整",
+                    style = EInkTheme.typography.titleMedium,
+                    modifier = Modifier.weight(1f),
+                )
+                Box(
+                    modifier = Modifier
+                        .size(44.dp)
+                        .staticClickable(role = Role.Button, onClick = onClose),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    EInkText(
+                        text = "×",
+                        style = EInkTheme.typography.titleLarge,
+                        color = EInkTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+            EInkHorizontalDivider()
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = EInkSpacing.l, vertical = EInkSpacing.s),
+            ) {
+                PanelTabRow(
+                    labels = listOf("正文", "页眉", "页脚"),
+                    selected = selectedTab,
+                    onSelect = { selectedTab = it }
+                )
+                when (selectedTab) {
+                    0 -> MarginRows(
+                        topDp = style.paddingTop,
+                        bottomDp = style.paddingBottom,
+                        leftDp = style.paddingLeft,
+                        rightDp = style.paddingRight,
+                        onAdjustTop = onAdjustPaddingTop,
+                        onAdjustBottom = onAdjustPaddingBottom,
+                        onAdjustLeft = onAdjustPaddingLeft,
+                        onAdjustRight = onAdjustPaddingRight,
+                    )
+
+                    1 -> MarginRows(
+                        topDp = style.headerPaddingTop,
+                        bottomDp = style.headerPaddingBottom,
+                        leftDp = style.headerPaddingLeft,
+                        rightDp = style.headerPaddingRight,
+                        onAdjustTop = onAdjustHeaderPaddingTop,
+                        onAdjustBottom = onAdjustHeaderPaddingBottom,
+                        onAdjustLeft = onAdjustHeaderPaddingLeft,
+                        onAdjustRight = onAdjustHeaderPaddingRight,
+                    )
+
+                    else -> MarginRows(
+                        topDp = style.footerPaddingTop,
+                        bottomDp = style.footerPaddingBottom,
+                        leftDp = style.footerPaddingLeft,
+                        rightDp = style.footerPaddingRight,
+                        onAdjustTop = onAdjustFooterPaddingTop,
+                        onAdjustBottom = onAdjustFooterPaddingBottom,
+                        onAdjustLeft = onAdjustFooterPaddingLeft,
+                        onAdjustRight = onAdjustFooterPaddingRight,
+                    )
+                }
+            }
+        }
+    }
+}
+
+/** 单个区域的边距 4 行：上边距、下边距、左边距、右边距。 */
+@Composable
+private fun MarginRows(
+    topDp: Int,
+    bottomDp: Int,
+    leftDp: Int,
+    rightDp: Int,
+    onAdjustTop: (Int) -> Unit,
+    onAdjustBottom: (Int) -> Unit,
+    onAdjustLeft: (Int) -> Unit,
+    onAdjustRight: (Int) -> Unit,
+) {
+    StepperRow(
+        label = "上边距",
+        value = "${topDp}dp",
+        onDecrement = { onAdjustTop(-2) },
+        onIncrement = { onAdjustTop(2) },
     )
     StepperRow(
-        label = "边距（左右）",
-        value = "${style.paddingH} dp",
-        onDecrement = { onAdjustPaddingH(-2) },
-        onIncrement = { onAdjustPaddingH(2) },
+        label = "下边距",
+        value = "${bottomDp}dp",
+        onDecrement = { onAdjustBottom(-2) },
+        onIncrement = { onAdjustBottom(2) },
     )
     StepperRow(
-        label = "边距（上下）",
-        value = "${style.paddingV} dp",
-        onDecrement = { onAdjustPaddingV(-2) },
-        onIncrement = { onAdjustPaddingV(2) },
+        label = "左边距",
+        value = "${leftDp}dp",
+        onDecrement = { onAdjustLeft(-2) },
+        onIncrement = { onAdjustLeft(2) },
     )
     StepperRow(
-        label = "页眉边距",
-        value = "${style.headerPadding} dp",
-        onDecrement = { onAdjustHeaderPadding(-2) },
-        onIncrement = { onAdjustHeaderPadding(2) },
+        label = "右边距",
+        value = "${rightDp}dp",
+        onDecrement = { onAdjustRight(-2) },
+        onIncrement = { onAdjustRight(2) },
     )
-    StepperRow(
-        label = "页脚边距",
-        value = "${style.footerPadding} dp",
-        onDecrement = { onAdjustFooterPadding(-2) },
-        onIncrement = { onAdjustFooterPadding(2) },
-    )
+}
+
+// ====================================================================
+// 边距调整弹框（屏幕居中）
+// ====================================================================
+
+/** 面板 Tab 行：选中项反白，零动画直接切换。 */
+@Composable
+private fun PanelTabRow(labels: List<String>, selected: Int, onSelect: (Int) -> Unit) {
+    val scheme = EInkTheme.colorScheme
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = EInkSpacing.s),
+        horizontalArrangement = Arrangement.spacedBy(EInkSpacing.s),
+    ) {
+        labels.forEachIndexed { index, label ->
+            val isSelected = index == selected
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .defaultMinSize(minHeight = 40.dp)
+                    .background(
+                        color = if (isSelected) scheme.primary else Color.Transparent,
+                        shape = EInkShapes.small,
+                    )
+                    .border(
+                        width = 1.dp,
+                        color = if (isSelected) scheme.primary else scheme.outline,
+                        shape = EInkShapes.small,
+                    )
+                    .staticClickable(role = Role.Tab, onClick = { onSelect(index) }),
+                contentAlignment = Alignment.Center,
+            ) {
+                EInkText(
+                    text = label,
+                    color = if (isSelected) scheme.onPrimary else scheme.onSurface,
+                    style = EInkTheme.typography.labelLarge,
+                    maxLines = 1,
+                )
+            }
+        }
+    }
 }
 
 // ====================================================================
@@ -470,57 +657,5 @@ private fun OptionRow(label: String, onClick: () -> Unit) {
             style = EInkTheme.typography.titleLarge,
             color = EInkTheme.colorScheme.onSurfaceVariant,
         )
-    }
-}
-
-/** 单选 chip 行（用于缩进等离散参数）。 */
-@Composable
-private fun ChipRow(
-    label: String,
-    options: List<String>,
-    optionValues: List<Int>,
-    selectedValue: Int,
-    onSelect: (Int) -> Unit,
-) {
-    Column(modifier = Modifier.fillMaxWidth()) {
-        EInkText(
-            text = label,
-            style = EInkTheme.typography.bodyMedium,
-            modifier = Modifier.padding(top = EInkSpacing.s),
-        )
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = EInkSpacing.s),
-            horizontalArrangement = Arrangement.spacedBy(EInkSpacing.s),
-        ) {
-            options.forEachIndexed { index, option ->
-                val selected = optionValues[index] == selectedValue
-                val scheme = EInkTheme.colorScheme
-                Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .defaultMinSize(minHeight = 40.dp)
-                        .background(
-                            color = if (selected) scheme.primary else Color.Transparent,
-                            shape = EInkShapes.small,
-                        )
-                        .border(
-                            width = 1.dp,
-                            color = if (selected) scheme.primary else scheme.outline,
-                            shape = EInkShapes.small,
-                        )
-                        .staticClickable(role = Role.RadioButton, onClick = { onSelect(optionValues[index]) }),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    EInkText(
-                        text = option,
-                        color = if (selected) scheme.onPrimary else scheme.onSurface,
-                        style = EInkTheme.typography.labelMedium,
-                        maxLines = 1,
-                    )
-                }
-            }
-        }
     }
 }

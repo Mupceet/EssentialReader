@@ -29,7 +29,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -63,6 +62,7 @@ fun ReaderRoute(
     val context = LocalContext.current
     val view = LocalView.current
     var panel by remember { mutableStateOf<ReaderPanel?>(null) }
+    var showMarginDialog by remember { mutableStateOf(false) }
 
     LaunchedEffect(bookUrl) {
         viewModel.attach(bookUrl)
@@ -84,9 +84,10 @@ fun ReaderRoute(
         onDispose { }
     }
 
-    // 返回键逐级回退：面板 → 操作条 → 退出阅读
+    // 返回键逐级回退：边距弹框 → 设置面板 → 操作条 → 退出阅读
     BackHandler {
         when {
+            showMarginDialog -> showMarginDialog = false
             panel != null -> panel = null
             uiState.controlsVisible -> viewModel.hideControls()
             else -> onBack()
@@ -96,9 +97,9 @@ fun ReaderRoute(
     Box(modifier = Modifier.fillMaxSize()) {
         ReaderScreen(
             state = uiState,
-            // 设置面板打开时收起操作条（面板关闭后自动恢复），
+            // 设置面板/边距弹框打开时收起操作条（关闭后自动恢复），
             // 排版调参时才能看清页眉、边距等顶部效果
-            barsVisible = uiState.controlsVisible && panel == null,
+            barsVisible = uiState.controlsVisible && panel == null && !showMarginDialog,
             onPrevPage = viewModel::prevPage,
             onNextPage = viewModel::nextPage,
             onCenterTap = viewModel::toggleControls,
@@ -119,20 +120,20 @@ fun ReaderRoute(
             // 面板与阅读内容对齐（Edge-to-Edge 下避免被系统栏遮挡）
             Box(modifier = Modifier.fillMaxSize().safeDrawingPadding()) {
                 when (current) {
-                    ReaderPanel.LAYOUT -> ReaderPanelContainer(title = "排版设置", onClose = onClose) {
-                        ReaderLayoutPanel(
-                            style = uiState.style,
-                            onAdjustTextSize = viewModel::adjustTextSize,
-                            onAdjustLetterSpacing = viewModel::adjustLetterSpacing,
-                            onAdjustLineSpacing = viewModel::adjustLineSpacing,
-                            onAdjustParagraphSpacing = viewModel::adjustParagraphSpacing,
-                            onSetIndent = viewModel::setIndent,
-                            onAdjustPaddingH = viewModel::adjustPaddingH,
-                            onAdjustPaddingV = viewModel::adjustPaddingV,
-                            onAdjustHeaderPadding = viewModel::adjustHeaderPadding,
-                            onAdjustFooterPadding = viewModel::adjustFooterPadding,
-                        )
-                    }
+                ReaderPanel.LAYOUT -> ReaderPanelContainer(title = "排版设置", onClose = onClose) {
+                    ReaderLayoutPanel(
+                        style = uiState.style,
+                        onAdjustTextSize = viewModel::adjustTextSize,
+                        onAdjustLetterSpacing = viewModel::adjustLetterSpacing,
+                        onAdjustIndent = viewModel::adjustIndent,
+                        onAdjustLineSpacing = viewModel::adjustLineSpacing,
+                        onAdjustParagraphSpacing = viewModel::adjustParagraphSpacing,
+                        onOpenMargins = {
+                            panel = null
+                            showMarginDialog = true
+                        },
+                    )
+                }
 
                     ReaderPanel.OTHER -> ReaderPanelContainer(title = "其它设置", onClose = onClose) {
                         ReaderOtherPanel(
@@ -154,6 +155,27 @@ fun ReaderRoute(
                     }
                 }
             }
+        }
+
+        // 边距调整弹框：屏幕居中、四周透明，内含 正文/页眉/页脚 三 Tab，
+        // 调整时页眉/页脚/正文边距实时可见
+        if (showMarginDialog) {
+            ReaderMarginDialog(
+                style = uiState.style,
+                onAdjustPaddingTop = viewModel::adjustPaddingTop,
+                onAdjustPaddingBottom = viewModel::adjustPaddingBottom,
+                onAdjustPaddingLeft = viewModel::adjustPaddingLeft,
+                onAdjustPaddingRight = viewModel::adjustPaddingRight,
+                onAdjustHeaderPaddingTop = viewModel::adjustHeaderPaddingTop,
+                onAdjustHeaderPaddingBottom = viewModel::adjustHeaderPaddingBottom,
+                onAdjustHeaderPaddingLeft = viewModel::adjustHeaderPaddingLeft,
+                onAdjustHeaderPaddingRight = viewModel::adjustHeaderPaddingRight,
+                onAdjustFooterPaddingTop = viewModel::adjustFooterPaddingTop,
+                onAdjustFooterPaddingBottom = viewModel::adjustFooterPaddingBottom,
+                onAdjustFooterPaddingLeft = viewModel::adjustFooterPaddingLeft,
+                onAdjustFooterPaddingRight = viewModel::adjustFooterPaddingRight,
+                onClose = { showMarginDialog = false },
+            )
         }
     }
 }
@@ -209,10 +231,7 @@ internal fun ReaderScreen(
     ) {
         Column(modifier = Modifier.fillMaxSize()) {
             if (state.showHeader) {
-                ReaderHeader(
-                    state = state,
-                    padding = state.style.headerPadding.dp,
-                )
+                ReaderHeader(state = state)
             }
             Box(
                 modifier = Modifier
@@ -256,10 +275,7 @@ internal fun ReaderScreen(
                     ErrorView(message = state.error, onRetry = onRetry, onBack = onBack)
                 }
             }
-            ReaderFooter(
-                state = state,
-                padding = state.style.footerPadding.dp,
-            )
+            ReaderFooter(state = state)
         }
 
         if (barsVisible) {
@@ -293,15 +309,17 @@ internal fun ReaderScreen(
     }
 }
 
-/** 页眉：书名（左）+ 阅读进度（右）。 */
+/** 页眉：书名（左）+ 阅读进度（右）。字号固定（与 View 版对齐），四向边距来自排版参数。 */
 @Composable
-private fun ReaderHeader(state: ReaderUiState, padding: Dp) {
+private fun ReaderHeader(state: ReaderUiState) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .padding(
-                horizontal = padding + 8.dp,
-                vertical = 4.dp,
+                start = state.style.headerPaddingLeft.dp,
+                top = state.style.headerPaddingTop.dp,
+                end = state.style.headerPaddingRight.dp,
+                bottom = state.style.headerPaddingBottom.dp,
             ),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -322,15 +340,17 @@ private fun ReaderHeader(state: ReaderUiState, padding: Dp) {
     }
 }
 
-/** 页脚：章节标题（左）+ 页码（右）。 */
+/** 页脚：章节标题（左）+ 页码（右）。字号固定（与 View 版对齐），四向边距来自排版参数。 */
 @Composable
-private fun ReaderFooter(state: ReaderUiState, padding: Dp) {
+private fun ReaderFooter(state: ReaderUiState) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .padding(
-                horizontal = padding + 8.dp,
-                vertical = 4.dp,
+                start = state.style.footerPaddingLeft.dp,
+                top = state.style.footerPaddingTop.dp,
+                end = state.style.footerPaddingRight.dp,
+                bottom = state.style.footerPaddingBottom.dp,
             ),
         verticalAlignment = Alignment.CenterVertically,
     ) {

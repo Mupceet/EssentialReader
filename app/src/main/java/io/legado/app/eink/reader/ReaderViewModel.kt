@@ -45,15 +45,23 @@ import kotlin.math.min
 
 /** 排版参数快照（渲染 + 设置面板双用途）。 */
 data class ReaderTextStyle(
-    val textSize: Int = 20,          // sp
-    val letterSpacing: Float = 0.1f, // em
-    val lineSpacing: Int = 12,       // x0.1 倍行高
-    val paragraphSpacing: Int = 2,   // x0.1 行高
-    val indentChars: Int = 2,        // 缩进字符数
-    val paddingH: Int = 16,          // 左右边距 dp
-    val paddingV: Int = 6,           // 上下边距 dp
-    val headerPadding: Int = 0,      // 页眉边距 dp
-    val footerPadding: Int = 6,      // 页脚边距 dp
+    val textSize: Int = 20,            // sp
+    val letterSpacing: Float = 0.1f,   // em
+    val indentChars: Int = 2,          // 缩进字符数
+    val lineSpacing: Int = 12,         // x0.1 倍行高
+    val paragraphSpacing: Int = 2,     // x0.1 行高
+    val paddingLeft: Int = 16,         // 正文左边距 dp
+    val paddingTop: Int = 6,           // 正文上边距 dp
+    val paddingRight: Int = 16,        // 正文右边距 dp
+    val paddingBottom: Int = 6,        // 正文下边距 dp
+    val headerPaddingLeft: Int = 16,   // 页眉左边距 dp
+    val headerPaddingTop: Int = 0,     // 页眉上边距 dp
+    val headerPaddingRight: Int = 16,  // 页眉右边距 dp
+    val headerPaddingBottom: Int = 0,  // 页眉下边距 dp
+    val footerPaddingLeft: Int = 16,   // 页脚左边距 dp
+    val footerPaddingTop: Int = 6,     // 页脚上边距 dp
+    val footerPaddingRight: Int = 16,  // 页脚右边距 dp
+    val footerPaddingBottom: Int = 6,  // 页脚下边距 dp
 )
 
 /**
@@ -437,36 +445,70 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application),
             (ReadBookConfig.paragraphSpacing + delta).coerceIn(0, 10)
     }
 
-    fun setIndent(chars: Int) = applyLayoutStyle {
-        ReadBookConfig.paragraphIndent = if (chars <= 0) "" else ChapterProvider.indentChar.repeat(chars)
+    fun adjustIndent(delta: Int) = applyLayoutStyle {
+        val current = ReadBookConfig.paragraphIndent.count { it == ChapterProvider.indentChar[0] }
+        val value = (current + delta).coerceIn(MIN_INDENT_CHARS, MAX_INDENT_CHARS)
+        ReadBookConfig.paragraphIndent = if (value <= 0) "" else ChapterProvider.indentChar.repeat(value)
     }
 
-    fun adjustPaddingH(delta: Int) = applyLayoutStyle {
-        val value = (ReadBookConfig.paddingLeft + delta).coerceIn(0, 64)
-        ReadBookConfig.paddingLeft = value
-        ReadBookConfig.paddingRight = value
+    fun adjustPaddingLeft(delta: Int) = applyLayoutStyle {
+        ReadBookConfig.paddingLeft = (ReadBookConfig.paddingLeft + delta).coerceIn(0, 64)
     }
 
-    fun adjustPaddingV(delta: Int) = applyLayoutStyle {
-        val value = (ReadBookConfig.paddingTop + delta).coerceIn(0, 48)
-        ReadBookConfig.paddingTop = value
-        ReadBookConfig.paddingBottom = value
+    fun adjustPaddingTop(delta: Int) = applyLayoutStyle {
+        ReadBookConfig.paddingTop = (ReadBookConfig.paddingTop + delta).coerceIn(0, 48)
     }
 
-    fun adjustHeaderPadding(delta: Int) = applyStyleOnly {
-        val value = (ReadBookConfig.durConfig.headerPaddingLeft + delta).coerceIn(0, 48)
-        ReadBookConfig.durConfig.headerPaddingLeft = value
-        ReadBookConfig.durConfig.headerPaddingRight = value
-        ReadBookConfig.durConfig.headerPaddingTop = value
-        ReadBookConfig.durConfig.headerPaddingBottom = value
+    fun adjustPaddingRight(delta: Int) = applyLayoutStyle {
+        ReadBookConfig.paddingRight = (ReadBookConfig.paddingRight + delta).coerceIn(0, 64)
     }
 
-    fun adjustFooterPadding(delta: Int) = applyStyleOnly {
-        val value = (ReadBookConfig.durConfig.footerPaddingLeft + delta).coerceIn(0, 48)
-        ReadBookConfig.durConfig.footerPaddingLeft = value
-        ReadBookConfig.durConfig.footerPaddingRight = value
-        ReadBookConfig.durConfig.footerPaddingTop = value
-        ReadBookConfig.durConfig.footerPaddingBottom = value
+    fun adjustPaddingBottom(delta: Int) = applyLayoutStyle {
+        ReadBookConfig.paddingBottom = (ReadBookConfig.paddingBottom + delta).coerceIn(0, 48)
+    }
+
+    // ---- 页眉 / 页脚边距：写回 ReadBookConfig（与 View 版共用），
+    // 不影响 ChapterProvider 分页，仅刷新快照即时生效。
+    // 页眉/页脚字号与 View 版对齐，不做单独设置。 ----
+
+    fun adjustHeaderPaddingLeft(delta: Int) = applyStyleOnly {
+        ReadBookConfig.durConfig.headerPaddingLeft =
+            (ReadBookConfig.durConfig.headerPaddingLeft + delta).coerceIn(0, 48)
+    }
+
+    fun adjustHeaderPaddingTop(delta: Int) = applyStyleOnly {
+        ReadBookConfig.durConfig.headerPaddingTop =
+            (ReadBookConfig.durConfig.headerPaddingTop + delta).coerceIn(0, 48)
+    }
+
+    fun adjustHeaderPaddingRight(delta: Int) = applyStyleOnly {
+        ReadBookConfig.durConfig.headerPaddingRight =
+            (ReadBookConfig.durConfig.headerPaddingRight + delta).coerceIn(0, 48)
+    }
+
+    fun adjustHeaderPaddingBottom(delta: Int) = applyStyleOnly {
+        ReadBookConfig.durConfig.headerPaddingBottom =
+            (ReadBookConfig.durConfig.headerPaddingBottom + delta).coerceIn(0, 48)
+    }
+
+    fun adjustFooterPaddingLeft(delta: Int) = applyStyleOnly {
+        ReadBookConfig.durConfig.footerPaddingLeft =
+            (ReadBookConfig.durConfig.footerPaddingLeft + delta).coerceIn(0, 48)
+    }
+
+    fun adjustFooterPaddingTop(delta: Int) = applyStyleOnly {
+        ReadBookConfig.durConfig.footerPaddingTop =
+            (ReadBookConfig.durConfig.footerPaddingTop + delta).coerceIn(0, 48)
+    }
+
+    fun adjustFooterPaddingRight(delta: Int) = applyStyleOnly {
+        ReadBookConfig.durConfig.footerPaddingRight =
+            (ReadBookConfig.durConfig.footerPaddingRight + delta).coerceIn(0, 48)
+    }
+
+    fun adjustFooterPaddingBottom(delta: Int) = applyStyleOnly {
+        ReadBookConfig.durConfig.footerPaddingBottom =
+            (ReadBookConfig.durConfig.footerPaddingBottom + delta).coerceIn(0, 48)
     }
 
     fun toggleTextBold() = applyLayoutStyle {
@@ -658,6 +700,10 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application),
 /** 缓存全部剩余章节的标记值。 */
 const val CACHE_ALL = -1
 
+/** 缩进字符数可调区间。 */
+internal const val MIN_INDENT_CHARS = 0
+internal const val MAX_INDENT_CHARS = 4
+
 /** 等待阅读区尺寸就绪的超时（毫秒）。 */
 internal const val VIEW_SIZE_TIMEOUT_MS = 2000L
 
@@ -676,11 +722,19 @@ private const val MAX_TEXT_SIZE = 40
 private fun ReadBookConfig.snapshotStyle(): ReaderTextStyle = ReaderTextStyle(
     textSize = textSize,
     letterSpacing = letterSpacing,
+    indentChars = paragraphIndent.count { it == ChapterProvider.indentChar[0] },
     lineSpacing = lineSpacingExtra,
     paragraphSpacing = paragraphSpacing,
-    indentChars = paragraphIndent.count { it == ChapterProvider.indentChar[0] },
-    paddingH = paddingLeft,
-    paddingV = paddingTop,
-    headerPadding = durConfig.headerPaddingLeft,
-    footerPadding = durConfig.footerPaddingLeft,
+    paddingLeft = paddingLeft,
+    paddingTop = paddingTop,
+    paddingRight = paddingRight,
+    paddingBottom = paddingBottom,
+    headerPaddingLeft = durConfig.headerPaddingLeft,
+    headerPaddingTop = durConfig.headerPaddingTop,
+    headerPaddingRight = durConfig.headerPaddingRight,
+    headerPaddingBottom = durConfig.headerPaddingBottom,
+    footerPaddingLeft = durConfig.footerPaddingLeft,
+    footerPaddingTop = durConfig.footerPaddingTop,
+    footerPaddingRight = durConfig.footerPaddingRight,
+    footerPaddingBottom = durConfig.footerPaddingBottom,
 )
