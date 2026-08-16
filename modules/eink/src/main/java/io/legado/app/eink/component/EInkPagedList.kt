@@ -8,6 +8,8 @@ import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.Saver
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import kotlinx.coroutines.flow.filter
@@ -18,6 +20,10 @@ import kotlinx.coroutines.flow.first
  *
  * 列表首次布局时，实测"第一页完整展示的项数" [pageItemCount]，
  * 之后每次翻页固定移动该项数（[pageStart] ± [pageItemCount]，scrollToItem 直接跳转）。
+ *
+ * 分页状态经 [rememberEInkPagedListState] 随导航栈保存恢复：从其他界面
+ * 返回时 [pageStart] 保持原值（不回第一页），且恢复后 [pageItemCount] > 0，
+ * 自动跳过重新测量——恢复的非零滚动位置不会被测量流程归零。
  *
  * 由此保证：
  *  - 每一页从完整项边界开始，第一项永远完整展示；
@@ -107,6 +113,16 @@ class EInkPagedListState(val listState: LazyListState) {
     }
 
     /**
+     * 从保存的状态恢复分页（导航返回，经 [rememberEInkPagedListState] 的
+     * Saver 调用）。恢复后 [pageItemCount] > 0，[measureOnFirstLayout]
+     * 自动跳过。
+     */
+    internal fun restorePaging(pageStart: Int, pageItemCount: Int) {
+        this.pageStart = pageStart
+        this.pageItemCount = pageItemCount
+    }
+
+    /**
      * 数据集变化后把实际滚动位置拉回 [pageStart]。
      *
      * LazyColumn 按 key 锚定，列表原地重排（如按最后阅读时间排序更新）时，
@@ -159,11 +175,25 @@ class EInkPagedListState(val listState: LazyListState) {
 
 /**
  * 创建并记住 [EInkPagedListState]，内部在首次布局时自动测量页项数。
+ *
+ * 分页状态（[EInkPagedListState.pageStart]/[EInkPagedListState.pageItemCount]）
+ * 经 [rememberSaveable] 随导航栈条目保存恢复，与 [rememberLazyListState]
+ * 的滚动位置恢复保持一致：从其他界面返回时停在离开时的页，不回第一页。
  */
 @Composable
 fun rememberEInkPagedListState(): EInkPagedListState {
     val listState = rememberLazyListState()
-    val state = remember { EInkPagedListState(listState) }
+    val saver = remember(listState) {
+        Saver<EInkPagedListState, List<Any>>(
+            save = { listOf(it.pageStart, it.pageItemCount) },
+            restore = { values ->
+                EInkPagedListState(listState).apply {
+                    restorePaging(values[0] as Int, values[1] as Int)
+                }
+            }
+        )
+    }
+    val state = rememberSaveable(saver = saver) { EInkPagedListState(listState) }
     LaunchedEffect(state) { state.measureOnFirstLayout() }
     return state
 }

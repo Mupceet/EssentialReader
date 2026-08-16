@@ -78,10 +78,10 @@ fun HomeRoute(
         scope.launch { pager.pageDown(totalBooks) }
     }
 
-    // 数据变化（最后阅读排序更新/增删）后把实际滚动拉回页首：
-    // LazyColumn 按 key 锚定，原地重排会让首可见项漂移（新首项被顶到
-    // 可视区之上），与分页状态脱钩；从阅读页返回时 pager 为新实例
-    // （pageStart=0），这里同时负责把恢复的滚动位置对齐回第一页
+    // 数据变化（最后阅读排序更新/增删）后把实际滚动对齐回页首：
+    // 列表原地重排后首可见项可能与 pageStart 脱钩。分页状态随导航栈
+    // 保存恢复，从阅读页/搜索页返回时恢复离开时的 pageStart（不回
+    // 第一页），本 realign 负责把恢复的滚动位置对齐到该页首
     LaunchedEffect(uiState.books) {
         pager.realignToPageStart(uiState.books.size)
     }
