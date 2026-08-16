@@ -4,15 +4,19 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import io.legado.app.R
+import io.legado.app.constant.AppLog
 import io.legado.app.constant.BookType
 import io.legado.app.data.appDb
 import io.legado.app.data.entities.Book
 import io.legado.app.eink.arch.UserMessage
+import io.legado.app.help.book.BookHelp
 import io.legado.app.help.book.addType
 import io.legado.app.help.book.isLocal
 import io.legado.app.help.book.isNotShelf
 import io.legado.app.help.book.removeType
 import io.legado.app.model.webBook.WebBook
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -28,7 +32,6 @@ import kotlinx.coroutines.launch
 data class BookDetailUiState(
     val book: Book? = null,
     val isLoading: Boolean = true,
-    val isUpdating: Boolean = false,
     val isInBookshelf: Boolean = false,
 ) {
     /** 未找到书籍且不在加载中 */
@@ -43,7 +46,8 @@ data class BookDetailUiState(
  *  2. [appDb.searchBookDao] 搜索结果 `toBook()`
  *
  * 不在书架且缺目录信息时，联网调用 [WebBook.getBookInfoAwait] 拉取完整详情
- * （简介/标签/最新章节/封面/字数），带 `isUpdating` 状态。
+ * （简介/标签/最新章节/封面/字数）。书籍展示后后台预取目录入库
+ * （[prefetchChapterList]），使首次进入阅读页只剩正文下载。
  */
 class BookDetailViewModel(application: Application) : AndroidViewModel(application) {
 
@@ -71,7 +75,7 @@ class BookDetailViewModel(application: Application) : AndroidViewModel(applicati
             return
         }
         loadedKey = key
-        _uiState.update { it.copy(isLoading = true, book = null, isUpdating = false) }
+        _uiState.update { it.copy(isLoading = true, book = null) }
         viewModelScope.launch {
             val book = findBook(name, author, bookUrl)
             if (book == null) {
@@ -82,10 +86,50 @@ class BookDetailViewModel(application: Application) : AndroidViewModel(applicati
             _uiState.update {
                 it.copy(book = book, isInBookshelf = inShelf, isLoading = false)
             }
-            // 不在书架且目录信息缺失时拉取完整详情（简介等）
-            if (book.tocUrl.isEmpty() && !book.isLocal) {
-                refreshBookInfo(book)
+            prefetchChapterList(book, inShelf)
+        }
+    }
+
+    /**
+     * 后台预取目录入库：把新书首次打开阅读页时"详情→目录→正文"的串行下载
+     * 缩减为只剩正文下载（对齐 View 版详情页 BookInfoViewModel 的拉取时机，
+     * 详情缺失时先拉详情，再拉目录）。
+     *
+     * 未加书架的书落 notShelf 隐藏行（同阅读页/目录页兜底行为），否则阅读页
+     * 会从 SearchBook 重建 tocUrl 为空的 Book，导致目录被重复拉取。静默失败：
+     * 阅读页 ReaderViewModel.initBookData 仍作为兜底。
+     */
+    private fun prefetchChapterList(book: Book, inShelf: Boolean) {
+        if (book.isLocal) return
+        viewModelScope.launch(Dispatchers.IO) {
+            if (appDb.bookChapterDao.getChapterList(book.bookUrl).isNotEmpty()) return@launch
+            val source = appDb.bookSourceDao.getBookSource(book.origin) ?: return@launch
+            val oldBook = book.copy()
+            val chapters = runCatching {
+                if (book.tocUrl.isEmpty()) {
+                    WebBook.getBookInfoAwait(source, book, canReName = true)
+                }
+                WebBook.getChapterListAwait(source, book, runPerJs = inShelf).getOrThrow()
+            }.getOrElse { e ->
+                if (e is CancellationException) throw e
+                AppLog.put("详情页预取目录出错《${book.name}》\n${e.localizedMessage}", e)
+                return@launch
             }
+            if (inShelf) {
+                if (oldBook.bookUrl == book.bookUrl) {
+                    appDb.bookDao.update(book)
+                } else {
+                    // 目录地址重定向，替换书架记录并迁移缓存目录
+                    appDb.bookDao.replace(oldBook, book)
+                    BookHelp.updateCacheFolder(oldBook, book)
+                    appDb.bookChapterDao.delByBook(oldBook.bookUrl)
+                }
+            } else {
+                book.addType(BookType.notShelf)
+                book.save()
+            }
+            appDb.bookChapterDao.insert(*chapters.toTypedArray())
+            _uiState.update { it.copy(book = book) }
         }
     }
 
@@ -97,24 +141,6 @@ class BookDetailViewModel(application: Application) : AndroidViewModel(applicati
         }
         appDb.searchBookDao.getFirstByNameAuthor(name, author)?.toBook()?.let { return it }
         return null
-    }
-
-    private fun refreshBookInfo(book: Book) {
-        _uiState.update { it.copy(isUpdating = true) }
-        viewModelScope.launch {
-            val source = appDb.bookSourceDao.getBookSource(book.origin)
-            if (source == null) {
-                _uiState.update { it.copy(isUpdating = false) }
-                return@launch
-            }
-            runCatching {
-                WebBook.getBookInfoAwait(source, book, canReName = true)
-            }.onSuccess { updated ->
-                _uiState.update { it.copy(book = updated, isUpdating = false) }
-            }.onFailure {
-                _uiState.update { it.copy(isUpdating = false) }
-            }
-        }
     }
 
     /** 加入书架（参考 View 版 `BookInfoViewModel.addToBookshelf`）。 */
