@@ -22,7 +22,7 @@ import io.legado.app.eink.theme.EInkTheme
  *
  * E-Ink 约束:
  *  - 零涟漪（全局 NoIndication）、零阴影，层次仅靠分隔线；
- *  - 返回键使用 "←" 文本字形（不引入图标库依赖），触控目标 48dp；
+ *  - 返回键使用统一的 arrow_back 图标，触控目标 48dp；
  *  - 高度与底部操作栏一致（56dp），上下形成稳定的对称骨架。
  *
  * @param title 标题文本

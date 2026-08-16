@@ -45,8 +45,10 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import io.legado.app.R
 import io.legado.app.data.entities.BookChapter
+import io.legado.app.eink.component.EInkBackButton
 import io.legado.app.eink.component.EInkHorizontalDivider
 import io.legado.app.eink.component.EInkLoading
+import io.legado.app.eink.component.EInkPageArrows
 import io.legado.app.eink.component.EInkText
 import io.legado.app.eink.component.EInkTopBar
 import io.legado.app.eink.component.rememberEInkPagedListState
@@ -342,24 +344,31 @@ private fun TocBottomBar(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(EInkSpacing.m),
         ) {
-            BarGlyphAction(glyph = "←", contentDescription = "返回", onClick = onBack)
-            BarTextAction(label = "回到当前", onClick = onBackToCurrent)
-            BarTextAction(label = "去底部", onClick = onGoToBottom)
-            Spacer(modifier = Modifier.weight(1f))
-            PageArrow(glyph = "▲", enabled = canPageUp, onClickLabel = "上一页", onClick = onPageUp)
-            PageArrow(glyph = "▼", enabled = canPageDown, onClickLabel = "下一页", onClick = onPageDown)
+            EInkBackButton(onClick = onBack)
+            BarTextAction(label = "回到当前", onClick = onBackToCurrent, modifier = Modifier.weight(1f))
+            BarTextAction(label = "去底部", onClick = onGoToBottom, modifier = Modifier.weight(1f))
+            EInkPageArrows(
+                pageUpEnabled = canPageUp,
+                pageDownEnabled = canPageDown,
+                onPageUp = onPageUp,
+                onPageDown = onPageDown,
+            )
         }
     }
 }
 
 /** 操作条文字按钮：按压反色。 */
 @Composable
-private fun BarTextAction(label: String, onClick: () -> Unit) {
+private fun BarTextAction(
+    label: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
     val scheme = EInkTheme.colorScheme
     val press = rememberImmediatePressState()
     Box(
-        modifier = Modifier
-            .size(48.dp)
+        modifier = modifier
+            .height(48.dp)
             .then(press.modifier)
             .background(if (press.isPressed) scheme.onSurface else Color.Transparent)
             .staticClickable(role = Role.Button, onClick = onClick),
@@ -370,52 +379,12 @@ private fun BarTextAction(label: String, onClick: () -> Unit) {
             style = EInkTheme.typography.labelLarge,
             color = if (press.isPressed) scheme.surface else scheme.onSurface,
             maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
         )
     }
 }
 
-/** 操作条字形按钮（返回箭头等）：按压反色。 */
-@Composable
-private fun BarGlyphAction(glyph: String, contentDescription: String, onClick: () -> Unit) {
-    val scheme = EInkTheme.colorScheme
-    val press = rememberImmediatePressState()
-    Box(
-        modifier = Modifier
-            .size(48.dp)
-            .then(press.modifier)
-            .background(if (press.isPressed) scheme.onSurface else Color.Transparent)
-            .staticClickable(role = Role.Button, onClickLabel = contentDescription, onClick = onClick),
-        contentAlignment = Alignment.Center,
-    ) {
-        EInkText(
-            text = glyph,
-            style = EInkTheme.typography.titleLarge,
-            color = if (press.isPressed) scheme.surface else scheme.onSurface,
-        )
-    }
-}
 
-/** 翻页箭头：不可用时置灰，按压反色。 */
-@Composable
-private fun PageArrow(glyph: String, enabled: Boolean, onClickLabel: String, onClick: () -> Unit) {
-    val scheme = EInkTheme.colorScheme
-    val press = rememberImmediatePressState()
-    val color = when {
-        !enabled -> scheme.disabledContent
-        press.isPressed -> scheme.surface
-        else -> scheme.onSurface
-    }
-    Box(
-        modifier = Modifier
-            .size(48.dp)
-            .then(press.modifier)
-            .background(if (enabled && press.isPressed) scheme.onSurface else Color.Transparent)
-            .staticClickable(enabled = enabled, role = Role.Button, onClickLabel = onClickLabel, onClick = onClick),
-        contentAlignment = Alignment.Center,
-    ) {
-        EInkText(text = glyph, style = EInkTheme.typography.titleLarge, color = color)
-    }
-}
 
 // ====================================================================
 // 右侧快速滑动手柄

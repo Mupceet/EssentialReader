@@ -10,7 +10,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -26,8 +25,9 @@ import io.legado.app.eink.theme.EInkTheme
 /**
  * 底部通用操作栏（参考微信读书墨水屏版）。
  *
- * 结构：左侧为页面 Tab（选中项以反白色块表达，无动画），右侧固定两个
- * 上/下箭头按钮，用于对当前界面的列表做整页翻页。
+ * 结构：左侧为页面 Tab（选中项以反白色块表达，无动画），右侧固定
+ * 上/下翻页箭头。上下箭头统一使用 [EInkPageArrows]，包在胶囊边框内，
+ * 中间以竖线分隔。
  *
  * E-Ink 约束：
  *  - 不可翻页（列表已到顶/到底、或当前内容不可翻页）时箭头置灰
@@ -71,25 +71,23 @@ fun EInkOperationBar(
             horizontalArrangement = Arrangement.spacedBy(EInkSpacing.m)
         ) {
             navigationIcon?.invoke()
-            tabs.forEachIndexed { index, label ->
-                TabItem(
-                    label = label,
-                    selected = index == selectedTabIndex,
-                    onClick = { onTabSelect(index) }
-                )
+            if (tabs.isEmpty()) {
+                Spacer(modifier = Modifier.weight(1f))
+            } else {
+                tabs.forEachIndexed { index, label ->
+                    TabItem(
+                        label = label,
+                        selected = index == selectedTabIndex,
+                        onClick = { onTabSelect(index) },
+                        modifier = Modifier.weight(1f)
+                    )
+                }
             }
-            Spacer(modifier = Modifier.weight(1f))
-            PageArrow(
-                glyph = ArrowUpGlyph,
-                enabled = pageUpEnabled,
-                onClickLabel = "上一页",
-                onClick = onPageUp
-            )
-            PageArrow(
-                glyph = ArrowDownGlyph,
-                enabled = pageDownEnabled,
-                onClickLabel = "下一页",
-                onClick = onPageDown
+            EInkPageArrows(
+                pageUpEnabled = pageUpEnabled,
+                pageDownEnabled = pageDownEnabled,
+                onPageUp = onPageUp,
+                onPageDown = onPageDown
             )
         }
     }
@@ -99,14 +97,15 @@ fun EInkOperationBar(
 private fun TabItem(
     label: String,
     selected: Boolean,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     val colors = EInkTheme.colorScheme
     val backgroundColor = if (selected) colors.primary else Color.Transparent
     val contentColor = if (selected) colors.onPrimary else colors.onSurface
 
     Box(
-        modifier = Modifier
+        modifier = modifier
             .background(color = backgroundColor, shape = EInkShapes.small)
             .clickable(
                 enabled = !selected,
@@ -125,39 +124,5 @@ private fun TabItem(
     }
 }
 
-@Composable
-private fun PageArrow(
-    glyph: String,
-    enabled: Boolean,
-    onClickLabel: String,
-    onClick: () -> Unit
-) {
-    val scheme = EInkTheme.colorScheme
-    val color = if (enabled) scheme.onSurface else scheme.disabledContent
-
-    Box(
-        modifier = Modifier
-            .size(ArrowTouchTarget)
-            .clickable(
-                enabled = enabled,
-                role = Role.Button,
-                onClickLabel = onClickLabel,
-                onClick = onClick
-            ),
-        contentAlignment = Alignment.Center
-    ) {
-        BasicText(
-            text = glyph,
-            style = EInkTheme.typography.titleLarge.copy(color = color)
-        )
-    }
-}
-
 /** 操作栏高度（触控目标 ≥48dp + 上下留白）。 */
 private val BarHeight = 56.dp
-
-/** 箭头按钮触控目标（边缘区域规范：48dp）。 */
-private val ArrowTouchTarget = 48.dp
-
-private const val ArrowUpGlyph = "▲"
-private const val ArrowDownGlyph = "▼"

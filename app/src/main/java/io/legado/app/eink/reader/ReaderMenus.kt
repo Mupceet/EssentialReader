@@ -1,5 +1,6 @@
 package io.legado.app.eink.reader
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -27,10 +28,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import io.legado.app.R
 import io.legado.app.eink.component.EInkHorizontalDivider
 import io.legado.app.eink.component.EInkText
 import io.legado.app.eink.modifier.rememberImmediatePressState
@@ -78,18 +82,25 @@ internal fun ReaderTopBar(
                 overflow = TextOverflow.Ellipsis,
             )
             BarAction(
-                label = "换源",
+                iconRes = R.drawable.ic_exchange,
+                contentDescription = "换源",
                 enabled = !state.isLocalBook,
                 onClick = onChangeSource,
             )
-            BarAction(label = "刷新", onClick = onRefresh)
             BarAction(
-                label = "缓存",
+                iconRes = R.drawable.ic_refresh_black_24dp,
+                contentDescription = "刷新",
+                onClick = onRefresh,
+            )
+            BarAction(
+                iconRes = R.drawable.ic_download_line,
+                contentDescription = "缓存",
                 enabled = !state.isLocalBook,
                 onClick = onOpenCachePanel,
             )
             BarAction(
-                label = if (state.inBookshelf) "移出书架" else "加书架",
+                iconRes = if (state.inBookshelf) R.drawable.ic_outline_delete else R.drawable.ic_add,
+                contentDescription = if (state.inBookshelf) "移出书架" else "加书架",
                 onClick = onToggleBookshelf,
             )
         }
@@ -99,7 +110,12 @@ internal fun ReaderTopBar(
 }
 
 @Composable
-private fun BarAction(label: String, enabled: Boolean = true, onClick: () -> Unit) {
+private fun BarAction(
+    iconRes: Int,
+    contentDescription: String,
+    enabled: Boolean = true,
+    onClick: () -> Unit,
+) {
     val scheme = EInkTheme.colorScheme
     // 按压反色：按下黑底白字，抬起恢复（即时手势跟踪，不受滚动容器影响）
     val press = rememberImmediatePressState()
@@ -113,11 +129,21 @@ private fun BarAction(label: String, enabled: Boolean = true, onClick: () -> Uni
             .defaultMinSize(minWidth = 44.dp, minHeight = 44.dp)
             .then(press.modifier)
             .background(if (enabled && press.isPressed) scheme.onSurface else Color.Transparent)
-            .staticClickable(enabled = enabled, role = Role.Button, onClick = onClick)
+            .staticClickable(
+                enabled = enabled,
+                role = Role.Button,
+                onClickLabel = contentDescription,
+                onClick = onClick,
+            )
             .padding(horizontal = EInkSpacing.s),
         contentAlignment = Alignment.Center,
     ) {
-        EInkText(text = label, color = content, style = EInkTheme.typography.labelLarge)
+        Image(
+            painter = painterResource(iconRes),
+            contentDescription = contentDescription,
+            modifier = Modifier.size(24.dp),
+            colorFilter = ColorFilter.tint(content),
+        )
     }
 }
 
