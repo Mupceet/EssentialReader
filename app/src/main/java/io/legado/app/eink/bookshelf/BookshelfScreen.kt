@@ -1,6 +1,9 @@
 package io.legado.app.eink.bookshelf
 
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -20,6 +23,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
 import io.legado.app.R
 import io.legado.app.data.entities.Book
 import io.legado.app.eink.component.EInkLoading
@@ -45,12 +49,14 @@ import io.legado.app.eink.widget.EInkInfoRow
  *  - 上下滑动手势经 [EInkPageSwipe] 识别为整页翻页，
  *    与底部操作栏 ▲▼ 按钮触发同一动作。
  *
- * 列表项遵循规范 §41: title + secondary text + metadata + divider。
+ * 列表项遵循规范 §41: title + secondary text + metadata + divider：
+ * 点击进阅读，长按进详情（对齐 View 版书架交互）。
  */
 @Composable
 internal fun BookshelfScreen(
     state: BookshelfUiState,
     onBookClick: (String) -> Unit,
+    onBookLongClick: (Book) -> Unit,
     listState: LazyListState = rememberLazyListState(),
     onPageUp: () -> Unit = {},
     onPageDown: () -> Unit = {},
@@ -61,7 +67,9 @@ internal fun BookshelfScreen(
             state.isEmpty -> EmptyBookshelf(modifier = Modifier.fillMaxSize())
             else -> BookList(
                 books = state.books,
+                updatingBookUrls = state.updatingBookUrls,
                 onBookClick = onBookClick,
+                onBookLongClick = onBookLongClick,
                 listState = listState,
                 onPageUp = onPageUp,
                 onPageDown = onPageDown
@@ -73,7 +81,9 @@ internal fun BookshelfScreen(
 @Composable
 private fun BookList(
     books: List<Book>,
+    updatingBookUrls: Set<String>,
     onBookClick: (String) -> Unit,
+    onBookLongClick: (Book) -> Unit,
     listState: LazyListState,
     onPageUp: () -> Unit,
     onPageDown: () -> Unit
@@ -94,28 +104,56 @@ private fun BookList(
         // 视口不动，仅内容变化的项重绘。列表项无跨重排保留的内部状态，
         // 无需 key
         items(books) { book ->
-            BookListItem(book = book, onClick = { onBookClick(book.bookUrl) })
+            BookListItem(
+                book = book,
+                isUpdating = updatingBookUrls.contains(book.bookUrl),
+                onClick = { onBookClick(book.bookUrl) },
+                onLongClick = { onBookLongClick(book) }
+            )
         }
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun BookListItem(book: Book, onClick: () -> Unit) {
+private fun BookListItem(
+    book: Book,
+    isUpdating: Boolean,
+    onClick: () -> Unit,
+    onLongClick: () -> Unit
+) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick)
+            .combinedClickable(onClick = onClick, onLongClick = onLongClick)
             .padding(horizontal = EInkSpacing.l, vertical = EInkSpacing.s)
     ) {
-        // 左侧封面；无封面/加载失败时 [EInkBookCover] 显示文字占位封面
-        EInkBookCover(
-            url = book.getDisplayCover(),
-            name = book.name,
-            author = book.getRealAuthor(),
-            modifier = Modifier
-                .width(EInkCoverWidth)
-                .height(EInkCoverHeight)
-        )
+        // 左侧封面 + 未读角标；无封面/加载失败时 [EInkBookCover] 显示文字占位封面
+        Box {
+            EInkBookCover(
+                url = book.getDisplayCover(),
+                name = book.name,
+                author = book.getRealAuthor(),
+                modifier = Modifier
+                    .width(EInkCoverWidth)
+                    .height(EInkCoverHeight)
+            )
+            when {
+                // 刷新中：角标静态替换为省略号（E-Ink 禁止加载动画）
+                isUpdating -> ShelfBadge(
+                    text = "…",
+                    highlight = false,
+                    modifier = Modifier.align(Alignment.TopEnd)
+                )
+                // 未读章节数（View 版 getUnreadChapterNum；本次刷新发现
+                // 新章时高亮）
+                book.getUnreadChapterNum() > 0 -> ShelfBadge(
+                    text = book.getUnreadChapterNum().toString(),
+                    highlight = book.lastCheckCount > 0,
+                    modifier = Modifier.align(Alignment.TopEnd)
+                )
+            }
+        }
         Spacer(modifier = Modifier.width(EInkSpacing.m))
         Column(
             modifier = Modifier
@@ -155,6 +193,37 @@ private fun BookListItem(book: Book, onClick: () -> Unit) {
                 )
             }
         }
+    }
+}
+
+
+/**
+ * 书架未读角标：覆盖在封面右上角。
+ *
+ * E-Ink 约束：静态绘制、零动画零阴影——刷新中不做转圈/闪烁，仅把角标
+ * 静态替换为省略号，完成后一次性替换为数字或消失。高亮（本次刷新发现
+ * 新章，lastCheckCount > 0）为反色实心（黑底白字），普通为描边
+ * （白底黑字），两种状态均单帧绘制。
+ */
+@Composable
+private fun ShelfBadge(
+    text: String,
+    highlight: Boolean,
+    modifier: Modifier = Modifier
+) {
+    val colors = EInkTheme.colorScheme
+    Box(
+        modifier = modifier
+            .border(1.dp, colors.onSurface)
+            .background(if (highlight) colors.onSurface else colors.background)
+            .padding(horizontal = EInkSpacing.s, vertical = 0.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        EInkText(
+            text = text,
+            style = EInkTheme.typography.labelSmall,
+            color = if (highlight) colors.background else colors.onSurface
+        )
     }
 }
 

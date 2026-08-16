@@ -10,6 +10,7 @@ import androidx.compose.foundation.text.BasicText
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import io.legado.app.eink.theme.EInkSpacing
@@ -27,6 +28,7 @@ import io.legado.app.eink.theme.EInkTheme
  *
  * @param title 标题文本
  * @param onBack 返回回调；为 null 时不显示返回按钮（根页面用）
+ * @param titleStyle 标题样式；null 时用默认 titleMedium（首页等传 titleLarge 放大）
  * @param actions 右侧动作区内容（文本按钮等）
  */
 @Composable
@@ -34,6 +36,7 @@ fun EInkTopBar(
     title: String,
     modifier: Modifier = Modifier,
     onBack: (() -> Unit)? = null,
+    titleStyle: TextStyle? = null,
     actions: @Composable RowScope.() -> Unit = {}
 ) {
     val colors = EInkTheme.colorScheme
@@ -51,7 +54,8 @@ fun EInkTopBar(
             }
             BasicText(
                 text = title,
-                style = EInkTheme.typography.titleMedium.copy(color = colors.onSurface),
+                style = (titleStyle ?: EInkTheme.typography.titleMedium)
+                    .copy(color = colors.onSurface),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier

@@ -14,7 +14,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
+import androidx.lifecycle.lifecycleScope
+import io.legado.app.data.appDb
 import io.legado.app.eink.theme.EInkTheme
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 
 /**
  * E-Ink 版本单 Activity 入口。
@@ -37,6 +41,11 @@ class EInkMainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        // 清理未加书架的隐藏行（对齐 View 版 MainViewModel 启动时的
+        // deleteNotShelfBook；详情页预取/未加架阅读都会落这类行）
+        lifecycleScope.launch(Dispatchers.IO) {
+            appDb.bookDao.deleteNotShelfBook()
+        }
         setContent {
             EInkTheme {
                 EInkRoot()

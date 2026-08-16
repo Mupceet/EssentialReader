@@ -100,6 +100,12 @@ fun EInkApp(
                             // 书架点击直接进入阅读
                             controller.navigate(EInkScreen.Reader(bookUrl))
                         },
+                        onBookLongClick = { book ->
+                            // 长按进详情页（对齐 View 版书架交互）
+                            controller.navigate(
+                                EInkScreen.BookDetail(book.name, book.author, book.bookUrl)
+                            )
+                        },
                         onSearch = { controller.navigate(EInkScreen.Search) },
                         onOpenFullMode = {
                             // 完整模式（View UI）：恢复原主题，墨水屏界面退出；
