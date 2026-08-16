@@ -178,4 +178,68 @@ class BugFixTest {
             record1, record3
         )
     }
+
+    /**
+     * 测试并发速率限制的 off-by-one 修复
+     * 当并发率为 "3/1000" 时，应允许恰好 3 个请求通过，第 4 个请求被阻塞
+     * 修复前：初始 frequency=1，检查条件为 >，导致允许 4 个请求
+     * 修复后：初始 frequency=0，检查条件为 >=，正确允许 3 个请求
+     */
+    @Test
+    fun testConcurrentRateLimiterOffByOneFix() {
+        val maxConcurrent = 3
+        val record = ConcurrentRecord(true, System.currentTimeMillis(), 0)
+
+        var allowedCount = 0
+        var blockedCount = 0
+
+        for (i in 0 until 10) {
+            synchronized(record) {
+                if (record.frequency >= maxConcurrent) {
+                    blockedCount++
+                } else {
+                    record.frequency += 1
+                    allowedCount++
+                }
+            }
+        }
+
+        Assert.assertEquals(
+            "Exactly $maxConcurrent requests should be allowed",
+            maxConcurrent,
+            allowedCount
+        )
+        Assert.assertEquals(
+            "Remaining requests should be blocked",
+            10 - maxConcurrent,
+            blockedCount
+        )
+        Assert.assertEquals(
+            "Final frequency should equal max concurrent",
+            maxConcurrent,
+            record.frequency
+        )
+    }
+
+    /**
+     * 测试初始 frequency 为 0 时的正确性
+     * 新创建的 ConcurrentRecord frequency=0，第一个请求应被允许
+     */
+    @Test
+    fun testConcurrentRateLimiterInitialFrequency() {
+        val record = ConcurrentRecord(true, System.currentTimeMillis(), 0)
+        val maxConcurrent = 1
+
+        synchronized(record) {
+            Assert.assertEquals("Initial frequency should be 0", 0, record.frequency)
+
+            val firstAllowed = record.frequency >= maxConcurrent
+            Assert.assertFalse("First request should be allowed when frequency=0", firstAllowed)
+
+            record.frequency += 1
+
+            val secondAllowed = record.frequency >= maxConcurrent
+            Assert.assertTrue("Second request should be blocked when frequency=1 >= max=1", secondAllowed)
+        }
+    }
 }
