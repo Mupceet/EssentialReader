@@ -52,7 +52,6 @@ private val HomeTabLabels = listOf("书架", "我的")
 fun HomeRoute(
     onBookClick: (String) -> Unit,
     onSearch: () -> Unit,
-    onSettings: () -> Unit,
     onOpenFullMode: () -> Unit = {},
     viewModel: BookshelfViewModel = viewModel()
 ) {
@@ -105,7 +104,6 @@ fun HomeRoute(
         },
         mine = {
             MineScreen(
-                onSettings = onSettings,
                 onOpenFullMode = onOpenFullMode
             )
         }

@@ -26,7 +26,6 @@ import io.legado.app.eink.navigation.EInkNavController
 import io.legado.app.eink.navigation.EInkScreen
 import io.legado.app.eink.reader.ReaderRoute
 import io.legado.app.eink.search.SearchRoute
-import io.legado.app.eink.settings.SettingsRoute
 import io.legado.app.eink.toc.TocRoute
 import io.legado.app.help.config.AppConfig
 import io.legado.app.ui.main.MainActivity
@@ -102,7 +101,6 @@ fun EInkApp(
                             controller.navigate(EInkScreen.Reader(bookUrl))
                         },
                         onSearch = { controller.navigate(EInkScreen.Search) },
-                        onSettings = { controller.navigate(EInkScreen.Settings) },
                         onOpenFullMode = {
                             // 完整模式（View UI）：恢复原主题，墨水屏界面退出；
                             // 导入导出等管理功能在完整模式中完成，
@@ -137,10 +135,6 @@ fun EInkApp(
                                 },
                                 onRead = { bookUrl -> controller.navigate(EInkScreen.Reader(bookUrl)) },
                             )
-                        }
-
-                        is EInkScreen.Settings -> {
-                            SettingsRoute(onBack = { controller.pop() })
                         }
 
                         is EInkScreen.Toc -> {

@@ -35,7 +35,6 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import io.legado.app.eink.component.EInkText
 import io.legado.app.eink.modifier.staticClickable
 import io.legado.app.eink.theme.EInkTheme
-import io.legado.app.help.config.ReadBookConfig
 import android.view.WindowManager
 
 /**
@@ -211,21 +210,11 @@ internal fun ReaderScreen(
     onOpenPanel: (ReaderPanel) -> Unit,
     onRetry: () -> Unit,
 ) {
-    val readerBg = remember {
-        ReadBookConfig.durConfig.run {
-            if (bgTypeEInk == 0) {
-                runCatching { Color(android.graphics.Color.parseColor(bgStrEInk)) }
-                    .getOrDefault(Color.White)
-            } else {
-                Color.White
-            }
-        }
-    }
-
+    // 纯净阅读固定白底黑字（配置清单决策 B1/B2）：不读取 bgStrEInk 等颜色配置
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(readerBg)
+            .background(Color.White)
             .safeDrawingPadding()
     ) {
         Column(modifier = Modifier.fillMaxSize()) {
