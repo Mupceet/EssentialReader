@@ -519,12 +519,10 @@ private fun PanelTabRow(labels: List<String>, selected: Int, onSelect: (Int) -> 
 internal fun ReaderOtherPanel(
     state: ReaderUiState,
     onToggleKeepScreenOn: () -> Unit,
-    onToggleShowHeader: () -> Unit,
     onToggleTextBold: () -> Unit,
     onAdjustAutoInterval: (Int) -> Unit,
 ) {
     ToggleRow(label = "保持屏幕常亮", checked = state.keepScreenOn, onToggle = onToggleKeepScreenOn)
-    ToggleRow(label = "显示页眉", checked = state.showHeader, onToggle = onToggleShowHeader)
     ToggleRow(label = "正文加粗", checked = state.textBold, onToggle = onToggleTextBold)
     StepperRow(
         label = "自动翻页间隔",

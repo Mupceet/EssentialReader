@@ -136,13 +136,12 @@ fun ReaderRoute(
                 }
 
                     ReaderPanel.OTHER -> ReaderPanelContainer(title = "其它设置", onClose = onClose) {
-                        ReaderOtherPanel(
-                            state = uiState,
-                            onToggleKeepScreenOn = viewModel::toggleKeepScreenOn,
-                            onToggleShowHeader = viewModel::toggleShowHeader,
-                            onToggleTextBold = viewModel::toggleTextBold,
-                            onAdjustAutoInterval = viewModel::adjustAutoPlayInterval,
-                        )
+                    ReaderOtherPanel(
+                        state = uiState,
+                        onToggleKeepScreenOn = viewModel::toggleKeepScreenOn,
+                        onToggleTextBold = viewModel::toggleTextBold,
+                        onAdjustAutoInterval = viewModel::adjustAutoPlayInterval,
+                    )
                     }
 
                     ReaderPanel.CACHE -> ReaderPanelContainer(title = "缓存", onClose = onClose) {
@@ -230,7 +229,7 @@ internal fun ReaderScreen(
             .safeDrawingPadding()
     ) {
         Column(modifier = Modifier.fillMaxSize()) {
-            if (state.showHeader) {
+            if (state.headerVisible) {
                 ReaderHeader(state = state)
             }
             Box(
@@ -275,7 +274,9 @@ internal fun ReaderScreen(
                     ErrorView(message = state.error, onRetry = onRetry, onBack = onBack)
                 }
             }
-            ReaderFooter(state = state)
+            if (state.footerVisible) {
+                ReaderFooter(state = state)
+            }
         }
 
         if (barsVisible) {
@@ -309,7 +310,7 @@ internal fun ReaderScreen(
     }
 }
 
-/** 页眉：书名（左）+ 阅读进度（右）。字号固定（与 View 版对齐），四向边距来自排版参数。 */
+/** 页眉：时间（左）+ 电量%（右）。可见性与内容按 View 版 ReadTipConfig 默认规则，不开放设置。 */
 @Composable
 private fun ReaderHeader(state: ReaderUiState) {
     Row(
@@ -323,24 +324,23 @@ private fun ReaderHeader(state: ReaderUiState) {
             ),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        EInkText(
-            text = state.bookName,
-            modifier = Modifier.weight(1f),
-            color = EInkTheme.colorScheme.onSurfaceVariant,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
-        if (state.readProgress.isNotEmpty()) {
+        if (state.headerTime.isNotEmpty()) {
             EInkText(
-                text = state.readProgress,
+                text = state.headerTime,
+                modifier = Modifier.weight(1f),
                 color = EInkTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1,
             )
         }
+        EInkText(
+            text = "${state.batteryPercent}%",
+            color = EInkTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1,
+        )
     }
 }
 
-/** 页脚：章节标题（左）+ 页码（右）。字号固定（与 View 版对齐），四向边距来自排版参数。 */
+/** 页脚：章节标题（左）+ 页数及进度（右，View 版 pageAndTotal 格式）。 */
 @Composable
 private fun ReaderFooter(state: ReaderUiState) {
     Row(
@@ -361,9 +361,9 @@ private fun ReaderFooter(state: ReaderUiState) {
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
-        if (state.pageIndicator.isNotEmpty()) {
+        if (state.pageAndTotal.isNotEmpty()) {
             EInkText(
-                text = state.pageIndicator,
+                text = state.pageAndTotal,
                 color = EInkTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1,
             )

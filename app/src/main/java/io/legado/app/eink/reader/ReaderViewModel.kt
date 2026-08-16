@@ -1,8 +1,12 @@
 package io.legado.app.eink.reader
 
 import android.app.Application
+import android.content.Intent
+import android.content.IntentFilter
+import android.os.BatteryManager
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import io.legado.app.constant.AppConst
 import io.legado.app.constant.BookType
 import io.legado.app.data.appDb
 import io.legado.app.data.entities.Book
@@ -16,6 +20,7 @@ import io.legado.app.help.book.isLocalModified
 import io.legado.app.help.book.isType
 import io.legado.app.help.book.removeType
 import io.legado.app.help.config.ReadBookConfig
+import io.legado.app.help.config.ReadTipConfig
 import io.legado.app.model.CacheBook
 import io.legado.app.model.ReadBook
 import io.legado.app.model.localBook.LocalBook
@@ -41,6 +46,7 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
 import splitties.init.appCtx
+import java.util.Date
 import kotlin.math.min
 
 /** 排版参数快照（渲染 + 设置面板双用途）。 */
@@ -88,14 +94,28 @@ data class ReaderUiState(
     val autoPlayIntervalSec: Int = DEFAULT_AUTO_INTERVAL_SEC,
     val isLocalBook: Boolean = false,
     val inBookshelf: Boolean = false,
-    val showHeader: Boolean = true,
     val keepScreenOn: Boolean = false,
     val textBold: Boolean = false,
     val style: ReaderTextStyle = ReaderTextStyle(),
+    // 页眉/页脚信息（按 View 版 ReadTipConfig 规则渲染，不开放设置）
+    val headerVisible: Boolean = false,
+    val footerVisible: Boolean = true,
+    val headerTime: String = "",
+    val batteryPercent: Int = 100,
 ) {
     /** 页码显示文本，如 "3/15" */
     val pageIndicator: String
         get() = if (pageCount > 0) "${pageIndex + 1}/$pageCount" else ""
+
+    /** 页数及进度（View 版 pageAndTotal 格式），如 "3/15  12.3%" */
+    val pageAndTotal: String
+        get() = buildString {
+            if (pageIndicator.isNotEmpty()) append(pageIndicator)
+            if (readProgress.isNotEmpty()) {
+                if (isNotEmpty()) append("  ")
+                append(readProgress)
+            }
+        }
 }
 
 /**
@@ -109,14 +129,12 @@ data class ReaderUiState(
 class ReaderViewModel(application: Application) : AndroidViewModel(application), ReadBook.CallBack {
 
     companion object {
-        private const val PREF_SHOW_HEADER = "einkReaderShowHeader"
         private const val PREF_KEEP_SCREEN_ON = "einkReaderKeepScreenOn"
         private const val PREF_AUTO_INTERVAL = "einkReaderAutoIntervalSec"
     }
 
     private val _uiState = MutableStateFlow(
         ReaderUiState(
-            showHeader = appCtx.getPrefBoolean(PREF_SHOW_HEADER, true),
             keepScreenOn = appCtx.getPrefBoolean(PREF_KEEP_SCREEN_ON),
             autoPlayIntervalSec = appCtx.getPrefInt(PREF_AUTO_INTERVAL, DEFAULT_AUTO_INTERVAL_SEC)
                 .coerceIn(MIN_AUTO_INTERVAL_SEC, MAX_AUTO_INTERVAL_SEC),
@@ -301,6 +319,36 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application),
                 bookName = book.name,
                 isLocalBook = book.isLocal,
                 inBookshelf = inBookshelf,
+            )
+        }
+        updateTipInfo()
+    }
+
+    /**
+     * 刷新页眉/页脚信息（复刻 View 版 PageView.upTipStyle 的可见性与默认内容，
+     * 配置读取 ReadTipConfig，不开放设置）：
+     * - 页眉：headerMode 1 强制显示 / 2 强制隐藏 / 默认状态栏显示时隐藏，
+     *   内容为 时间（左）+ 电量%（右）
+     * - 页脚：默认显示（footerMode 1 隐藏），内容为 章节标题（左）+ 页数及进度（右）
+     *
+     * 时间/电量随页面状态更新刷新（翻页时刻），不做周期性重组。
+     */
+    private fun updateTipInfo() {
+        val app = getApplication<Application>()
+        val batteryIntent = app.registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
+        val level = batteryIntent?.getIntExtra(BatteryManager.EXTRA_LEVEL, -1) ?: -1
+        val scale = batteryIntent?.getIntExtra(BatteryManager.EXTRA_SCALE, -1) ?: -1
+        val battery = if (level >= 0 && scale > 0) level * 100 / scale else 100
+        _uiState.update {
+            it.copy(
+                headerVisible = when (ReadTipConfig.headerMode) {
+                    1 -> true
+                    2 -> false
+                    else -> ReadBookConfig.hideStatusBar
+                },
+                footerVisible = ReadTipConfig.footerMode != 1,
+                headerTime = AppConst.timeFormat.format(Date()).toString(),
+                batteryPercent = battery,
             )
         }
     }
@@ -515,13 +563,6 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application),
         ReadBookConfig.textBold = if (ReadBookConfig.textBold == 1) 0 else 1
     }
 
-    fun toggleShowHeader() {
-        _uiState.update {
-            appCtx.putPrefBoolean(PREF_SHOW_HEADER, !it.showHeader)
-            it.copy(showHeader = !it.showHeader)
-        }
-    }
-
     fun toggleKeepScreenOn() {
         _uiState.update {
             appCtx.putPrefBoolean(PREF_KEEP_SCREEN_ON, !it.keepScreenOn)
@@ -641,6 +682,7 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application),
                     error = null,
                 )
             }
+            updateTipInfo()
         }
         success?.invoke()
     }
