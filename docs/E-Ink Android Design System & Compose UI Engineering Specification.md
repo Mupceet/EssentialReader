@@ -1217,15 +1217,32 @@ Focus feedback 不使用动画。
 
 默认无 Ripple。
 
-允许：
+要求（必须）：所有可点按的交互元素（按钮、图标按钮、列表项、Tab、
+操作栏箭头等）必须在触摸按下时提供即时静态视觉反馈。
+不允许"无任何反馈"的点击目标。
 
+原因：动作结果可能有网络延迟（如书架刷新数秒），或无可见变化
+（如重复触发同一动作），反馈不能依赖动作完成，必须在按下时刻
+本地完成。
+
+允许的反馈形式（任选其一）：
+
+    pressed -> 反色（容器/内容色互换）
     pressed -> black background
-
-或者：
-
     pressed -> border change
 
-但是必须：
+实现范式（:modules:eink）：
+
+    rememberImmediatePressState + staticClickable
+    按下瞬时反色、抬起恢复；pointer 手势层直接驱动，
+    不受滚动容器派发延迟影响。
+
+禁止：
+
+    ripple / 悬停高亮等动画型反馈
+    裸 clickable + NoIndication 的"静默"可交互元素
+
+一切反馈必须：
 
     instantaneous
     no animation
