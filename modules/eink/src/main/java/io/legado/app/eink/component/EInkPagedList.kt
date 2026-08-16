@@ -74,6 +74,19 @@ class EInkPagedListState(val listState: LazyListState) {
     }
 
     /**
+     * 跳转到指定项所在页：页首对齐到完整页边界并同步 [pageStart]。
+     *
+     * 用于"回到当前 / 去到底部 / 快速拖动结束"等任意位置跳转，
+     * 跳转后翻页序列仍保持完整页边界。
+     */
+    suspend fun jumpToItemAligned(index: Int) {
+        if (pageItemCount <= 0) return
+        val aligned = (index.coerceAtLeast(0) / pageItemCount) * pageItemCount
+        pageStart = aligned
+        scrollToPageStart(aligned)
+    }
+
+    /**
      * 重置分页计数到第一页（不滚动）。
      *
      * 发起新搜索等会先清空列表再填充新数据的场景使用：列表被清空后
