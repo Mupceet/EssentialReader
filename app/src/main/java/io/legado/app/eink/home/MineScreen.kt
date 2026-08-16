@@ -18,13 +18,12 @@ import io.legado.app.eink.theme.EInkTheme
 /**
  * 无状态「我的」页 — 首页第二个 Tab。
  *
- * 承载原先书架顶栏的入口（书源管理、阅读设置），
+ * 承载原先书架顶栏的入口（阅读设置），
  * 以及进入完整模式（导入导出等管理功能在完整模式中完成），
  * 内容为静态入口列表，无列表翻页（操作栏箭头置灰）。
  */
 @Composable
 internal fun MineScreen(
-    onBookSource: () -> Unit,
     onSettings: () -> Unit,
     onOpenFullMode: () -> Unit = {},
 ) {
@@ -37,8 +36,6 @@ internal fun MineScreen(
                 vertical = EInkSpacing.m
             )
         )
-        EInkHorizontalDivider()
-        MineEntry(label = "书源管理", onClick = onBookSource)
         EInkHorizontalDivider()
         MineEntry(label = "阅读设置", onClick = onSettings)
         EInkHorizontalDivider()

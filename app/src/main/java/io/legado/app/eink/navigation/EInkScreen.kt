@@ -13,8 +13,6 @@ sealed interface EInkScreen {
 
     data object Search : EInkScreen
 
-    data object BookSource : EInkScreen
-
     data object Settings : EInkScreen
 
     /** 书籍详情（搜索结果等入口） */

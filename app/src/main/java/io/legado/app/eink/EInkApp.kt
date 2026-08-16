@@ -20,7 +20,6 @@ import androidx.lifecycle.viewmodel.CreationExtras
 import androidx.lifecycle.viewmodel.MutableCreationExtras
 import androidx.lifecycle.viewmodel.compose.LocalViewModelStoreOwner
 import io.legado.app.eink.bookdetail.BookDetailRoute
-import io.legado.app.eink.booksource.BookSourceRoute
 import io.legado.app.eink.changesource.ChangeSourceRoute
 import io.legado.app.eink.home.HomeRoute
 import io.legado.app.eink.navigation.EInkNavController
@@ -103,7 +102,6 @@ fun EInkApp(
                             controller.navigate(EInkScreen.Reader(bookUrl))
                         },
                         onSearch = { controller.navigate(EInkScreen.Search) },
-                        onBookSource = { controller.navigate(EInkScreen.BookSource) },
                         onSettings = { controller.navigate(EInkScreen.Settings) },
                         onOpenFullMode = {
                             // 完整模式（View UI）：恢复原主题，墨水屏界面退出；
@@ -139,10 +137,6 @@ fun EInkApp(
                                 },
                                 onRead = { bookUrl -> controller.navigate(EInkScreen.Reader(bookUrl)) },
                             )
-                        }
-
-                        is EInkScreen.BookSource -> {
-                            BookSourceRoute(onBack = { controller.pop() })
                         }
 
                         is EInkScreen.Settings -> {
