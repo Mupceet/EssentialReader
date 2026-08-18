@@ -178,8 +178,10 @@ internal fun HomeScreen(
 }
 
 /**
- * 头部刷新按钮：标准 [EInkIconButton]，按压反色反馈由组件内置（规范 §35）。
- * 刷新中图标置灰（onSurfaceVariant），仍可点击重新发起刷新。
+ * 头部刷新按钮：空闲时显示刷新图标；刷新中置灰并禁用，避免重复点击。
+ *
+ * 与 View 版对齐：下拉刷新和菜单“更新目录”都不支持停止，只做排队去重，
+ * 因此 E-Ink 这里同样不提供停止图标，而是刷新期间禁用按钮。
  */
 @Composable
 private fun RefreshAction(isRefreshing: Boolean, onClick: () -> Unit) {
@@ -187,7 +189,8 @@ private fun RefreshAction(isRefreshing: Boolean, onClick: () -> Unit) {
     EInkIconButton(
         onClick = onClick,
         painter = painterResource(R.drawable.ic_refresh_black_24dp),
-        contentDescription = "刷新",
+        contentDescription = if (isRefreshing) "刷新中" else "刷新",
+        enabled = !isRefreshing,
         tint = if (isRefreshing) colors.onSurfaceVariant else colors.onSurface
     )
 }

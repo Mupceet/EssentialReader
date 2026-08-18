@@ -122,39 +122,22 @@ private fun BookListItem(
     onClick: () -> Unit,
     onLongClick: () -> Unit
 ) {
+    val unreadCount = book.getUnreadChapterNum()
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .combinedClickable(onClick = onClick, onLongClick = onLongClick)
             .padding(horizontal = EInkSpacing.l, vertical = EInkSpacing.s)
     ) {
-        // 左侧封面 + 未读角标；无封面/加载失败时 [EInkBookCover] 显示文字占位封面
-        Box {
-            EInkBookCover(
-                url = book.getDisplayCover(),
-                name = book.name,
-                author = book.getRealAuthor(),
-                sourceOrigin = book.origin,
-                modifier = Modifier
-                    .width(EInkCoverWidth)
-                    .height(EInkCoverHeight)
-            )
-            when {
-                // 刷新中：角标静态替换为省略号（E-Ink 禁止加载动画）
-                isUpdating -> ShelfBadge(
-                    text = "…",
-                    highlight = false,
-                    modifier = Modifier.align(Alignment.TopEnd)
-                )
-                // 未读章节数（View 版 getUnreadChapterNum；本次刷新发现
-                // 新章时高亮）
-                book.getUnreadChapterNum() > 0 -> ShelfBadge(
-                    text = book.getUnreadChapterNum().toString(),
-                    highlight = book.lastCheckCount > 0,
-                    modifier = Modifier.align(Alignment.TopEnd)
-                )
-            }
-        }
+        EInkBookCover(
+            url = book.getDisplayCover(),
+            name = book.name,
+            author = book.getRealAuthor(),
+            sourceOrigin = book.origin,
+            modifier = Modifier
+                .width(EInkCoverWidth)
+                .height(EInkCoverHeight)
+        )
         Spacer(modifier = Modifier.width(EInkSpacing.m))
         Column(
             modifier = Modifier
@@ -194,12 +177,30 @@ private fun BookListItem(
                 )
             }
         }
+        when {
+            // 刷新中：角标静态替换为省略号（E-Ink 禁止加载动画）
+            isUpdating -> ShelfBadge(
+                text = "…",
+                highlight = false,
+                modifier = Modifier
+                    .padding(start = EInkSpacing.xs)
+                    .align(Alignment.Top)
+            )
+            // 未读章节数（View 版 getUnreadChapterNum；本次刷新发现新章时高亮）
+            unreadCount > 0 -> ShelfBadge(
+                text = unreadCount.toString(),
+                highlight = book.lastCheckCount > 0,
+                modifier = Modifier
+                    .padding(start = EInkSpacing.xs)
+                    .align(Alignment.Top)
+            )
+        }
     }
 }
 
 
 /**
- * 书架未读角标：覆盖在封面右上角。
+ * 书架角标：位于 Item 右上角（文本列右侧），不覆盖封面。
  *
  * E-Ink 约束：静态绘制、零动画零阴影——刷新中不做转圈/闪烁，仅把角标
  * 静态替换为省略号，完成后一次性替换为数字或消失。高亮（本次刷新发现

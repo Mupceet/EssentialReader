@@ -51,7 +51,7 @@ import kotlin.math.min
 data class BookshelfUiState(
     val books: List<Book> = emptyList(),
     val isLoading: Boolean = true,
-    /** 目录刷新进行中（首页头部刷新按钮置灰） */
+    /** 目录刷新进行中（首页头部刷新按钮禁用并置灰） */
     val isRefreshing: Boolean = false,
     /** 正在更新目录的书籍 bookUrl 集合（对应行角标替换为刷新态） */
     val updatingBookUrls: Set<String> = emptySet(),
@@ -107,19 +107,25 @@ class BookshelfViewModel(application: Application) : AndroidViewModel(applicatio
         viewModelScope.launch(Dispatchers.IO) {
             appDb.bookDao.deleteNotShelfBook()
         }
-        // 进入首页默认刷新一次（延迟 1 秒对齐 View 版启动自动刷新节奏）；
-        // 根路由 ViewModel 常驻，从阅读页/搜索返回不会重复触发
-        viewModelScope.launch {
-            delay(AUTO_REFRESH_DELAY_MS)
-            refresh()
+        // 与 View 版 MainActivity 自动刷新一致：仅在设置开启时，
+        // 进入首页延迟 1 秒自动刷新一次；ViewModel 常驻，
+        // 从阅读页/搜索返回不会重复触发。
+        if (AppConfig.autoRefreshBook) {
+            viewModelScope.launch {
+                delay(AUTO_REFRESH_DELAY_MS)
+                refresh()
+            }
         }
     }
 
     /**
-     * 刷新书架：取消进行中的刷新后重新请求（刷新中仍可再次点击）。
+     * 刷新书架：进行中时直接忽略，与 View 版 upToc 的排队去重行为一致。
+     * View 版下拉刷新和菜单“更新目录”都不会中断当前任务，重复触发只会排队
+     * 当前书架中尚未处理的书籍；E-Ink 首页展示全部书籍，因此这里简化为
+     * 活动期间 no-op。
      */
     fun refresh() {
-        refreshJob?.cancel()
+        if (refreshJob?.isActive == true) return
         refreshJob = viewModelScope.launch(Dispatchers.IO) {
             val myJob = coroutineContext[Job]
             _isRefreshing.value = true
