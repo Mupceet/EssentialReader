@@ -14,7 +14,6 @@ import io.legado.app.eink.arch.UserMessage
 import io.legado.app.help.book.BookHelp
 import io.legado.app.help.book.addType
 import io.legado.app.help.book.isLocal
-import io.legado.app.help.book.isNotShelf
 import io.legado.app.help.book.isUpError
 import io.legado.app.help.book.removeType
 import io.legado.app.help.book.sync
@@ -82,9 +81,8 @@ class BookshelfViewModel(application: Application) : AndroidViewModel(applicatio
     private val _isRefreshing = MutableStateFlow(false)
     private val _updatingUrls = MutableStateFlow<Set<String>>(emptySet())
 
-    // notShelf 过滤：flowAll 查询不过滤未加书架的隐藏行（详情页预取/未加架
-    // 阅读都会落 notShelf 行），View 版靠启动时 deleteNotShelfBook 清理，
-    // E-Ink 模式没有该清理，显示与刷新都需自行排除
+    // notShelf 行已在 [flowByGroup] 内过滤，并在 init 中物理删除；此处
+    // 直接使用查询结果，与 View 版保持一致。
     val uiState: StateFlow<BookshelfUiState> =
         combine(
             appDb.bookDao.flowByGroup(BookGroup.IdAll),
@@ -92,7 +90,7 @@ class BookshelfViewModel(application: Application) : AndroidViewModel(applicatio
             _updatingUrls
         ) { books, refreshing, updatingUrls ->
             BookshelfUiState(
-                books = books.filter { !it.isNotShelf },
+                books = books,
                 isLoading = false,
                 isRefreshing = refreshing,
                 updatingBookUrls = updatingUrls,
@@ -103,6 +101,12 @@ class BookshelfViewModel(application: Application) : AndroidViewModel(applicatio
     private var cacheBookJob: Job? = null
 
     init {
+        // 与 View 版 MainViewModel.init 对齐：启动时物理删除未加书架
+        //（notShelf）的隐藏行。详情页/搜索/阅读页的预取可能写入 notShelf 行，
+        // 统一在此清理，后续查询与刷新无需再逐个过滤。
+        viewModelScope.launch(Dispatchers.IO) {
+            appDb.bookDao.deleteNotShelfBook()
+        }
         // 进入首页默认刷新一次（延迟 1 秒对齐 View 版启动自动刷新节奏）；
         // 根路由 ViewModel 常驻，从阅读页/搜索返回不会重复触发
         viewModelScope.launch {
@@ -122,18 +126,19 @@ class BookshelfViewModel(application: Application) : AndroidViewModel(applicatio
             _updatingUrls.value = emptySet()
             try {
                 val books = appDb.bookDao.flowByGroup(BookGroup.IdAll).first()
-                    .filter { !it.isLocal && it.canUpdate && !it.isNotShelf }
+                    .filter { !it.isLocal && it.canUpdate }
                 books.asFlow()
                     .onEachParallel(min(AppConfig.threadCount, AppConst.MAX_THREAD)) { book ->
                         updateToc(book.bookUrl)
                     }
                     .collect()
-                // 目录全部更新完成后启动预缓存泵（对齐 View 版 upToc 的
-                // onCompletion 触发时机；取消/失败不启动）
-                startCacheBook()
             } finally {
                 if (refreshJob === myJob) {
                     _isRefreshing.value = false
+                    // 无论正常完成还是被取消/失败，都启动预缓存泵处理已入队
+                    // 章节，避免重复点击刷新导致上一轮已入队任务被遗留
+                    //（E-Ink 无前台服务，泵需在本进程内及时运转）。
+                    startCacheBook()
                 }
             }
         }

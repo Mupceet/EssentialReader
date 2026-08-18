@@ -1,8 +1,7 @@
 package io.legado.app.eink.widget
 
-import android.graphics.Bitmap
 import android.graphics.drawable.Drawable
-import android.util.LruCache
+import android.net.Uri
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -14,15 +13,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.produceState
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.ColorFilter
-import androidx.compose.ui.graphics.ImageBitmap
-import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.TextStyle
@@ -30,42 +24,29 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import com.bumptech.glide.Glide
-import com.bumptech.glide.request.target.CustomTarget
-import com.bumptech.glide.request.transition.Transition
+import com.bumptech.glide.RequestBuilder
 import io.legado.app.eink.component.EInkText
 import io.legado.app.eink.theme.EInkShapes
 import io.legado.app.eink.theme.EInkSpacing
 import io.legado.app.eink.theme.EInkTheme
 import io.legado.app.help.config.AppConfig
-import io.legado.app.help.glide.ImageLoader
+import io.legado.app.help.glide.OkHttpModelLoader
+import io.legado.app.utils.isAbsUrl
+import io.legado.app.utils.isContentScheme
+import io.legado.app.utils.isDataUrl
+import java.io.File
 
 /** 封面尺寸（与 View 版 item_bookshelf_list.xml 一致：66dp × 90dp）。 */
 internal val EInkCoverWidth = 66.dp
 internal val EInkCoverHeight = 90.dp
 
 /**
- * 封面位图内存缓存（按字节计，上限 16MB）：从详情页等返回列表时，
- * 封面直接命中缓存展示，避免重新走 Glide 加载（防止占位封面闪烁）。
- */
-private val coverBitmapCache = object : LruCache<String, ImageBitmap>(CoverCacheBytes) {
-    override fun sizeOf(key: String, value: ImageBitmap): Int =
-        value.width * value.height * 4
-}
-
-/** 封面缓存字节上限。 */
-private const val CoverCacheBytes = 16 * 1024 * 1024
-
-/**
  * E-Ink 书籍封面（书架/搜索结果等列表项复用）。
  *
- * 复用应用内 Glide（[ImageLoader.loadBitmap]）加载封面图，按 [EInkCoverWidth] ×
- * [EInkCoverHeight] 裁剪显示；**封面始终有正常显示**：
- *  - 无封面地址、用户开启"使用默认封面"或加载失败时，显示文字占位封面
- *    （书名 + 作者，居中、带边框），不会出现空白/破图；
- *  - 加载成功则显示封面位图（[ContentScale.Crop]）。
+ * 封面加载统一通过 [EInkAsyncImage] 进入 Glide Compose，不在 Compose 侧做
+ * bitmap copy 或额外 LruCache；内存缓存、磁盘缓存与生命周期由 Glide 管理。
  *
- * 占位封面用纯 Compose 绘制而非位图，E-Ink 下文字更清晰、无残影风险。
+ * 无封面地址、用户开启“使用默认封面”、加载中或加载失败时，显示文字占位封面。
  */
 @Composable
 internal fun EInkBookCover(
@@ -75,61 +56,53 @@ internal fun EInkBookCover(
     modifier: Modifier = Modifier,
     width: Dp = EInkCoverWidth,
     height: Dp = EInkCoverHeight,
+    sourceOrigin: String? = null,
 ) {
-    val context = LocalContext.current.applicationContext
-    val useDefaultCover = AppConfig.useDefaultCover
+    if (url.isNullOrBlank() || AppConfig.useDefaultCover) {
+        EInkDefaultCover(name = name, author = author, modifier = modifier)
+        return
+    }
+
     val density = LocalDensity.current
     val targetWidthPx = with(density) { width.toPx() }.toInt()
     val targetHeightPx = with(density) { height.toPx() }.toInt()
 
-    val coverBitmap by produceState<ImageBitmap?>(
-        initialValue = url?.let { coverBitmapCache.get(it) },
-        url,
-        useDefaultCover
-    ) {
-        if (url.isNullOrBlank() || useDefaultCover) {
-            // 无封面地址或用户选择"使用默认封面"：直接展示文字占位封面。
-            value = null
-            return@produceState
+    // 与 View 版 ImageLoader.load 保持一致的 path -> model 判断，
+    // 避免 http/content/file/data 不同格式被 Glide 默认 StringLoader 误解。
+    val model: Any? = remember(url) {
+        when {
+            url.isDataUrl() -> url
+            url.isAbsUrl() -> url
+            url.isContentScheme() -> Uri.parse(url)
+            else -> kotlin.runCatching { File(url) }.getOrElse { url }
         }
-        // 缓存命中：直接复用，不再重新发起加载（返回列表时封面不闪烁）。
-        if (coverBitmapCache.get(url) != null) return@produceState
-
-        val target = object : CustomTarget<Bitmap>(targetWidthPx, targetHeightPx) {
-            override fun onResourceReady(
-                resource: Bitmap,
-                transition: Transition<in Bitmap>?,
-            ) {
-                val bitmap = resource.asImageBitmap()
-                coverBitmapCache.put(url, bitmap)
-                value = bitmap
-            }
-
-            override fun onLoadCleared(placeholder: Drawable?) {
-                value = null
-            }
-        }
-        val request = ImageLoader.loadBitmap(context, url)
-            .override(targetWidthPx, targetHeightPx)
-            .into(target)
-        awaitDispose { Glide.with(context).clear(target) }
     }
 
-    val bitmap = coverBitmap
-    if (bitmap != null) {
-        Image(
-            bitmap = bitmap,
-            contentDescription = name,
-            modifier = modifier,
-            contentScale = ContentScale.Crop
-        )
-    } else {
-        EInkDefaultCover(
-            name = name,
-            author = author,
-            modifier = modifier
-        )
-    }
+    // 与 View 版 CoverImageView.load 对齐：透传书源 origin 以支持需要
+    // 自定义请求头（Referer/User-Agent）的封面；书架列表仅 Wi-Fi 加载固定为 false。
+    val requestBuilderTransform: (RequestBuilder<Drawable>) -> RequestBuilder<Drawable> =
+        remember(model, sourceOrigin, targetWidthPx, targetHeightPx) {
+            { request ->
+                var builder = request.set(OkHttpModelLoader.loadOnlyWifiOption, false)
+                if (sourceOrigin != null) {
+                    builder = builder.set(OkHttpModelLoader.sourceOriginOption, sourceOrigin)
+                }
+                builder.override(targetWidthPx, targetHeightPx)
+            }
+        }
+
+    EInkAsyncImage(
+        model = model,
+        contentDescription = name,
+        modifier = modifier,
+        loading = {
+            EInkDefaultCover(name = name, author = author, modifier = modifier)
+        },
+        failure = {
+            EInkDefaultCover(name = name, author = author, modifier = modifier)
+        },
+        requestBuilderTransform = requestBuilderTransform,
+    )
 }
 
 /**

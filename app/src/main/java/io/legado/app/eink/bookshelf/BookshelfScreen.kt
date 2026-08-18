@@ -134,6 +134,7 @@ private fun BookListItem(
                 url = book.getDisplayCover(),
                 name = book.name,
                 author = book.getRealAuthor(),
+                sourceOrigin = book.origin,
                 modifier = Modifier
                     .width(EInkCoverWidth)
                     .height(EInkCoverHeight)

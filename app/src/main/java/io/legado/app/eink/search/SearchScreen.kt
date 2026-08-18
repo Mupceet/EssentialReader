@@ -183,6 +183,7 @@ private fun ResultItem(book: SearchBook, inShelf: Boolean, onClick: () -> Unit) 
             url = book.coverUrl,
             name = book.name,
             author = book.author,
+            sourceOrigin = book.origin,
             modifier = Modifier
                 .width(EInkCoverWidth)
                 .height(EInkCoverHeight)
