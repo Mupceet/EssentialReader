@@ -147,13 +147,30 @@ private fun BookListItem(
                 .padding(vertical = EInkSpacing.xxs),
             verticalArrangement = Arrangement.SpaceBetween
         ) {
-            // 书名
-            EInkText(
-                text = book.name,
-                style = EInkTheme.typography.titleMedium,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
+            // 书名行：标题占满剩余宽度，角标只与标题同一行
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                EInkText(
+                    text = book.name,
+                    style = EInkTheme.typography.titleMedium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f)
+                )
+                when {
+                    // 刷新中：角标静态替换为省略号（E-Ink 禁止加载动画）
+                    isUpdating -> ShelfBadge(
+                        text = "…",
+                        highlight = false,
+                        modifier = Modifier.padding(start = EInkSpacing.xs)
+                    )
+                    // 未读章节数（View 版 getUnreadChapterNum；本次刷新发现新章时高亮）
+                    unreadCount > 0 -> ShelfBadge(
+                        text = unreadCount.toString(),
+                        highlight = book.lastCheckCount > 0,
+                        modifier = Modifier.padding(start = EInkSpacing.xs)
+                    )
+                }
+            }
             // 作者（图标 + 文字，同 View 版 iv_author）
             EInkInfoRow(
                 iconRes = R.drawable.ic_author,
@@ -177,30 +194,12 @@ private fun BookListItem(
                 )
             }
         }
-        when {
-            // 刷新中：角标静态替换为省略号（E-Ink 禁止加载动画）
-            isUpdating -> ShelfBadge(
-                text = "…",
-                highlight = false,
-                modifier = Modifier
-                    .padding(start = EInkSpacing.xs)
-                    .align(Alignment.Top)
-            )
-            // 未读章节数（View 版 getUnreadChapterNum；本次刷新发现新章时高亮）
-            unreadCount > 0 -> ShelfBadge(
-                text = unreadCount.toString(),
-                highlight = book.lastCheckCount > 0,
-                modifier = Modifier
-                    .padding(start = EInkSpacing.xs)
-                    .align(Alignment.Top)
-            )
-        }
     }
 }
 
 
 /**
- * 书架角标：位于 Item 右上角（文本列右侧），不覆盖封面。
+ * 书架角标：位于书籍标题同一行右侧，不覆盖封面与下方信息行。
  *
  * E-Ink 约束：静态绘制、零动画零阴影——刷新中不做转圈/闪烁，仅把角标
  * 静态替换为省略号，完成后一次性替换为数字或消失。高亮（本次刷新发现
