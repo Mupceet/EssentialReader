@@ -4,6 +4,7 @@ import android.app.Activity
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -36,6 +37,7 @@ import io.legado.app.eink.component.EInkText
 import io.legado.app.eink.modifier.staticClickable
 import io.legado.app.eink.theme.EInkTheme
 import android.view.WindowManager
+import io.legado.app.help.config.AppConfig
 
 /**
  * 阅读 Route — ViewModel 感知层。
@@ -189,8 +191,11 @@ fun ReaderRoute(
  * 状态栏区域转为页眉区域（页眉上移占位），正文始终从页眉之下开始排版。
  *
  * 手势（规范 §16）：
- * - 操作条可见时：点正文任意处收起操作条；
- * - 操作条隐藏时：点左 30% 上一页 / 右 30% 下一页 / 中间 40% 唤出操作条。
+ * - 操作条可见时：点/滑动正文任意处收起操作条；
+ * - 操作条隐藏时：点中间 40% 唤出操作条，点其余区域下一页；
+ * - 水平滑动翻页，判定对齐 View 版：触发距离读 AppConfig.pageTouchSlop
+ *   （完整版设置"翻页触发距离"，0 = 系统 slop，Compose 版只读不设），
+ *   松手前反向回拖取消；无跟手移动，翻页整页立即替换。
  */
 @Composable
 internal fun ReaderScreen(
@@ -235,11 +240,47 @@ internal fun ReaderScreen(
                                 return@detectTapGestures
                             }
                             val width = size.width
-                            when {
-                                offset.x < width * 0.3f -> onPrevPage()
-                                offset.x > width * 0.7f -> onNextPage()
-                                else -> onCenterTap()
+                            if (offset.x in width * 0.3f..width * 0.7f) {
+                                onCenterTap()
+                            } else {
+                                onNextPage()
                             }
+                        }
+                    }
+                    .pointerInput(state.controlsVisible) {
+                        // 水平滑动翻页，判定对齐 View 版：
+                        // - 触发距离 = AppConfig.pageTouchSlop（px），0 = 系统 touch slop
+                        //   （该 slop 已由 detectHorizontalDragGestures 消费）；
+                        // - 松手前最后一次增量与滑动方向相反则取消（等价 View 版 isCancel）。
+                        var dragAccum = 0f
+                        var lastDelta = 0f
+                        detectHorizontalDragGestures(
+                            onDragStart = {
+                                dragAccum = 0f
+                                lastDelta = 0f
+                            },
+                            onDragEnd = {
+                                if (state.controlsVisible) {
+                                    onCenterTap() // 收起操作条，不翻页
+                                } else {
+                                    val slop = AppConfig.pageTouchSlop.toFloat()
+                                    when {
+                                        lastDelta * dragAccum < 0f -> Unit // 回拖取消
+                                        dragAccum < -slop -> onNextPage()
+                                        dragAccum > slop -> onPrevPage()
+                                    }
+                                }
+                                dragAccum = 0f
+                                lastDelta = 0f
+                            },
+                            onDragCancel = {
+                                dragAccum = 0f
+                                lastDelta = 0f
+                            },
+                        ) { change, dragAmount ->
+                            change.consume()
+                            dragAccum += dragAmount
+                            if (dragAmount != 0f) lastDelta = dragAmount
                         }
                     }
             ) {
