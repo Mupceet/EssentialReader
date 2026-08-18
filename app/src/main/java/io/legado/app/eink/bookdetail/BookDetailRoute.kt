@@ -176,10 +176,10 @@ internal fun BookDetailScreen(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .padding(
-                                    start = EInkSpacing.l,
-                                    end = EInkSpacing.l,
+                                    start = EInkSpacing.m,
+                                    end = EInkSpacing.m,
                                     top = 60.dp,
-                                    bottom = EInkSpacing.l
+                                    bottom = EInkSpacing.m
                                 ),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
@@ -259,7 +259,7 @@ internal fun BookDetailScreen(
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(horizontal = EInkSpacing.l, vertical = EInkSpacing.s),
+                                .padding(horizontal = EInkSpacing.m, vertical = EInkSpacing.s),
                             horizontalArrangement = Arrangement.SpaceEvenly,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
@@ -293,7 +293,7 @@ internal fun BookDetailScreen(
                         Column(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(horizontal = EInkSpacing.l, vertical = EInkSpacing.m)
+                                .padding(horizontal = EInkSpacing.m, vertical = EInkSpacing.m)
                         ) {
                             EInkText(
                                 text = book.getDisplayIntro()?.takeIf { it.isNotBlank() } ?: "暂无简介",

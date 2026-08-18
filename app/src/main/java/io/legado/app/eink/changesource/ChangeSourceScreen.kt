@@ -139,7 +139,7 @@ private fun SourceItem(
         modifier = Modifier
             .fillMaxWidth()
             .staticClickable(role = Role.Button, onClick = onClick)
-            .padding(horizontal = EInkSpacing.l, vertical = EInkSpacing.s),
+            .padding(horizontal = EInkSpacing.m, vertical = EInkSpacing.s),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(modifier = Modifier.weight(1f)) {

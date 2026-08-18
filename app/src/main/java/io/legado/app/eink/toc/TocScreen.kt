@@ -288,7 +288,7 @@ private fun ChapterItem(chapter: BookChapter, isCurrent: Boolean, cached: Boolea
             .fillMaxWidth()
             .background(if (isCurrent) scheme.onSurface else Color.Transparent)
             .clickable(onClick = onClick)
-            .padding(horizontal = EInkSpacing.l, vertical = EInkSpacing.s),
+            .padding(horizontal = EInkSpacing.m, vertical = EInkSpacing.s),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(EInkSpacing.s),
     ) {

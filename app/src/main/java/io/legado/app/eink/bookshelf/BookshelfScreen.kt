@@ -127,7 +127,7 @@ private fun BookListItem(
         modifier = Modifier
             .fillMaxWidth()
             .combinedClickable(onClick = onClick, onLongClick = onLongClick)
-            .padding(horizontal = EInkSpacing.l, vertical = EInkSpacing.s)
+            .padding(horizontal = EInkSpacing.m, vertical = EInkSpacing.s)
     ) {
         EInkBookCover(
             url = book.getDisplayCover(),

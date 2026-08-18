@@ -60,7 +60,7 @@ fun EInkTopBar(
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier
                     .weight(1f)
-                    .padding(start = if (onBack == null) EInkSpacing.m else 0.dp)
+                    .padding(start = if (onBack != null) EInkSpacing.m else 0.dp)
             )
             Row(
                 verticalAlignment = Alignment.CenterVertically,

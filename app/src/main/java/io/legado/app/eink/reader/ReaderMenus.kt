@@ -261,7 +261,7 @@ internal fun ReaderPanelContainer(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = EInkSpacing.l, vertical = EInkSpacing.s),
+                    .padding(horizontal = EInkSpacing.m, vertical = EInkSpacing.s),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 EInkText(
@@ -277,7 +277,7 @@ internal fun ReaderPanelContainer(
                     .fillMaxWidth()
                     .heightIn(max = maxContentHeight)
                     .verticalScroll(rememberScrollState())
-                    .padding(horizontal = EInkSpacing.l, vertical = EInkSpacing.s),
+                    .padding(horizontal = EInkSpacing.m, vertical = EInkSpacing.s),
             ) {
                 content()
             }
@@ -390,7 +390,7 @@ internal fun ReaderMarginDialog(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = EInkSpacing.l, vertical = EInkSpacing.s),
+                    .padding(horizontal = EInkSpacing.m, vertical = EInkSpacing.s),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 EInkText(
@@ -404,7 +404,7 @@ internal fun ReaderMarginDialog(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = EInkSpacing.l, vertical = EInkSpacing.s),
+                    .padding(horizontal = EInkSpacing.m, vertical = EInkSpacing.s),
             ) {
                 PanelTabRow(
                     labels = listOf("正文", "页眉", "页脚"),
