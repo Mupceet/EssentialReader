@@ -73,7 +73,7 @@ viewpager2 = "1.0.0"
 #noinspection GradleDependency
 firebaseBom = "33.2.0"
 
-composeBom = "2025.08.00"
+composeBom = "2026.06.01"
 
 [libraries]
 
