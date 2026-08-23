@@ -6,6 +6,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.size
@@ -15,7 +16,6 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.ProgressBarRangeInfo
 import androidx.compose.ui.semantics.progressBarRangeInfo
@@ -23,6 +23,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.isFinite
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -79,18 +80,10 @@ fun EInkSteppedSlider(
     val thumbWidthPx = with(density) { ThumbWidth.toPx() }
 
     var isPressed by remember { mutableStateOf(false) }
-    var trackWidthPx by remember { mutableStateOf(0f) }
-    val stepPx = if (steps > 0) {
-        (trackWidthPx - thumbWidthPx).coerceAtLeast(0f) / steps
-    } else {
-        0f
-    }
-    val thumbLeftPx = stepPx * (safeValue - start)
 
-    Box(
+    BoxWithConstraints(
         modifier = modifier
             .heightIn(min = SliderHeight)
-            .onSizeChanged { trackWidthPx = it.width.toFloat() }
             .pointerInput(enabled, start, end) {
                 if (!enabled || steps <= 0) return@pointerInput
                 val touchSlop = viewConfiguration.touchSlop
@@ -158,6 +151,16 @@ fun EInkSteppedSlider(
             },
         contentAlignment = Alignment.CenterStart,
     ) {
+        // 约束期即拿到最终宽度，首帧就能把滑块定位到目标档位，
+        // 避免"先画在起点、下一帧再跳过去"的两帧跳动
+        val trackWidthPx = if (maxWidth.isFinite) with(density) { maxWidth.toPx() } else 0f
+        val stepPx = if (steps > 0) {
+            (trackWidthPx - thumbWidthPx).coerceAtLeast(0f) / steps
+        } else {
+            0f
+        }
+        val thumbLeftPx = stepPx * (safeValue - start)
+
         val inactiveColor = scheme.disabledContent
         val fillColor = if (enabled) scheme.primary else inactiveColor
         Canvas(modifier = Modifier.matchParentSize()) {
