@@ -1,6 +1,8 @@
 package io.legado.app.ui.main
 
 import android.app.Application
+import android.os.SystemClock
+import android.util.Log
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.viewModelScope
 import androidx.recyclerview.widget.RecyclerView.RecycledViewPool
@@ -42,6 +44,7 @@ import kotlinx.coroutines.launch
 import java.util.LinkedList
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Executors
+import java.util.concurrent.atomic.AtomicInteger
 import kotlin.math.min
 
 class MainViewModel(application: Application) : BaseViewModel(application) {
@@ -60,7 +63,25 @@ class MainViewModel(application: Application) : BaseViewModel(application) {
         setMaxRecycledViews(0, 100)
     }
 
+    // 刷新性能日志：与 E-Ink 版 BookshelfViewModel 同 tag（ShelfBench），便于两版对拍与刷新慢的问题定位
+    private val benchInFlight = AtomicInteger(0)
+    private val benchOk = AtomicInteger(0)
+    private val benchErr = AtomicInteger(0)
+    private var benchPeak = 0
+
+    private fun benchReset() = synchronized(this) {
+        benchInFlight.set(0)
+        benchOk.set(0)
+        benchErr.set(0)
+        benchPeak = 0
+    }
+
+    private fun benchTrackPeak(cur: Int) = synchronized(this) {
+        if (cur > benchPeak) benchPeak = cur
+    }
+
     init {
+        Log.i(TAG, "View VM init autoRefreshBook=${AppConfig.autoRefreshBook} threadCount=${AppConfig.threadCount}")
         deleteNotShelfBook()
     }
 
@@ -89,7 +110,9 @@ class MainViewModel(application: Application) : BaseViewModel(application) {
 
     fun upAllBookToc() {
         execute {
-            addToWaitUp(appDb.bookDao.hasUpdateBooks)
+            val books = appDb.bookDao.hasUpdateBooks
+            Log.i(TAG, "View upAllBookToc trigger scope=${books.size}")
+            addToWaitUp(books)
         }
     }
 
@@ -98,6 +121,7 @@ class MainViewModel(application: Application) : BaseViewModel(application) {
             books.filter {
                 !it.isLocal && it.canUpdate
             }.let {
+                Log.i(TAG, "View upToc trigger in=${books.size} afterFilter=${it.size}")
                 addToWaitUp(it)
             }
         }
@@ -105,11 +129,14 @@ class MainViewModel(application: Application) : BaseViewModel(application) {
 
     @Synchronized
     private fun addToWaitUp(books: List<Book>) {
+        var added = 0
         books.forEach { book ->
             if (!waitUpTocBooks.contains(book.bookUrl) && !onUpTocBooks.contains(book.bookUrl)) {
                 waitUpTocBooks.add(book.bookUrl)
+                added++
             }
         }
+        Log.i(TAG, "View queue added=$added waiting=${waitUpTocBooks.size} onUp=${onUpTocBooks.size}")
         if (upTocJob == null) {
             startUpTocJob()
         }
@@ -118,6 +145,9 @@ class MainViewModel(application: Application) : BaseViewModel(application) {
     private fun startUpTocJob() {
         upPool()
         postUpBooksLiveData()
+        benchReset()
+        val benchStart = SystemClock.elapsedRealtime()
+        Log.i(TAG, "View job start threadCount=$threadCount poolSize=$poolSize waiting=${waitUpTocBooks.size}")
         upTocJob = viewModelScope.launch(upTocPool) {
             flow {
                 while (true) {
@@ -133,6 +163,12 @@ class MainViewModel(application: Application) : BaseViewModel(application) {
                 postUpBooksLiveData()
             }.onCompletion {
                 upTocJob = null
+                Log.i(
+                    TAG,
+                    "View job end elapsedMs=${SystemClock.elapsedRealtime() - benchStart} " +
+                        "ok=${benchOk.get()} err=${benchErr.get()} peakInFlight=$benchPeak " +
+                        "remainingWaiting=${waitUpTocBooks.size} cancelled=${it != null}"
+                )
                 if (waitUpTocBooks.isNotEmpty()) {
                     startUpTocJob()
                 }
@@ -147,16 +183,24 @@ class MainViewModel(application: Application) : BaseViewModel(application) {
     }
 
     private suspend fun updateToc(bookUrl: String) {
-        val book = appDb.bookDao.getBook(bookUrl) ?: return
-        val source = appDb.bookSourceDao.getBookSource(book.origin)
-        if (source == null) {
-            if (!book.isUpError) {
-                book.addType(BookType.updateError)
-                appDb.bookDao.update(book)
+        val benchStart = SystemClock.elapsedRealtime()
+        val benchCur = benchInFlight.incrementAndGet()
+        benchTrackPeak(benchCur)
+        var benchResult = "noBook"
+        var benchName = ""
+        try {
+            val book = appDb.bookDao.getBook(bookUrl) ?: return
+            benchName = book.name
+            val source = appDb.bookSourceDao.getBookSource(book.origin)
+            if (source == null) {
+                benchResult = "noSource"
+                if (!book.isUpError) {
+                    book.addType(BookType.updateError)
+                    appDb.bookDao.update(book)
+                }
+                return
             }
-            return
-        }
-        kotlin.runCatching {
+            kotlin.runCatching {
             val oldBook = book.copy()
             if (book.tocUrl.isBlank()) {
                 WebBook.getBookInfoAwait(source, book)
@@ -177,6 +221,7 @@ class MainViewModel(application: Application) : BaseViewModel(application) {
             ReadBook.onChapterListUpdated(book)
             addDownload(source, book)
         }.onFailure {
+            benchResult = "error"
             currentCoroutineContext().ensureActive()
             AppLog.put("${book.name} 更新目录失败\n${it.localizedMessage}", it)
             //这里可能因为时间太长书籍信息已经更改,所以重新获取
@@ -184,6 +229,17 @@ class MainViewModel(application: Application) : BaseViewModel(application) {
                 book.addType(BookType.updateError)
                 appDb.bookDao.update(book)
             }
+        }
+            benchResult = "ok"
+        } finally {
+            benchInFlight.decrementAndGet()
+            if (benchResult == "ok") benchOk.incrementAndGet() else benchErr.incrementAndGet()
+            Log.i(
+                TAG,
+                "View book done name=<$benchName> result=$benchResult " +
+                    "inFlight=${benchInFlight.get()} " +
+                    "elapsedMs=${SystemClock.elapsedRealtime() - benchStart} url=$bookUrl"
+            )
         }
     }
 
@@ -244,6 +300,10 @@ class MainViewModel(application: Application) : BaseViewModel(application) {
         execute {
             appDb.bookDao.deleteNotShelfBook()
         }
+    }
+
+    companion object {
+        private const val TAG = "ShelfBench"
     }
 
 }

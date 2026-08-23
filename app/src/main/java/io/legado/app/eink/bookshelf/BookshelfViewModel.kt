@@ -1,9 +1,10 @@
 package io.legado.app.eink.bookshelf
 
 import android.app.Application
+import android.os.SystemClock
+import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import io.legado.app.constant.AppConst
 import io.legado.app.constant.AppLog
 import io.legado.app.constant.BookType
 import io.legado.app.data.appDb
@@ -42,6 +43,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import java.util.concurrent.atomic.AtomicInteger
 import kotlin.coroutines.coroutineContext
 import kotlin.math.min
 
@@ -100,6 +102,23 @@ class BookshelfViewModel(application: Application) : AndroidViewModel(applicatio
     private var refreshJob: Job? = null
     private var cacheBookJob: Job? = null
 
+    // 刷新性能日志：与 View 版 MainViewModel 同 tag（ShelfBench），便于两版对拍与刷新慢的问题定位
+    private val benchInFlight = AtomicInteger(0)
+    private val benchOk = AtomicInteger(0)
+    private val benchErr = AtomicInteger(0)
+    private var benchPeak = 0
+
+    private fun benchReset() = synchronized(this) {
+        benchInFlight.set(0)
+        benchOk.set(0)
+        benchErr.set(0)
+        benchPeak = 0
+    }
+
+    private fun benchTrackPeak(cur: Int) = synchronized(this) {
+        if (cur > benchPeak) benchPeak = cur
+    }
+
     init {
         // 与 View 版 MainViewModel.init 对齐：启动时物理删除未加书架
         //（notShelf）的隐藏行。详情页/搜索/阅读页的预取可能写入 notShelf 行，
@@ -113,9 +132,10 @@ class BookshelfViewModel(application: Application) : AndroidViewModel(applicatio
         if (AppConfig.autoRefreshBook) {
             viewModelScope.launch {
                 delay(AUTO_REFRESH_DELAY_MS)
-                refresh()
+                refresh("auto")
             }
         }
+        Log.i(TAG, "EInk VM init autoRefreshBook=${AppConfig.autoRefreshBook} threadCount=${AppConfig.threadCount}")
     }
 
     /**
@@ -124,23 +144,37 @@ class BookshelfViewModel(application: Application) : AndroidViewModel(applicatio
      * 当前书架中尚未处理的书籍；E-Ink 首页展示全部书籍，因此这里简化为
      * 活动期间 no-op。
      */
-    fun refresh() {
-        if (refreshJob?.isActive == true) return
+    fun refresh() = refresh("manual")
+
+    fun refresh(trigger: String) {
+        if (refreshJob?.isActive == true) {
+            Log.i(TAG, "EInk refresh ignored (job active) trigger=$trigger")
+            return
+        }
         refreshJob = viewModelScope.launch(Dispatchers.IO) {
             val myJob = coroutineContext[Job]
+            val benchStart = SystemClock.elapsedRealtime()
+            benchReset()
             _isRefreshing.value = true
             _updatingUrls.value = emptySet()
             try {
                 val books = appDb.bookDao.flowByGroup(BookGroup.IdAll).first()
                     .filter { !it.isLocal && it.canUpdate }
+                val concurrency = min(AppConfig.threadCount, MAX_REFRESH_CONCURRENCY)
+                Log.i(TAG, "EInk refresh start trigger=$trigger scope=${books.size} concurrency=$concurrency")
                 books.asFlow()
-                    .onEachParallel(min(AppConfig.threadCount, AppConst.MAX_THREAD)) { book ->
+                    .onEachParallel(concurrency) { book ->
                         updateToc(book.bookUrl)
                     }
                     .collect()
             } finally {
                 if (refreshJob === myJob) {
                     _isRefreshing.value = false
+                    Log.i(
+                        TAG,
+                        "EInk refresh end elapsedMs=${SystemClock.elapsedRealtime() - benchStart} " +
+                            "ok=${benchOk.get()} err=${benchErr.get()} peakInFlight=$benchPeak"
+                    )
                     // 无论正常完成还是被取消/失败，都启动预缓存泵处理已入队
                     // 章节，避免重复点击刷新导致上一轮已入队任务被遗留
                     //（E-Ink 无前台服务，泵需在本进程内及时运转）。
@@ -192,10 +226,17 @@ class BookshelfViewModel(application: Application) : AndroidViewModel(applicatio
      */
     private suspend fun updateToc(bookUrl: String) {
         _updatingUrls.update { it + bookUrl }
+        val benchStart = SystemClock.elapsedRealtime()
+        val benchCur = benchInFlight.incrementAndGet()
+        benchTrackPeak(benchCur)
+        var benchResult = "noBook"
+        var benchName = ""
         try {
             val book = appDb.bookDao.getBook(bookUrl) ?: return
+            benchName = book.name
             val source = appDb.bookSourceDao.getBookSource(book.origin)
             if (source == null) {
+                benchResult = "noSource"
                 if (!book.isUpError) {
                     book.addType(BookType.updateError)
                     appDb.bookDao.update(book)
@@ -224,6 +265,7 @@ class BookshelfViewModel(application: Application) : AndroidViewModel(applicatio
                 ReadBook.onChapterListUpdated(book)
                 addDownload(source, book)
             }.onFailure {
+                benchResult = "error"
                 currentCoroutineContext().ensureActive()
                 AppLog.put("${book.name} 更新目录失败\n${it.localizedMessage}", it)
                 //这里可能因为时间太长书籍信息已经更改,所以重新获取
@@ -232,12 +274,32 @@ class BookshelfViewModel(application: Application) : AndroidViewModel(applicatio
                     appDb.bookDao.update(curBook)
                 }
             }
+            benchResult = "ok"
         } finally {
+            benchInFlight.decrementAndGet()
+            if (benchResult == "ok") benchOk.incrementAndGet() else benchErr.incrementAndGet()
+            Log.i(
+                TAG,
+                "EInk book done name=<$benchName> result=$benchResult " +
+                    "inFlight=${benchInFlight.get()} " +
+                    "elapsedMs=${SystemClock.elapsedRealtime() - benchStart} url=$bookUrl"
+            )
             _updatingUrls.update { it - bookUrl }
         }
     }
 
     companion object {
+        private const val TAG = "ShelfBench"
+
+        /**
+         * 目录刷新并发上限：取用户 threadCount 设置，不再压到
+         * AppConst.MAX_THREAD（那是固定线程池的 CPU 侧尺寸上限，目录刷新
+         * 的网络请求为挂起式、不受线程数约束）；仅以 OkHttp Dispatcher
+         * 全局 maxRequests（默认 64）为防护上界，超过它请求只在 OkHttp
+         * 内排队，无任何收益。
+         */
+        private const val MAX_REFRESH_CONCURRENCY = 64
+
         /** 进入首页自动刷新的延迟（毫秒），对齐 View 版节奏 */
         private const val AUTO_REFRESH_DELAY_MS = 1000L
     }
