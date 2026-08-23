@@ -8,7 +8,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
@@ -160,12 +159,15 @@ private fun BarAction(
 // ====================================================================
 
 /**
- * 底部操作条：返回 / 目录 / 自动翻页 / 排版 / 其它。
+ * 底部操作条：返回 / 目录 / 自动翻页 / 排版 / 其它，全部为图标按钮。
  *
- * 返回为图标按钮（统一 arrow_back）：关闭设置面板 → 退出阅读。
- * 设置面板打开期间操作条保持可见：排版/其它按钮呈选中态（实心色块），
- * 面板在操作条上方展开（覆盖层按 [ReaderBottomBarInset] 避让）。
- * 边距调整弹框例外：操作条整体隐藏，保证正文四周边距实时可见。
+ * 图标沿用 View 版：目录 ic_toc、自动翻页 ic_auto_page(_stop)、
+ * 排版（View 版"界面"）ic_interface_setting、其它（设置）ic_settings、
+ * 返回统一 arrow_back：关闭设置面板 → 退出阅读。
+ * 五枚图标均匀分布；设置面板打开期间操作条保持可见：排版/其它按钮
+ * 呈选中态（实心色块），面板在操作条上方展开（覆盖层按
+ * [ReaderBottomBarInset] 避让）。边距调整弹框例外：操作条整体隐藏，
+ * 保证正文四周边距实时可见。
  */
 @Composable
 internal fun ReaderBottomBar(
@@ -186,59 +188,67 @@ internal fun ReaderBottomBar(
                 .background(EInkTheme.colorScheme.surface)
                 .padding(horizontal = EInkSpacing.m),
             verticalAlignment = Alignment.CenterVertically,
-            // 与目录页操作条一致：16dp 边距与间距，返回图标避开设备圆角区
-            horizontalArrangement = Arrangement.spacedBy(EInkSpacing.m),
+            // 首枚图标离屏幕边缘 16dp（与目录页一致，避开设备圆角区），
+            // 五枚图标均匀分布
+            horizontalArrangement = Arrangement.SpaceBetween,
         ) {
-            // 分层返回：边距弹框 → 设置面板 → 退出阅读
+            // 分层返回：关闭设置面板 → 退出阅读
             EInkBackButton(onClick = onBarBack)
-            BottomAction(label = "目录", weight = 1f, onClick = onOpenToc)
-            BottomAction(
-                label = if (state.autoPlay) "停止翻页" else "自动翻页",
+            BottomIconAction(
+                iconRes = R.drawable.ic_toc,
+                contentDescription = "目录",
+                onClick = onOpenToc,
+            )
+            BottomIconAction(
+                iconRes = if (state.autoPlay) R.drawable.ic_auto_page_stop else R.drawable.ic_auto_page,
+                contentDescription = if (state.autoPlay) "停止翻页" else "自动翻页",
                 selected = state.autoPlay,
-                weight = 1.3f,
                 onClick = onToggleAutoPlay,
             )
-            BottomAction(
-                label = "排版",
+            BottomIconAction(
+                iconRes = R.drawable.ic_interface_setting,
+                contentDescription = "排版",
                 selected = selectedPanel == ReaderPanel.LAYOUT,
-                weight = 1f,
                 onClick = { onOpenPanel(ReaderPanel.LAYOUT) },
             )
-            BottomAction(
-                label = "其它",
+            BottomIconAction(
+                iconRes = R.drawable.ic_settings,
+                contentDescription = "其它设置",
                 selected = selectedPanel == ReaderPanel.OTHER,
-                weight = 1f,
                 onClick = { onOpenPanel(ReaderPanel.OTHER) },
             )
         }
     }
 }
 
+/** 操作条图标按钮：48dp 触控目标，按下瞬时反色；选中为实心色块 + 反白图标，按压瞬时覆盖选中。 */
 @Composable
-private fun RowScope.BottomAction(
-    label: String,
-    weight: Float,
+private fun BottomIconAction(
+    iconRes: Int,
+    contentDescription: String,
     selected: Boolean = false,
     onClick: () -> Unit,
 ) {
-    // 分层反馈（规范 §35/§42）：按下瞬时反色，选中实心色块，按压瞬时覆盖选中
+    // 分层反馈（规范 §35/§42）
     val press = rememberImmediatePressState()
     val colors = eInkActionColors(pressed = press.isPressed, selected = selected)
     Box(
         modifier = Modifier
-            .weight(weight)
-            .fillMaxWidth()
-            .height(BarHeight)
-            .background(color = colors.containerColor, shape = EInkShapes.small)
+            .size(48.dp)
             .then(press.modifier)
-            .staticClickable(role = Role.Button, onClick = onClick),
+            .background(colors.containerColor)
+            .staticClickable(
+                role = Role.Button,
+                onClickLabel = contentDescription,
+                onClick = onClick,
+            ),
         contentAlignment = Alignment.Center,
     ) {
-        EInkText(
-            text = label,
-            color = colors.contentColor,
-            style = EInkTheme.typography.labelLarge,
-            maxLines = 1,
+        Image(
+            painter = painterResource(iconRes),
+            contentDescription = contentDescription,
+            modifier = Modifier.size(24.dp),
+            colorFilter = ColorFilter.tint(colors.contentColor),
         )
     }
 }
