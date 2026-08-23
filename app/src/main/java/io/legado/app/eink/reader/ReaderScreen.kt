@@ -57,6 +57,7 @@ fun ReaderRoute(
     onBack: () -> Unit,
     onOpenToc: (String) -> Unit,
     onChangeSource: (String) -> Unit,
+    onOpenDetail: (name: String, author: String, bookUrl: String) -> Unit,
     viewModel: ReaderViewModel = viewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -120,6 +121,12 @@ fun ReaderRoute(
             onOpenToc = { onOpenToc(bookUrl) },
             onToggleAutoPlay = viewModel::toggleAutoPlay,
             onChangeSource = { onChangeSource(bookUrl) },
+            onOpenDetail = {
+                // 换源后以引擎当前持有的书为准（bookUrl 与路由参数可能不同）
+                if (uiState.bookUrl.isNotEmpty()) {
+                    onOpenDetail(uiState.bookName, uiState.bookAuthor, uiState.bookUrl)
+                }
+            },
             onRefresh = viewModel::refreshChapter,
             onOpenCachePanel = { panel = ReaderPanel.CACHE },
             onToggleBookshelf = viewModel::toggleBookshelf,
@@ -240,6 +247,7 @@ internal fun ReaderScreen(
     onOpenToc: () -> Unit,
     onToggleAutoPlay: () -> Unit,
     onChangeSource: () -> Unit,
+    onOpenDetail: () -> Unit,
     onRefresh: () -> Unit,
     onOpenCachePanel: () -> Unit,
     onToggleBookshelf: () -> Unit,
@@ -349,6 +357,7 @@ internal fun ReaderScreen(
             ) {
                 ReaderTopBar(
                     state = state,
+                    onOpenDetail = onOpenDetail,
                     onChangeSource = onChangeSource,
                     onRefresh = onRefresh,
                     onOpenCachePanel = onOpenCachePanel,

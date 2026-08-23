@@ -79,6 +79,9 @@ data class ReaderTextStyle(
  */
 data class ReaderUiState(
     val bookName: String = "",
+    // 当前书信息（换源后与路由参数不同，以引擎持有的书为准）
+    val bookAuthor: String = "",
+    val bookUrl: String = "",
     val chapterTitle: String = "",
     val textPage: TextPage? = null,
     val pageVersion: Int = 0,
@@ -328,6 +331,8 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application),
         _uiState.update {
             it.copy(
                 bookName = book.name,
+                bookAuthor = book.author,
+                bookUrl = book.bookUrl,
                 isLocalBook = book.isLocal,
                 inBookshelf = inBookshelf,
             )
@@ -639,6 +644,8 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application),
         _uiState.update {
             it.copy(
                 bookName = book.name,
+                bookAuthor = book.author,
+                bookUrl = book.bookUrl,
                 chapterIndex = ReadBook.durChapterIndex,
                 chapterSize = ReadBook.chapterSize,
             )
@@ -649,6 +656,8 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application),
         _uiState.update {
             it.copy(
                 bookName = book.name,
+                bookAuthor = book.author,
+                bookUrl = book.bookUrl,
                 chapterSize = ReadBook.chapterSize,
             )
         }

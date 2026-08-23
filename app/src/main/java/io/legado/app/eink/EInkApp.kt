@@ -89,6 +89,11 @@ fun EInkApp(
                     onChangeSource = { bookUrl ->
                         controller.navigate(EInkScreen.ChangeSource(bookUrl))
                     },
+                    onOpenDetail = { name, author, bookUrl ->
+                        controller.navigate(
+                            EInkScreen.BookDetail(name, author, bookUrl, fromReader = true)
+                        )
+                    },
                 )
             } else {
                 // 其余界面统一避让系统栏（Edge-to-Edge 下系统栏透明覆盖在背景上）
@@ -139,7 +144,16 @@ fun EInkApp(
                                 onOpenToc = { bookUrl ->
                                     controller.navigate(EInkScreen.Toc(bookUrl, fromReader = false))
                                 },
-                                onRead = { bookUrl -> controller.navigate(EInkScreen.Reader(bookUrl)) },
+                                onRead = { bookUrl ->
+                                    if (screen.fromReader && bookUrl == screen.bookUrl) {
+                                        // 自阅读页进入且书未重定向：仅弹出详情，
+                                        // 复用下方既有阅读页，详情不留在返回栈
+                                        controller.pop()
+                                    } else {
+                                        // 书架/搜索等路径：新进阅读页，详情保留在栈中
+                                        controller.navigate(EInkScreen.Reader(bookUrl))
+                                    }
+                                },
                             )
                         }
 

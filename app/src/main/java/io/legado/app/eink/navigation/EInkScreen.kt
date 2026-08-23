@@ -13,8 +13,19 @@ sealed interface EInkScreen {
 
     data object Search : EInkScreen
 
-    /** 书籍详情（搜索结果等入口） */
-    data class BookDetail(val name: String, val author: String, val bookUrl: String) : EInkScreen
+    /**
+     * 书籍详情。
+     *
+     * @param fromReader 是否自阅读页进入：点"阅读"仅弹出详情（复用下方既有
+     * 阅读页，详情不留在返回栈）；否则点"阅读"新进阅读页（详情保留在栈中，
+     * 返回阅读页时可回到详情）
+     */
+    data class BookDetail(
+        val name: String,
+        val author: String,
+        val bookUrl: String,
+        val fromReader: Boolean = false,
+    ) : EInkScreen
 
     /**
      * 目录。

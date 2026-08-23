@@ -71,6 +71,7 @@ private const val MarginTickStep = 8
 @Composable
 internal fun ReaderTopBar(
     state: ReaderUiState,
+    onOpenDetail: () -> Unit,
     onChangeSource: () -> Unit,
     onRefresh: () -> Unit,
     onOpenCachePanel: () -> Unit,
@@ -86,13 +87,36 @@ internal fun ReaderTopBar(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(EInkSpacing.s),
         ) {
-            EInkText(
-                text = state.bookName,
-                modifier = Modifier.weight(1f),
-                style = EInkTheme.typography.titleMedium,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
+            // 书名点击进详情；按下瞬时反色（规范 §35）。
+            // 触控高度与右侧图标操作一致（44dp）
+            val detailPress = rememberImmediatePressState()
+            val detailEnabled = state.bookUrl.isNotEmpty()
+            val detailColors = eInkActionColors(
+                pressed = detailPress.isPressed,
+                enabled = detailEnabled,
             )
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .defaultMinSize(minHeight = 44.dp)
+                    .then(detailPress.modifier)
+                    .background(detailColors.containerColor)
+                    .staticClickable(
+                        enabled = detailEnabled,
+                        role = Role.Button,
+                        onClickLabel = "书籍详情",
+                        onClick = onOpenDetail,
+                    ),
+                contentAlignment = Alignment.CenterStart,
+            ) {
+                EInkText(
+                    text = state.bookName,
+                    color = detailColors.contentColor,
+                    style = EInkTheme.typography.titleMedium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
             BarAction(
                 iconRes = R.drawable.ic_exchange,
                 contentDescription = "换源",
