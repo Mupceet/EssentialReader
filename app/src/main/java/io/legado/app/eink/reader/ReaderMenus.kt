@@ -36,12 +36,14 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import io.legado.app.R
 import io.legado.app.eink.component.EInkHorizontalDivider
+import io.legado.app.eink.component.EInkSteppedSlider
 import io.legado.app.eink.component.EInkText
 import io.legado.app.eink.modifier.rememberImmediatePressState
 import io.legado.app.eink.modifier.staticClickable
 import io.legado.app.eink.theme.EInkShapes
 import io.legado.app.eink.theme.EInkSpacing
 import io.legado.app.eink.theme.EInkTheme
+import kotlin.math.roundToInt
 
 /** 设置面板类型（UI 局部状态，见 Route 中的 remember）。 */
 internal enum class ReaderPanel { LAYOUT, OTHER, CACHE }
@@ -51,6 +53,12 @@ private val BarHeight = 56.dp
 
 /** 步进器加减按钮触控目标。 */
 private val StepTouchTarget = 44.dp
+
+/** 档位滑条行标签列宽（容纳"上边距"三字并对齐各行滑条起点）。 */
+private val SliderLabelWidth = 64.dp
+
+/** 边距滑条刻度间隔（dp）。 */
+private const val MarginTickStep = 8
 
 // ====================================================================
 // 顶部操作条：换源 / 刷新 / 缓存 / 添加书架或移出书架
@@ -292,49 +300,60 @@ internal fun ReaderPanelContainer(
 /**
  * 排版面板。
  *
- * 6 行整行步进：字号、字距、缩进、行距、段距，以及"边距调整"入口。
- * 边距调整在独立的居中弹框（[ReaderMarginDialog]）中进行：
+ * 6 行：字号、字距、缩进、行距、段距为档位滑条行（拖动选值 + ±1 逐级精调），
+ * 以及"边距调整"入口。边距调整在独立的居中弹框（[ReaderMarginDialog]）中进行：
  * 底部面板会遮挡页眉/页脚，居中弹框四周透明，调整时实时可见效果。
  */
 @Composable
 internal fun ReaderLayoutPanel(
     style: ReaderTextStyle,
-    onAdjustTextSize: (Int) -> Unit,
-    onAdjustLetterSpacing: (Float) -> Unit,
-    onAdjustIndent: (Int) -> Unit,
-    onAdjustLineSpacing: (Int) -> Unit,
-    onAdjustParagraphSpacing: (Int) -> Unit,
+    onSetTextSize: (Int) -> Unit,
+    onSetLetterSpacing: (Int) -> Unit,
+    onSetIndent: (Int) -> Unit,
+    onSetLineSpacing: (Int) -> Unit,
+    onSetParagraphSpacing: (Int) -> Unit,
     onOpenMargins: () -> Unit,
 ) {
-    StepperRow(
+    SliderRow(
         label = "字号",
-        value = "${style.textSize}sp",
-        onDecrement = { onAdjustTextSize(-1) },
-        onIncrement = { onAdjustTextSize(1) },
+        value = style.textSize,
+        valueRange = MIN_TEXT_SIZE..MAX_TEXT_SIZE,
+        thumbLabel = { "${it}sp" },
+        tickStep = 4,
+        onSetValue = onSetTextSize,
     )
-    StepperRow(
+    SliderRow(
         label = "字距",
-        value = String.format("%.2f", style.letterSpacing),
-        onDecrement = { onAdjustLetterSpacing(-0.05f) },
-        onIncrement = { onAdjustLetterSpacing(0.05f) },
+        value = (style.letterSpacing / LETTER_SPACING_STEP).roundToInt()
+            .coerceIn(0, LETTER_SPACING_STEPS),
+        valueRange = 0..LETTER_SPACING_STEPS,
+        thumbLabel = { "%.2f".format(it * LETTER_SPACING_STEP) },
+        tickStep = 2,
+        onSetValue = onSetLetterSpacing,
     )
-    StepperRow(
+    SliderRow(
         label = "缩进",
-        value = "${style.indentChars}字",
-        onDecrement = { onAdjustIndent(-1) },
-        onIncrement = { onAdjustIndent(1) },
+        value = style.indentChars,
+        valueRange = MIN_INDENT_CHARS..MAX_INDENT_CHARS,
+        thumbLabel = { "${it}字" },
+        tickStep = 1,
+        onSetValue = onSetIndent,
     )
-    StepperRow(
+    SliderRow(
         label = "行距",
-        value = "%.1f倍".format(style.lineSpacing / 10f),
-        onDecrement = { onAdjustLineSpacing(-1) },
-        onIncrement = { onAdjustLineSpacing(1) },
+        value = style.lineSpacing,
+        valueRange = 0..MAX_LINE_SPACING,
+        thumbLabel = { "%.1f倍".format(it / 10f) },
+        tickStep = 5,
+        onSetValue = onSetLineSpacing,
     )
-    StepperRow(
+    SliderRow(
         label = "段距",
-        value = "%.1f行".format(style.paragraphSpacing / 10f),
-        onDecrement = { onAdjustParagraphSpacing(-1) },
-        onIncrement = { onAdjustParagraphSpacing(1) },
+        value = style.paragraphSpacing,
+        valueRange = 0..MAX_PARAGRAPH_SPACING,
+        thumbLabel = { "%.1f行".format(it / 10f) },
+        tickStep = 2,
+        onSetValue = onSetParagraphSpacing,
     )
     OptionRow(label = "边距调整") { onOpenMargins() }
 }
@@ -345,26 +364,26 @@ internal fun ReaderLayoutPanel(
 
 /**
  * 边距调整弹框：屏幕居中的卡片，四周透明 —— 页眉/页脚/正文边距
- * 调整时实时可见效果（±2dp）。
+ * 调整时实时可见效果（档位滑条，逐 dp 可调）。
  *
- * 内含三个 Tab：正文 / 页眉 / 页脚，每个 Tab 各 4 行整行步进：
+ * 内含三个 Tab：正文 / 页眉 / 页脚，每个 Tab 各 4 行档位滑条：
  * 上边距、下边距、左边距、右边距。
  */
 @Composable
 internal fun ReaderMarginDialog(
     style: ReaderTextStyle,
-    onAdjustPaddingTop: (Int) -> Unit,
-    onAdjustPaddingBottom: (Int) -> Unit,
-    onAdjustPaddingLeft: (Int) -> Unit,
-    onAdjustPaddingRight: (Int) -> Unit,
-    onAdjustHeaderPaddingTop: (Int) -> Unit,
-    onAdjustHeaderPaddingBottom: (Int) -> Unit,
-    onAdjustHeaderPaddingLeft: (Int) -> Unit,
-    onAdjustHeaderPaddingRight: (Int) -> Unit,
-    onAdjustFooterPaddingTop: (Int) -> Unit,
-    onAdjustFooterPaddingBottom: (Int) -> Unit,
-    onAdjustFooterPaddingLeft: (Int) -> Unit,
-    onAdjustFooterPaddingRight: (Int) -> Unit,
+    onSetPaddingTop: (Int) -> Unit,
+    onSetPaddingBottom: (Int) -> Unit,
+    onSetPaddingLeft: (Int) -> Unit,
+    onSetPaddingRight: (Int) -> Unit,
+    onSetHeaderPaddingTop: (Int) -> Unit,
+    onSetHeaderPaddingBottom: (Int) -> Unit,
+    onSetHeaderPaddingLeft: (Int) -> Unit,
+    onSetHeaderPaddingRight: (Int) -> Unit,
+    onSetFooterPaddingTop: (Int) -> Unit,
+    onSetFooterPaddingBottom: (Int) -> Unit,
+    onSetFooterPaddingLeft: (Int) -> Unit,
+    onSetFooterPaddingRight: (Int) -> Unit,
     onClose: () -> Unit,
 ) {
     var selectedTab by remember { mutableIntStateOf(0) }
@@ -417,10 +436,12 @@ internal fun ReaderMarginDialog(
                         bottomDp = style.paddingBottom,
                         leftDp = style.paddingLeft,
                         rightDp = style.paddingRight,
-                        onAdjustTop = onAdjustPaddingTop,
-                        onAdjustBottom = onAdjustPaddingBottom,
-                        onAdjustLeft = onAdjustPaddingLeft,
-                        onAdjustRight = onAdjustPaddingRight,
+                        maxVertical = MAX_PADDING_VERTICAL,
+                        maxHorizontal = MAX_PADDING_HORIZONTAL,
+                        onSetTop = onSetPaddingTop,
+                        onSetBottom = onSetPaddingBottom,
+                        onSetLeft = onSetPaddingLeft,
+                        onSetRight = onSetPaddingRight,
                     )
 
                     1 -> MarginRows(
@@ -428,10 +449,12 @@ internal fun ReaderMarginDialog(
                         bottomDp = style.headerPaddingBottom,
                         leftDp = style.headerPaddingLeft,
                         rightDp = style.headerPaddingRight,
-                        onAdjustTop = onAdjustHeaderPaddingTop,
-                        onAdjustBottom = onAdjustHeaderPaddingBottom,
-                        onAdjustLeft = onAdjustHeaderPaddingLeft,
-                        onAdjustRight = onAdjustHeaderPaddingRight,
+                        maxVertical = MAX_PADDING_VERTICAL,
+                        maxHorizontal = MAX_PADDING_VERTICAL,
+                        onSetTop = onSetHeaderPaddingTop,
+                        onSetBottom = onSetHeaderPaddingBottom,
+                        onSetLeft = onSetHeaderPaddingLeft,
+                        onSetRight = onSetHeaderPaddingRight,
                     )
 
                     else -> MarginRows(
@@ -439,10 +462,12 @@ internal fun ReaderMarginDialog(
                         bottomDp = style.footerPaddingBottom,
                         leftDp = style.footerPaddingLeft,
                         rightDp = style.footerPaddingRight,
-                        onAdjustTop = onAdjustFooterPaddingTop,
-                        onAdjustBottom = onAdjustFooterPaddingBottom,
-                        onAdjustLeft = onAdjustFooterPaddingLeft,
-                        onAdjustRight = onAdjustFooterPaddingRight,
+                        maxVertical = MAX_PADDING_VERTICAL,
+                        maxHorizontal = MAX_PADDING_VERTICAL,
+                        onSetTop = onSetFooterPaddingTop,
+                        onSetBottom = onSetFooterPaddingBottom,
+                        onSetLeft = onSetFooterPaddingLeft,
+                        onSetRight = onSetFooterPaddingRight,
                     )
                 }
             }
@@ -450,41 +475,51 @@ internal fun ReaderMarginDialog(
     }
 }
 
-/** 单个区域的边距 4 行：上边距、下边距、左边距、右边距。 */
+/** 单个区域的边距 4 行档位滑条：上边距、下边距、左边距、右边距。 */
 @Composable
 private fun MarginRows(
     topDp: Int,
     bottomDp: Int,
     leftDp: Int,
     rightDp: Int,
-    onAdjustTop: (Int) -> Unit,
-    onAdjustBottom: (Int) -> Unit,
-    onAdjustLeft: (Int) -> Unit,
-    onAdjustRight: (Int) -> Unit,
+    maxVertical: Int,
+    maxHorizontal: Int,
+    onSetTop: (Int) -> Unit,
+    onSetBottom: (Int) -> Unit,
+    onSetLeft: (Int) -> Unit,
+    onSetRight: (Int) -> Unit,
 ) {
-    StepperRow(
+    SliderRow(
         label = "上边距",
-        value = "${topDp}dp",
-        onDecrement = { onAdjustTop(-2) },
-        onIncrement = { onAdjustTop(2) },
+        value = topDp,
+        valueRange = 0..maxVertical,
+        thumbLabel = { "${it}dp" },
+        tickStep = MarginTickStep,
+        onSetValue = onSetTop,
     )
-    StepperRow(
+    SliderRow(
         label = "下边距",
-        value = "${bottomDp}dp",
-        onDecrement = { onAdjustBottom(-2) },
-        onIncrement = { onAdjustBottom(2) },
+        value = bottomDp,
+        valueRange = 0..maxVertical,
+        thumbLabel = { "${it}dp" },
+        tickStep = MarginTickStep,
+        onSetValue = onSetBottom,
     )
-    StepperRow(
+    SliderRow(
         label = "左边距",
-        value = "${leftDp}dp",
-        onDecrement = { onAdjustLeft(-2) },
-        onIncrement = { onAdjustLeft(2) },
+        value = leftDp,
+        valueRange = 0..maxHorizontal,
+        thumbLabel = { "${it}dp" },
+        tickStep = MarginTickStep,
+        onSetValue = onSetLeft,
     )
-    StepperRow(
+    SliderRow(
         label = "右边距",
-        value = "${rightDp}dp",
-        onDecrement = { onAdjustRight(-2) },
-        onIncrement = { onAdjustRight(2) },
+        value = rightDp,
+        valueRange = 0..maxHorizontal,
+        thumbLabel = { "${it}dp" },
+        tickStep = MarginTickStep,
+        onSetValue = onSetRight,
     )
 }
 
@@ -626,6 +661,53 @@ private fun StepperRow(
             )
         }
         StepButton(glyph = "＋", onClickLabel = "增大", onClick = onIncrement)
+    }
+}
+
+/**
+ * 档位滑条行：标签在左，[−] 滑条 [+] 在右，当前数值印在滑块上。
+ *
+ * 滑条支持拖动选值与点按轨道跳档，[−]/[+] 为 ±1 逐级精调（行内按值域钳制）。
+ */
+@Composable
+private fun SliderRow(
+    label: String,
+    value: Int,
+    valueRange: IntRange,
+    thumbLabel: (Int) -> String,
+    tickStep: Int,
+    onSetValue: (Int) -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(48.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(EInkSpacing.xs),
+    ) {
+        EInkText(
+            text = label,
+            modifier = Modifier.width(SliderLabelWidth),
+            style = EInkTheme.typography.bodyMedium,
+        )
+        StepButton(
+            glyph = "−",
+            onClickLabel = "减小",
+            onClick = { onSetValue((value - 1).coerceIn(valueRange.first, valueRange.last)) },
+        )
+        EInkSteppedSlider(
+            value = value,
+            onValueChange = onSetValue,
+            valueRange = valueRange,
+            modifier = Modifier.weight(1f),
+            thumbLabel = thumbLabel,
+            tickStep = tickStep,
+        )
+        StepButton(
+            glyph = "＋",
+            onClickLabel = "增大",
+            onClick = { onSetValue((value + 1).coerceIn(valueRange.first, valueRange.last)) },
+        )
     }
 }
 

@@ -124,11 +124,11 @@ fun ReaderRoute(
                 ReaderPanel.LAYOUT -> ReaderPanelContainer(title = "排版设置", onClose = onClose) {
                     ReaderLayoutPanel(
                         style = uiState.style,
-                        onAdjustTextSize = viewModel::adjustTextSize,
-                        onAdjustLetterSpacing = viewModel::adjustLetterSpacing,
-                        onAdjustIndent = viewModel::adjustIndent,
-                        onAdjustLineSpacing = viewModel::adjustLineSpacing,
-                        onAdjustParagraphSpacing = viewModel::adjustParagraphSpacing,
+                        onSetTextSize = viewModel::setTextSize,
+                        onSetLetterSpacing = viewModel::setLetterSpacing,
+                        onSetIndent = viewModel::setIndent,
+                        onSetLineSpacing = viewModel::setLineSpacing,
+                        onSetParagraphSpacing = viewModel::setParagraphSpacing,
                         onOpenMargins = {
                             panel = null
                             showMarginDialog = true
@@ -162,18 +162,18 @@ fun ReaderRoute(
         if (showMarginDialog) {
             ReaderMarginDialog(
                 style = uiState.style,
-                onAdjustPaddingTop = viewModel::adjustPaddingTop,
-                onAdjustPaddingBottom = viewModel::adjustPaddingBottom,
-                onAdjustPaddingLeft = viewModel::adjustPaddingLeft,
-                onAdjustPaddingRight = viewModel::adjustPaddingRight,
-                onAdjustHeaderPaddingTop = viewModel::adjustHeaderPaddingTop,
-                onAdjustHeaderPaddingBottom = viewModel::adjustHeaderPaddingBottom,
-                onAdjustHeaderPaddingLeft = viewModel::adjustHeaderPaddingLeft,
-                onAdjustHeaderPaddingRight = viewModel::adjustHeaderPaddingRight,
-                onAdjustFooterPaddingTop = viewModel::adjustFooterPaddingTop,
-                onAdjustFooterPaddingBottom = viewModel::adjustFooterPaddingBottom,
-                onAdjustFooterPaddingLeft = viewModel::adjustFooterPaddingLeft,
-                onAdjustFooterPaddingRight = viewModel::adjustFooterPaddingRight,
+                onSetPaddingTop = viewModel::setPaddingTop,
+                onSetPaddingBottom = viewModel::setPaddingBottom,
+                onSetPaddingLeft = viewModel::setPaddingLeft,
+                onSetPaddingRight = viewModel::setPaddingRight,
+                onSetHeaderPaddingTop = viewModel::setHeaderPaddingTop,
+                onSetHeaderPaddingBottom = viewModel::setHeaderPaddingBottom,
+                onSetHeaderPaddingLeft = viewModel::setHeaderPaddingLeft,
+                onSetHeaderPaddingRight = viewModel::setHeaderPaddingRight,
+                onSetFooterPaddingTop = viewModel::setFooterPaddingTop,
+                onSetFooterPaddingBottom = viewModel::setFooterPaddingBottom,
+                onSetFooterPaddingLeft = viewModel::setFooterPaddingLeft,
+                onSetFooterPaddingRight = viewModel::setFooterPaddingRight,
                 onClose = { showMarginDialog = false },
             )
         }
