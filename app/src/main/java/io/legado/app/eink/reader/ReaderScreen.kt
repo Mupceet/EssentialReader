@@ -85,7 +85,8 @@ fun ReaderRoute(
         onDispose { }
     }
 
-    // 返回键逐级回退：边距弹框 → 设置面板 → 操作条 → 退出阅读
+    // 返回键逐级回退：边距弹框 → 设置面板 → 收起操作条 → 退出阅读
+    // （边距弹框期间排版面板保留，返回即回到排版展开态）
     BackHandler {
         when {
             showMarginDialog -> showMarginDialog = false
@@ -95,31 +96,57 @@ fun ReaderRoute(
         }
     }
 
+    // 操作条返回图标：关闭设置面板 → 退出阅读。
+    // 边距弹框期间操作条整体隐藏（保证边距实时可见），其首级返回
+    // 由系统返回键/点击弹框外区域承担，关闭后回到排版展开态
+    val onBarBack = {
+        if (panel != null) panel = null else onBack()
+    }
+
     Box(modifier = Modifier.fillMaxSize()) {
         ReaderScreen(
             state = uiState,
-            // 设置面板/边距弹框打开时收起操作条（关闭后自动恢复），
-            // 排版调参时才能看清页眉、边距等顶部效果
-            barsVisible = uiState.controlsVisible && panel == null && !showMarginDialog,
+            // 顶栏在设置面板打开期间隐藏（保持页眉等顶部调参预览不被遮挡）；
+            // 底部操作条常驻可见，承载面板期间的返回与选中态；
+            // 边距调整弹框例外：操作条隐藏，保证正文四周边距实时可见
+            topBarVisible = uiState.controlsVisible && panel == null,
+            bottomBarVisible = uiState.controlsVisible && !showMarginDialog,
             onPrevPage = viewModel::prevPage,
             onNextPage = viewModel::nextPage,
             onCenterTap = viewModel::toggleControls,
             onContentSized = viewModel::updateViewSize,
             onBack = onBack,
+            onBarBack = onBarBack,
             onOpenToc = { onOpenToc(bookUrl) },
             onToggleAutoPlay = viewModel::toggleAutoPlay,
             onChangeSource = { onChangeSource(bookUrl) },
             onRefresh = viewModel::refreshChapter,
             onOpenCachePanel = { panel = ReaderPanel.CACHE },
             onToggleBookshelf = viewModel::toggleBookshelf,
-            onOpenPanel = { panel = it },
+            selectedPanel = panel,
+            onOpenPanel = { target ->
+                // 再次点击已打开的面板按钮 = 关闭（取消选中）；
+                // 边距弹框打开时点击则先收回弹框、回到面板
+                val toggleOff = panel == target && !showMarginDialog
+                showMarginDialog = false
+                panel = if (toggleOff) null else target
+            },
             onRetry = { viewModel.attach(bookUrl) },
         )
 
-        panel?.let { current ->
+        // 设置面板与阅读内容对齐（Edge-to-Edge 下避免被系统栏遮挡），
+        // 底部避开常驻操作条，保持其可见可点；
+        // 边距弹框期间面板隐藏（panel 状态保留），关闭弹框后回到展开态
+        panel?.takeIf { !showMarginDialog }?.let { current ->
             val onClose = { panel = null }
-            // 面板与阅读内容对齐（Edge-to-Edge 下避免被系统栏遮挡）
-            Box(modifier = Modifier.fillMaxSize().safeDrawingPadding()) {
+            // 面板与阅读内容对齐（Edge-to-Edge 下避免被系统栏遮挡），
+            // 底部避开常驻操作条，保持其可见可点
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .safeDrawingPadding()
+                    .padding(bottom = ReaderBottomBarInset)
+            ) {
                 when (current) {
                 ReaderPanel.LAYOUT -> ReaderPanelContainer(title = "排版设置", onClose = onClose) {
                     ReaderLayoutPanel(
@@ -129,10 +156,8 @@ fun ReaderRoute(
                         onSetIndent = viewModel::setIndent,
                         onSetLineSpacing = viewModel::setLineSpacing,
                         onSetParagraphSpacing = viewModel::setParagraphSpacing,
-                        onOpenMargins = {
-                            panel = null
-                            showMarginDialog = true
-                        },
+                        // 排版面板保留（不置空 panel），返回键回到排版展开态
+                        onOpenMargins = { showMarginDialog = true },
                     )
                 }
 
@@ -158,7 +183,8 @@ fun ReaderRoute(
         }
 
         // 边距调整弹框：屏幕居中、四周透明，内含 正文/页眉/页脚 三 Tab，
-        // 调整时页眉/页脚/正文边距实时可见
+        // 调整时页眉/页脚/正文边距实时可见。弹框期间操作条隐藏；
+        // 关闭后回到排版展开态（面板保留），操作条恢复显示
         if (showMarginDialog) {
             ReaderMarginDialog(
                 style = uiState.style,
@@ -186,6 +212,9 @@ fun ReaderRoute(
  * 结构：页眉（书名/进度）→ 正文 Canvas（引擎排版区域）→ 页脚（章节/页码）。
  * 操作条覆盖在正文之上，不改变排版区域尺寸（布局稳定，规范 §15）。
  *
+ * 操作条可见性：设置面板打开期间底部操作条保持可见（承载分层返回
+ * [onBarBack] 与面板选中态 [selectedPanel]），顶栏隐藏以保持顶部调参预览。
+ *
  * 系统栏避让由本界面自管（[safeDrawingPadding]）：窗口 Edge-to-Edge、
  * 状态栏阅读时保持可见，页眉紧贴状态栏下方；后续若支持收起状态栏，
  * 状态栏区域转为页眉区域（页眉上移占位），正文始终从页眉之下开始排版。
@@ -200,18 +229,21 @@ fun ReaderRoute(
 @Composable
 internal fun ReaderScreen(
     state: ReaderUiState,
-    barsVisible: Boolean,
+    topBarVisible: Boolean,
+    bottomBarVisible: Boolean,
     onPrevPage: () -> Unit,
     onNextPage: () -> Unit,
     onCenterTap: () -> Unit,
     onContentSized: (Int, Int) -> Unit,
     onBack: () -> Unit,
+    onBarBack: () -> Unit,
     onOpenToc: () -> Unit,
     onToggleAutoPlay: () -> Unit,
     onChangeSource: () -> Unit,
     onRefresh: () -> Unit,
     onOpenCachePanel: () -> Unit,
     onToggleBookshelf: () -> Unit,
+    selectedPanel: ReaderPanel?,
     onOpenPanel: (ReaderPanel) -> Unit,
     onRetry: () -> Unit,
 ) {
@@ -309,7 +341,7 @@ internal fun ReaderScreen(
             }
         }
 
-        if (barsVisible) {
+        if (topBarVisible) {
             Box(
                 modifier = Modifier
                     .align(Alignment.TopCenter)
@@ -323,6 +355,8 @@ internal fun ReaderScreen(
                     onToggleBookshelf = onToggleBookshelf,
                 )
             }
+        }
+        if (bottomBarVisible) {
             Box(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
@@ -330,7 +364,8 @@ internal fun ReaderScreen(
             ) {
                 ReaderBottomBar(
                     state = state,
-                    onBack = onBack,
+                    selectedPanel = selectedPanel,
+                    onBarBack = onBarBack,
                     onOpenToc = onOpenToc,
                     onToggleAutoPlay = onToggleAutoPlay,
                     onOpenPanel = onOpenPanel,

@@ -35,6 +35,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import io.legado.app.R
+import io.legado.app.eink.component.EInkBackButton
 import io.legado.app.eink.component.EInkHorizontalDivider
 import io.legado.app.eink.component.EInkSteppedSlider
 import io.legado.app.eink.component.EInkText
@@ -51,6 +52,9 @@ internal enum class ReaderPanel { LAYOUT, OTHER, CACHE }
 
 /** 操作条高度（与全局顶/底栏一致）。 */
 private val BarHeight = 56.dp
+
+/** 底部操作条总占位（操作条 + 顶部分隔线），面板/弹框覆盖层据此避让，保持操作条可见可点。 */
+internal val ReaderBottomBarInset = BarHeight + 1.dp
 
 /** 步进器加减按钮触控目标。 */
 private val StepTouchTarget = 44.dp
@@ -155,10 +159,19 @@ private fun BarAction(
 // 底部操作条：返回 / 目录 / 自动翻页 / 排版 / 其它
 // ====================================================================
 
+/**
+ * 底部操作条：返回 / 目录 / 自动翻页 / 排版 / 其它。
+ *
+ * 返回为图标按钮（统一 arrow_back）：关闭设置面板 → 退出阅读。
+ * 设置面板打开期间操作条保持可见：排版/其它按钮呈选中态（实心色块），
+ * 面板在操作条上方展开（覆盖层按 [ReaderBottomBarInset] 避让）。
+ * 边距调整弹框例外：操作条整体隐藏，保证正文四周边距实时可见。
+ */
 @Composable
 internal fun ReaderBottomBar(
     state: ReaderUiState,
-    onBack: () -> Unit,
+    selectedPanel: ReaderPanel?,
+    onBarBack: () -> Unit,
     onOpenToc: () -> Unit,
     onToggleAutoPlay: () -> Unit,
     onOpenPanel: (ReaderPanel) -> Unit,
@@ -173,8 +186,11 @@ internal fun ReaderBottomBar(
                 .background(EInkTheme.colorScheme.surface)
                 .padding(horizontal = EInkSpacing.m),
             verticalAlignment = Alignment.CenterVertically,
+            // 与目录页操作条一致：16dp 边距与间距，返回图标避开设备圆角区
+            horizontalArrangement = Arrangement.spacedBy(EInkSpacing.m),
         ) {
-            BottomAction(label = "返回", weight = 1f, onClick = onBack)
+            // 分层返回：边距弹框 → 设置面板 → 退出阅读
+            EInkBackButton(onClick = onBarBack)
             BottomAction(label = "目录", weight = 1f, onClick = onOpenToc)
             BottomAction(
                 label = if (state.autoPlay) "停止翻页" else "自动翻页",
@@ -182,8 +198,18 @@ internal fun ReaderBottomBar(
                 weight = 1.3f,
                 onClick = onToggleAutoPlay,
             )
-            BottomAction(label = "排版", weight = 1f, onClick = { onOpenPanel(ReaderPanel.LAYOUT) })
-            BottomAction(label = "其它", weight = 1f, onClick = { onOpenPanel(ReaderPanel.OTHER) })
+            BottomAction(
+                label = "排版",
+                selected = selectedPanel == ReaderPanel.LAYOUT,
+                weight = 1f,
+                onClick = { onOpenPanel(ReaderPanel.LAYOUT) },
+            )
+            BottomAction(
+                label = "其它",
+                selected = selectedPanel == ReaderPanel.OTHER,
+                weight = 1f,
+                onClick = { onOpenPanel(ReaderPanel.OTHER) },
+            )
         }
     }
 }
