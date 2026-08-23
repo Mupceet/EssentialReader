@@ -14,7 +14,7 @@ This file is the shared source of truth for coding agents working in this reposi
 
 - After staging files, always run `git status` before committing to verify no unrelated files (for example `.zcode/`, tool config, temp scripts, or extracted backup data) are included.
 - Never commit directly to `master`; work on `develop` or a feature branch.
-- Run a build check (`./gradlew assembleDebug`) before committing to catch compilation errors. On this machine set `GRADLE_USER_HOME=D:\Projects\AndroidProjects\.gradle` to avoid a KSP cross-drive root mismatch between the C: default cache and the D: project.
+- Run a build check (`./gradlew assembleDebug`) before committing to catch compilation errors. Do not assume a specific `GRADLE_USER_HOME` path: on each machine, first confirm the actual location (check the `GRADLE_USER_HOME` environment variable, or ask the user) and that builds work with it, then use it consistently for the session. A non-default `GRADLE_USER_HOME` on the same drive as the project avoids a KSP cross-drive root mismatch.
 - Do not commit changes to commented-out mirror repositories in `settings.gradle`; those are for local use only.
 
 ## Build Commands
