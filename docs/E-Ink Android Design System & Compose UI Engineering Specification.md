@@ -1225,22 +1225,55 @@ Focus feedback 不使用动画。
 （如重复触发同一动作），反馈不能依赖动作完成，必须在按下时刻
 本地完成。
 
-允许的反馈形式（任选其一）：
+分层反馈语言（唯一实现，不得自创变体）：
 
-    pressed -> 反色（容器/内容色互换）
-    pressed -> black background
-    pressed -> border change
+    pressed（瞬时态）
+        反色：容器 = onSurface（黑），内容 = surface（白）。
+        反色是唯一允许的按压反馈语言：黑白翻转是 A2/DU 快刷下
+        最可靠、最显著的 1-bit 变换。
 
-实现范式（:modules:eink）：
+    selected（持久态，小面积控件：Tab / 开关 / 复选）
+        实心色块：容器 = primary，内容 = onPrimary。
 
-    rememberImmediatePressState + staticClickable
-    按下瞬时反色、抬起恢复；pointer 手势层直接驱动，
-    不受滚动容器派发延迟影响。
+    selected（持久态，长列表行：目录当前章、书架多选等）
+        左侧实心标记（▮）+ 标题加粗。
+        禁止整行反色：大面积持久反色退出时残影重，需全刷清除
+        （"加黑"比"去黑"可靠，additive inking 残影最小）。
+
+    focus（键盘/物理键导航）
+        2dp 边框加粗（见 36. Focus）。
+
+    disabled
+        专用中灰 disabledContent，不用 alpha 混合。
+
+    常态
+        透明容器 + onSurface 内容 / onSurfaceVariant 次级内容。
+
+    优先级：disabled > pressed > selected > 常态。
+    按压瞬时覆盖选中（按压期间显示反色，抬起后回到选中态）。
+
+最短保持（必须）：
+
+    按压反色自按下起至少显示 120ms
+    （ImmediatePressMinHoldMillis，:modules:eink 统一定义）。
+    E-Ink 局刷可见需要时间，快于该时长的点按也要保证反馈可感知
+    （快速连点时反色不闪烁消失）。该数值由共享设施统一实现，
+    组件与屏幕不得自行计时、不得更改。
+
+实现（必须复用 :modules:eink 共享设施，禁止屏幕内自写反色逻辑）：
+
+    rememberImmediatePressState + staticClickable + eInkActionColors()
+    按下瞬时反色、抬起复位（不足 120ms 补足）；pointer 手势层直接
+    驱动，不受滚动容器派发延迟影响；手势被滚动消费时立即复位
+    （不做最短保持）。
 
 禁止：
 
     ripple / 悬停高亮等动画型反馈
     裸 clickable + NoIndication 的"静默"可交互元素
+    灰色填充、网点/抖动填充作为按压反馈（A2 快刷下灰阶劣化成脏斑）
+    边框变化作为按压反馈（信噪比不足，边框仅用于 focus 态）
+    屏幕内手写 if (pressed) 换色逻辑（必须走 eInkActionColors / 组件）
 
 一切反馈必须：
 
@@ -1254,9 +1287,15 @@ Focus feedback 不使用动画。
 
 Focus 状态必须是静态视觉变化。
 
+标准 focus 语言：
+
+    2dp 边框加粗（常态 1dp -> focus 2dp）。
+
+边框变化不得用于 pressed（pressed 只用反色，见 35. Touch Feedback）。
+
 推荐：
 
-    border thickness
+    border thickness（标准）
     background color
     text weight
 
@@ -1392,15 +1431,18 @@ List 推荐：
 42. Selection
 ======================================================================
 
-Selection 必须立即变化：
+Selection 必须立即变化（selected = true，零动画）。
 
-    selected = true
+持久选中分层（见 35. Touch Feedback 分层反馈语言）：
 
-视觉变化：
+    小面积控件（Tab / 开关 / 复选）
+        实心色块：primary / onPrimary。
 
-    static background
-    border
-    text weight
+    长列表行（目录当前章、书架多选等）
+        左侧实心标记（▮）+ 标题加粗。
+        禁止整行反色：大面积持久反色退出时残影重，需全刷清除。
+
+按压瞬时覆盖选中：按压期间显示反色，抬起后回到选中态。
 
 禁止：
 
@@ -2134,6 +2176,11 @@ Compose Preview 可以正常使用。
     8. 是否需要 Full Refresh？
     9. 是否可以静态表达？
     10. 是否可以减少视觉复杂度？
+    11. 按压反馈是否为反色，且复用共享设施
+        （rememberImmediatePressState + eInkActionColors，
+        120ms 最短保持）？
+    12. 持久选中是否符合 42. Selection 分层
+        （小面积实心色块 / 长列表行 ▮ + 加粗，禁止整行反色）？
 
 
 ======================================================================
@@ -2233,6 +2280,16 @@ E-Ink App 的“流畅”定义：
     Rule 10:
         如果不确定某 API 是否适合 E-Ink，默认禁止，
         先验证再使用。
+
+    Rule 11:
+        按压反馈必须复用 :modules:eink 共享设施
+        （rememberImmediatePressState + eInkActionColors），
+        不得在屏幕内自写反色配色逻辑；
+        120ms 最短保持由共享设施提供，不得自实现、不得更改。
+        持久选中遵守 42. Selection 分层，禁止整行反色。
+
+新增或更新任何交互控件前，必须先对照 35. Touch Feedback 的
+分层反馈语言与 74. Design Review Checklist 第 11/12 条。
 
 
 ======================================================================

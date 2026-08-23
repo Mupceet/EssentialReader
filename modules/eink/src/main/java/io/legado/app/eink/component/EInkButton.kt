@@ -58,7 +58,8 @@ fun EInkButton(
 ) {
     val minSize = if (isEdgeButton) EdgeButtonMinSize else CentralButtonMinSize
 
-    // 按压反馈：按下瞬时反色（容器/内容色互换），抬起恢复。
+    // 按压反馈：按下瞬时反色（容器/内容色互换），抬起恢复
+    // （快抬时由共享 ImmediatePress 补足 120ms 最短保持，规范 §35）。
     // 即时手势跟踪（不受滚动容器影响）；零涟漪零动画，仅离散状态替换。
     val press = rememberImmediatePressState()
     val normalContainer = if (enabled) colors.containerColor else colors.disabledContainerColor

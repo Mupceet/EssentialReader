@@ -2,7 +2,6 @@ package io.legado.app.eink.toc
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -31,7 +30,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
@@ -51,6 +50,7 @@ import io.legado.app.eink.component.EInkLoading
 import io.legado.app.eink.component.EInkPageArrows
 import io.legado.app.eink.component.EInkText
 import io.legado.app.eink.component.EInkTopBar
+import io.legado.app.eink.component.eInkActionColors
 import io.legado.app.eink.component.rememberEInkPagedListState
 import io.legado.app.eink.modifier.EInkPageSwipe
 import io.legado.app.eink.modifier.rememberImmediatePressState
@@ -74,6 +74,10 @@ private val HandleThumbHeight = 48.dp
 
 /** 未缓存章节图标尺寸。 */
 private val IconSize = 16.dp
+
+/** 当前阅读章节左侧实心标记尺寸（▮，规范 §42 列表行持久选中）。 */
+private val CurrentMarkWidth = 4.dp
+private val CurrentMarkHeight = 16.dp
 
 /**
  * 目录 Route — ViewModel 感知层。
@@ -185,12 +189,9 @@ internal fun TocScreen(
             title = state.book?.name ?: "目录",
             onBack = null,
             actions = {
-                EInkText(
-                    text = if (state.isReversed) "倒序" else "正序",
-                    modifier = Modifier
-                        .clickable { onToggleReverse() }
-                        .padding(horizontal = EInkSpacing.m),
-                    style = EInkTheme.typography.labelLarge
+                SortToggle(
+                    label = if (state.isReversed) "倒序" else "正序",
+                    onToggle = onToggleReverse,
                 )
             }
         )
@@ -279,41 +280,66 @@ private fun ChapterList(
     }
 }
 
-/** 章节条目：当前阅读章节整行反色（黑底白字）更醒目；未缓存章节显示云端图标。 */
+/**
+ * 章节条目：按压瞬时反色（规范 §35）。
+ *
+ * 当前阅读章节为长列表持久选中态：不整行反色（大面积持久反色退出时
+ * 残影重，规范 §42），改用左侧实心标记 + 标题加粗 + "在读"标签
+ * （additive inking，"加黑"比"去黑"可靠）。
+ * 未缓存章节显示云端图标。
+ */
 @Composable
 private fun ChapterItem(chapter: BookChapter, isCurrent: Boolean, cached: Boolean, onClick: () -> Unit) {
     val scheme = EInkTheme.colorScheme
+    val press = rememberImmediatePressState()
+    val colors = eInkActionColors(pressed = press.isPressed)
+    // 标记/标签随按压反色；标题：当前章加深，其余为次级色
+    val markColor = if (press.isPressed) scheme.surface else scheme.onSurface
+    val titleColor = when {
+        press.isPressed -> colors.contentColor
+        isCurrent -> scheme.onSurface
+        else -> scheme.onSurfaceVariant
+    }
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .background(if (isCurrent) scheme.onSurface else Color.Transparent)
-            .clickable(onClick = onClick)
+            .then(press.modifier)
+            .background(colors.containerColor)
+            .staticClickable(role = Role.Button, onClick = onClick)
             .padding(horizontal = EInkSpacing.m, vertical = EInkSpacing.s),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(EInkSpacing.s),
     ) {
+        if (isCurrent) {
+            Box(
+                modifier = Modifier
+                    .size(width = CurrentMarkWidth, height = CurrentMarkHeight)
+                    .background(markColor)
+            )
+        }
         EInkText(
             text = chapter.title,
             modifier = Modifier.weight(1f),
             style = EInkTheme.typography.bodyMedium,
             fontWeight = if (isCurrent) FontWeight.Bold else null,
-            color = if (isCurrent) scheme.surface else scheme.onSurfaceVariant,
+            color = titleColor,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis
         )
         if (!cached) {
-            // 未下载缓存标记（云图标，与 View 版一致）
+            // 未下载缓存标记（云图标，与 View 版一致），颜色随按压反色
             Image(
                 painter = painterResource(id = R.drawable.ic_outline_cloud_24),
                 contentDescription = "未缓存",
                 modifier = Modifier.size(IconSize),
+                colorFilter = ColorFilter.tint(titleColor),
             )
         }
         if (isCurrent) {
             EInkText(
                 text = "在读",
                 style = EInkTheme.typography.labelMedium,
-                color = scheme.surface,
+                color = markColor,
             )
         }
     }
@@ -364,22 +390,43 @@ private fun BarTextAction(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val scheme = EInkTheme.colorScheme
     val press = rememberImmediatePressState()
+    val colors = eInkActionColors(pressed = press.isPressed)
     Box(
         modifier = modifier
             .height(48.dp)
             .then(press.modifier)
-            .background(if (press.isPressed) scheme.onSurface else Color.Transparent)
+            .background(colors.containerColor)
             .staticClickable(role = Role.Button, onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
         EInkText(
             text = label,
             style = EInkTheme.typography.labelLarge,
-            color = if (press.isPressed) scheme.surface else scheme.onSurface,
+            color = colors.contentColor,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
+        )
+    }
+}
+
+/** 正/倒序切换（顶栏动作）：按压反色。 */
+@Composable
+private fun SortToggle(label: String, onToggle: () -> Unit) {
+    val press = rememberImmediatePressState()
+    val colors = eInkActionColors(pressed = press.isPressed)
+    Box(
+        modifier = Modifier
+            .then(press.modifier)
+            .background(colors.containerColor)
+            .staticClickable(role = Role.Button, onClickLabel = label, onClick = onToggle)
+            .padding(horizontal = EInkSpacing.m),
+        contentAlignment = Alignment.Center,
+    ) {
+        EInkText(
+            text = label,
+            color = colors.contentColor,
+            style = EInkTheme.typography.labelLarge,
         )
     }
 }

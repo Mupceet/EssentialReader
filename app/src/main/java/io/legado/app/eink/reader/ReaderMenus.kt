@@ -38,6 +38,7 @@ import io.legado.app.R
 import io.legado.app.eink.component.EInkHorizontalDivider
 import io.legado.app.eink.component.EInkSteppedSlider
 import io.legado.app.eink.component.EInkText
+import io.legado.app.eink.component.eInkActionColors
 import io.legado.app.eink.modifier.rememberImmediatePressState
 import io.legado.app.eink.modifier.staticClickable
 import io.legado.app.eink.theme.EInkShapes
@@ -124,19 +125,14 @@ private fun BarAction(
     enabled: Boolean = true,
     onClick: () -> Unit,
 ) {
-    val scheme = EInkTheme.colorScheme
-    // 按压反色：按下黑底白字，抬起恢复（即时手势跟踪，不受滚动容器影响）
+    // 按压反色（共享配色解析 + 120ms 最短保持，规范 §35）
     val press = rememberImmediatePressState()
-    val content = if (enabled) {
-        if (press.isPressed) scheme.surface else scheme.onSurface
-    } else {
-        scheme.disabledContent
-    }
+    val colors = eInkActionColors(pressed = press.isPressed, enabled = enabled)
     Box(
         modifier = Modifier
             .defaultMinSize(minWidth = 44.dp, minHeight = 44.dp)
             .then(press.modifier)
-            .background(if (enabled && press.isPressed) scheme.onSurface else Color.Transparent)
+            .background(colors.containerColor)
             .staticClickable(
                 enabled = enabled,
                 role = Role.Button,
@@ -150,7 +146,7 @@ private fun BarAction(
             painter = painterResource(iconRes),
             contentDescription = contentDescription,
             modifier = Modifier.size(24.dp),
-            colorFilter = ColorFilter.tint(content),
+            colorFilter = ColorFilter.tint(colors.contentColor),
         )
     }
 }
@@ -199,32 +195,22 @@ private fun RowScope.BottomAction(
     selected: Boolean = false,
     onClick: () -> Unit,
 ) {
-    val scheme = EInkTheme.colorScheme
-    // 按压/选中反色：选中常态反白，按下瞬时反色，抬起恢复
+    // 分层反馈（规范 §35/§42）：按下瞬时反色，选中实心色块，按压瞬时覆盖选中
     val press = rememberImmediatePressState()
-    val container = when {
-        press.isPressed -> scheme.onSurface
-        selected -> scheme.primary
-        else -> Color.Transparent
-    }
-    val content = when {
-        press.isPressed -> scheme.surface
-        selected -> scheme.onPrimary
-        else -> scheme.onSurface
-    }
+    val colors = eInkActionColors(pressed = press.isPressed, selected = selected)
     Box(
         modifier = Modifier
             .weight(weight)
             .fillMaxWidth()
             .height(BarHeight)
-            .background(color = container, shape = EInkShapes.small)
+            .background(color = colors.containerColor, shape = EInkShapes.small)
             .then(press.modifier)
             .staticClickable(role = Role.Button, onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
         EInkText(
             text = label,
-            color = content,
+            color = colors.contentColor,
             style = EInkTheme.typography.labelLarge,
             maxLines = 1,
         )
@@ -530,20 +516,21 @@ private fun MarginRows(
 /** 关闭按钮（×）：按压反色。 */
 @Composable
 private fun CloseButton(onClose: () -> Unit) {
-    val scheme = EInkTheme.colorScheme
+    // 按压反色；× 常态为次级色（onSurfaceVariant），按压反色为白
     val press = rememberImmediatePressState()
+    val colors = eInkActionColors(pressed = press.isPressed)
     Box(
         modifier = Modifier
             .size(44.dp)
             .then(press.modifier)
-            .background(if (press.isPressed) scheme.onSurface else Color.Transparent)
+            .background(colors.containerColor)
             .staticClickable(role = Role.Button, onClick = onClose),
         contentAlignment = Alignment.Center,
     ) {
         EInkText(
             text = "×",
             style = EInkTheme.typography.titleLarge,
-            color = if (press.isPressed) scheme.surface else scheme.onSurfaceVariant,
+            color = colors.secondaryContentColor,
         )
     }
 }
@@ -559,32 +546,27 @@ private fun PanelTabRow(labels: List<String>, selected: Int, onSelect: (Int) -> 
         horizontalArrangement = Arrangement.spacedBy(EInkSpacing.s),
     ) {
         labels.forEachIndexed { index, label ->
-            val isSelected = index == selected
             val press = rememberImmediatePressState()
-            val container = when {
-                press.isPressed -> scheme.onSurface
-                isSelected -> scheme.primary
-                else -> Color.Transparent
+            val colors = eInkActionColors(pressed = press.isPressed, selected = index == selected)
+            // 按压/选中时边框取容器色（黑），常态为轮廓线
+            val borderColor = if (colors.containerColor != Color.Transparent) {
+                colors.containerColor
+            } else {
+                scheme.outline
             }
-            val content = when {
-                press.isPressed -> scheme.surface
-                isSelected -> scheme.onPrimary
-                else -> scheme.onSurface
-            }
-            val borderColor = if (press.isPressed || isSelected) container else scheme.outline
             Box(
                 modifier = Modifier
                     .weight(1f)
                     .defaultMinSize(minHeight = 40.dp)
                     .then(press.modifier)
-                    .background(color = container, shape = EInkShapes.small)
+                    .background(color = colors.containerColor, shape = EInkShapes.small)
                     .border(width = 1.dp, color = borderColor, shape = EInkShapes.small)
                     .staticClickable(role = Role.Tab, onClick = { onSelect(index) }),
                 contentAlignment = Alignment.Center,
             ) {
                 EInkText(
                     text = label,
-                    color = content,
+                    color = colors.contentColor,
                     style = EInkTheme.typography.labelLarge,
                     maxLines = 1,
                 )
@@ -713,34 +695,33 @@ private fun SliderRow(
 
 @Composable
 private fun StepButton(glyph: String, onClickLabel: String, onClick: () -> Unit) {
-    val scheme = EInkTheme.colorScheme
-    // 按压反色：按下黑底白字形，抬起恢复（即时手势跟踪，滚动容器内不延迟不滞留）
+    // 按压反色（共享配色解析 + 120ms 最短保持，规范 §35）
     val press = rememberImmediatePressState()
+    val colors = eInkActionColors(pressed = press.isPressed)
     Box(
         modifier = Modifier
             .size(StepTouchTarget)
             .then(press.modifier)
-            .background(if (press.isPressed) scheme.onSurface else Color.Transparent)
+            .background(colors.containerColor)
             .staticClickable(role = Role.Button, onClickLabel = onClickLabel, onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
         EInkText(
             text = glyph,
             style = EInkTheme.typography.titleLarge,
-            color = if (press.isPressed) scheme.surface else scheme.onSurface,
+            color = colors.contentColor,
         )
     }
 }
 
-/** 开关行：标签在左，状态块在右（开启反白）；按压时整行反色。 */
+/** 开关行：标签在左，状态块在右（开启实心黑）；按压时整行反色。 */
 @Composable
 private fun ToggleRow(label: String, checked: Boolean, onToggle: () -> Unit) {
     val scheme = EInkTheme.colorScheme
-    // 按压反色：整行黑底、文字白字，状态块同步反转
+    // 按压反色：整行黑底、文字白字，状态块同步反转（块内配色是反色的反色，属特例）
     val press = rememberImmediatePressState()
     val isPressed = press.isPressed
-    val rowContainer = if (isPressed) scheme.onSurface else Color.Transparent
-    val labelColor = if (isPressed) scheme.surface else scheme.onSurface
+    val rowColors = eInkActionColors(pressed = isPressed)
     val blockContainer = when {
         isPressed -> scheme.surface
         checked -> scheme.primary
@@ -757,7 +738,7 @@ private fun ToggleRow(label: String, checked: Boolean, onToggle: () -> Unit) {
             .fillMaxWidth()
             .height(48.dp)
             .then(press.modifier)
-            .background(rowContainer)
+            .background(rowColors.containerColor)
             .staticClickable(role = Role.Switch, onClick = onToggle)
             .padding(end = EInkSpacing.s),
         verticalAlignment = Alignment.CenterVertically,
@@ -766,7 +747,7 @@ private fun ToggleRow(label: String, checked: Boolean, onToggle: () -> Unit) {
             text = label,
             modifier = Modifier.weight(1f),
             style = EInkTheme.typography.bodyMedium,
-            color = labelColor,
+            color = rowColors.contentColor,
         )
         Box(
             modifier = Modifier
@@ -787,27 +768,27 @@ private fun ToggleRow(label: String, checked: Boolean, onToggle: () -> Unit) {
 /** 选项行（整行点击，按压反色）。 */
 @Composable
 private fun OptionRow(label: String, onClick: () -> Unit) {
-    val scheme = EInkTheme.colorScheme
     val press = rememberImmediatePressState()
+    val colors = eInkActionColors(pressed = press.isPressed)
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .height(48.dp)
             .then(press.modifier)
-            .background(if (press.isPressed) scheme.onSurface else Color.Transparent)
+            .background(colors.containerColor)
             .staticClickable(role = Role.Button, onClick = onClick),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         EInkText(
             text = label,
             style = EInkTheme.typography.bodyMedium,
-            color = if (press.isPressed) scheme.surface else scheme.onSurface,
+            color = colors.contentColor,
         )
         Spacer(modifier = Modifier.weight(1f))
         EInkText(
             text = "›",
             style = EInkTheme.typography.titleLarge,
-            color = if (press.isPressed) scheme.surface else scheme.onSurfaceVariant,
+            color = colors.secondaryContentColor,
         )
     }
 }

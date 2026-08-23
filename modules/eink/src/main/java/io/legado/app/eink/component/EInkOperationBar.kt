@@ -1,7 +1,6 @@
 package io.legado.app.eink.component
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -14,10 +13,11 @@ import androidx.compose.foundation.text.BasicText
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import io.legado.app.eink.modifier.rememberImmediatePressState
+import io.legado.app.eink.modifier.staticClickable
 import io.legado.app.eink.theme.EInkShapes
 import io.legado.app.eink.theme.EInkSpacing
 import io.legado.app.eink.theme.EInkTheme
@@ -100,14 +100,15 @@ private fun TabItem(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val colors = EInkTheme.colorScheme
-    val backgroundColor = if (selected) colors.primary else Color.Transparent
-    val contentColor = if (selected) colors.onPrimary else colors.onSurface
+    // 分层反馈（规范 §35/§42）：按下瞬时反色（含 120ms 最短保持），选中实心色块
+    val press = rememberImmediatePressState()
+    val colors = eInkActionColors(pressed = press.isPressed, selected = selected)
 
     Box(
         modifier = modifier
-            .background(color = backgroundColor, shape = EInkShapes.small)
-            .clickable(
+            .then(press.modifier)
+            .background(color = colors.containerColor, shape = EInkShapes.small)
+            .staticClickable(
                 enabled = !selected,
                 role = Role.Tab,
                 onClick = onClick
@@ -117,7 +118,7 @@ private fun TabItem(
     ) {
         BasicText(
             text = label,
-            style = EInkTheme.typography.labelLarge.copy(color = contentColor),
+            style = EInkTheme.typography.labelLarge.copy(color = colors.contentColor),
             maxLines = 1,
             overflow = TextOverflow.Ellipsis
         )

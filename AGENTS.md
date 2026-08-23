@@ -38,7 +38,7 @@ The project uses Groovy DSL (`build.gradle`) with a version catalog at `gradle/l
 ## Project Configuration
 
 - **Package / namespace**: `io.legado.app`
-- **Compile SDK**: 36 / **Min SDK**: 21 / **Target SDK**: 36
+- **Compile SDK**: 36 / **Min SDK**: 23 / **Target SDK**: 36
 - **Java target**: 17
 - **Versioning**: `versionCode = 10000 + gitCommitCount`, `versionName = 3.<yy.MMddHH>`
 - **Build variants**: debug (`.debug` suffix) and release (`.release` suffix). Debug applicationId is `io.legado.app.debug`.
@@ -150,6 +150,7 @@ The E-Ink version follows `docs/E-Ink Android Design System & Compose UI Enginee
 - **Reading First**: The reader is the core. Fixed page, stable layout, tap/swipe to page (immediate, no animation).
 - **Refresh awareness**: Compose recomposition ≠ screen refresh. A `RefreshController` abstraction mediates UI state changes and hardware refresh (NONE/PARTIAL/FULL).
 - **Component naming**: All components use `EInkXxx` prefix (`EInkButton`, `EInkText`, `EInkDialog`, ...).
+- **Layered feedback language (spec §35/§42, mandatory)**: pressed = instant inversion (the only pressed language), with a 120ms minimum hold, provided by `rememberImmediatePressState` + `eInkActionColors` in `:modules:eink` — never hand-written per-screen inversion color logic. Persistent selection: small controls use solid fill (primary/onPrimary); long-list rows use a left solid marker (▮) + bold title, never full-row inversion. Disabled = dedicated mid-gray, never alpha. Border emphasis is reserved for focus. New or updated interactive components must comply (see spec §74 checklist items 11/12 and §78 Rule 11).
 
 Refer to `D:\Projects\AndroidProjects\eink-compose` for reference implementations of theme, modifiers, and components that were adapted into `:modules:eink`.
 
