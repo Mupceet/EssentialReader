@@ -1,6 +1,5 @@
 package io.legado.app.eink.reader
 
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -10,6 +9,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.defaultMinSize
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -27,15 +27,14 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import io.legado.app.R
-import io.legado.app.eink.component.EInkBackButton
 import io.legado.app.eink.component.EInkHorizontalDivider
+import io.legado.app.eink.component.EInkOperationBarIcon
 import io.legado.app.eink.component.EInkSteppedSlider
 import io.legado.app.eink.component.EInkText
 import io.legado.app.eink.component.eInkActionColors
@@ -82,13 +81,12 @@ internal fun ReaderTopBar(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(BarHeight)
-                .background(EInkTheme.colorScheme.surface)
-                .padding(horizontal = EInkSpacing.m),
+                .background(EInkTheme.colorScheme.surface),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(EInkSpacing.s),
         ) {
             // 书名点击进详情；按下瞬时反色（规范 §35）。
-            // 触控高度与右侧图标操作一致（44dp）
+            // 触控高度撑满操作条，与右侧图标按钮一致；
+            // 左端保留屏幕边距（右侧图标按钮居右连续排列、贴右屏，见 BarAction）
             val detailPress = rememberImmediatePressState()
             val detailEnabled = state.bookUrl.isNotEmpty()
             val detailColors = eInkActionColors(
@@ -98,7 +96,8 @@ internal fun ReaderTopBar(
             Box(
                 modifier = Modifier
                     .weight(1f)
-                    .defaultMinSize(minHeight = 44.dp)
+                    .padding(start = EInkSpacing.m)
+                    .fillMaxHeight()
                     .then(detailPress.modifier)
                     .background(detailColors.containerColor)
                     .staticClickable(
@@ -145,6 +144,11 @@ internal fun ReaderTopBar(
     }
 }
 
+/**
+ * 顶部操作条图标按钮（居右连续排列、贴右屏）：复用 [EInkOperationBarIcon]
+ * 默认尺寸（高度撑满操作条，宽度自适应 min(屏幕宽/6, 1.7 倍高)，28dp 图标）。
+ * 按压瞬时反色；无选中语义。
+ */
 @Composable
 private fun BarAction(
     iconRes: Int,
@@ -152,30 +156,12 @@ private fun BarAction(
     enabled: Boolean = true,
     onClick: () -> Unit,
 ) {
-    // 按压反色（共享配色解析 + 120ms 最短保持，规范 §35）
-    val press = rememberImmediatePressState()
-    val colors = eInkActionColors(pressed = press.isPressed, enabled = enabled)
-    Box(
-        modifier = Modifier
-            .defaultMinSize(minWidth = 44.dp, minHeight = 44.dp)
-            .then(press.modifier)
-            .background(colors.containerColor)
-            .staticClickable(
-                enabled = enabled,
-                role = Role.Button,
-                onClickLabel = contentDescription,
-                onClick = onClick,
-            )
-            .padding(horizontal = EInkSpacing.s),
-        contentAlignment = Alignment.Center,
-    ) {
-        Image(
-            painter = painterResource(iconRes),
-            contentDescription = contentDescription,
-            modifier = Modifier.size(24.dp),
-            colorFilter = ColorFilter.tint(colors.contentColor),
-        )
-    }
+    EInkOperationBarIcon(
+        icon = painterResource(iconRes),
+        contentDescription = contentDescription,
+        onClick = onClick,
+        enabled = enabled,
+    )
 }
 
 // ====================================================================
@@ -188,8 +174,9 @@ private fun BarAction(
  * 图标沿用 View 版：目录 ic_toc、自动翻页 ic_auto_page(_stop)、
  * 排版（View 版"界面"）ic_interface_setting、其它（设置）ic_settings、
  * 返回统一 arrow_back：关闭设置面板 → 退出阅读。
- * 五枚图标均匀分布；设置面板打开期间操作条保持可见：排版/其它按钮
- * 呈选中态（实心色块），面板在操作条上方展开（覆盖层按
+ * 五枚图标复用 [EInkOperationBarIcon]，居左连续排列、贴屏幕左缘；
+ * 设置面板打开期间操作条保持可见：排版/其它按钮呈选中态（无素材对，
+ * 回落实心色块），面板在操作条上方展开（覆盖层按
  * [ReaderBottomBarInset] 避让）。边距调整弹框例外：操作条整体隐藏，
  * 保证正文四周边距实时可见。
  */
@@ -209,15 +196,15 @@ internal fun ReaderBottomBar(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(BarHeight)
-                .background(EInkTheme.colorScheme.surface)
-                .padding(horizontal = EInkSpacing.m),
+                .background(EInkTheme.colorScheme.surface),
             verticalAlignment = Alignment.CenterVertically,
-            // 首枚图标离屏幕边缘 16dp（与目录页一致，避开设备圆角区），
-            // 五枚图标均匀分布
-            horizontalArrangement = Arrangement.SpaceBetween,
         ) {
             // 分层返回：关闭设置面板 → 退出阅读
-            EInkBackButton(onClick = onBarBack)
+            EInkOperationBarIcon(
+                icon = painterResource(R.drawable.ic_arrow_back),
+                contentDescription = "返回",
+                onClick = onBarBack,
+            )
             BottomIconAction(
                 iconRes = R.drawable.ic_toc,
                 contentDescription = "目录",
@@ -245,7 +232,12 @@ internal fun ReaderBottomBar(
     }
 }
 
-/** 操作条图标按钮：48dp 触控目标，按下瞬时反色；选中为实心色块 + 反白图标，按压瞬时覆盖选中。 */
+/**
+ * 底部操作条图标按钮：复用 [EInkOperationBarIcon] 默认尺寸（高度撑满
+ * 操作条，宽度自适应 min(屏幕宽/6, 1.7 倍高)，28dp 图标）。
+ * 按下瞬时反色；选中无素材对，回落实心色块 + 反白图标（规范 §35/§42），
+ * 按压瞬时覆盖选中。
+ */
 @Composable
 private fun BottomIconAction(
     iconRes: Int,
@@ -253,28 +245,12 @@ private fun BottomIconAction(
     selected: Boolean = false,
     onClick: () -> Unit,
 ) {
-    // 分层反馈（规范 §35/§42）
-    val press = rememberImmediatePressState()
-    val colors = eInkActionColors(pressed = press.isPressed, selected = selected)
-    Box(
-        modifier = Modifier
-            .size(48.dp)
-            .then(press.modifier)
-            .background(colors.containerColor)
-            .staticClickable(
-                role = Role.Button,
-                onClickLabel = contentDescription,
-                onClick = onClick,
-            ),
-        contentAlignment = Alignment.Center,
-    ) {
-        Image(
-            painter = painterResource(iconRes),
-            contentDescription = contentDescription,
-            modifier = Modifier.size(24.dp),
-            colorFilter = ColorFilter.tint(colors.contentColor),
-        )
-    }
+    EInkOperationBarIcon(
+        icon = painterResource(iconRes),
+        contentDescription = contentDescription,
+        onClick = onClick,
+        selected = selected,
+    )
 }
 
 // ====================================================================

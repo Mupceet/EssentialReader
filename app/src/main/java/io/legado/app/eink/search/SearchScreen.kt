@@ -21,14 +21,15 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import io.legado.app.R
 import io.legado.app.data.entities.SearchBook
-import io.legado.app.eink.component.EInkBackButton
 import io.legado.app.eink.component.EInkHorizontalDivider
 import io.legado.app.eink.component.EInkOperationBar
+import io.legado.app.eink.component.EInkOperationBarIcon
 import io.legado.app.eink.modifier.EInkPageSwipe
 import io.legado.app.eink.component.EInkSearchInputBar
 import io.legado.app.eink.component.EInkText
@@ -131,7 +132,13 @@ fun SearchRoute(
             tabs = emptyList(),
             selectedTabIndex = 0,
             onTabSelect = {},
-            navigationIcon = { EInkBackButton(onClick = onBack) },
+            navigationIcon = {
+                EInkOperationBarIcon(
+                    icon = painterResource(R.drawable.ic_arrow_back),
+                    contentDescription = "返回",
+                    onClick = onBack
+                )
+            },
             pageUpEnabled = canPage && pager.canPageUp(),
             pageDownEnabled = canPage && pager.canPageDown(totalItems),
             onPageUp = pageUp,

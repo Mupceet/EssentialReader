@@ -1235,6 +1235,14 @@ Focus feedback 不使用动画。
     selected（持久态，小面积控件：Tab / 开关 / 复选）
         实心色块：容器 = primary，内容 = onPrimary。
 
+    selected（持久态，操作条图标按钮：底部操作栏 Tab / 阅读操作条，
+    统一由 EInkOperationBarIcon 实现，禁止屏幕自写）
+        提供素材对时：图标切换填充变体（线性 `_e` → 填充 `_s`，
+        沿用 View 版底栏命名约定），容器保持白底；
+        未提供素材对时：回落实心色块（primary/onPrimary）。
+        素材优先成对提供，后续新增素材同样要求；
+        按压反色期间覆盖选中样式。
+
     selected（持久态，长列表行：目录当前章、书架多选等）
         左侧实心标记（▮）+ 标题加粗。
         禁止整行反色：大面积持久反色退出时残影重，需全刷清除
@@ -1437,6 +1445,11 @@ Selection 必须立即变化（selected = true，零动画）。
 
     小面积控件（Tab / 开关 / 复选）
         实心色块：primary / onPrimary。
+
+    操作条图标按钮（底部操作栏 Tab / 阅读操作条）
+        有素材对：图标切换填充变体（`_e` → `_s`），容器白底；
+        无素材对：实心色块（primary/onPrimary）。
+        统一由 EInkOperationBarIcon 实现。
 
     长列表行（目录当前章、书架多选等）
         左侧实心标记（▮）+ 标题加粗。

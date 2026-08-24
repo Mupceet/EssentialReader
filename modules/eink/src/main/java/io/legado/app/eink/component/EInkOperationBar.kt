@@ -1,45 +1,41 @@
 package io.legado.app.eink.component
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.text.BasicText
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import io.legado.app.eink.modifier.rememberImmediatePressState
-import io.legado.app.eink.modifier.staticClickable
-import io.legado.app.eink.theme.EInkShapes
 import io.legado.app.eink.theme.EInkSpacing
-import io.legado.app.eink.theme.EInkTheme
 
 /**
  * 底部通用操作栏（参考微信读书墨水屏版）。
  *
- * 结构：左侧为页面 Tab（选中项以反白色块表达，无动画），右侧固定
- * 上/下翻页箭头。上下箭头统一使用 [EInkPageArrows]，包在胶囊边框内，
- * 中间以竖线分隔。
+ * 结构：图标按钮（[EInkOperationBarIcon] 默认尺寸：高度撑满操作栏、
+ * 宽度自适应 —— min(屏幕宽/6, 1.7 倍高度)）居左连续排列
+ * （不与屏幕留边距、按钮彼此紧邻），
+ * 中间留白，右侧固定上/下翻页胶囊 [EInkPageArrows]（竖线分隔，
+ * 距屏幕右侧留 [EInkSpacing.m] 边距）。
+ *
+ * 选中态：Tab 选中不使用实心色块，按钮保持白底，仅图标切换为
+ * 填充变体素材（见 [EInkOperationTab] 的素材成对要求）。
  *
  * E-Ink 约束：
  *  - 不可翻页（列表已到顶/到底、或当前内容不可翻页）时箭头置灰
  *    （[io.legado.app.eink.theme.EInkColorScheme.disabledContent] 中灰，
  *    非 alpha 混合，避免残影）；
- *  - 零动画：Tab 切换与翻页均为状态直接替换；
- *  - 触控目标 ≥48dp（边缘区域规范）。
+ *  - 零动画：Tab 切换与翻页均为状态直接替换。
  *
  * 该操作栏在各界面普遍存在；无 Tab 的界面传 [tabs] 为空列表即可，
- * 此时左侧不渲染 Tab，仅保留右侧翻页按钮。
+ * 此时左侧仅保留 [navigationIcon]，右侧翻页按钮。
  *
- * @param tabs Tab 标签文案列表（从左到右）
+ * @param tabs Tab 列表（图标素材对 + 无障碍文案，从左到右）
  * @param selectedTabIndex 当前选中的 Tab 下标
  * @param onTabSelect 点击 Tab 回调，参数为下标
  * @param navigationIcon 最左侧导航槽（如返回按钮），非首页常用；与 Tab 可并存
@@ -50,7 +46,7 @@ import io.legado.app.eink.theme.EInkTheme
  */
 @Composable
 fun EInkOperationBar(
-    tabs: List<String>,
+    tabs: List<EInkOperationTab>,
     selectedTabIndex: Int,
     onTabSelect: (Int) -> Unit,
     modifier: Modifier = Modifier,
@@ -66,23 +62,21 @@ fun EInkOperationBar(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(BarHeight)
-                .padding(horizontal = EInkSpacing.m),
+                .padding(end = EInkSpacing.m),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(EInkSpacing.m)
         ) {
             navigationIcon?.invoke()
-            if (tabs.isEmpty()) {
-                Spacer(modifier = Modifier.weight(1f))
-            } else {
-                tabs.forEachIndexed { index, label ->
-                    TabItem(
-                        label = label,
-                        selected = index == selectedTabIndex,
-                        onClick = { onTabSelect(index) },
-                        modifier = Modifier.weight(1f)
-                    )
-                }
+            tabs.forEachIndexed { index, tab ->
+                EInkOperationBarIcon(
+                    icon = tab.icon,
+                    selectedIcon = tab.selectedIcon,
+                    contentDescription = tab.contentDescription,
+                    selected = index == selectedTabIndex,
+                    role = Role.Tab,
+                    onClick = { onTabSelect(index) },
+                )
             }
+            Spacer(modifier = Modifier.weight(1f))
             EInkPageArrows(
                 pageUpEnabled = pageUpEnabled,
                 pageDownEnabled = pageDownEnabled,
@@ -93,37 +87,20 @@ fun EInkOperationBar(
     }
 }
 
-@Composable
-private fun TabItem(
-    label: String,
-    selected: Boolean,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    // 分层反馈（规范 §35/§42）：按下瞬时反色（含 120ms 最短保持），选中实心色块
-    val press = rememberImmediatePressState()
-    val colors = eInkActionColors(pressed = press.isPressed, selected = selected)
+/**
+ * 操作栏 Tab：图标素材对 + 无障碍文案。
+ *
+ * 素材成对要求（规范 §35/§42 操作条图标按钮选中层）：操作条图标
+ * 必须提供两个变体 —— [icon] 线性/描边（未选中）+ [selectedIcon]
+ * 填充（选中），沿用 View 版底栏 `_e` / `_s` 资源命名约定。
+ * 选中态不使用实心色块，按钮保持白底，仅图标切换为填充变体；
+ * 后续新增素材同样必须成对提供。
+ */
+class EInkOperationTab(
+    val icon: Painter,
+    val selectedIcon: Painter,
+    val contentDescription: String,
+)
 
-    Box(
-        modifier = modifier
-            .then(press.modifier)
-            .background(color = colors.containerColor, shape = EInkShapes.small)
-            .staticClickable(
-                enabled = !selected,
-                role = Role.Tab,
-                onClick = onClick
-            )
-            .padding(horizontal = EInkSpacing.m, vertical = EInkSpacing.s),
-        contentAlignment = Alignment.Center
-    ) {
-        BasicText(
-            text = label,
-            style = EInkTheme.typography.labelLarge.copy(color = colors.contentColor),
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis
-        )
-    }
-}
-
-/** 操作栏高度（触控目标 ≥48dp + 上下留白）。 */
+/** 操作栏高度（触控目标 ≥48dp + 上下留白），图标按钮高度撑满该值。 */
 private val BarHeight = 56.dp

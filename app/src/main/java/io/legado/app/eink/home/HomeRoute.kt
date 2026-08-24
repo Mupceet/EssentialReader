@@ -21,6 +21,7 @@ import io.legado.app.eink.bookshelf.BookshelfScreen
 import io.legado.app.eink.bookshelf.BookshelfViewModel
 import io.legado.app.eink.component.EInkIconButton
 import io.legado.app.eink.component.EInkOperationBar
+import io.legado.app.eink.component.EInkOperationTab
 import io.legado.app.eink.component.EInkSearchHintBar
 import io.legado.app.eink.component.EInkTopBar
 
@@ -36,6 +37,12 @@ internal object HomeTabs {
 
 /** 首页 Tab 文案（从左到右），同时作为头部标题。 */
 private val HomeTabLabels = listOf("书架", "我的")
+
+/** 首页 Tab 图标素材对（从左到右）：线性（未选中）+ 填充（选中），沿用 View 版底栏图标。 */
+private val HomeTabIcons = listOf(
+    R.drawable.ic_bottom_books_e to R.drawable.ic_bottom_books_s,
+    R.drawable.ic_bottom_person_e to R.drawable.ic_bottom_person_s
+)
 
 /**
  * 首页 Route — ViewModel 感知层。
@@ -166,7 +173,14 @@ internal fun HomeScreen(
             }
         }
         EInkOperationBar(
-            tabs = HomeTabLabels,
+            tabs = HomeTabLabels.mapIndexed { index, label ->
+                val (iconRes, selectedIconRes) = HomeTabIcons[index]
+                EInkOperationTab(
+                    icon = painterResource(iconRes),
+                    selectedIcon = painterResource(selectedIconRes),
+                    contentDescription = label
+                )
+            },
             selectedTabIndex = selectedTab,
             onTabSelect = onSelectTab,
             pageUpEnabled = canPageUp,
