@@ -23,7 +23,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
@@ -255,11 +254,12 @@ internal fun ReaderScreen(
     onOpenPanel: (ReaderPanel) -> Unit,
     onRetry: () -> Unit,
 ) {
-    // 纯净阅读固定白底黑字（配置清单决策 B1/B2）：不读取 bgStrEInk 等颜色配置
+    // 纯净阅读底色/字色随日/夜间主题（决策 B1/B2 修订：仍不读取
+    // bgStrEInk / textColorEInk 等用户配色配置，颜色由主题统一下发）
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color.White)
+            .background(EInkTheme.colorScheme.background)
             .safeDrawingPadding()
     ) {
         Column(modifier = Modifier.fillMaxSize()) {

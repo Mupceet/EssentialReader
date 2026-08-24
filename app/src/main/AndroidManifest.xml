@@ -41,10 +41,13 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
-        <!-- 纯净阅读（墨水屏）模式界面：主题模式为 E-Ink 时由 Welcome 直接进入，无桌面入口 -->
+        <!-- 纯净阅读（墨水屏）模式界面：主题模式为 E-Ink 时由 Welcome 直接进入，无桌面入口。
+             configChanges 含 uiMode：系统日/夜间切换不重建 Activity（Compose 随
+             LocalConfiguration 重组切主题），阅读中途切主题不丢导航栈与阅读位置 -->
         <activity
             android:name=".eink.EInkMainActivity"
             android:label="纯净阅读(墨水屏)"
+            android:configChanges="locale|keyboardHidden|orientation|screenSize|smallestScreenSize|screenLayout|uiMode"
             android:windowSoftInputMode="adjustResize" />
         <!-- 图标1 -->
         <activity

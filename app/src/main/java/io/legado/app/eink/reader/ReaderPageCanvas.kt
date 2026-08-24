@@ -9,6 +9,8 @@ import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.nativeCanvas
+import androidx.compose.ui.graphics.toArgb
+import io.legado.app.eink.theme.EInkTheme
 import io.legado.app.help.config.AppConfig
 import io.legado.app.model.ImageProvider
 import io.legado.app.model.ReadBook
@@ -28,6 +30,11 @@ import io.legado.app.ui.book.read.page.provider.ChapterProvider
  * 的绘制结果一致（字号、字距、行距、段距、缩进、边距全部由引擎决定）。
  *
  * [pageVersion] 用于强制重绘（同一 TextPage 实例在引擎内会被原地更新）。
+ *
+ * 正文字色随日/夜间主题（决策 B1 修订：不读取 textColorEInk 配置）：
+ * 每次绘制前把主题色钉到引擎共享画笔 —— 首帧即正确，
+ * [ChapterProvider.upStyle] 重建画笔后随下次绘制自动纠正，
+ * 主题切换时重组生成新绘制块、自动重绘。
  */
 @Composable
 internal fun ReaderPageCanvas(
@@ -39,8 +46,12 @@ internal fun ReaderPageCanvas(
         Paint().apply { isAntiAlias = AppConfig.useAntiAlias }
     }
     // 引擎可能原地更新同一 TextPage 实例，用版本号强制重建绘制块
+    val themeTextColorArgb = EInkTheme.colorScheme.onBackground.toArgb()
     key(pageVersion) {
         Canvas(modifier = modifier) {
+            // 主题字色钉到引擎共享画笔（日/夜间随主题，见类注释）
+            ChapterProvider.titlePaint.color = themeTextColorArgb
+            ChapterProvider.contentPaint.color = themeTextColorArgb
             val textPage = page ?: return@Canvas
             val nativeCanvas = drawContext.canvas.nativeCanvas
             for (line in textPage.lines) {

@@ -171,7 +171,6 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application),
         if (attachJob?.isActive == true) return
         attachJob = viewModelScope.launch(Dispatchers.IO) {
             ReadBook.register(this@ReaderViewModel)
-            pinTextPaintColor()
 
             // 首次排版前必须拿到阅读区真实尺寸：ChapterProvider 宽高为 0 时
             // visibleWidth 为负数，StaticLayout 会直接抛异常，导致 upContent
@@ -604,28 +603,18 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application),
         ReadBook.loadContent(resetPageOffset = false)
     }
 
-    /** 应用不影响分页的参数：仅写配置、刷新画笔与快照。 */
+    /** 应用不影响分页的参数：仅写配置、刷新画笔与快照。
+     *  画笔字色由 [ReaderPageCanvas] 每次绘制前按主题钉死。 */
     private fun applyStyleOnly(change: () -> Unit) {
         change()
         ReadBookConfig.save()
         ChapterProvider.upStyle()
-        pinTextPaintColor()
         _uiState.update {
             it.copy(
                 style = ReadBookConfig.snapshotStyle(),
                 textBold = ReadBookConfig.textBold == 1,
             )
         }
-    }
-
-    /**
-     * 纯净阅读固定黑字（配置清单决策 B1）：不使用 ReadBookConfig 的
-     * textColorEInk 配置。upStyle() 每次按配置重建画笔（可能沿用上个
-     * View 会话遗留的颜色），会话开始与每次 upStyle 后重新钉死。
-     */
-    private fun pinTextPaintColor() {
-        ChapterProvider.titlePaint.color = EINK_TEXT_COLOR
-        ChapterProvider.contentPaint.color = EINK_TEXT_COLOR
     }
 
     // ==================== ReadBook.CallBack 实现 ====================
@@ -787,9 +776,6 @@ internal const val MAX_PARAGRAPH_SPACING = 10
 /** 正文边距上界：左右 64dp / 上下 48dp；页眉/页脚边距全部 48dp。 */
 internal const val MAX_PADDING_HORIZONTAL = 64
 internal const val MAX_PADDING_VERTICAL = 48
-
-/** 纯净阅读正文/标题固定文字颜色（黑）。 */
-private const val EINK_TEXT_COLOR = android.graphics.Color.BLACK
 
 /** 从阅读配置读取排版参数快照。 */
 private fun ReadBookConfig.snapshotStyle(): ReaderTextStyle = ReaderTextStyle(
