@@ -39,6 +39,8 @@ import io.legado.app.eink.theme.EInkSpacing
  * @param selectedTabIndex 当前选中的 Tab 下标
  * @param onTabSelect 点击 Tab 回调，参数为下标
  * @param navigationIcon 最左侧导航槽（如返回按钮），非首页常用；与 Tab 可并存
+ * @param actions 左侧动作槽（如 目录/阅读），排在导航与 Tab 之后、留白之前，
+ * 与左侧按钮连续排列
  * @param pageUpEnabled 上翻（向列表上方翻一页）是否可用
  * @param pageDownEnabled 下翻是否可用
  * @param onPageUp 点击上翻箭头
@@ -51,6 +53,7 @@ fun EInkOperationBar(
     onTabSelect: (Int) -> Unit,
     modifier: Modifier = Modifier,
     navigationIcon: (@Composable () -> Unit)? = null,
+    actions: (@Composable () -> Unit)? = null,
     pageUpEnabled: Boolean = false,
     pageDownEnabled: Boolean = false,
     onPageUp: () -> Unit = {},
@@ -76,6 +79,7 @@ fun EInkOperationBar(
                     onClick = { onTabSelect(index) },
                 )
             }
+            actions?.invoke()
             Spacer(modifier = Modifier.weight(1f))
             EInkPageArrows(
                 pageUpEnabled = pageUpEnabled,
