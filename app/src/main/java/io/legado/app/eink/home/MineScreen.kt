@@ -26,15 +26,6 @@ internal fun MineScreen(
     onOpenFullMode: () -> Unit = {},
 ) {
     Column(modifier = Modifier.fillMaxSize()) {
-        EInkText(
-            text = "我的",
-            style = EInkTheme.typography.titleLarge,
-            modifier = Modifier.padding(
-                horizontal = EInkSpacing.m,
-                vertical = EInkSpacing.m
-            )
-        )
-        EInkHorizontalDivider()
         MineEntry(label = "完整模式", onClick = onOpenFullMode)
         EInkHorizontalDivider()
     }
