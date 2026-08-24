@@ -48,8 +48,8 @@ import io.legado.app.eink.widget.EInkInfoRow
 import kotlin.math.roundToInt
 import kotlinx.coroutines.launch
 
-/** 详情页封面宽高比（沿用原 130 × 182dp 封面比例），随封面区高度等比缩放。 */
-private const val CoverAspectRatio = 130f / 182f
+/** 详情页封面宽高比。 */
+private const val CoverAspectRatio = 0.75f
 
 /** 顶部操作条高度（与底部通用操作栏一致）。 */
 private val DetailBarHeight = 56.dp
@@ -188,8 +188,8 @@ internal fun BookDetailScreen(
                             .fillMaxSize()
                             .verticalScroll(scrollState, enabled = false)
                     ) {
-                        // 封面：上 1/2 视口，按区高等比缩放，居中
-                        val coverAreaHeight = viewportHeight / 2
+                        // 封面
+                        val coverAreaHeight = viewportHeight * 0.65f
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
