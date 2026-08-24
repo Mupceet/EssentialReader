@@ -129,7 +129,7 @@ fun ReaderRoute(
             },
             onRefresh = viewModel::refreshChapter,
             onOpenCachePanel = { panel = ReaderPanel.CACHE },
-            onToggleBookshelf = viewModel::toggleBookshelf,
+            onAddToBookshelf = viewModel::addToBookshelf,
             selectedPanel = panel,
             onOpenPanel = { target ->
                 // 再次点击已打开的面板按钮 = 关闭（取消选中）；
@@ -250,7 +250,7 @@ internal fun ReaderScreen(
     onOpenDetail: () -> Unit,
     onRefresh: () -> Unit,
     onOpenCachePanel: () -> Unit,
-    onToggleBookshelf: () -> Unit,
+    onAddToBookshelf: () -> Unit,
     selectedPanel: ReaderPanel?,
     onOpenPanel: (ReaderPanel) -> Unit,
     onRetry: () -> Unit,
@@ -361,7 +361,7 @@ internal fun ReaderScreen(
                     onChangeSource = onChangeSource,
                     onRefresh = onRefresh,
                     onOpenCachePanel = onOpenCachePanel,
-                    onToggleBookshelf = onToggleBookshelf,
+                    onAddToBookshelf = onAddToBookshelf,
                 )
             }
         }

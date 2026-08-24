@@ -455,8 +455,8 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application),
         viewModelScope.launch { _messages.emit(UserMessage.from(R.string.eink_reader_cache_started)) }
     }
 
-    /** 添加/移出书架。 */
-    fun toggleBookshelf() {
+    /** 加入书架（仅未加书架的书；阅读页不提供移出书架）。 */
+    fun addToBookshelf() {
         val book = ReadBook.book ?: return
         viewModelScope.launch(Dispatchers.IO) {
             runCatching {
@@ -466,22 +466,13 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application),
                         book.order = appDb.bookDao.minOrder - 1
                     }
                     ReadBook.inBookshelf = true
+                    book.save()
                 } else {
-                    book.addType(BookType.notShelf)
-                    ReadBook.inBookshelf = false
+                    return@launch
                 }
-                book.save()
             }.onSuccess {
                 _uiState.update { it.copy(inBookshelf = ReadBook.inBookshelf) }
-                _messages.emit(
-                    UserMessage.from(
-                        if (ReadBook.inBookshelf) {
-                            R.string.eink_added_to_bookshelf
-                        } else {
-                            R.string.eink_removed_from_bookshelf
-                        }
-                    )
-                )
+                _messages.emit(UserMessage.from(R.string.eink_added_to_bookshelf))
             }.onFailure {
                 _messages.emit(UserMessage.from(R.string.eink_operation_failed))
             }

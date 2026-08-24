@@ -64,7 +64,8 @@ private val SliderLabelWidth = 64.dp
 private const val MarginTickStep = 8
 
 // ====================================================================
-// 顶部操作条：换源 / 刷新 / 缓存 / 添加书架或移出书架
+// 顶部操作条：换源 / 刷新 / 缓存 / 加书架（仅未加书架时显示；
+// 阅读页不提供移出书架，管理书架走书架长按或详情页）
 // ====================================================================
 
 @Composable
@@ -74,7 +75,7 @@ internal fun ReaderTopBar(
     onChangeSource: () -> Unit,
     onRefresh: () -> Unit,
     onOpenCachePanel: () -> Unit,
-    onToggleBookshelf: () -> Unit,
+    onAddToBookshelf: () -> Unit,
 ) {
     Column(modifier = Modifier.fillMaxWidth()) {
         Row(
@@ -133,11 +134,13 @@ internal fun ReaderTopBar(
                 enabled = !state.isLocalBook,
                 onClick = onOpenCachePanel,
             )
-            BarAction(
-                iconRes = if (state.inBookshelf) R.drawable.ic_outline_delete else R.drawable.ic_add,
-                contentDescription = if (state.inBookshelf) "移出书架" else "加书架",
-                onClick = onToggleBookshelf,
-            )
+            if (!state.inBookshelf) {
+                BarAction(
+                    iconRes = R.drawable.ic_add,
+                    contentDescription = "加书架",
+                    onClick = onAddToBookshelf,
+                )
+            }
         }
         // 分隔线在底部：与下方正文分界
         EInkHorizontalDivider()
