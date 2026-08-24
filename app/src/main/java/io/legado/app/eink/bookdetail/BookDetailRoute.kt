@@ -255,7 +255,7 @@ internal fun BookDetailScreen(
                         ) {
                             EInkText(
                                 text = book.getDisplayIntro()?.takeIf { it.isNotBlank() } ?: "暂无简介",
-                                style = EInkTheme.typography.bodyMedium,
+                                style = EInkTheme.typography.bodyLarge,
                                 color = EInkTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier.padding(top = EInkSpacing.s)
                             )
