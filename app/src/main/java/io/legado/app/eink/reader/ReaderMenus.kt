@@ -112,7 +112,7 @@ internal fun ReaderTopBar(
                 EInkText(
                     text = state.bookName,
                     color = detailColors.contentColor,
-                    style = EInkTheme.typography.titleMedium,
+                    style = EInkTheme.typography.titleLarge,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )

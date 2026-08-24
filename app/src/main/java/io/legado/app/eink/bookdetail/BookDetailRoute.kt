@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -59,8 +60,8 @@ private val PageOverlap = 56.dp
 /**
  * 书籍详情 Route — ViewModel 感知层。
  *
- * 布局：顶部操作条（无标题，界面信息区已有书名；加入/移出书架、
- * 切换书源图标按钮居右连续排列、贴右屏，参考阅读页 ReaderTopBar）；
+ * 布局：顶部操作条（书名动态显隐——翻到简介区后显示，首页不显示；
+ * 加入/移出书架、切换书源图标按钮居右连续排列、贴右屏，参考阅读页 ReaderTopBar）；
  * 内容区 封面（上 1/2 视口，等比居中）→ 基础信息（横向居中）→ 简介
  * （总高至少一屏，翻页到底时整屏均为简介）；底部操作栏
  * 返回 / 目录 / 阅读 居左连续 + 翻页胶囊。
@@ -132,6 +133,11 @@ internal fun BookDetailScreen(
     val pageDown: () -> Unit = {
         scope.launch { scrollState.scrollTo((scrollState.value + pageStep).coerceAtMost(scrollState.maxValue)) }
     }
+    // 顶栏书名动态显隐：首页（封面 + 基础信息，界面已有书名）不显示；
+    // 翻页进入简介区（书名滚出视口）后显示。翻页为整页跳转（无自由滑动），
+    // 滚动值只在 0 与翻页落点间切换，故以"不在顶部"判断；
+    // 落点可能被 maxValue 截短，不能用 pageStep 作阈值
+    val showTitleInBar = scrollState.value > 0
 
     Column(
         modifier = Modifier
@@ -140,6 +146,7 @@ internal fun BookDetailScreen(
     ) {
         DetailTopBar(
             state = state,
+            showTitle = showTitleInBar,
             onAddToShelf = onAddToShelf,
             onRemoveFromShelf = onRemoveFromShelf,
             onChangeSource = onChangeSource,
@@ -320,13 +327,15 @@ private fun ChapterRows(
 }
 
 /**
- * 顶部操作条（参考阅读页 ReaderTopBar）：无标题（界面信息区已有书名），
- * 加入/移出书架、切换书源图标按钮居右连续排列、贴右屏
- * （复用 [EInkOperationBarIcon] 默认尺寸）。加载中/未找到时不渲染动作按钮。
+ * 顶部操作条（参考阅读页 ReaderTopBar）：书名动态显隐（[showTitle]，
+ * 翻到简介区、界面书名滚出视口后显示，首页不显示）；加入/移出书架、
+ * 切换书源图标按钮居右连续排列、贴右屏（复用 [EInkOperationBarIcon]
+ * 默认尺寸）。加载中/未找到时不渲染动作按钮。
  */
 @Composable
 private fun DetailTopBar(
     state: BookDetailUiState,
+    showTitle: Boolean,
     onAddToShelf: () -> Unit,
     onRemoveFromShelf: () -> Unit,
     onChangeSource: () -> Unit,
@@ -339,7 +348,25 @@ private fun DetailTopBar(
                 .background(EInkTheme.colorScheme.surface),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Spacer(modifier = Modifier.weight(1f))
+            val bookName = state.book?.name
+            if (showTitle && !bookName.isNullOrBlank()) {
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .padding(start = EInkSpacing.m)
+                        .fillMaxHeight(),
+                    contentAlignment = Alignment.CenterStart
+                ) {
+                    EInkText(
+                        text = bookName,
+                        style = EInkTheme.typography.titleLarge,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+            } else {
+                Spacer(modifier = Modifier.weight(1f))
+            }
             if (state.book != null) {
                 EInkOperationBarIcon(
                     icon = painterResource(
