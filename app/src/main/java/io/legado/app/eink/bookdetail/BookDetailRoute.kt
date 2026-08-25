@@ -6,8 +6,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -35,11 +33,11 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import io.legado.app.R
-import io.legado.app.eink.component.EInkHorizontalDivider
 import io.legado.app.eink.component.EInkLoading
 import io.legado.app.eink.component.EInkOperationBar
 import io.legado.app.eink.component.EInkOperationBarIcon
 import io.legado.app.eink.component.EInkText
+import io.legado.app.eink.component.EInkTopActionBar
 import io.legado.app.eink.modifier.EInkPageSwipe
 import io.legado.app.eink.theme.EInkSpacing
 import io.legado.app.eink.theme.EInkTheme
@@ -50,9 +48,6 @@ import kotlinx.coroutines.launch
 
 /** 详情页封面宽高比。 */
 private const val CoverAspectRatio = 0.75f
-
-/** 顶部操作条高度（与底部通用操作栏一致）。 */
-private val DetailBarHeight = 56.dp
 
 /** 跨页重叠量：翻页步进 = 视口高 - 该值，保证跨页处的文字在上下两页都完整可见。 */
 private val PageOverlap = 56.dp
@@ -144,12 +139,25 @@ internal fun BookDetailScreen(
             .fillMaxSize()
             .background(EInkTheme.colorScheme.background)
     ) {
-        DetailTopBar(
-            state = state,
-            showTitle = showTitleInBar,
-            onAddToShelf = onAddToShelf,
-            onRemoveFromShelf = onRemoveFromShelf,
-            onChangeSource = onChangeSource,
+        // 顶部操作条：书名动态显隐（翻到简介区后显示），动作按钮新规格贴右屏
+        EInkTopActionBar(
+            title = if (showTitleInBar) state.book?.name.orEmpty() else "",
+            actions = {
+                if (state.book != null) {
+                    EInkOperationBarIcon(
+                        icon = painterResource(
+                            if (state.isInBookshelf) R.drawable.ic_outline_delete else R.drawable.ic_add
+                        ),
+                        contentDescription = if (state.isInBookshelf) "移出书架" else "加入书架",
+                        onClick = if (state.isInBookshelf) onRemoveFromShelf else onAddToShelf
+                    )
+                    EInkOperationBarIcon(
+                        icon = painterResource(R.drawable.ic_exchange),
+                        contentDescription = "切换书源",
+                        onClick = onChangeSource
+                    )
+                }
+            }
         )
         when {
             state.isLoading -> {
@@ -326,63 +334,3 @@ private fun ChapterRows(
     }
 }
 
-/**
- * 顶部操作条（参考阅读页 ReaderTopBar）：书名动态显隐（[showTitle]，
- * 翻到简介区、界面书名滚出视口后显示，首页不显示）；加入/移出书架、
- * 切换书源图标按钮居右连续排列、贴右屏（复用 [EInkOperationBarIcon]
- * 默认尺寸）。加载中/未找到时不渲染动作按钮。
- */
-@Composable
-private fun DetailTopBar(
-    state: BookDetailUiState,
-    showTitle: Boolean,
-    onAddToShelf: () -> Unit,
-    onRemoveFromShelf: () -> Unit,
-    onChangeSource: () -> Unit,
-) {
-    Column(modifier = Modifier.fillMaxWidth()) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(DetailBarHeight)
-                .background(EInkTheme.colorScheme.surface),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            val bookName = state.book?.name
-            if (showTitle && !bookName.isNullOrBlank()) {
-                Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .padding(start = EInkSpacing.m)
-                        .fillMaxHeight(),
-                    contentAlignment = Alignment.CenterStart
-                ) {
-                    EInkText(
-                        text = bookName,
-                        style = EInkTheme.typography.titleLarge,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                }
-            } else {
-                Spacer(modifier = Modifier.weight(1f))
-            }
-            if (state.book != null) {
-                EInkOperationBarIcon(
-                    icon = painterResource(
-                        if (state.isInBookshelf) R.drawable.ic_outline_delete else R.drawable.ic_add
-                    ),
-                    contentDescription = if (state.isInBookshelf) "移出书架" else "加入书架",
-                    onClick = if (state.isInBookshelf) onRemoveFromShelf else onAddToShelf
-                )
-                EInkOperationBarIcon(
-                    icon = painterResource(R.drawable.ic_exchange),
-                    contentDescription = "切换书源",
-                    onClick = onChangeSource
-                )
-            }
-        }
-        // 分隔线在底部：与下方内容分界
-        EInkHorizontalDivider()
-    }
-}

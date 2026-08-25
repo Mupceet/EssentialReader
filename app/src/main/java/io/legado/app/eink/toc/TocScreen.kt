@@ -44,12 +44,11 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import io.legado.app.R
 import io.legado.app.data.entities.BookChapter
-import io.legado.app.eink.component.EInkBackButton
-import io.legado.app.eink.component.EInkHorizontalDivider
 import io.legado.app.eink.component.EInkLoading
-import io.legado.app.eink.component.EInkPageArrows
+import io.legado.app.eink.component.EInkOperationBar
+import io.legado.app.eink.component.EInkOperationBarIcon
 import io.legado.app.eink.component.EInkText
-import io.legado.app.eink.component.EInkTopBar
+import io.legado.app.eink.component.EInkTopActionBar
 import io.legado.app.eink.component.eInkActionColors
 import io.legado.app.eink.component.rememberEInkPagedListState
 import io.legado.app.eink.modifier.EInkPageSwipe
@@ -61,9 +60,6 @@ import io.legado.app.eink.theme.EInkTheme
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
-
-/** 底部操作条高度（与全局底栏一致）。 */
-private val TocBarHeight = 56.dp
 
 /** 快速滑动手柄触控宽度。 */
 private val HandleTouchWidth = 36.dp
@@ -164,8 +160,9 @@ fun TocRoute(
 /**
  * 无状态目录 Screen。
  *
- * 结构：顶栏（书名 + 正序/倒序，无返回图标）→ 章节列表（固定页分页 +
- * 右侧快速滑动手柄）→ 底部操作条（返回 / 回到当前 / 去底部 + 翻页箭头）。
+ * 结构：顶栏（书名 + 正/倒序图标按钮，无返回图标）→ 章节列表（固定页分页 +
+ * 右侧快速滑动手柄）→ 底部操作栏（返回 / 回到当前 / 去底部 居左连续 +
+ * 翻页胶囊，统一 EInkOperationBar）。
  */
 @Composable
 internal fun TocScreen(
@@ -185,13 +182,18 @@ internal fun TocScreen(
     onToggleReverse: () -> Unit,
 ) {
     Column(modifier = Modifier.fillMaxSize()) {
-        EInkTopBar(
+        // 顶栏：书名居左，正/倒序图标按钮（新规格：撑满顶栏高、贴右屏）
+        EInkTopActionBar(
             title = state.book?.name ?: "目录",
-            onBack = null,
             actions = {
-                SortToggle(
-                    label = if (state.isReversed) "倒序" else "正序",
-                    onToggle = onToggleReverse,
+                // 图标随状态互换（asc/desc 成对素材）
+                EInkOperationBarIcon(
+                    icon = painterResource(
+                        if (state.isReversed) R.drawable.ic_toc_sort_desc
+                        else R.drawable.ic_toc_sort_asc
+                    ),
+                    contentDescription = if (state.isReversed) "倒序" else "正序",
+                    onClick = onToggleReverse,
                 )
             }
         )
@@ -228,14 +230,35 @@ internal fun TocScreen(
                 }
             }
         }
-        TocBottomBar(
-            canPageUp = canPageUp,
-            canPageDown = canPageDown,
+        // 底部操作栏：返回 / 回到当前 / 去底部 居左连续 + 翻页胶囊
+        //（与其它界面统一的 EInkOperationBar）
+        EInkOperationBar(
+            tabs = emptyList(),
+            selectedTabIndex = 0,
+            onTabSelect = {},
+            navigationIcon = {
+                EInkOperationBarIcon(
+                    icon = painterResource(R.drawable.ic_arrow_back),
+                    contentDescription = "返回",
+                    onClick = onBack
+                )
+            },
+            actions = {
+                EInkOperationBarIcon(
+                    icon = painterResource(R.drawable.ic_toc_locate),
+                    contentDescription = "回到当前",
+                    onClick = onBackToCurrent
+                )
+                EInkOperationBarIcon(
+                    icon = painterResource(R.drawable.ic_toc_to_bottom),
+                    contentDescription = "去底部",
+                    onClick = onGoToBottom
+                )
+            },
+            pageUpEnabled = canPageUp,
+            pageDownEnabled = canPageDown,
             onPageUp = onPageUp,
-            onPageDown = onPageDown,
-            onBack = onBack,
-            onBackToCurrent = onBackToCurrent,
-            onGoToBottom = onGoToBottom,
+            onPageDown = onPageDown
         )
     }
 }
@@ -342,92 +365,6 @@ private fun ChapterItem(chapter: BookChapter, isCurrent: Boolean, cached: Boolea
                 color = markColor,
             )
         }
-    }
-}
-
-// ====================================================================
-// 底部操作条：返回 / 回到当前 / 去底部 …… ▲ ▼
-// ====================================================================
-
-@Composable
-private fun TocBottomBar(
-    canPageUp: Boolean,
-    canPageDown: Boolean,
-    onPageUp: () -> Unit,
-    onPageDown: () -> Unit,
-    onBack: () -> Unit,
-    onBackToCurrent: () -> Unit,
-    onGoToBottom: () -> Unit,
-) {
-    Column(modifier = Modifier.fillMaxWidth()) {
-        EInkHorizontalDivider()
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(TocBarHeight)
-                .background(EInkTheme.colorScheme.surface)
-                .padding(horizontal = EInkSpacing.m),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(EInkSpacing.m),
-        ) {
-            EInkBackButton(onClick = onBack)
-            BarTextAction(label = "回到当前", onClick = onBackToCurrent, modifier = Modifier.weight(1f))
-            BarTextAction(label = "去底部", onClick = onGoToBottom, modifier = Modifier.weight(1f))
-            EInkPageArrows(
-                pageUpEnabled = canPageUp,
-                pageDownEnabled = canPageDown,
-                onPageUp = onPageUp,
-                onPageDown = onPageDown,
-            )
-        }
-    }
-}
-
-/** 操作条文字按钮：按压反色。 */
-@Composable
-private fun BarTextAction(
-    label: String,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    val press = rememberImmediatePressState()
-    val colors = eInkActionColors(pressed = press.isPressed)
-    Box(
-        modifier = modifier
-            .height(48.dp)
-            .then(press.modifier)
-            .background(colors.containerColor)
-            .staticClickable(role = Role.Button, onClick = onClick),
-        contentAlignment = Alignment.Center,
-    ) {
-        EInkText(
-            text = label,
-            style = EInkTheme.typography.labelLarge,
-            color = colors.contentColor,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
-    }
-}
-
-/** 正/倒序切换（顶栏动作）：按压反色。 */
-@Composable
-private fun SortToggle(label: String, onToggle: () -> Unit) {
-    val press = rememberImmediatePressState()
-    val colors = eInkActionColors(pressed = press.isPressed)
-    Box(
-        modifier = Modifier
-            .then(press.modifier)
-            .background(colors.containerColor)
-            .staticClickable(role = Role.Button, onClickLabel = label, onClick = onToggle)
-            .padding(horizontal = EInkSpacing.m),
-        contentAlignment = Alignment.Center,
-    ) {
-        EInkText(
-            text = label,
-            color = colors.contentColor,
-            style = EInkTheme.typography.labelLarge,
-        )
     }
 }
 

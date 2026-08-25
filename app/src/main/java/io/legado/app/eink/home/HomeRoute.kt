@@ -19,11 +19,11 @@ import io.legado.app.R
 import io.legado.app.data.entities.Book
 import io.legado.app.eink.bookshelf.BookshelfScreen
 import io.legado.app.eink.bookshelf.BookshelfViewModel
-import io.legado.app.eink.component.EInkIconButton
 import io.legado.app.eink.component.EInkOperationBar
+import io.legado.app.eink.component.EInkOperationBarIcon
 import io.legado.app.eink.component.EInkOperationTab
 import io.legado.app.eink.component.EInkSearchHintBar
-import io.legado.app.eink.component.EInkTopBar
+import io.legado.app.eink.component.EInkTopActionBar
 
 import io.legado.app.eink.component.rememberEInkPagedListState
 import io.legado.app.eink.theme.EInkTheme
@@ -153,11 +153,9 @@ internal fun HomeScreen(
     ) {
         EInkSearchHintBar(onClick = onSearchClick)
         // 搜索栏与内容区之间的一行头部：左侧放大标题，右侧动作区
-        //（自带底部分隔线，取代原独立分隔线）
-        EInkTopBar(
+        //（动作按钮新规格：撑满顶栏高、贴右屏，自带底部分隔线）
+        EInkTopActionBar(
             title = headerTitle,
-            onBack = null,
-            titleStyle = EInkTheme.typography.titleLarge,
             actions = {
                 if (showRefresh) {
                     RefreshAction(
@@ -201,12 +199,11 @@ internal fun HomeScreen(
  */
 @Composable
 private fun RefreshAction(isRefreshing: Boolean, onClick: () -> Unit) {
-    val colors = EInkTheme.colorScheme
-    EInkIconButton(
-        onClick = onClick,
-        painter = painterResource(R.drawable.ic_refresh_black_24dp),
+    // 刷新中禁用置灰（组件 disabledContent 中灰），避免重复点击
+    EInkOperationBarIcon(
+        icon = painterResource(R.drawable.ic_refresh_black_24dp),
         contentDescription = if (isRefreshing) "刷新中" else "刷新",
         enabled = !isRefreshing,
-        tint = if (isRefreshing) colors.onSurfaceVariant else colors.onSurface
+        onClick = onClick,
     )
 }
