@@ -54,7 +54,7 @@ fun EInkTopBar(
             }
             BasicText(
                 text = title,
-                style = (titleStyle ?: EInkTheme.typography.titleMedium)
+                style = (titleStyle ?: EInkTheme.typography.titleLarge)
                     .copy(color = colors.onSurface),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,

@@ -320,7 +320,7 @@ private fun ChapterItem(chapter: BookChapter, isCurrent: Boolean, cached: Boolea
         EInkText(
             text = chapter.title,
             modifier = Modifier.weight(1f),
-            style = EInkTheme.typography.bodyMedium,
+            style = EInkTheme.typography.bodyLarge,
             fontWeight = if (isCurrent) FontWeight.Bold else null,
             color = titleColor,
             maxLines = 1,
