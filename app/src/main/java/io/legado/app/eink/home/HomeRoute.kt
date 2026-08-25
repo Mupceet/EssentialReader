@@ -61,6 +61,7 @@ fun HomeRoute(
     onBookLongClick: (Book) -> Unit,
     onSearch: () -> Unit,
     onOpenFullMode: () -> Unit = {},
+    onOpenThemeDebug: () -> Unit = {},
     viewModel: BookshelfViewModel = viewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -117,7 +118,8 @@ fun HomeRoute(
         },
         mine = {
             MineScreen(
-                onOpenFullMode = onOpenFullMode
+                onOpenFullMode = onOpenFullMode,
+                onOpenThemeDebug = onOpenThemeDebug
             )
         }
     )

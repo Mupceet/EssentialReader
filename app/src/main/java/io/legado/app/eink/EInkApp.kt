@@ -21,6 +21,7 @@ import androidx.lifecycle.viewmodel.MutableCreationExtras
 import androidx.lifecycle.viewmodel.compose.LocalViewModelStoreOwner
 import io.legado.app.eink.bookdetail.BookDetailRoute
 import io.legado.app.eink.changesource.ChangeSourceRoute
+import io.legado.app.eink.debug.ThemeDebugRoute
 import io.legado.app.eink.home.HomeRoute
 import io.legado.app.eink.navigation.EInkNavController
 import io.legado.app.eink.navigation.EInkScreen
@@ -121,6 +122,9 @@ fun EInkApp(
                                 addFlags(Intent.FLAG_ACTIVITY_CLEAR_TASK)
                             }
                         },
+                        onOpenThemeDebug = {
+                            controller.navigate(EInkScreen.ThemeDebug)
+                        },
                     )
                 }
 
@@ -179,6 +183,10 @@ fun EInkApp(
                                 bookUrl = screen.bookUrl,
                                 onBack = { controller.pop() },
                             )
+                        }
+
+                        is EInkScreen.ThemeDebug -> {
+                            ThemeDebugRoute(onBack = { controller.pop() })
                         }
 
                         is EInkScreen.Reader -> Unit // 上方已处理

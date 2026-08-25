@@ -11,6 +11,7 @@ import io.legado.app.eink.component.EInkText
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import io.legado.app.BuildConfig
 import io.legado.app.eink.component.EInkHorizontalDivider
 import io.legado.app.eink.theme.EInkSpacing
 import io.legado.app.eink.theme.EInkTheme
@@ -24,10 +25,16 @@ import io.legado.app.eink.theme.EInkTheme
 @Composable
 internal fun MineScreen(
     onOpenFullMode: () -> Unit = {},
+    onOpenThemeDebug: () -> Unit = {},
 ) {
     Column(modifier = Modifier.fillMaxSize()) {
         MineEntry(label = "完整模式", onClick = onOpenFullMode)
         EInkHorizontalDivider()
+        if (BuildConfig.DEBUG) {
+            // 排版样式调试入口仅 debug 变体展示（编译期常量，release 中整个分支被移除）
+            MineEntry(label = "排版样式调试", onClick = onOpenThemeDebug)
+            EInkHorizontalDivider()
+        }
     }
 }
 

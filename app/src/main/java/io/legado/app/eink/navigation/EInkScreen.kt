@@ -40,4 +40,7 @@ sealed interface EInkScreen {
 
     /** 换源（跨书源搜索并切换当前书籍来源） */
     data class ChangeSource(val bookUrl: String) : EInkScreen
+
+    /** 排版样式调试（逐级展示 EInkTheme.typography） */
+    data object ThemeDebug : EInkScreen
 }
