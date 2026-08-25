@@ -46,6 +46,7 @@ val MIN_FONT_SIZE: TextUnit = 14.sp
  * @param overflow How to handle text overflow
  * @param softWrap Whether to allow soft line breaks
  * @param maxLines Maximum number of lines
+ * @param minLines Minimum number of lines (height floor, keeps rows aligned)
  * @param style Base text style (its fontSize is consulted when [fontSize] is unspecified)
  */
 @Composable
@@ -60,6 +61,7 @@ fun EInkText(
     overflow: TextOverflow = TextOverflow.Clip,
     softWrap: Boolean = true,
     maxLines: Int = Int.MAX_VALUE,
+    minLines: Int = 1,
     style: TextStyle = EInkTheme.typography.bodyMedium
 ) {
     // Three-way minimum font size fallback with correct TextUnit.Unspecified handling.
@@ -88,7 +90,8 @@ fun EInkText(
         style = finalStyle,
         overflow = overflow,
         softWrap = softWrap,
-        maxLines = maxLines
+        maxLines = maxLines,
+        minLines = minLines
     )
 }
 

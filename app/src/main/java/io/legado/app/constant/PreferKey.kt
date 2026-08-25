@@ -6,6 +6,7 @@ object PreferKey {
     const val fontScale = "fontScale"
     const val themeMode = "themeMode"
     const val einkPrevThemeMode = "einkPrevThemeMode"
+    const val einkBookshelfGrid = "einkBookshelfGrid"
     const val userAgent = "userAgent"
     const val showUnread = "showUnread"
     const val bookGroupStyle = "bookGroupStyle"

@@ -57,6 +57,8 @@ data class BookshelfUiState(
     val isRefreshing: Boolean = false,
     /** 正在更新目录的书籍 bookUrl 集合（对应行角标替换为刷新态） */
     val updatingBookUrls: Set<String> = emptySet(),
+    /** 书架网格布局（true = 网格，列数按屏宽自适应；false = 列表） */
+    val isGridLayout: Boolean = false,
 ) {
     val isEmpty: Boolean get() = books.isEmpty() && !isLoading
 }
@@ -82,6 +84,7 @@ class BookshelfViewModel(application: Application) : AndroidViewModel(applicatio
 
     private val _isRefreshing = MutableStateFlow(false)
     private val _updatingUrls = MutableStateFlow<Set<String>>(emptySet())
+    private val _isGridLayout = MutableStateFlow(AppConfig.einkBookshelfGrid)
 
     // notShelf 行已在 [flowByGroup] 内过滤，并在 init 中物理删除；此处
     // 直接使用查询结果，与 View 版保持一致。
@@ -89,15 +92,24 @@ class BookshelfViewModel(application: Application) : AndroidViewModel(applicatio
         combine(
             appDb.bookDao.flowByGroup(BookGroup.IdAll),
             _isRefreshing,
-            _updatingUrls
-        ) { books, refreshing, updatingUrls ->
+            _updatingUrls,
+            _isGridLayout
+        ) { books, refreshing, updatingUrls, isGridLayout ->
             BookshelfUiState(
                 books = books,
                 isLoading = false,
                 isRefreshing = refreshing,
                 updatingBookUrls = updatingUrls,
+                isGridLayout = isGridLayout,
             )
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), BookshelfUiState())
+
+    /** 切换列表/网格布局，立即落盘（[AppConfig.einkBookshelfGrid]）。 */
+    fun toggleGridLayout() {
+        val next = !_isGridLayout.value
+        AppConfig.einkBookshelfGrid = next
+        _isGridLayout.value = next
+    }
 
     private var refreshJob: Job? = null
     private var cacheBookJob: Job? = null

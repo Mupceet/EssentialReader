@@ -145,6 +145,18 @@ object AppConfig : SharedPreferences.OnSharedPreferenceChangeListener {
             appCtx.putPrefBoolean(PreferKey.showUnread, value)
         }
 
+    /**
+     * E-Ink 书架网格布局：true = 网格（列数按屏宽自适应），false = 列表。
+     *
+     * 独立于 View 版 [bookshelfLayout]（其值为固定列数 1~3），两套 UI
+     * 各自记忆布局选择，互不覆盖。
+     */
+    var einkBookshelfGrid: Boolean
+        get() = appCtx.getPrefBoolean(PreferKey.einkBookshelfGrid, false)
+        set(value) {
+            appCtx.putPrefBoolean(PreferKey.einkBookshelfGrid, value)
+        }
+
     var showLastUpdateTime: Boolean
         get() = appCtx.getPrefBoolean(PreferKey.showLastUpdateTime, false)
         set(value) {

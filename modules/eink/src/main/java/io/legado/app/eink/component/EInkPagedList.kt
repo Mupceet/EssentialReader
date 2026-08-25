@@ -16,6 +16,34 @@ import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.first
 
 /**
+ * E-Ink 固定页分页控制器的公共接口（列表 [EInkPagedListState] 与网格
+ * [EInkGridPagedListState] 两种实现）。
+ *
+ * 让承载层（首页等）在列表与网格布局间切换时，对两种分页状态无差别
+ * 调用：翻页可用性判断、整页翻页、数据变化后的页首对齐。
+ */
+@Stable
+interface EInkPageController {
+
+    /** 是否可向前翻页（当前不在第一页）。 */
+    fun canPageUp(): Boolean
+
+    /** 是否可向后翻页（当前不在最后一页）。 */
+    fun canPageDown(totalItems: Int): Boolean
+
+    /** 上一页。 */
+    suspend fun pageUp()
+
+    /** 下一页；最后一页可能不满一页（到尾即止）。 */
+    suspend fun pageDown(totalItems: Int)
+
+    /**
+     * 数据集变化后把实际滚动位置拉回当前页首（见各实现的详细说明）。
+     */
+    suspend fun realignToPageStart(totalItems: Int)
+}
+
+/**
  * E-Ink 固定页数分页状态。
  *
  * 列表首次布局时，实测"第一页完整展示的项数" [pageItemCount]，
@@ -33,7 +61,7 @@ import kotlinx.coroutines.flow.first
  * 配合 LazyColumn `userScrollEnabled = false` + [EInkPageSwipe] 使用。
  */
 @Stable
-class EInkPagedListState(val listState: LazyListState) {
+class EInkPagedListState(val listState: LazyListState) : EInkPageController {
 
     /** 一页完整展示的项数（首次布局实测，之后固定）。 */
     var pageItemCount: Int by mutableIntStateOf(0)
@@ -69,19 +97,19 @@ class EInkPagedListState(val listState: LazyListState) {
         pageItemCount = count.coerceAtLeast(1)
     }
 
-    fun canPageUp(): Boolean = pageStart > 0
+    override fun canPageUp(): Boolean = pageStart > 0
 
-    fun canPageDown(totalItems: Int): Boolean =
+    override fun canPageDown(totalItems: Int): Boolean =
         pageItemCount > 0 && pageStart + pageItemCount < totalItems
 
     /** 下一页；最后一页可能不足 [pageItemCount] 项（到尾即止）。 */
-    suspend fun pageDown(totalItems: Int) {
+    override suspend fun pageDown(totalItems: Int) {
         if (!canPageDown(totalItems)) return
         pageStart = (pageStart + pageItemCount).coerceAtMost((totalItems - 1).coerceAtLeast(0))
         scrollToPageStart(pageStart)
     }
 
-    suspend fun pageUp() {
+    override suspend fun pageUp() {
         if (!canPageUp()) return
         pageStart -= pageItemCount
         scrollToPageStart(pageStart)
@@ -131,7 +159,7 @@ class EInkPagedListState(val listState: LazyListState) {
      * 恢复"实际位置 = 页首"不变式；列表缩短时页首同步收敛到最后一个
      * 完整页起点。
      */
-    suspend fun realignToPageStart(totalItems: Int) {
+    override suspend fun realignToPageStart(totalItems: Int) {
         if (pageItemCount <= 0) return
         if (totalItems <= 0) {
             pageStart = 0

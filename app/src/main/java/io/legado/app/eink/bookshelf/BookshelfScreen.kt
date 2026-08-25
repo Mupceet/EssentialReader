@@ -6,9 +6,12 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -18,10 +21,16 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyGridState
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import io.legado.app.eink.component.EInkText
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import io.legado.app.R
@@ -34,6 +43,19 @@ import io.legado.app.eink.widget.EInkBookCover
 import io.legado.app.eink.widget.EInkCoverHeight
 import io.legado.app.eink.widget.EInkCoverWidth
 import io.legado.app.eink.widget.EInkInfoRow
+
+/**
+ * 网格最小格宽门槛（GridCells.Adaptive 的 minSize）。
+ *
+ * Adaptive 的列数为整除向下取整：minSize 是"扣完成边距与列距后的门槛值"，
+ * 不是视觉格宽——实际格宽由列数反推。取 96dp 的依据（左右边距 16dp、
+ * 列距 16dp）：
+ *  - 360dp 手机屏恰好落 3 列，格宽约 99dp（门槛可行区间 83~98.7 的
+ *    靠上取整，上保 360dp 有 3 列、下防 411dp 掉进 4 列）；
+ *  - 617dp 7 英寸阅读器屏落 5 列，格宽约 107dp；
+ *  - 常见密度（560/440/420/330dpi）下 px 取整均不越界翻列。
+ */
+internal val EInkBookshelfGridMinCellWidth = 96.dp
 
 /**
  * 无状态书架列表 Screen — 纯渲染。
@@ -51,6 +73,12 @@ import io.legado.app.eink.widget.EInkInfoRow
  *
  * 列表项遵循规范 §41: title + secondary text + metadata + divider：
  * 点击进阅读，长按进详情（对齐 View 版书架交互）。
+ *
+ * 布局模式由 [BookshelfUiState.isGridLayout] 驱动（首页顶栏切换按钮）：
+ * 网格模式条目为 封面 + 未读角标 + 书名（对齐 View 版 item_bookshelf_grid），
+ * 列数按屏宽自适应（[EInkBookshelfGridMinCellWidth]）。两种模式同为
+ * E-Ink 分页模式（禁自由滚动，整页翻页），[listState]/[gridState]
+ * 均由外层提升供首页底部操作栏驱动。
  */
 @Composable
 internal fun BookshelfScreen(
@@ -58,6 +86,7 @@ internal fun BookshelfScreen(
     onBookClick: (String) -> Unit,
     onBookLongClick: (Book) -> Unit,
     listState: LazyListState = rememberLazyListState(),
+    gridState: LazyGridState = rememberLazyGridState(),
     onPageUp: () -> Unit = {},
     onPageDown: () -> Unit = {},
 ) {
@@ -65,6 +94,15 @@ internal fun BookshelfScreen(
         when {
             state.isLoading -> EInkLoading(modifier = Modifier.fillMaxSize())
             state.isEmpty -> EmptyBookshelf(modifier = Modifier.fillMaxSize())
+            state.isGridLayout -> BookGrid(
+                books = state.books,
+                updatingBookUrls = state.updatingBookUrls,
+                onBookClick = onBookClick,
+                onBookLongClick = onBookLongClick,
+                gridState = gridState,
+                onPageUp = onPageUp,
+                onPageDown = onPageDown
+            )
             else -> BookList(
                 books = state.books,
                 updatingBookUrls = state.updatingBookUrls,
@@ -111,6 +149,119 @@ private fun BookList(
                 onLongClick = { onBookLongClick(book) }
             )
         }
+    }
+}
+
+/**
+ * 书架网格（E-Ink 分页模式，同 [BookList] 的翻页约定）。
+ *
+ * 列数由 [GridCells.Adaptive] 按屏宽解析（见 [EInkBookshelfGridMinCellWidth]
+ * 的推导说明）；不用 key 的理由与 [BookList] 相同。
+ */
+@Composable
+private fun BookGrid(
+    books: List<Book>,
+    updatingBookUrls: Set<String>,
+    onBookClick: (String) -> Unit,
+    onBookLongClick: (Book) -> Unit,
+    gridState: LazyGridState,
+    onPageUp: () -> Unit,
+    onPageDown: () -> Unit
+) {
+    LazyVerticalGrid(
+        columns = GridCells.Adaptive(EInkBookshelfGridMinCellWidth),
+        modifier = Modifier
+            .fillMaxSize()
+            .EInkPageSwipe(
+                onPageUp = onPageUp,
+                onPageDown = onPageDown
+            ),
+        state = gridState,
+        contentPadding = PaddingValues(
+            horizontal = EInkSpacing.m,
+            vertical = EInkSpacing.s
+        ),
+        horizontalArrangement = Arrangement.spacedBy(EInkSpacing.m),
+        verticalArrangement = Arrangement.spacedBy(EInkSpacing.m),
+        userScrollEnabled = false,
+        overscrollEffect = null
+    ) {
+        items(books) { book ->
+            BookGridItem(
+                book = book,
+                isUpdating = updatingBookUrls.contains(book.bookUrl),
+                onClick = { onBookClick(book.bookUrl) },
+                onLongClick = { onBookLongClick(book) }
+            )
+        }
+    }
+}
+
+/**
+ * 网格条目：封面（未读角标叠加右上角）+ 书名，对齐 View 版
+ * item_bookshelf_grid 的组成与比例。
+ *
+ * 书名固定两行高（minLines = maxLines = 2），保证同行各列行高一致、
+ * 翻页按完整行计；字体缩放放大（如 1.3）时高度随之增长但不破坏对齐。
+ */
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun BookGridItem(
+    book: Book,
+    isUpdating: Boolean,
+    onClick: () -> Unit,
+    onLongClick: () -> Unit
+) {
+    val unreadCount = book.getUnreadChapterNum()
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .combinedClickable(onClick = onClick, onLongClick = onLongClick)
+    ) {
+        // 封面占满格宽，按 View 版封面 66:90 比例定高；实际格宽经
+        // BoxWithConstraints 取得，回传给 EInkBookCover 作 Glide 解码尺寸
+        BoxWithConstraints(
+            modifier = Modifier
+                .fillMaxWidth()
+                .aspectRatio(EInkCoverWidth / EInkCoverHeight)
+        ) {
+            EInkBookCover(
+                url = book.getDisplayCover(),
+                name = book.name,
+                author = book.getRealAuthor(),
+                sourceOrigin = book.origin,
+                modifier = Modifier.fillMaxSize(),
+                width = maxWidth,
+                height = maxHeight
+            )
+            // 角标规则与列表项一致：刷新中"…"，未读章节数（本次刷新
+            // 发现新章时高亮）；位置同 View 版网格（封面右上角）
+            val badgeText = when {
+                isUpdating -> "…"
+                unreadCount > 0 -> unreadCount.toString()
+                else -> null
+            }
+            if (badgeText != null) {
+                ShelfBadge(
+                    text = badgeText,
+                    highlight = !isUpdating && book.lastCheckCount > 0,
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(EInkSpacing.xxs)
+                )
+            }
+        }
+        EInkText(
+            text = book.name,
+            style = EInkTheme.typography.bodySmall,
+            textAlign = TextAlign.Center,
+            maxLines = 2,
+            minLines = 2,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = EInkSpacing.xs)
+        )
     }
 }
 
