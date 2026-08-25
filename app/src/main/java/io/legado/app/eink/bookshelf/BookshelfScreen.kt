@@ -6,7 +6,6 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -218,9 +217,11 @@ private fun BookGridItem(
             .fillMaxWidth()
             .combinedClickable(onClick = onClick, onLongClick = onLongClick)
     ) {
-        // 封面占满格宽，按 View 版封面 66:90 比例定高；实际格宽经
-        // BoxWithConstraints 取得，回传给 EInkBookCover 作 Glide 解码尺寸
-        BoxWithConstraints(
+        // 封面占满格宽，按 View 版封面 66:90 比例定高。解码尺寸用门槛宽
+        // 推导而非逐项 BoxWithConstraints 实测（子组合在弱 SoC 上拖慢整页
+        // 翻帧）：各屏实际格宽 ≥ 门槛 96dp，上采样 ≤10%，墨水屏灰阶下
+        // 不可感知
+        Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .aspectRatio(EInkCoverWidth / EInkCoverHeight)
@@ -231,8 +232,8 @@ private fun BookGridItem(
                 author = book.getRealAuthor(),
                 sourceOrigin = book.origin,
                 modifier = Modifier.fillMaxSize(),
-                width = maxWidth,
-                height = maxHeight
+                width = EInkBookshelfGridMinCellWidth,
+                height = EInkBookshelfGridMinCellWidth * (EInkCoverHeight / EInkCoverWidth)
             )
             // 角标规则与列表项一致：刷新中"…"，未读章节数（本次刷新
             // 发现新章时高亮）；位置同 View 版网格（封面右上角）
