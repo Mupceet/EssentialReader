@@ -201,6 +201,7 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application),
                     loadedBookUrl = book.bookUrl
                     syncBookState(book)
                     upContent()
+                    checkTocUpdate()
                     return@launch
                 }
                 // 章节跳转（目录选章等）：清空旧页面显示加载中，
@@ -223,7 +224,20 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application),
 
             ReadBook.upMsg(null)
             ReadBook.loadContent(resetPageOffset = true)
+            checkTocUpdate()
         }
+    }
+
+    /**
+     * 追更场景打开书后自动联网检查目录更新（View 版行为对齐）：
+     * 有新章节时静默并入目录并预载下一章，不打扰当前页。
+     * View 版靠引擎 preDownload 链路间接触发，但停在目录最后一章时
+     * 预下载区间为空不会触发，E-Ink 同书重进又走早退分支完全不经过
+     * 该链路，故在打开书时显式触发一次。
+     * 门槛与 10 分钟限频都在 [ReadBook.upToc] 内部，重复调用安全。
+     */
+    private fun checkTocUpdate() {
+        ReadBook.upToc()
     }
 
     /**
