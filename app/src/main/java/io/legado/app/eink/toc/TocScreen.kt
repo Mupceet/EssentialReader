@@ -47,6 +47,7 @@ import io.legado.app.data.entities.BookChapter
 import io.legado.app.eink.component.EInkLoading
 import io.legado.app.eink.component.EInkOperationBar
 import io.legado.app.eink.component.EInkOperationBarIcon
+import io.legado.app.eink.component.EInkPageArrows
 import io.legado.app.eink.component.EInkText
 import io.legado.app.eink.component.EInkTopActionBar
 import io.legado.app.eink.component.eInkActionColors
@@ -133,14 +134,34 @@ fun TocRoute(
         scope.launch { pager.jumpToItemAligned(index) }
     }
 
+    // 翻页动作 remember 稳定实例：下传后接收方（章节列表 / EInkPageSwipe）
+    // 不因 lambda 逐次更换而被迫重组
+    val pageUp: () -> Unit = remember(pager, scope) {
+        { scope.launch { pager.pageUp() } }
+    }
+    val pageDown: () -> Unit = remember(pager, displayCount, scope) {
+        { scope.launch { pager.pageDown(displayCount) } }
+    }
+
+    // 翻页箭头槽：canPageUp/canPageDown 读取分页状态（pageStart 为
+    // mutableStateOf），在 Route 作用域读取会让整个目录页随每次翻页/滑块
+    // 定位重组；收敛到槽内读取，翻页只重组箭头两个图标
+    val pageArrows: @Composable () -> Unit = {
+        EInkPageArrows(
+            pageUpEnabled = pager.canPageUp(),
+            pageDownEnabled = pager.canPageDown(displayCount),
+            onPageUp = pageUp,
+            onPageDown = pageDown
+        )
+    }
+
     TocScreen(
         state = uiState,
         positioned = positioned,
         listState = pager.listState,
-        canPageUp = pager.canPageUp(),
-        canPageDown = pager.canPageDown(displayCount),
-        onPageUp = { scope.launch { pager.pageUp() } },
-        onPageDown = { scope.launch { pager.pageDown(displayCount) } },
+        pageArrows = pageArrows,
+        onPageUp = pageUp,
+        onPageDown = pageDown,
         onScrub = onScrub,
         onScrubEnd = onScrubEnd,
         onBack = onBack,
@@ -163,14 +184,16 @@ fun TocRoute(
  * 结构：顶栏（书名 + 正/倒序图标按钮，无返回图标）→ 章节列表（固定页分页 +
  * 右侧快速滑动手柄）→ 底部操作栏（返回 / 回到当前 / 去底部 居左连续 +
  * 翻页胶囊，统一 EInkOperationBar）。
+ *
+ * [pageArrows] 为翻页箭头槽：由承载层在其中读取分页状态并组合
+ * [EInkPageArrows]，使翻页可用状态的读取收敛到箭头叶作用域。
  */
 @Composable
 internal fun TocScreen(
     state: TocUiState,
     positioned: Boolean,
     listState: LazyListState,
-    canPageUp: Boolean,
-    canPageDown: Boolean,
+    pageArrows: @Composable () -> Unit,
     onPageUp: () -> Unit,
     onPageDown: () -> Unit,
     onScrub: (Int) -> Unit,
@@ -255,10 +278,7 @@ internal fun TocScreen(
                     onClick = onGoToBottom
                 )
             },
-            pageUpEnabled = canPageUp,
-            pageDownEnabled = canPageDown,
-            onPageUp = onPageUp,
-            onPageDown = onPageDown
+            pageArrows = pageArrows
         )
     }
 }

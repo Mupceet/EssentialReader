@@ -16,6 +16,7 @@ import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -30,6 +31,7 @@ import io.legado.app.data.entities.SearchBook
 import io.legado.app.eink.component.EInkHorizontalDivider
 import io.legado.app.eink.component.EInkOperationBar
 import io.legado.app.eink.component.EInkOperationBarIcon
+import io.legado.app.eink.component.EInkPageArrows
 import io.legado.app.eink.modifier.EInkPageSwipe
 import io.legado.app.eink.component.EInkSearchInputBar
 import io.legado.app.eink.component.EInkText
@@ -77,8 +79,26 @@ fun SearchRoute(
     val totalItems = if (isResultListVisible) uiState.results.size else uiState.history.size
     val canPage = isResultListVisible || uiState.history.isNotEmpty()
 
-    val pageUp: () -> Unit = { scope.launch { pager.pageUp() } }
-    val pageDown: () -> Unit = { scope.launch { pager.pageDown(totalItems) } }
+    // 翻页动作 remember 稳定实例：下传后接收方（列表 / EInkPageSwipe）
+    // 不因 lambda 逐次更换而被迫重组
+    val pageUp: () -> Unit = remember(pager, scope) {
+        { scope.launch { pager.pageUp() } }
+    }
+    val pageDown: () -> Unit = remember(pager, totalItems, scope) {
+        { scope.launch { pager.pageDown(totalItems) } }
+    }
+
+    // 翻页箭头槽：canPageUp/canPageDown 读取分页状态（pageStart 为
+    // mutableStateOf），在 Route 作用域读取会让整个搜索页随每次翻页重组；
+    // 收敛到槽内读取，翻页只重组箭头两个图标
+    val pageArrows: @Composable () -> Unit = {
+        EInkPageArrows(
+            pageUpEnabled = canPage && pager.canPageUp(),
+            pageDownEnabled = canPage && pager.canPageDown(totalItems),
+            onPageUp = pageUp,
+            onPageDown = pageDown
+        )
+    }
 
     Column(
         modifier = Modifier
@@ -139,10 +159,7 @@ fun SearchRoute(
                     onClick = onBack
                 )
             },
-            pageUpEnabled = canPage && pager.canPageUp(),
-            pageDownEnabled = canPage && pager.canPageDown(totalItems),
-            onPageUp = pageUp,
-            onPageDown = pageDown
+            pageArrows = pageArrows
         )
     }
 }
