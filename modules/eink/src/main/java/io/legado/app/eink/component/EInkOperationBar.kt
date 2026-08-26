@@ -18,7 +18,7 @@ import io.legado.app.eink.theme.EInkSpacing
  * 底部通用操作栏（参考微信读书墨水屏版）。
  *
  * 结构：图标按钮（[EInkOperationBarIcon] 默认尺寸：高度撑满操作栏、
- * 宽度自适应 —— min(屏幕宽/6, 1.7 倍高度)）居左连续排列
+ * 宽度自适应 —— min(屏幕宽/5, 1.7 倍高度)）居左连续排列
  * （不与屏幕留边距、按钮彼此紧邻），
  * 中间留白，右侧固定上/下翻页胶囊 [EInkPageArrows]（竖线分隔，
  * 距屏幕右侧留 [EInkSpacing.m] 边距）。

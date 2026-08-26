@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
@@ -37,6 +38,8 @@ import io.legado.app.eink.component.EInkHorizontalDivider
 import io.legado.app.eink.component.EInkOperationBarIcon
 import io.legado.app.eink.component.EInkSteppedSlider
 import io.legado.app.eink.component.EInkText
+import io.legado.app.eink.component.LocalOperationBarWidthRatio
+import io.legado.app.eink.component.TopBarWidthRatio
 import io.legado.app.eink.component.eInkActionColors
 import io.legado.app.eink.modifier.rememberImmediatePressState
 import io.legado.app.eink.modifier.staticClickable
@@ -117,29 +120,32 @@ internal fun ReaderTopBar(
                     overflow = TextOverflow.Ellipsis,
                 )
             }
-            BarAction(
-                iconRes = R.drawable.ic_exchange,
-                contentDescription = "换源",
-                enabled = !state.isLocalBook,
-                onClick = onChangeSource,
-            )
-            BarAction(
-                iconRes = R.drawable.ic_refresh_black_24dp,
-                contentDescription = "刷新",
-                onClick = onRefresh,
-            )
-            BarAction(
-                iconRes = R.drawable.ic_download_line,
-                contentDescription = "缓存",
-                enabled = !state.isLocalBook,
-                onClick = onOpenCachePanel,
-            )
-            if (!state.inBookshelf) {
+            // 顶栏动作按钮较底部操作栏更窄：与 EInkTopActionBar 一致收敛为 1.2 倍高度
+            CompositionLocalProvider(LocalOperationBarWidthRatio provides TopBarWidthRatio) {
                 BarAction(
-                    iconRes = R.drawable.ic_add,
-                    contentDescription = "加书架",
-                    onClick = onAddToBookshelf,
+                    iconRes = R.drawable.ic_exchange,
+                    contentDescription = "换源",
+                    enabled = !state.isLocalBook,
+                    onClick = onChangeSource,
                 )
+                BarAction(
+                    iconRes = R.drawable.ic_refresh_black_24dp,
+                    contentDescription = "刷新",
+                    onClick = onRefresh,
+                )
+                BarAction(
+                    iconRes = R.drawable.ic_download_line,
+                    contentDescription = "缓存",
+                    enabled = !state.isLocalBook,
+                    onClick = onOpenCachePanel,
+                )
+                if (!state.inBookshelf) {
+                    BarAction(
+                        iconRes = R.drawable.ic_add,
+                        contentDescription = "加书架",
+                        onClick = onAddToBookshelf,
+                    )
+                }
             }
         }
         // 分隔线在底部：与下方正文分界
@@ -149,7 +155,8 @@ internal fun ReaderTopBar(
 
 /**
  * 顶部操作条图标按钮（居右连续排列、贴右屏）：复用 [EInkOperationBarIcon]
- * 默认尺寸（高度撑满操作条，宽度自适应 min(屏幕宽/6, 1.7 倍高)，28dp 图标）。
+ * 默认尺寸（高度撑满操作条，宽度自适应，收敛上限由 [ReaderTopBar] 经
+ * [LocalOperationBarWidthRatio] 降为 [TopBarWidthRatio] 倍高度，28dp 图标）。
  * 按压瞬时反色；无选中语义。
  */
 @Composable

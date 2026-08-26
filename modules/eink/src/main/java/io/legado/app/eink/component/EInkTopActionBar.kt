@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.TextStyle
@@ -20,7 +21,9 @@ import io.legado.app.eink.theme.EInkTheme
 /**
  * 顶栏（操作条语言统一版）：标题居左占剩余宽度（左侧留屏幕边距），
  * 动作图标按钮（[EInkOperationBarIcon] 默认尺寸：高度撑满 56dp 顶栏、
- * 宽度自适应、28dp 图标）居右连续排列、贴右屏；底部一条分隔线。
+ * 宽度自适应但收敛上限降为 [TopBarWidthRatio] 倍高度（1.2，约 67dp，
+ * 较底部操作栏的 1.7 倍更窄）、28dp 图标）居右连续排列、贴右屏；
+ * 底部一条分隔线。
  *
  * 与 [EInkTopBar] 的区别：动作区无内边距、按钮贴右屏撑满高度。
  * 带右侧动作的界面（首页/目录/详情页）用本组件；仅标题+返回的简单
@@ -59,7 +62,10 @@ fun EInkTopActionBar(
                     overflow = TextOverflow.Ellipsis,
                 )
             }
-            actions()
+            // 顶栏动作按钮比底部操作栏窄：收敛宽度降为 TopBarWidthRatio 倍高度
+            CompositionLocalProvider(LocalOperationBarWidthRatio provides TopBarWidthRatio) {
+                actions()
+            }
         }
         EInkHorizontalDivider()
     }

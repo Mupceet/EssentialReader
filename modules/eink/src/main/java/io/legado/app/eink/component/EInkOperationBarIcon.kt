@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.ColorFilter
@@ -24,8 +25,10 @@ import io.legado.app.eink.modifier.staticClickable
  * 尺寸：高度默认撑满底部通用操作栏 [EInkOperationBar]（56dp），
  * 可用 [height]/[iconSize] 覆写。宽度默认自适应（[width] 传 null）：
  * 假设 [AdaptiveButtonCount] 枚按钮均分屏幕宽度；屏幕足够宽
- * （均分结果超过 1.7 倍高度，约 95dp）时收敛为 1.7 倍高度，
- * 避免宽屏上按钮过宽。
+ * （均分结果超过收敛上限）时收敛为「高度 × [LocalOperationBarWidthRatio]」，
+ * 避免宽屏上按钮过宽。收敛倍数默认 1.7（约 95dp，底部操作栏规格）；
+ * 顶栏（[EInkTopActionBar] 等）经该环境值降为 [TopBarWidthRatio]
+ * （1.2 倍，约 67dp）。
  *
  * 分层反馈（规范 §35/§42）：
  *  - 选中：提供 [selectedIcon] 填充变体素材（`_e`/`_s` 素材对）时，
@@ -58,12 +61,13 @@ fun EInkOperationBarIcon(
         enabled = enabled,
         selected = selected && selectedIcon == null
     )
-    // 宽度自适应：min(屏幕宽 / 6, 1.7 × 高度)。手机类窄屏均分
-    // 屏宽（触控目标仍 ≥48dp），宽屏收敛为固定规格
+    // 宽度自适应：min(屏幕宽 / 5, 收敛倍数 × 高度)。手机类窄屏均分
+    // 屏宽（触控目标仍 ≥48dp），宽屏收敛为固定规格；收敛倍数由所属
+    // 操作条经 [LocalOperationBarWidthRatio] 覆写（顶栏 1.2、底栏默认 1.7）
     val screenWidth = LocalConfiguration.current.screenWidthDp.dp
     val resolvedWidth = width ?: minOf(
         screenWidth / AdaptiveButtonCount,
-        height * DefaultWidthRatio
+        height * LocalOperationBarWidthRatio.current
     )
     Box(
         modifier = modifier
@@ -96,6 +100,12 @@ private const val AdaptiveButtonCount = 5
 
 /** 宽度收敛上限相对高度的倍数（约 95dp，暂定可微调）。 */
 private const val DefaultWidthRatio = 1.7f
+
+/** 顶栏动作按钮宽度收敛倍数：按钮较底部操作栏更窄（1.2 × 56dp ≈ 67dp）。 */
+const val TopBarWidthRatio = 1.2f
+
+/** 宽度收敛倍数的环境覆写：所属操作条（顶栏/底栏）经 CompositionLocalProvider 提供，默认 [DefaultWidthRatio]。 */
+val LocalOperationBarWidthRatio = staticCompositionLocalOf { DefaultWidthRatio }
 
 /** 默认图标尺寸：默认高度的 50%（与 48dp 按钮配 24dp 图标同比例）。 */
 private val DefaultIconSize = 28.dp
