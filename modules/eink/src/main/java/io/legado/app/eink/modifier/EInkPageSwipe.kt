@@ -1,6 +1,9 @@
 package io.legado.app.eink.modifier
 
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
@@ -17,30 +20,39 @@ import androidx.compose.ui.unit.dp
  *
  * 位移不做实时跟随：E-Ink 上"手指拖到哪内容跟到哪"会产生大量局部刷新，
  * 且松手后的回弹/吸附在电泳屏上必然残影，因此采用阈值触发 + 整页跳转。
+ *
+ * 回调经 [rememberUpdatedState] 持有：手势协程只在 [enabled] 变化时重启，
+ * 期间调用方传入的新回调实例（如翻页 lambda 依赖最新总数）仍会被调用，
+ * 不存在只捕获首次回调的过期闭包问题。
  */
+@Composable
 fun Modifier.EInkPageSwipe(
     enabled: Boolean = true,
     onPageUp: () -> Unit,
     onPageDown: () -> Unit,
-): Modifier = pointerInput(enabled) {
-    if (!enabled) return@pointerInput
-    var totalDrag = 0f
-    val threshold = PageSwipeThreshold.toPx()
-    detectVerticalDragGestures(
-        onDragStart = { totalDrag = 0f },
-        onVerticalDrag = { change, dragAmount ->
-            totalDrag += dragAmount
-            change.consume()
-        },
-        onDragEnd = {
-            when {
-                totalDrag <= -threshold -> onPageDown()
-                totalDrag >= threshold -> onPageUp()
-            }
-            totalDrag = 0f
-        },
-        onDragCancel = { totalDrag = 0f }
-    )
+): Modifier {
+    val currentPageUp by rememberUpdatedState(onPageUp)
+    val currentPageDown by rememberUpdatedState(onPageDown)
+    return this.pointerInput(enabled) {
+        if (!enabled) return@pointerInput
+        var totalDrag = 0f
+        val threshold = PageSwipeThreshold.toPx()
+        detectVerticalDragGestures(
+            onDragStart = { totalDrag = 0f },
+            onVerticalDrag = { change, dragAmount ->
+                totalDrag += dragAmount
+                change.consume()
+            },
+            onDragEnd = {
+                when {
+                    totalDrag <= -threshold -> currentPageDown()
+                    totalDrag >= threshold -> currentPageUp()
+                }
+                totalDrag = 0f
+            },
+            onDragCancel = { totalDrag = 0f }
+        )
+    }
 }
 
 /** 触发翻页的最小滑动距离（低于此距离视为误触）。 */

@@ -6,7 +6,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.runtime.Stable
-import androidx.compose.runtime.compositionLocalOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalCursorBlinkEnabled
@@ -179,7 +179,12 @@ fun EInkTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
     content: @Composable () -> Unit,
 ) {
-    val colorScheme = resolveColorScheme(colorVariant, darkTheme)
+    // Remembered: scheme resolution allocates a new instance per call, and
+    // EInkTheme wrapping content would otherwise churn instances on every
+    // recomposition of the theme root.
+    val colorScheme = remember(colorVariant, darkTheme) {
+        resolveColorScheme(colorVariant, darkTheme)
+    }
     val typography = DefaultTypography
 
     CompositionLocalProvider(
@@ -231,15 +236,22 @@ private val DefaultTypography: EInkTypographySystem = with(EInkTypography) {
 
 /**
  * Holds the active [EInkColorScheme]. Defaults to an error so misuse fails loudly.
+ *
+ * Static local: the scheme instance never changes within a themed session, so
+ * reads don't need per-scope subscription tracking (cheaper for list items);
+ * a rare theme switch replaces the whole content composition, which is fine.
  */
-val LocalEInkColorScheme = compositionLocalOf<EInkColorScheme> {
+val LocalEInkColorScheme = staticCompositionLocalOf<EInkColorScheme> {
     error("No EInkColorScheme provided. Wrap your content in EInkTheme { ... }.")
 }
 
 /**
  * Holds the active [EInkTypographySystem].
+ *
+ * Static local for the same reason as [LocalEInkColorScheme]: the value is a
+ * singleton that never changes within a session.
  */
-val LocalEInkTypography = compositionLocalOf<EInkTypographySystem> {
+val LocalEInkTypography = staticCompositionLocalOf<EInkTypographySystem> {
     error("No EInkTypography provided. Wrap your content in EInkTheme { ... }.")
 }
 

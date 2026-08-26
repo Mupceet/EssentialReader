@@ -33,7 +33,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import io.legado.app.R
-import io.legado.app.data.entities.Book
 import io.legado.app.eink.component.EInkLoading
 import io.legado.app.eink.modifier.EInkPageSwipe
 import io.legado.app.eink.theme.EInkSpacing
@@ -83,7 +82,7 @@ internal val EInkBookshelfGridMinCellWidth = 96.dp
 internal fun BookshelfScreen(
     state: BookshelfUiState,
     onBookClick: (String) -> Unit,
-    onBookLongClick: (Book) -> Unit,
+    onBookLongClick: (ShelfBookUiModel) -> Unit,
     listState: LazyListState = rememberLazyListState(),
     gridState: LazyGridState = rememberLazyGridState(),
     onPageUp: () -> Unit = {},
@@ -117,10 +116,10 @@ internal fun BookshelfScreen(
 
 @Composable
 private fun BookList(
-    books: List<Book>,
+    books: List<ShelfBookUiModel>,
     updatingBookUrls: Set<String>,
     onBookClick: (String) -> Unit,
-    onBookLongClick: (Book) -> Unit,
+    onBookLongClick: (ShelfBookUiModel) -> Unit,
     listState: LazyListState,
     onPageUp: () -> Unit,
     onPageDown: () -> Unit
@@ -140,12 +139,16 @@ private fun BookList(
         // 跟随原首可见项漂移、再被分页对齐拉回，整个列表抖动；按下标锚定
         // 视口不动，仅内容变化的项重绘。列表项无跨重排保留的内部状态，
         // 无需 key
+        //
+        // 条目跳过：不在 items 块里逐项新建 click lambda（那会让条目参数
+        // 永不相等），回调直接透传、由条目内部用 model 字段构造；数据未变
+        // 的条目参数全稳定相等，整条跳过重组
         items(books) { book ->
             BookListItem(
                 book = book,
                 isUpdating = updatingBookUrls.contains(book.bookUrl),
-                onClick = { onBookClick(book.bookUrl) },
-                onLongClick = { onBookLongClick(book) }
+                onBookClick = onBookClick,
+                onBookLongClick = onBookLongClick
             )
         }
     }
@@ -159,10 +162,10 @@ private fun BookList(
  */
 @Composable
 private fun BookGrid(
-    books: List<Book>,
+    books: List<ShelfBookUiModel>,
     updatingBookUrls: Set<String>,
     onBookClick: (String) -> Unit,
-    onBookLongClick: (Book) -> Unit,
+    onBookLongClick: (ShelfBookUiModel) -> Unit,
     gridState: LazyGridState,
     onPageUp: () -> Unit,
     onPageDown: () -> Unit
@@ -189,8 +192,8 @@ private fun BookGrid(
             BookGridItem(
                 book = book,
                 isUpdating = updatingBookUrls.contains(book.bookUrl),
-                onClick = { onBookClick(book.bookUrl) },
-                onLongClick = { onBookLongClick(book) }
+                onBookClick = onBookClick,
+                onBookLongClick = onBookLongClick
             )
         }
     }
@@ -206,16 +209,19 @@ private fun BookGrid(
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun BookGridItem(
-    book: Book,
+    book: ShelfBookUiModel,
     isUpdating: Boolean,
-    onClick: () -> Unit,
-    onLongClick: () -> Unit
+    onBookClick: (String) -> Unit,
+    onBookLongClick: (ShelfBookUiModel) -> Unit
 ) {
-    val unreadCount = book.getUnreadChapterNum()
+    val unreadCount = book.unreadCount
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .combinedClickable(onClick = onClick, onLongClick = onLongClick)
+            .combinedClickable(
+                onClick = { onBookClick(book.bookUrl) },
+                onLongClick = { onBookLongClick(book) }
+            )
     ) {
         // 封面占满格宽，按 View 版封面 66:90 比例定高。解码尺寸用门槛宽
         // 推导而非逐项 BoxWithConstraints 实测（子组合在弱 SoC 上拖慢整页
@@ -227,9 +233,9 @@ private fun BookGridItem(
                 .aspectRatio(EInkCoverWidth / EInkCoverHeight)
         ) {
             EInkBookCover(
-                url = book.getDisplayCover(),
+                url = book.coverUrl,
                 name = book.name,
-                author = book.getRealAuthor(),
+                author = book.displayAuthor,
                 sourceOrigin = book.origin,
                 modifier = Modifier.fillMaxSize(),
                 width = EInkBookshelfGridMinCellWidth,
@@ -245,7 +251,7 @@ private fun BookGridItem(
             if (badgeText != null) {
                 ShelfBadge(
                     text = badgeText,
-                    highlight = !isUpdating && book.lastCheckCount > 0,
+                    highlight = !isUpdating && book.hasNewChapter,
                     modifier = Modifier
                         .align(Alignment.TopEnd)
                         .padding(EInkSpacing.xxs)
@@ -269,22 +275,25 @@ private fun BookGridItem(
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun BookListItem(
-    book: Book,
+    book: ShelfBookUiModel,
     isUpdating: Boolean,
-    onClick: () -> Unit,
-    onLongClick: () -> Unit
+    onBookClick: (String) -> Unit,
+    onBookLongClick: (ShelfBookUiModel) -> Unit
 ) {
-    val unreadCount = book.getUnreadChapterNum()
+    val unreadCount = book.unreadCount
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .combinedClickable(onClick = onClick, onLongClick = onLongClick)
+            .combinedClickable(
+                onClick = { onBookClick(book.bookUrl) },
+                onLongClick = { onBookLongClick(book) }
+            )
             .padding(horizontal = EInkSpacing.m, vertical = EInkSpacing.s)
     ) {
         EInkBookCover(
-            url = book.getDisplayCover(),
+            url = book.coverUrl,
             name = book.name,
-            author = book.getRealAuthor(),
+            author = book.displayAuthor,
             sourceOrigin = book.origin,
             modifier = Modifier
                 .width(EInkCoverWidth)
@@ -318,7 +327,7 @@ private fun BookListItem(
                     // 未读章节数（View 版 getUnreadChapterNum；本次刷新发现新章时高亮）
                     unreadCount > 0 -> ShelfBadge(
                         text = unreadCount.toString(),
-                        highlight = book.lastCheckCount > 0,
+                        highlight = book.hasNewChapter,
                         modifier = Modifier.padding(start = EInkSpacing.xs)
                     )
                 }
@@ -326,7 +335,7 @@ private fun BookListItem(
             // 作者（图标 + 文字，同 View 版 iv_author）
             EInkInfoRow(
                 iconRes = R.drawable.ic_author,
-                text = book.getRealAuthor(),
+                text = book.displayAuthor,
                 style = EInkTheme.typography.bodySmall
             )
             // 当前进度章节（同 View 版 iv_read / ic_history）

@@ -49,9 +49,12 @@ import kotlin.math.min
 
 /**
  * 书架屏幕 UiState（扁平布尔标志位，参考 JBusDriver UDF 模式）。
+ *
+ * [books] 为预抽取的稳定 UiModel（[toShelfBookUiModel]），条目参数
+ * 全稳定类型且数据未变时可跳过重组。
  */
 data class BookshelfUiState(
-    val books: List<Book> = emptyList(),
+    val books: List<ShelfBookUiModel> = emptyList(),
     val isLoading: Boolean = true,
     /** 目录刷新进行中（首页头部刷新按钮禁用并置灰） */
     val isRefreshing: Boolean = false,
@@ -88,9 +91,12 @@ class BookshelfViewModel(application: Application) : AndroidViewModel(applicatio
 
     // notShelf 行已在 [flowByGroup] 内过滤，并在 init 中物理删除；此处
     // 直接使用查询结果，与 View 版保持一致。
+    // UiModel 映射放在上游 map：只在 Room 发射（books 表变化）时执行一次，
+    // 刷新期间 updatingUrls 频繁翻转时 combine 复用缓存的最新映射列表。
     val uiState: StateFlow<BookshelfUiState> =
         combine(
-            appDb.bookDao.flowByGroup(BookGroup.IdAll),
+            appDb.bookDao.flowByGroup(BookGroup.IdAll)
+                .map { books -> books.map { it.toShelfBookUiModel() } },
             _isRefreshing,
             _updatingUrls,
             _isGridLayout

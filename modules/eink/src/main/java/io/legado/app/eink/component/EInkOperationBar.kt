@@ -45,6 +45,10 @@ import io.legado.app.eink.theme.EInkSpacing
  * @param pageDownEnabled 下翻是否可用
  * @param onPageUp 点击上翻箭头
  * @param onPageDown 点击下翻箭头
+ * @param pageArrows 翻页箭头自定义槽：非空时替代内置 [EInkPageArrows]。
+ * 供承载层把翻页可用状态的读取收敛到箭头叶作用域（如书架固定页分页的
+ * canPageUp/canPageDown 读 mutableStateOf，在 Route 层读取会让整个首页
+ * 随每次翻页重组），槽内自行组合 [EInkPageArrows]
  */
 @Composable
 fun EInkOperationBar(
@@ -58,6 +62,7 @@ fun EInkOperationBar(
     pageDownEnabled: Boolean = false,
     onPageUp: () -> Unit = {},
     onPageDown: () -> Unit = {},
+    pageArrows: (@Composable () -> Unit)? = null,
 ) {
     Column(modifier = modifier.fillMaxWidth()) {
         EInkHorizontalDivider()
@@ -81,7 +86,7 @@ fun EInkOperationBar(
             }
             actions?.invoke()
             Spacer(modifier = Modifier.weight(1f))
-            EInkPageArrows(
+            pageArrows?.invoke() ?: EInkPageArrows(
                 pageUpEnabled = pageUpEnabled,
                 pageDownEnabled = pageDownEnabled,
                 onPageUp = onPageUp,

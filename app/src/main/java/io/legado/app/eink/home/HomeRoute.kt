@@ -8,21 +8,26 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.zIndex
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import io.legado.app.R
-import io.legado.app.data.entities.Book
 import io.legado.app.eink.bookshelf.BookshelfScreen
 import io.legado.app.eink.bookshelf.BookshelfViewModel
+import io.legado.app.eink.bookshelf.ShelfBookUiModel
 import io.legado.app.eink.component.EInkPageController
 import io.legado.app.eink.component.EInkOperationBar
 import io.legado.app.eink.component.EInkOperationBarIcon
 import io.legado.app.eink.component.EInkOperationTab
+import io.legado.app.eink.component.EInkPageArrows
 import io.legado.app.eink.component.EInkSearchHintBar
 import io.legado.app.eink.component.EInkTopActionBar
 
@@ -66,7 +71,7 @@ private val HomeTabIcons = listOf(
 @Composable
 fun HomeRoute(
     onBookClick: (String) -> Unit,
-    onBookLongClick: (Book) -> Unit,
+    onBookLongClick: (ShelfBookUiModel) -> Unit,
     onSearch: () -> Unit,
     onOpenFullMode: () -> Unit = {},
     onOpenThemeDebug: () -> Unit = {},
@@ -85,16 +90,14 @@ fun HomeRoute(
     val scope = rememberCoroutineScope()
     val totalBooks = uiState.books.size
 
-    val isBookshelfTab = selectedTab == HomeTabs.BOOKSHELF
-    val canPageUp = isBookshelfTab && pager.canPageUp()
-    val canPageDown = isBookshelfTab && pager.canPageDown(totalBooks)
-
-    // 翻页动作：底部操作栏 ▲▼ 与列表/网格滑动手势共用（固定页项数，零动画整页跳转）
-    val pageUp: () -> Unit = {
-        scope.launch { pager.pageUp() }
+    // 翻页动作：底部操作栏 ▲▼ 与列表/网格滑动手势共用（固定页项数，零动画整页跳转）。
+    // remember 稳定实例：下传后接收方（BookshelfScreen / EInkPageSwipe）不因
+    // lambda 逐次更换而被迫重组
+    val pageUp: () -> Unit = remember(pager, scope) {
+        { scope.launch { pager.pageUp() } }
     }
-    val pageDown: () -> Unit = {
-        scope.launch { pager.pageDown(totalBooks) }
+    val pageDown: () -> Unit = remember(pager, totalBooks, scope) {
+        { scope.launch { pager.pageDown(totalBooks) } }
     }
 
     // 数据变化（最后阅读排序更新/增删）后把实际滚动对齐回页首：
@@ -106,20 +109,30 @@ fun HomeRoute(
         pager.realignToPageStart(uiState.books.size)
     }
 
+    // 翻页箭头槽：canPageUp/canPageDown 读取分页状态（pageStart 为
+    // mutableStateOf），在 Route 作用域读取会让整个首页随每次翻页重组；
+    // 收敛到本槽内读取，翻页只重组箭头两个图标。Tab 非书架时箭头置灰
+    val pageArrows: @Composable () -> Unit = {
+        val isBookshelfTab = selectedTab == HomeTabs.BOOKSHELF
+        EInkPageArrows(
+            pageUpEnabled = isBookshelfTab && pager.canPageUp(),
+            pageDownEnabled = isBookshelfTab && pager.canPageDown(totalBooks),
+            onPageUp = pageUp,
+            onPageDown = pageDown
+        )
+    }
+
     HomeScreen(
         selectedTab = selectedTab,
         onSelectTab = { selectedTab = it },
         headerTitle = HomeTabLabels[selectedTab],
-        showRefresh = isBookshelfTab,
+        showRefresh = selectedTab == HomeTabs.BOOKSHELF,
         isRefreshing = uiState.isRefreshing,
         onRefresh = viewModel::refresh,
         isGridLayout = uiState.isGridLayout,
         onToggleLayout = viewModel::toggleGridLayout,
-        canPageUp = canPageUp,
-        canPageDown = canPageDown,
-        onPageUp = pageUp,
-        onPageDown = pageDown,
         onSearchClick = onSearch,
+        pageArrows = pageArrows,
         bookshelf = {
             BookshelfScreen(
                 state = uiState,
@@ -144,6 +157,9 @@ fun HomeRoute(
  * 无状态首页外壳 — 顶部搜索框 + 头部标题行 + 内容区 + 底部操作栏。
  *
  * 内容通过 [bookshelf] / [mine] 槽位注入，外壳只负责布局。
+ *
+ * [pageArrows] 为翻页箭头槽：由承载层在其中读取分页状态并组合
+ * [EInkPageArrows]，使翻页可用状态的读取收敛到箭头叶作用域。
  */
 @Composable
 internal fun HomeScreen(
@@ -155,11 +171,8 @@ internal fun HomeScreen(
     onRefresh: () -> Unit,
     isGridLayout: Boolean,
     onToggleLayout: () -> Unit,
-    canPageUp: Boolean,
-    canPageDown: Boolean,
-    onPageUp: () -> Unit,
-    onPageDown: () -> Unit,
     onSearchClick: () -> Unit,
+    pageArrows: @Composable () -> Unit,
     bookshelf: @Composable () -> Unit,
     mine: @Composable () -> Unit
 ) {
@@ -187,11 +200,12 @@ internal fun HomeScreen(
             }
         )
         Box(modifier = Modifier.weight(1f)) {
-            if (selectedTab == HomeTabs.BOOKSHELF) {
-                bookshelf()
-            } else {
-                mine()
-            }
+            // 两个 Tab 常驻组合（E-Ink 零动画规范）：切换只翻转各自 Pane 的
+            // 可见性（小作用域），不销毁/重建组合树——书架整页条目（含
+            // Glide 封面请求）在 Tab 往返时零重组；隐藏期间数据更新照常
+            // 预热，切回即时可见
+            HomePane(visible = selectedTab == HomeTabs.BOOKSHELF) { bookshelf() }
+            HomePane(visible = selectedTab != HomeTabs.BOOKSHELF) { mine() }
         }
         EInkOperationBar(
             tabs = HomeTabLabels.mapIndexed { index, label ->
@@ -204,11 +218,37 @@ internal fun HomeScreen(
             },
             selectedTabIndex = selectedTab,
             onTabSelect = onSelectTab,
-            pageUpEnabled = canPageUp,
-            pageDownEnabled = canPageDown,
-            onPageUp = onPageUp,
-            onPageDown = onPageDown
+            pageArrows = pageArrows
         )
+    }
+}
+
+/**
+ * 常驻组合的内容 Pane：可见时 zIndex 置顶承接触摸与绘制；隐藏时跳过
+ * 绘制（不产生任何绘制开销）并从语义树移除。不做销毁/重建。
+ */
+@Composable
+private fun HomePane(
+    visible: Boolean,
+    content: @Composable () -> Unit
+) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .zIndex(if (visible) 1f else 0f)
+            .then(
+                if (visible) {
+                    Modifier
+                } else {
+                    Modifier
+                        .drawWithContent {
+                            // 隐藏页不绘制：跳过整棵子树的 draw 阶段
+                        }
+                        .clearAndSetSemantics { }
+                }
+            )
+    ) {
+        content()
     }
 }
 

@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -91,16 +92,20 @@ internal fun EInkBookCover(
             }
         }
 
+    // 占位 lambda 稳定实例（键随 name/author 变化）：每次重组新建会让
+    // GlideImage 内部 remember 失效、请求被反复重建。占位内容用
+    // fillMaxSize（单例 Modifier）填满 GlideImage 自身边界，与外层传入
+    // 的尺寸修饰效果一致
+    val placeholderContent: @Composable () -> Unit = remember(name, author) {
+        { EInkDefaultCover(name = name, author = author, modifier = Modifier.fillMaxSize()) }
+    }
+
     EInkAsyncImage(
         model = model,
         contentDescription = name,
         modifier = modifier,
-        loading = {
-            EInkDefaultCover(name = name, author = author, modifier = modifier)
-        },
-        failure = {
-            EInkDefaultCover(name = name, author = author, modifier = modifier)
-        },
+        loading = placeholderContent,
+        failure = placeholderContent,
         requestBuilderTransform = requestBuilderTransform,
     )
 }
@@ -159,12 +164,16 @@ internal fun EInkInfoRow(
     style: TextStyle,
     modifier: Modifier = Modifier,
 ) {
+    // ColorFilter.tint 每次调用都新建实例：列表项最多三行信息行，
+    // 缓存避免条目重组时的重复分配
+    val iconTintColor = EInkTheme.colorScheme.onSurfaceVariant
+    val iconTint = remember(iconTintColor) { ColorFilter.tint(iconTintColor) }
     Row(modifier = modifier, verticalAlignment = Alignment.CenterVertically) {
         Image(
             painter = painterResource(iconRes),
             contentDescription = null,
             modifier = Modifier.size(DescIconSize),
-            colorFilter = ColorFilter.tint(EInkTheme.colorScheme.onSurfaceVariant)
+            colorFilter = iconTint
         )
         Spacer(modifier = Modifier.width(EInkSpacing.xs))
         EInkText(
