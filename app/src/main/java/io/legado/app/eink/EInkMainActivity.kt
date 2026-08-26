@@ -46,16 +46,29 @@ class EInkMainActivity : ComponentActivity() {
         lifecycleScope.launch(Dispatchers.IO) {
             appDb.bookDao.deleteNotShelfBook()
         }
+        // 自动跳转最近阅读（对齐 View 版完整模式行为）：开关开启时由
+        // WelcomeActivity 传入标记，此处解析最近阅读书并以
+        // [书架, 阅读页] 初始栈启动，阅读页返回即书架
+        val lastReadBookUrl = if (intent.getBooleanExtra(EXTRA_DEFAULT_TO_READ, false)) {
+            appDb.bookDao.lastReadBook?.bookUrl
+        } else {
+            null
+        }
         setContent {
             EInkTheme {
-                EInkRoot()
+                EInkRoot(lastReadBookUrl)
             }
         }
+    }
+
+    companion object {
+        /** 冷启动自动进入最近阅读（由 WelcomeActivity 按 defaultToRead 设置判定后传入）。 */
+        const val EXTRA_DEFAULT_TO_READ = "defaultToRead"
     }
 }
 
 @Composable
-private fun EInkRoot() {
+private fun EInkRoot(initialReaderBookUrl: String?) {
     val scheme = EInkTheme.colorScheme
 
     // 系统栏图标外观随主题底色切换：亮底 → 深色图标；暗底 → 浅色图标
@@ -76,6 +89,6 @@ private fun EInkRoot() {
             .fillMaxSize()
             .background(scheme.background)
     ) {
-        EInkApp()
+        EInkApp(initialReaderBookUrl = initialReaderBookUrl)
     }
 }

@@ -22,7 +22,7 @@ import androidx.lifecycle.ViewModelStore
  * 实现"退出界面再进入 == 首次进入"（如搜索界面）。
  */
 class EInkNavController internal constructor(
-    initial: EInkScreen,
+    initialStack: List<EInkScreen>,
 ) {
     private data class Entry(
         val id: Long,
@@ -30,8 +30,14 @@ class EInkNavController internal constructor(
         val viewModelStore: ViewModelStore,
     )
 
-    private var backStack: MutableList<Entry> = mutableListOf(Entry(0L, initial, ViewModelStore()))
-    private var nextEntryId = 1L
+    init {
+        require(initialStack.isNotEmpty()) { "initialStack must not be empty" }
+    }
+
+    private var backStack: MutableList<Entry> = initialStack.mapIndexed { index, screen ->
+        Entry(index.toLong(), screen, ViewModelStore())
+    }.toMutableList()
+    private var nextEntryId = backStack.size.toLong()
     private var current by mutableStateOf(backStack.last())
 
     /** 当前屏幕。 */
@@ -90,9 +96,12 @@ class EInkNavController internal constructor(
     companion object {
         /**
          * 创建并记住一个 [EInkNavController]。
+         *
+         * @param initialStack 初始屏幕栈（至少一项）；多于一项时用于
+         * 冷启动直达（如自动跳转最近阅读：书架之上叠阅读页）
          */
         @Composable
-        fun remember(initial: EInkScreen = EInkScreen.Home): EInkNavController =
-            remember(initial) { EInkNavController(initial) }
+        fun remember(initialStack: List<EInkScreen> = listOf(EInkScreen.Home)): EInkNavController =
+            remember(initialStack) { EInkNavController(initialStack) }
     }
 }

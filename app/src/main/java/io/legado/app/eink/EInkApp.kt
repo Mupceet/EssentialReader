@@ -38,10 +38,16 @@ import io.legado.app.utils.startActivity
  * 1. 通过 when 分支直接替换屏幕内容（无动画过渡，规范 §12, §44）
  * 2. 导航状态由 [EInkNavController] 管理（UDF: state hoisted to controller）
  * 3. 用 [rememberSaveableStateHolder] 按"导航栈条目"保留 rememberSaveable 状态
+ *
+ * @param initialReaderBookUrl 冷启动直达阅读页的 bookUrl（自动跳转最近阅读，
+ * 非 null 时初始栈为 [书架, 阅读页]，阅读页返回即书架）
  */
 @Composable
 fun EInkApp(
-    controller: EInkNavController = EInkNavController.remember()
+    initialReaderBookUrl: String? = null,
+    controller: EInkNavController = EInkNavController.remember(
+        initialStack(initialReaderBookUrl)
+    ),
 ) {
     // 单 Activity 架构：系统返回键优先 pop 导航栈，根页面时交还系统（退出应用）
     BackHandler(enabled = controller.canPop) {
@@ -196,3 +202,11 @@ fun EInkApp(
         }
     }
 }
+
+/** 冷启动初始栈：默认仅书架；[自动跳转最近阅读]时书架之上叠阅读页。 */
+private fun initialStack(initialReaderBookUrl: String?): List<EInkScreen> =
+    if (initialReaderBookUrl == null) {
+        listOf(EInkScreen.Home)
+    } else {
+        listOf(EInkScreen.Home, EInkScreen.Reader(initialReaderBookUrl))
+    }

@@ -79,13 +79,19 @@ open class WelcomeActivity : BaseActivity<ActivityWelcomeBinding>() {
     }
 
     private fun startMainActivity() {
+        // 自动跳转最近阅读：开关开启且有最近阅读的书（两个模式共用判定）
+        val defaultToRead =
+            getPrefBoolean(PreferKey.defaultToRead) && appDb.bookDao.lastReadBook != null
         if (AppConfig.isEInkPureMode) {
             // 纯净阅读（墨水屏）主题模式：直接进入墨水屏界面；
-            // 导入导出等管理功能在完整模式（MainActivity）中完成
-            startActivity<EInkMainActivity>()
+            // 导入导出等管理功能在完整模式（MainActivity）中完成；
+            // 自动跳转判定传给 EInkMainActivity（以 [书架, 阅读页] 初始栈启动）
+            startActivity<EInkMainActivity> {
+                putExtra(EInkMainActivity.EXTRA_DEFAULT_TO_READ, defaultToRead)
+            }
         } else {
             startActivity<MainActivity>()
-            if (getPrefBoolean(PreferKey.defaultToRead) && appDb.bookDao.lastReadBook != null) {
+            if (defaultToRead) {
                 startActivity<ReadBookActivity>()
             }
         }
