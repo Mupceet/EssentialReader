@@ -3,7 +3,7 @@ package io.legado.app.eink.toc
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import io.legado.app.eink.engine.EinkEngineRegistry
+import io.legado.app.eink.engine.EInkEngineRegistry
 import io.legado.app.eink.engine.TocFetchResult
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -49,7 +49,7 @@ data class TocUiState(
  */
 class TocViewModel(application: Application) : AndroidViewModel(application) {
 
-    private val engine get() = EinkEngineRegistry.tocEngine
+    private val engine get() = EInkEngineRegistry.tocEngine
 
     private val _uiState = MutableStateFlow(TocUiState())
     val uiState: StateFlow<TocUiState> = _uiState.asStateFlow()

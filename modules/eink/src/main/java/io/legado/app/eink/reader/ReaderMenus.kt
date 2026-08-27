@@ -123,25 +123,25 @@ internal fun ReaderTopBar(
             // 顶栏动作按钮较底部操作栏更窄：与 EInkTopActionBar 一致收敛为 1.2 倍高度
             CompositionLocalProvider(LocalOperationBarWidthRatio provides TopBarWidthRatio) {
                 BarAction(
-                    iconRes = R.drawable.ic_exchange,
+                    iconRes = R.drawable.eink_ic_exchange,
                     contentDescription = "换源",
                     enabled = !state.isLocalBook,
                     onClick = onChangeSource,
                 )
                 BarAction(
-                    iconRes = R.drawable.ic_refresh_black_24dp,
+                    iconRes = R.drawable.eink_ic_refresh_black_24dp,
                     contentDescription = "刷新",
                     onClick = onRefresh,
                 )
                 BarAction(
-                    iconRes = R.drawable.ic_download_line,
+                    iconRes = R.drawable.eink_ic_download_line,
                     contentDescription = "缓存",
                     enabled = !state.isLocalBook,
                     onClick = onOpenCachePanel,
                 )
                 if (!state.inBookshelf) {
                     BarAction(
-                        iconRes = R.drawable.ic_add,
+                        iconRes = R.drawable.eink_ic_add,
                         contentDescription = "加书架",
                         onClick = onAddToBookshelf,
                     )
@@ -211,29 +211,29 @@ internal fun ReaderBottomBar(
         ) {
             // 分层返回：关闭设置面板 → 退出阅读
             EInkOperationBarIcon(
-                icon = painterResource(R.drawable.ic_eink_arrow_back),
+                icon = painterResource(R.drawable.eink_ic_arrow_back),
                 contentDescription = "返回",
                 onClick = onBarBack,
             )
             BottomIconAction(
-                iconRes = R.drawable.ic_toc,
+                iconRes = R.drawable.eink_ic_toc,
                 contentDescription = "目录",
                 onClick = onOpenToc,
             )
             BottomIconAction(
-                iconRes = if (state.autoPlay) R.drawable.ic_auto_page_stop else R.drawable.ic_auto_page,
+                iconRes = if (state.autoPlay) R.drawable.eink_ic_auto_page_stop else R.drawable.eink_ic_auto_page,
                 contentDescription = if (state.autoPlay) "停止翻页" else "自动翻页",
                 selected = state.autoPlay,
                 onClick = onToggleAutoPlay,
             )
             BottomIconAction(
-                iconRes = R.drawable.ic_interface_setting,
+                iconRes = R.drawable.eink_ic_interface_setting,
                 contentDescription = "排版",
                 selected = selectedPanel == ReaderPanel.LAYOUT,
                 onClick = { onOpenPanel(ReaderPanel.LAYOUT) },
             )
             BottomIconAction(
-                iconRes = R.drawable.ic_settings,
+                iconRes = R.drawable.eink_ic_settings,
                 contentDescription = "其它设置",
                 selected = selectedPanel == ReaderPanel.OTHER,
                 onClick = { onOpenPanel(ReaderPanel.OTHER) },

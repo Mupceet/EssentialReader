@@ -25,7 +25,7 @@ rm -rf modules/eink/build
 EINK_PKG="app/src/main/java/io/legado/app/eink"
 mkdir -p "$EINK_PKG/reader"
 cp -r "$SRC_ROOT/$EINK_PKG/bridge" "$EINK_PKG/bridge"
-cp "$SRC_ROOT/$EINK_PKG/EinkMainActivity.kt" "$EINK_PKG/"
+cp "$SRC_ROOT/$EINK_PKG/EInkMainActivity.kt" "$EINK_PKG/"
 cp "$SRC_ROOT/$EINK_PKG/reader/ReaderPageCanvas.kt" "$EINK_PKG/reader/"
 
 echo "==> 复制完成。剩余人工步骤："

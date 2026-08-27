@@ -334,14 +334,14 @@ private fun BookListItem(
             }
             // 作者（图标 + 文字，同 View 版 iv_author）
             EInkInfoRow(
-                iconRes = R.drawable.ic_author,
+                iconRes = R.drawable.eink_ic_author,
                 text = book.displayAuthor,
                 style = EInkTheme.typography.bodySmall
             )
             // 当前进度章节（同 View 版 iv_read / ic_history）
             book.durChapterTitle?.let { title ->
                 EInkInfoRow(
-                    iconRes = R.drawable.ic_history,
+                    iconRes = R.drawable.eink_ic_history,
                     text = title,
                     style = EInkTheme.typography.labelMedium
                 )
@@ -349,7 +349,7 @@ private fun BookListItem(
             // 最新章节（同 View 版 iv_last / ic_book_last）
             book.latestChapterTitle?.let { title ->
                 EInkInfoRow(
-                    iconRes = R.drawable.ic_book_last,
+                    iconRes = R.drawable.eink_ic_book_last,
                     text = title,
                     style = EInkTheme.typography.labelMedium
                 )

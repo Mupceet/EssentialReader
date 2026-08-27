@@ -5,9 +5,9 @@ import android.graphics.drawable.Drawable
 import android.net.Uri
 import com.bumptech.glide.RequestBuilder
 import io.legado.app.eink.engine.CoverEngine
-import io.legado.app.eink.engine.EinkEngineRegistry
+import io.legado.app.eink.engine.EInkEngineRegistry
 import io.legado.app.eink.engine.GlobalSettings
-import io.legado.app.eink.settings.EinkSettings
+import io.legado.app.eink.settings.EInkSettings
 import io.legado.app.help.config.AppConfig
 import io.legado.app.help.glide.OkHttpModelLoader
 import io.legado.app.utils.isAbsUrl
@@ -25,11 +25,11 @@ import java.io.File
  * 移植到新上游时：本目录（eink/bridge/）是唯一需要按目标引擎重写的
  * 部分，模块侧零改动（见 docs/eink-porting.md 的差异表）。
  */
-object EinkBridge {
+object EInkBridge {
 
     fun install(context: Context) {
-        EinkSettings.attach(context)
-        EinkEngineRegistry.install(
+        EInkSettings.attach(context)
+        EInkEngineRegistry.install(
             globalSettings = GlobalSettingsImpl,
             bookshelfEngine = BookshelfEngineImpl,
             searchEngine = SearchEngineImpl,

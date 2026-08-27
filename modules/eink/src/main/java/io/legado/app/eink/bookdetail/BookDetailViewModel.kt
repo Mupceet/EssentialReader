@@ -6,7 +6,7 @@ import androidx.lifecycle.viewModelScope
 import io.legado.app.eink.R
 import io.legado.app.eink.arch.UserMessage
 import io.legado.app.eink.engine.BookHandle
-import io.legado.app.eink.engine.EinkEngineRegistry
+import io.legado.app.eink.engine.EInkEngineRegistry
 import io.legado.app.eink.engine.PrefetchResult
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -47,7 +47,7 @@ data class BookDetailUiState(
  */
 class BookDetailViewModel(application: Application) : AndroidViewModel(application) {
 
-    private val engine get() = EinkEngineRegistry.bookDetailEngine
+    private val engine get() = EInkEngineRegistry.bookDetailEngine
 
     private val _uiState = MutableStateFlow(BookDetailUiState())
     val uiState: StateFlow<BookDetailUiState> = _uiState.asStateFlow()

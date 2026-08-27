@@ -13,19 +13,20 @@ E-Ink 界面嵌入到其它 legado 系上游（试验目标：GymMickey/legadoM-
 ├─ arch/                                  UiState/UserMessage 约定 + @EInkImmutable
 ├─ navigation/                            EInkScreen 路由 + EInkNavController 栈导航
 ├─ engine/                                ★ 移植契约接口（ports）
-│    EinkEngineRegistry + GlobalSettings + BookshelfEngine + SearchEngine +
+│    EInkEngineRegistry + GlobalSettings + BookshelfEngine + SearchEngine +
 │    TocEngine + BookDetailEngine + ChangeSourceEngine + CoverEngine + ReaderEngine
-│    (+ EngineHandles: BookHandle/SourceHandle/SearchResultHandle/EinkPageContent)
+│    (+ EngineHandles: BookHandle/SourceHandle/SearchResultHandle/EInkPageContent)
 ├─ bookshelf/ search/ toc/ bookdetail/ changesource/ home/ reader/
 │                                          全部 Screen + ViewModel + UiModel
-├─ debug/ widget/ util/ settings/          调试页 / 封面组件 / 并发工具 / EinkSettings
-└─ res/                                    eink_* 字符串 + 图标（自包含）
+├─ debug/ widget/ util/ settings/          调试页 / 封面组件 / 并发工具 / EInkSettings
+└─ res/                                    全部资源带 eink_ 前缀（字符串 + 图标，
+                                           与宿主 res 零同名，合并零遮蔽，自包含）
 
 app/.../eink/（宿主 = 入口 + 桥接层，移植时按目标引擎重写）
-├─ EinkMainActivity.kt                     入口（Manifest 注册、EinkBridge.install、
+├─ EInkMainActivity.kt                     入口（Manifest 注册、EInkBridge.install、
 │                                          初始 extras、宿主能力参数注入）
 ├─ bridge/                                 ★ 唯一需要重写的部分：端口实现
-│    EinkBridge.kt         装配入口（GlobalSettings/CoverEngine 在此）
+│    EInkBridge.kt         装配入口（GlobalSettings/CoverEngine 在此）
 │    BookshelfEngineImpl   书架流/目录刷新管线（对齐 MainViewModel.updateToc）
 │    SearchEngineImpl      SearchModel 回调适配 + 搜索历史 DAO
 │    TocEngineImpl         书籍解析(notShelf 落库)/目录拉取管线
@@ -56,7 +57,7 @@ app/.../eink/（宿主 = 入口 + 桥接层，移植时按目标引擎重写）
    （见 §4 兼容性注意事项）。
 4. **app 依赖**：目标 app 模块加 `implementation project(':modules:eink')`。
 5. **复制 app 侧桥接层**：`app/src/main/java/io/legado/app/eink/` 下的
-   `EinkMainActivity.kt`、`bridge/`、`reader/ReaderPageCanvas.kt`，然后按
+   `EInkMainActivity.kt`、`bridge/`、`reader/ReaderPageCanvas.kt`，然后按
    §3 差异表适配引擎调用。
 6. **Manifest**：注册入口（无桌面图标，由主题/启动页路由进入）：
    ```xml
@@ -85,7 +86,7 @@ app/.../eink/（宿主 = 入口 + 桥接层，移植时按目标引擎重写）
 | ChangeSourceEngineImpl | `WebBook.searchBookAwait` 的 `filter` lambda 为三参 `(name, author, kind)`（本仓两参）——仅改 `searchSourceBook` 内这一处 lambda |
 | ReaderEngineImpl | `ReadBook.loadOrUpContent/loadContent/onChapterListUpdated` 多默认参数（调用兼容，无需改）；`ChapterProvider` 排版函数拆至 `TextChapterLayout.kt`（对外 API 同名）；`TextPage.searchResult` 元素类型变为 `TextBaseColumn`（画布的 `when(column)` 走 else 分支，不破坏） |
 | ReaderEngineImpl / TocEngineImpl | `ChapterProvider.srcReplace*` 语义不同（未使用，无影响）；`Book.Config.splitLongChapter` 默认值翻转（行为差异，非编译问题） |
-| EinkBridge (install) | 目标仓需提供 `isEInkPureMode` 系列配置（见 §2 步骤 7）；`SearchScope(AppConfig.searchScope)` 在对方为多书源格式，构造兼容 |
+| EInkBridge (install) | 目标仓需提供 `isEInkPureMode` 系列配置（见 §2 步骤 7）；`SearchScope(AppConfig.searchScope)` 在对方为多书源格式，构造兼容 |
 | ReaderPageCanvas | 对方 `TextLine` 新增 `extraLetterSpacing/wordSpacing/isHtml`（本画布不处理这些偏移——排版细节会与对方 View 版有细微差异，属已知限制）；对方根提交已含全部 `*EInk` ReadBookConfig 字段，无需搬运 |
 | 全局 | 对方 minSdk 21（模块已降到 21）；Kotlin 2.3.10 / Compose BOM 2025.04.01（见 §4）；其自带 E-Ink View 层适配（溢出菜单/WaitDialog 等）与 Compose 版并存不冲突 |
 
@@ -121,12 +122,12 @@ themeMode "4" 纯净模式分流。
 |---|---|
 | ReaderEngineImpl | **回调双轨**：`ReadBook.CallBack` 仅剩 4 方法（upMenuView/loadChapterList/notifyBookChanged/sureNewProgress），渲染回调拆到 `ReadBook.ReaderRenderCallback`（upContent/upContentAwait/pageChanged/contentLoadFinish/upPageAnim/cancelSelect + LayoutProgressListener.onLayoutException）——适配器同实现两接口，register/unregister 两轨都走；`durPageIndex` 为 durChapterPos 派生只读值（端口本就只读，无影响）；翻页 `moveToNextPage()/moveToPrevPage()` 同名 |
 | ReaderEngineImpl | **排版写入必须走 ReadStyleGateway**（对方根 build.gradle.kts 的 `:verifyConfigArchitecture` 护栏拦 `ReadBookConfig.* =` 直写，且正则无 `(?!=)` 排除——`ReadBookConfig.textBold == 1` 这种**比较**也会误中，用 `.let { it == 1 }` 规避）：17 个 `ReadStyleMutation`（TextSize/LetterSpacing/ParagraphIndent/LineSpacing/ParagraphSpacing/Padding*/Header/FooterPadding*/TextBold 全有键）逐个 `updateCurrentStyle` 后显式 `save()`（updateCurrentStyle 只改内存+publishState）；随后 `ChapterProvider.upStyle()` |
-| ReaderPageCanvas | 护栏禁止 Compose 文件 import 兼容 Config——抗锯齿改 `antiAlias: Boolean` 参数，取值走 `EinkBridge.useAntiAlias`（Koin OtherSettingsGateway）；`ImageColumn` 自带 `book` 字段（换书瞬间旧页重绘不再误取新书），画布用 `column.book` |
+| ReaderPageCanvas | 护栏禁止 Compose 文件 import 兼容 Config——抗锯齿改 `antiAlias: Boolean` 参数，取值走 `EInkBridge.useAntiAlias`（Koin OtherSettingsGateway）；`ImageColumn` 自带 `book` 字段（换书瞬间旧页重绘不再误取新书），画布用 `column.book` |
 | SearchEngineImpl | **SearchModel 已删除**，多源搜索重构为 `SearchBooksUseCase.execute(BookSearchRequest, control): Flow<SearchRunEvent>`（Started/Progress(upsertBooks…)/Finished）；自带 `BookSearchGateway` 3 方法 DAO 直连实现（对齐其 SearchRepositoryImpl 的 scope→parts 映射）；搜索范围读 local_ui_status DataStore 的 `search_scope` 键（会话内 IO 读一次） |
 | BookshelfEngineImpl | 预缓存入队 `CacheBook.getOrCreate(source, book).addDownload(start, end)`；`startProcessJob(coroutineContext)` 同为 suspend |
 | ReaderEngineImpl (startCache) | `CacheBook.start(ctx, book, start, end)` 为 **suspend**——直接构造 `CacheDownloadRequest(bookUrl, ChapterSelection.Range(...))` 走非 suspend 重载（与其实现等价） |
 | ChangeSourceEngineImpl | `migrateTo(newBook, toc, replaceEnableDefault, chineseConverterType)` 需补两参（对齐其 ChangeBookSourceDialog：AppConfig.replaceEnableDefault / AppConfig.chineseConverterType）；searchBookAwait filter 三参同 legadoM-Ink |
-| EinkBridge (GlobalSettings) | `changeSourceCheckAuthor` 存独立 local_ui_status DataStore，无同步门面——经 Koin `ChangeSourceSettingsGateway` 读；threadCount/autoRefreshBook/preDownloadNum 仍走（@Deprecated 但可用的）AppConfig 门面 |
+| EInkBridge (GlobalSettings) | `changeSourceCheckAuthor` 存独立 local_ui_status DataStore，无同步门面——经 Koin `ChangeSourceSettingsGateway` 读；threadCount/autoRefreshBook/preDownloadNum 仍走（@Deprecated 但可用的）AppConfig 门面 |
 | 入口接线 | `MainActivity.onCreate` 在 `checkStartupRoute()`（首启引导）之后分流；`LabConfigRouteScreen` 加 LaunchedEffect：开关为 true 即 CLEAR_TASK 切 `EInkMainActivity`；退出时 `AppConfigStore.putBoolean(labEInkDisplay, false)` + MainActivity CLEAR_TASK；defaultToRead 经 AppConfigStore 同步读，`bookDao.lastReadBook` 存在 |
 
 环境事项：worktree 自带 `local.properties` 不入库需从主 checkout 复制；
@@ -138,11 +139,15 @@ showEInkTheme（"电子书"主题显露）不再可达（打开即切走），�
 - **Compose BOM 版本差**：本模块基于 BOM 2026.06.01 编写，对方为
   2025.04.01。模块只使用 Foundation/UI/Runtime 稳定 API；若构建报
   unresolved，回退该 API 的保守写法（改动收敛在模块内，两边同时受益）。
-- **资源合并**：模块 res 与宿主 res 同名时宿主覆盖（ic_arrow_back 等共享
-  图标两边共存无冲突；模块自有 `ic_eink_arrow_back` 保证返回箭头样式独立）。
-- **SharedPreferences**：`EinkSettings` 读写宿主默认 prefs 文件
+- **资源合并**：模块 res 全部资源名以 `eink_` 前缀开头（含 29 个图标，
+  均为模块自有副本），与任何宿主 res 零同名 —— 合并时不会被宿主
+  同名资源遮蔽。新增模块资源必须遵守同一前缀规则。
+- **SharedPreferences**：`EInkSettings` 读写宿主默认 prefs 文件
   （`<packageName>_preferences`），键名 `einkBookshelfGrid /
-  einkReaderKeepScreenOn / einkReaderAutoIntervalSec` 与历史版本一致。
+  einkReaderKeepScreenOn / einkReaderAutoIntervalSec` 与历史版本一致；
+  其初始化（attach）已折叠进宿主装配模板 `EInkBridge.install(context)`
+  —— 宿主入口只需这一处调用（引擎注册表 `EInkEngineRegistry` 同样
+  经此注册）。
 - **ProGuard**：模块 `consumer-rules.pro` 随模块走；Compose/Glide 规则由
   各自 consumer 提供。
 

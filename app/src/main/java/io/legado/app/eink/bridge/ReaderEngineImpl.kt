@@ -6,7 +6,7 @@ import io.legado.app.data.appDb
 import io.legado.app.data.entities.Book
 import io.legado.app.eink.engine.BookHandle
 import io.legado.app.eink.engine.BookPrepResult
-import io.legado.app.eink.engine.EinkPageContent
+import io.legado.app.eink.engine.EInkPageContent
 import io.legado.app.eink.engine.ReaderBookSnapshot
 import io.legado.app.eink.engine.ReaderEngine
 import io.legado.app.eink.engine.ReaderEngineCallback
@@ -33,7 +33,7 @@ import kotlin.coroutines.cancellation.CancellationException
 import kotlin.math.min
 
 /** TextPage 的不透明包装（模块只读展示字段；画布槽位还原绘制）。 */
-internal class TextPageContent(val textPage: TextPage) : EinkPageContent {
+internal class TextPageContent(val textPage: TextPage) : EInkPageContent {
     override val title: String get() = textPage.title
     override val readProgress: String get() = textPage.readProgress
 }
@@ -110,7 +110,7 @@ internal object ReaderEngineImpl : ReaderEngine {
     override val currentChapterPageSize: Int
         get() = ReadBook.curTextChapter?.pageSize ?: 0
 
-    override fun currentPage(): EinkPageContent? {
+    override fun currentPage(): EInkPageContent? {
         val chapter = ReadBook.curTextChapter ?: return null
         return chapter.getPage(ReadBook.durPageIndex)?.let(::TextPageContent)
     }

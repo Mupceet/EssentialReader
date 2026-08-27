@@ -18,7 +18,7 @@ import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
 import androidx.lifecycle.lifecycleScope
 import io.legado.app.data.appDb
-import io.legado.app.eink.bridge.EinkBridge
+import io.legado.app.eink.bridge.EInkBridge
 import io.legado.app.eink.bridge.TextPageContent
 import io.legado.app.eink.reader.ReaderPageCanvas
 import io.legado.app.eink.theme.EInkTheme
@@ -49,9 +49,9 @@ class EInkMainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-        // 注册引擎端口（:modules:eink 的 VM 经 EinkEngineRegistry 取用），
+        // 注册引擎端口（:modules:eink 的 VM 经 EInkEngineRegistry 取用），
         // 必须早于任何 E-Ink Composable 组合（VM 构造）
-        EinkBridge.install(this)
+        EInkBridge.install(this)
         // 清理未加书架的隐藏行（对齐 View 版 MainViewModel 启动时的
         // deleteNotShelfBook；详情页预取/未加架阅读都会落这类行）
         lifecycleScope.launch(Dispatchers.IO) {
