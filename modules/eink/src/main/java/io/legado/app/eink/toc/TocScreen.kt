@@ -42,8 +42,7 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
-import io.legado.app.R
-import io.legado.app.data.entities.BookChapter
+import io.legado.app.eink.R
 import io.legado.app.eink.component.EInkLoading
 import io.legado.app.eink.component.EInkOperationBar
 import io.legado.app.eink.component.EInkOperationBarIcon
@@ -261,7 +260,7 @@ internal fun TocScreen(
             onTabSelect = {},
             navigationIcon = {
                 EInkOperationBarIcon(
-                    icon = painterResource(R.drawable.ic_arrow_back),
+                    icon = painterResource(R.drawable.ic_eink_arrow_back),
                     contentDescription = "返回",
                     onClick = onBack
                 )
@@ -293,7 +292,7 @@ private fun ChapterList(
     onChapterClick: (Int) -> Unit,
 ) {
     // 展示项携带真实索引，避免倒序/过滤后索引错位
-    val display: List<Pair<Int, BookChapter>> = state.displayChapters
+    val display: List<Pair<Int, ChapterUiModel>> = state.displayChapters
         .mapIndexed { index, chapter -> index to chapter }
         .let { if (state.isReversed) it.asReversed() else it }
 
@@ -316,7 +315,7 @@ private fun ChapterList(
                 // 本地书与卷章节视为已缓存（与 View 版一致）
                 cached = state.isLocalBook
                         || chapter.isVolume
-                        || state.cachedFileNames.contains(chapter.getFileName()),
+                        || state.cachedFileNames.contains(chapter.fileName),
                 onClick = { onChapterClick(realIndex) }
             )
         }
@@ -332,7 +331,7 @@ private fun ChapterList(
  * 未缓存章节显示云端图标。
  */
 @Composable
-private fun ChapterItem(chapter: BookChapter, isCurrent: Boolean, cached: Boolean, onClick: () -> Unit) {
+private fun ChapterItem(chapter: ChapterUiModel, isCurrent: Boolean, cached: Boolean, onClick: () -> Unit) {
     val scheme = EInkTheme.colorScheme
     val press = rememberImmediatePressState()
     val colors = eInkActionColors(pressed = press.isPressed)

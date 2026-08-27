@@ -32,8 +32,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
-import io.legado.app.R
-import io.legado.app.eink.R as EinkR
+import io.legado.app.eink.R
 import io.legado.app.eink.component.EInkLoading
 import io.legado.app.eink.component.EInkOperationBar
 import io.legado.app.eink.component.EInkOperationBarIcon
@@ -175,7 +174,7 @@ internal fun BookDetailScreen(
             state.isEmpty -> {
                 Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
                     EInkText(
-                        text = LocalContext.current.getString(EinkR.string.eink_book_not_found),
+                        text = LocalContext.current.getString(R.string.eink_book_not_found),
                         style = EInkTheme.typography.bodyLarge
                     )
                 }
@@ -209,9 +208,9 @@ internal fun BookDetailScreen(
                             val coverHeight = coverAreaHeight - EInkSpacing.m * 2
                             val coverWidth = coverHeight * CoverAspectRatio
                             EInkBookCover(
-                                url = book.getDisplayCover(),
+                                url = book.displayCover,
                                 name = book.name,
-                                author = book.getRealAuthor(),
+                                author = book.displayAuthor,
                                 sourceOrigin = book.origin,
                                 modifier = Modifier
                                     .width(coverWidth)
@@ -238,7 +237,7 @@ internal fun BookDetailScreen(
                             )
                             // 作者
                             EInkText(
-                                text = book.getRealAuthor(),
+                                text = book.displayAuthor,
                                 style = EInkTheme.typography.labelLarge,
                                 color = EInkTheme.colorScheme.onSurfaceVariant,
                                 textAlign = TextAlign.Center,
@@ -263,7 +262,7 @@ internal fun BookDetailScreen(
                                 .padding(horizontal = EInkSpacing.m, vertical = EInkSpacing.m)
                         ) {
                             EInkText(
-                                text = book.getDisplayIntro()?.takeIf { it.isNotBlank() } ?: "暂无简介",
+                                text = book.displayIntro?.takeIf { it.isNotBlank() } ?: "暂无简介",
                                 style = EInkTheme.typography.bodyLarge,
                                 color = EInkTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier.padding(top = EInkSpacing.s)
@@ -280,7 +279,7 @@ internal fun BookDetailScreen(
             onTabSelect = {},
             navigationIcon = {
                 EInkOperationBarIcon(
-                    icon = painterResource(R.drawable.ic_arrow_back),
+                    icon = painterResource(R.drawable.ic_eink_arrow_back),
                     contentDescription = "返回",
                     onClick = onBack
                 )

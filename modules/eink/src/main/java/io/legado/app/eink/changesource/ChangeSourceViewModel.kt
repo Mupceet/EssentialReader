@@ -4,20 +4,9 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import io.legado.app.eink.R
-import io.legado.app.constant.AppLog
-import io.legado.app.constant.AppPattern
-import io.legado.app.constant.BookType
-import io.legado.app.data.appDb
-import io.legado.app.data.entities.Book
-import io.legado.app.data.entities.SearchBook
 import io.legado.app.eink.arch.UserMessage
-import io.legado.app.help.book.primaryStr
-import io.legado.app.help.book.releaseHtmlData
-import io.legado.app.help.book.removeType
-import io.legado.app.help.config.AppConfig
-import io.legado.app.model.ReadBook
-import io.legado.app.model.webBook.WebBook
-import kotlinx.coroutines.CancellationException
+import io.legado.app.eink.engine.BookHandle
+import io.legado.app.eink.engine.EinkEngineRegistry
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.coroutineScope
@@ -41,8 +30,8 @@ import kotlin.math.min
  * 换源 UiState。
  */
 data class ChangeSourceUiState(
-    val book: Book? = null,
-    val results: List<SearchBook> = emptyList(),
+    val book: ChangeSourceBookUiModel? = null,
+    val results: List<ChangeSourceResultUiModel> = emptyList(),
     val isSearching: Boolean = false,
     val searchedCount: Int = 0,
     val totalSourceCount: Int = 0,
@@ -56,9 +45,9 @@ data class ChangeSourceUiState(
 /**
  * 换源 ViewModel。
  *
- * 简化复用 View 版 [io.legado.app.ui.book.changesource.ChangeBookSourceViewModel]
- * 的核心链路：跨书源搜索书名（校验作者）→ 选中后获取目录 →
- * [Book.migrateTo] 迁移进度 → 替换数据库记录 → 重载 [ReadBook] 会话。
+ * 复用 View 版换源链路（引擎侧迁移管线经 ChangeSourceEngine 端口）：
+ * 跨书源并发搜索书名（校验作者）→ 选中后由宿主迁移进度并重载阅读会话。
+ * VM 保留并发编排（信号量限流、超时、按到达顺序追加、去重）。
  */
 class ChangeSourceViewModel(application: Application) : AndroidViewModel(application) {
 
@@ -67,11 +56,16 @@ class ChangeSourceViewModel(application: Application) : AndroidViewModel(applica
         private const val PARALLELISM = 8
     }
 
+    private val engine get() = EinkEngineRegistry.changeSourceEngine
+    private val settings get() = EinkEngineRegistry.globalSettings
+
     private val _uiState = MutableStateFlow(ChangeSourceUiState())
     val uiState: StateFlow<ChangeSourceUiState> = _uiState.asStateFlow()
 
     private val _messages = MutableSharedFlow<UserMessage>()
     val messages: SharedFlow<UserMessage> = _messages.asSharedFlow()
+
+    private var bookHandle: BookHandle? = null
 
     private var searchJob: Job? = null
     private var changeJob: Job? = null
@@ -79,12 +73,13 @@ class ChangeSourceViewModel(application: Application) : AndroidViewModel(applica
     fun load(bookUrl: String) {
         if (_uiState.value.book != null) return
         viewModelScope.launch(Dispatchers.IO) {
-            val book = ReadBook.book?.takeIf { it.bookUrl == bookUrl }
-                ?: appDb.bookDao.getBook(bookUrl)
-            if (book == null) {
+            val found = engine.currentReadingBook(bookUrl)
+            if (found == null) {
                 _uiState.update { it.copy(error = "书籍不存在") }
                 return@launch
             }
+            val (handle, book) = found
+            bookHandle = handle
             _uiState.update { it.copy(book = book) }
             startSearch()
         }
@@ -95,19 +90,17 @@ class ChangeSourceViewModel(application: Application) : AndroidViewModel(applica
      */
     fun startSearch() {
         val book = _uiState.value.book ?: return
+        val handle = bookHandle ?: return
         searchJob?.cancel()
         _uiState.update {
             ChangeSourceUiState(book = book, isSearching = true)
         }
         searchJob = viewModelScope.launch(Dispatchers.IO) {
-            val sources = appDb.bookSourceDao.allEnabledPart
-                .mapNotNull { it.getBookSource() }
-                .filter { !it.bookSourceUrl.isBlank() }
-            val author = book.author.replace(AppPattern.authorRegex, "")
-            val checkAuthor = AppConfig.changeSourceCheckAuthor
+            val sources = engine.enabledSources()
+            val checkAuthor = settings.changeSourceCheckAuthor
             _uiState.update { it.copy(totalSourceCount = sources.size) }
 
-            val semaphore = Semaphore(min(PARALLELISM, AppConfig.threadCount))
+            val semaphore = Semaphore(min(PARALLELISM, settings.threadCount))
             val searched = AtomicInteger(0)
             coroutineScope {
                 sources.map { source ->
@@ -115,20 +108,14 @@ class ChangeSourceViewModel(application: Application) : AndroidViewModel(applica
                         semaphore.withPermit {
                             try {
                                 withTimeout(SEARCH_TIMEOUT_MS) {
-                                    WebBook.searchBookAwait(
-                                        source,
-                                        book.name,
-                                        filter = { fName, fAuthor ->
-                                            fName == book.name &&
-                                                    (!checkAuthor || fAuthor.contains(author))
+                                    engine.searchSourceBook(source, book.name, book.author, checkAuthor)
+                                        .forEach { searchBook ->
+                                            if (searchBook.bookUrl != book.bookUrl) {
+                                                onSearchSuccess(searchBook)
+                                            }
                                         }
-                                    ).forEach { searchBook ->
-                                        if (searchBook.bookUrl != book.bookUrl) {
-                                            onSearchSuccess(searchBook, book)
-                                        }
-                                    }
                                 }
-                            } catch (e: CancellationException) {
+                            } catch (e: kotlinx.coroutines.CancellationException) {
                                 throw e
                             } catch (_: Throwable) {
                                 // 单个书源失败不影响整体
@@ -147,11 +134,10 @@ class ChangeSourceViewModel(application: Application) : AndroidViewModel(applica
         }
     }
 
-    private fun onSearchSuccess(searchBook: SearchBook, book: Book) {
-        searchBook.releaseHtmlData()
+    private fun onSearchSuccess(searchBook: ChangeSourceResultUiModel) {
         _uiState.update { state ->
             // 去重：同一书源同一书籍只保留一条
-            if (state.results.any { it.primaryStr() == searchBook.primaryStr() }) {
+            if (state.results.any { it.primary == searchBook.primary }) {
                 state
             } else {
                 state.copy(results = state.results + searchBook)
@@ -160,40 +146,24 @@ class ChangeSourceViewModel(application: Application) : AndroidViewModel(applica
     }
 
     /**
-     * 应用换源：获取目录 → 迁移进度 → 替换记录 → 重载阅读会话。
+     * 应用换源：宿主获取目录 → 迁移进度 → 替换记录 → 重载阅读会话。
      * 成功后由 UI 层 pop 返回阅读页（Route 层回调）。
      */
-    fun changeTo(searchBook: SearchBook, onChanged: () -> Unit) {
+    fun changeTo(searchBook: ChangeSourceResultUiModel, onChanged: () -> Unit) {
         if (_uiState.value.isChanging) return
-        val oldBook = _uiState.value.book ?: return
+        val handle = bookHandle ?: return
         changeJob = viewModelScope.launch(Dispatchers.IO) {
             _uiState.update { it.copy(isChanging = true) }
             try {
-                val source = appDb.bookSourceDao.getBookSource(searchBook.origin)
-                    ?: throw IllegalStateException("书源不存在")
-                val newBook = searchBook.toBook()
-                if (newBook.tocUrl.isEmpty()) {
-                    WebBook.getBookInfoAwait(source, newBook)
-                }
-                val toc = WebBook.getChapterListAwait(source, newBook).getOrThrow()
-
-                oldBook.migrateTo(newBook, toc)
-                newBook.removeType(BookType.updateError)
-                oldBook.delete()
-                appDb.bookDao.insert(newBook)
-                appDb.bookChapterDao.insert(*toc.toTypedArray())
-
-                // 重载引擎会话；阅读页返回时会采用引擎当前书籍
-                ReadBook.resetData(newBook)
-                ReadBook.loadContent(resetPageOffset = true)
-
-                // 导航状态必须在主线程变更
-                withContext(Dispatchers.Main) { onChanged() }
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Throwable) {
-                AppLog.put("换源失败\n${e.localizedMessage}", e)
-                _messages.emit(UserMessage.from(R.string.eink_change_source_failed))
+                engine.changeBookSource(handle, searchBook)
+                    .onSuccess { newHandle ->
+                        bookHandle = newHandle
+                        // 导航状态必须在主线程变更
+                        withContext(Dispatchers.Main) { onChanged() }
+                    }
+                    .onFailure {
+                        _messages.emit(UserMessage.from(R.string.eink_change_source_failed))
+                    }
             } finally {
                 _uiState.update { it.copy(isChanging = false) }
             }

@@ -21,7 +21,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
-import io.legado.app.data.entities.SearchBook
 import io.legado.app.eink.component.EInkHorizontalDivider
 import io.legado.app.eink.component.EInkLoading
 import io.legado.app.eink.component.EInkText
@@ -29,7 +28,6 @@ import io.legado.app.eink.component.EInkTopBar
 import io.legado.app.eink.modifier.staticClickable
 import io.legado.app.eink.theme.EInkSpacing
 import io.legado.app.eink.theme.EInkTheme
-import io.legado.app.help.book.primaryStr
 
 /**
  * 换源 Route — ViewModel 感知层。
@@ -95,7 +93,7 @@ fun ChangeSourceRoute(
 @Composable
 internal fun ChangeSourceScreen(
     state: ChangeSourceUiState,
-    onPick: (SearchBook) -> Unit,
+    onPick: (ChangeSourceResultUiModel) -> Unit,
 ) {
     Box(modifier = Modifier.fillMaxSize()) {
         when {
@@ -113,12 +111,12 @@ internal fun ChangeSourceScreen(
 }
 
 @Composable
-private fun SourceList(state: ChangeSourceUiState, onPick: (SearchBook) -> Unit) {
+private fun SourceList(state: ChangeSourceUiState, onPick: (ChangeSourceResultUiModel) -> Unit) {
     val listState = rememberLazyListState()
     val currentOrigin = state.book?.origin
 
     LazyColumn(state = listState, modifier = Modifier.fillMaxSize()) {
-        items(state.results, key = { it.primaryStr() }) { searchBook ->
+        items(state.results, key = { it.primary }) { searchBook ->
             SourceItem(
                 searchBook = searchBook,
                 isCurrent = searchBook.origin == currentOrigin,
@@ -131,7 +129,7 @@ private fun SourceList(state: ChangeSourceUiState, onPick: (SearchBook) -> Unit)
 
 @Composable
 private fun SourceItem(
-    searchBook: SearchBook,
+    searchBook: ChangeSourceResultUiModel,
     isCurrent: Boolean,
     onClick: () -> Unit,
 ) {

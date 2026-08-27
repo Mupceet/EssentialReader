@@ -11,7 +11,7 @@ import io.legado.app.eink.component.EInkText
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import io.legado.app.BuildConfig
+import io.legado.app.eink.BuildConfig
 import io.legado.app.eink.component.EInkHorizontalDivider
 import io.legado.app.eink.theme.EInkSpacing
 import io.legado.app.eink.theme.EInkTheme

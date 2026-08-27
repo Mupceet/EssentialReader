@@ -20,14 +20,13 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
-import io.legado.app.R
-import io.legado.app.data.entities.SearchBook
+import io.legado.app.eink.R
+
 import io.legado.app.eink.component.EInkHorizontalDivider
 import io.legado.app.eink.component.EInkOperationBar
 import io.legado.app.eink.component.EInkOperationBarIcon
@@ -57,7 +56,7 @@ import kotlinx.coroutines.launch
 @Composable
 fun SearchRoute(
     onBack: () -> Unit,
-    onBookClick: (SearchBook) -> Unit,
+    onBookClick: (SearchBookUiModel) -> Unit,
     viewModel: SearchViewModel = viewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -154,7 +153,7 @@ fun SearchRoute(
             onTabSelect = {},
             navigationIcon = {
                 EInkOperationBarIcon(
-                    icon = painterResource(R.drawable.ic_arrow_back),
+                    icon = painterResource(R.drawable.ic_eink_arrow_back),
                     contentDescription = "返回",
                     onClick = onBack
                 )
@@ -170,8 +169,8 @@ fun SearchRoute(
 @Composable
 private fun ResultList(
     state: SearchUiState,
-    isInBookshelf: (SearchBook) -> Boolean,
-    onBookClick: (SearchBook) -> Unit,
+    isInBookshelf: (SearchBookUiModel) -> Boolean,
+    onBookClick: (SearchBookUiModel) -> Unit,
     pagerListState: LazyListState,
     onPageUp: () -> Unit,
     onPageDown: () -> Unit,
@@ -195,7 +194,7 @@ private fun ResultList(
 }
 
 @Composable
-private fun ResultItem(book: SearchBook, inShelf: Boolean, onClick: () -> Unit) {
+private fun ResultItem(book: SearchBookUiModel, inShelf: Boolean, onClick: () -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -253,7 +252,7 @@ private fun ResultItem(book: SearchBook, inShelf: Boolean, onClick: () -> Unit) 
 
             // 简介（参考 View 版 tv_introduce；无简介显示"暂无简介"）
             EInkText(
-                text = book.trimIntro(LocalContext.current),
+                text = book.intro,
                 style = EInkTheme.typography.bodySmall,
                 color = EInkTheme.colorScheme.onSurfaceVariant,
                 maxLines = 2,

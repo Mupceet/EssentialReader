@@ -22,6 +22,8 @@ android {
 
     buildFeatures {
         compose = true
+        // MineScreen 排版调试入口按变体裁剪（BuildConfig.DEBUG 编译期常量）
+        buildConfig = true
     }
 
     compileOptions {
