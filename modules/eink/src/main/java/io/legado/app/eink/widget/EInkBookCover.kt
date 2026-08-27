@@ -1,7 +1,6 @@
 package io.legado.app.eink.widget
 
 import android.graphics.drawable.Drawable
-import android.net.Uri
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -27,30 +26,27 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.bumptech.glide.RequestBuilder
 import io.legado.app.eink.component.EInkText
+import io.legado.app.eink.engine.EinkEngineRegistry
 import io.legado.app.eink.theme.EInkShapes
 import io.legado.app.eink.theme.EInkSpacing
 import io.legado.app.eink.theme.EInkTheme
-import io.legado.app.help.config.AppConfig
-import io.legado.app.help.glide.OkHttpModelLoader
-import io.legado.app.utils.isAbsUrl
-import io.legado.app.utils.isContentScheme
-import io.legado.app.utils.isDataUrl
-import java.io.File
 
 /** 封面尺寸（与 View 版 item_bookshelf_list.xml 一致：66dp × 90dp）。 */
-internal val EInkCoverWidth = 66.dp
-internal val EInkCoverHeight = 90.dp
+val EInkCoverWidth = 66.dp
+val EInkCoverHeight = 90.dp
 
 /**
  * E-Ink 书籍封面（书架/搜索结果等列表项复用）。
  *
  * 封面加载统一通过 [EInkAsyncImage] 进入 Glide Compose，不在 Compose 侧做
  * bitmap copy 或额外 LruCache；内存缓存、磁盘缓存与生命周期由 Glide 管理。
+ * url 形态判定与请求选项（Wi-Fi 限制、书源 origin 头）经 CoverEngine 端口
+ * 由宿主提供（与 View 版 ImageLoader/CoverImageView 行为对齐）。
  *
  * 无封面地址、用户开启“使用默认封面”、加载中或加载失败时，显示文字占位封面。
  */
 @Composable
-internal fun EInkBookCover(
+fun EInkBookCover(
     url: String?,
     name: String,
     author: String? = null,
@@ -59,7 +55,8 @@ internal fun EInkBookCover(
     height: Dp = EInkCoverHeight,
     sourceOrigin: String? = null,
 ) {
-    if (url.isNullOrBlank() || AppConfig.useDefaultCover) {
+    val coverEngine = EinkEngineRegistry.coverEngine
+    if (url.isNullOrBlank() || coverEngine.useDefaultCover) {
         EInkDefaultCover(name = name, author = author, modifier = modifier)
         return
     }
@@ -68,28 +65,12 @@ internal fun EInkBookCover(
     val targetWidthPx = with(density) { width.toPx() }.toInt()
     val targetHeightPx = with(density) { height.toPx() }.toInt()
 
-    // 与 View 版 ImageLoader.load 保持一致的 path -> model 判断，
-    // 避免 http/content/file/data 不同格式被 Glide 默认 StringLoader 误解。
-    val model: Any? = remember(url) {
-        when {
-            url.isDataUrl() -> url
-            url.isAbsUrl() -> url
-            url.isContentScheme() -> Uri.parse(url)
-            else -> kotlin.runCatching { File(url) }.getOrElse { url }
-        }
-    }
+    // path → Glide model 的判定在宿主 CoverEngine（View 版同款逻辑）
+    val model: Any? = remember(url) { coverEngine.resolveCoverModel(url) }
 
-    // 与 View 版 CoverImageView.load 对齐：透传书源 origin 以支持需要
-    // 自定义请求头（Referer/User-Agent）的封面；书架列表仅 Wi-Fi 加载固定为 false。
     val requestBuilderTransform: (RequestBuilder<Drawable>) -> RequestBuilder<Drawable> =
         remember(model, sourceOrigin, targetWidthPx, targetHeightPx) {
-            { request ->
-                var builder = request.set(OkHttpModelLoader.loadOnlyWifiOption, false)
-                if (sourceOrigin != null) {
-                    builder = builder.set(OkHttpModelLoader.sourceOriginOption, sourceOrigin)
-                }
-                builder.override(targetWidthPx, targetHeightPx)
-            }
+            coverEngine.coverRequestTransform(sourceOrigin, targetWidthPx, targetHeightPx)
         }
 
     // 占位 lambda 稳定实例（键随 name/author 变化）：每次重组新建会让
@@ -158,7 +139,7 @@ private val DescIconSize = 18.dp
  * 作者 / 当前进度章节 / 最新章节等信息行。
  */
 @Composable
-internal fun EInkInfoRow(
+fun EInkInfoRow(
     iconRes: Int,
     text: String,
     style: TextStyle,

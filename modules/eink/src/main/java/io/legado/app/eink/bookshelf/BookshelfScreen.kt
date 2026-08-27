@@ -32,7 +32,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import io.legado.app.R
+import io.legado.app.eink.R
 import io.legado.app.eink.component.EInkLoading
 import io.legado.app.eink.modifier.EInkPageSwipe
 import io.legado.app.eink.theme.EInkSpacing
@@ -79,7 +79,7 @@ internal val EInkBookshelfGridMinCellWidth = 96.dp
  * 均由外层提升供首页底部操作栏驱动。
  */
 @Composable
-internal fun BookshelfScreen(
+fun BookshelfScreen(
     state: BookshelfUiState,
     onBookClick: (String) -> Unit,
     onBookLongClick: (ShelfBookUiModel) -> Unit,

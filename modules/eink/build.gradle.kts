@@ -45,6 +45,11 @@ dependencies {
     implementation(libs.compose.foundation)
     implementation(libs.compose.runtime)
 
+    // ViewModel + 协程（模块承载全部 E-Ink ViewModel）
+    implementation(libs.bundles.coroutines)
+    implementation(libs.lifecycle.viewmodel.compose)
+    implementation(libs.lifecycle.runtime.compose)
+
     // 图片加载（EInkAsyncImage / EInkBookCover 封面）
     implementation(libs.glide.glide)
     implementation(libs.glide.compose)
