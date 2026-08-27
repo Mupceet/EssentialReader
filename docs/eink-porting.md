@@ -103,6 +103,36 @@ app/.../eink/（宿主 = 入口 + 桥接层，移植时按目标引擎重写）
 - **构建变体**：appLegacy / appMax / appS 三 flavor，验证用
   `assembleAppLegacyDebug`。
 
+### 3.2 目标仓二：legado-with-MD3（深度重构 fork，2026-08 实测）
+
+目标 `D:\Projects\AndroidProjects\legado-with-MD3`（main @ 6dc2972）。
+工程形态：AGP 9.2.1 内置 Kotlin（模块不 apply kotlin-android）、
+Kotlin 2.4.0 / Compose BOM 2026.06.01 / Gradle 9.6.1 / minSdk 26 /
+compileSdk 37 / Java 21 / Koin。模块树零源码改动通过构建；
+`modules/eink/build.gradle.kts` 需按对方 catalog 重写
+（compose-bom→`androidx.compose.bom`、`libs.activity.compose`、
+glide-compose 直接坐标、去掉 kotlin-android 插件、Java 21）。
+**入口机制**：接管其实验室「墨水屏显示」开关（`labEInkDisplay`，
+存 "settings" DataStore，可经 `AppConfigStore.getBoolean` 同步读 /
+`putBoolean` 写）——打开即切换、退出即关闭，替代 legadoM-Ink 的
+themeMode "4" 纯净模式分流。
+
+| 桥接文件 | 差异与处置 |
+|---|---|
+| ReaderEngineImpl | **回调双轨**：`ReadBook.CallBack` 仅剩 4 方法（upMenuView/loadChapterList/notifyBookChanged/sureNewProgress），渲染回调拆到 `ReadBook.ReaderRenderCallback`（upContent/upContentAwait/pageChanged/contentLoadFinish/upPageAnim/cancelSelect + LayoutProgressListener.onLayoutException）——适配器同实现两接口，register/unregister 两轨都走；`durPageIndex` 为 durChapterPos 派生只读值（端口本就只读，无影响）；翻页 `moveToNextPage()/moveToPrevPage()` 同名 |
+| ReaderEngineImpl | **排版写入必须走 ReadStyleGateway**（对方根 build.gradle.kts 的 `:verifyConfigArchitecture` 护栏拦 `ReadBookConfig.* =` 直写，且正则无 `(?!=)` 排除——`ReadBookConfig.textBold == 1` 这种**比较**也会误中，用 `.let { it == 1 }` 规避）：17 个 `ReadStyleMutation`（TextSize/LetterSpacing/ParagraphIndent/LineSpacing/ParagraphSpacing/Padding*/Header/FooterPadding*/TextBold 全有键）逐个 `updateCurrentStyle` 后显式 `save()`（updateCurrentStyle 只改内存+publishState）；随后 `ChapterProvider.upStyle()` |
+| ReaderPageCanvas | 护栏禁止 Compose 文件 import 兼容 Config——抗锯齿改 `antiAlias: Boolean` 参数，取值走 `EinkBridge.useAntiAlias`（Koin OtherSettingsGateway）；`ImageColumn` 自带 `book` 字段（换书瞬间旧页重绘不再误取新书），画布用 `column.book` |
+| SearchEngineImpl | **SearchModel 已删除**，多源搜索重构为 `SearchBooksUseCase.execute(BookSearchRequest, control): Flow<SearchRunEvent>`（Started/Progress(upsertBooks…)/Finished）；自带 `BookSearchGateway` 3 方法 DAO 直连实现（对齐其 SearchRepositoryImpl 的 scope→parts 映射）；搜索范围读 local_ui_status DataStore 的 `search_scope` 键（会话内 IO 读一次） |
+| BookshelfEngineImpl | 预缓存入队 `CacheBook.getOrCreate(source, book).addDownload(start, end)`；`startProcessJob(coroutineContext)` 同为 suspend |
+| ReaderEngineImpl (startCache) | `CacheBook.start(ctx, book, start, end)` 为 **suspend**——直接构造 `CacheDownloadRequest(bookUrl, ChapterSelection.Range(...))` 走非 suspend 重载（与其实现等价） |
+| ChangeSourceEngineImpl | `migrateTo(newBook, toc, replaceEnableDefault, chineseConverterType)` 需补两参（对齐其 ChangeBookSourceDialog：AppConfig.replaceEnableDefault / AppConfig.chineseConverterType）；searchBookAwait filter 三参同 legadoM-Ink |
+| EinkBridge (GlobalSettings) | `changeSourceCheckAuthor` 存独立 local_ui_status DataStore，无同步门面——经 Koin `ChangeSourceSettingsGateway` 读；threadCount/autoRefreshBook/preDownloadNum 仍走（@Deprecated 但可用的）AppConfig 门面 |
+| 入口接线 | `MainActivity.onCreate` 在 `checkStartupRoute()`（首启引导）之后分流；`LabConfigRouteScreen` 加 LaunchedEffect：开关为 true 即 CLEAR_TASK 切 `EInkMainActivity`；退出时 `AppConfigStore.putBoolean(labEInkDisplay, false)` + MainActivity CLEAR_TASK；defaultToRead 经 AppConfigStore 同步读，`bookDao.lastReadBook` 存在 |
+
+环境事项：worktree 自带 `local.properties` 不入库需从主 checkout 复制；
+worktree 分支 port/eink 提交 4430933。已保留的旧开关副作用：主题页
+showEInkTheme（"电子书"主题显露）不再可达（打开即切走），无害未动。
+
 ## 4. 兼容性注意事项
 
 - **Compose BOM 版本差**：本模块基于 BOM 2026.06.01 编写，对方为
