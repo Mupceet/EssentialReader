@@ -76,17 +76,32 @@ app/.../eink/（宿主 = 入口 + 桥接层，移植时按目标引擎重写）
 
 ## 3. 引擎差异表（EssentialReader → legadoM-Ink）
 
-桥接层逐文件差异点（探明于 2026-08，基于 legadoM-Ink/main @ b8cabc611）：
+桥接层逐文件差异点（探明于 2026-08，基于 legadoM-Ink/main @ b8cabc611，
+已在 port/eink 分支实测构建通过）：
 
 | 桥接文件 | 差异与处置 |
 |---|---|
-| SearchEngineImpl | `SearchModel.CallBack` 多 `onSearchProgress(completed, total, resultCount)` 与 `onSourceStatesChanged(records)` 两个方法——在匿名 CallBack 里补两个空 override |
+| SearchEngineImpl | `SearchModel.CallBack` 多 `onSearchProgress(completed, total, resultCount)` 与 `onSourceStatesChanged(records: List<SourceSearchRecord>)` 两个方法——补两个空 override；`SourceSearchRecord` 需 import `io.legado.app.model.webBook.SourceSearchRecord` |
 | ChangeSourceEngineImpl | `WebBook.searchBookAwait` 的 `filter` lambda 为三参 `(name, author, kind)`（本仓两参）——仅改 `searchSourceBook` 内这一处 lambda |
 | ReaderEngineImpl | `ReadBook.loadOrUpContent/loadContent/onChapterListUpdated` 多默认参数（调用兼容，无需改）；`ChapterProvider` 排版函数拆至 `TextChapterLayout.kt`（对外 API 同名）；`TextPage.searchResult` 元素类型变为 `TextBaseColumn`（画布的 `when(column)` 走 else 分支，不破坏） |
 | ReaderEngineImpl / TocEngineImpl | `ChapterProvider.srcReplace*` 语义不同（未使用，无影响）；`Book.Config.splitLongChapter` 默认值翻转（行为差异，非编译问题） |
 | EinkBridge (install) | 目标仓需提供 `isEInkPureMode` 系列配置（见 §2 步骤 7）；`SearchScope(AppConfig.searchScope)` 在对方为多书源格式，构造兼容 |
 | ReaderPageCanvas | 对方 `TextLine` 新增 `extraLetterSpacing/wordSpacing/isHtml`（本画布不处理这些偏移——排版细节会与对方 View 版有细微差异，属已知限制）；对方根提交已含全部 `*EInk` ReadBookConfig 字段，无需搬运 |
 | 全局 | 对方 minSdk 21（模块已降到 21）；Kotlin 2.3.10 / Compose BOM 2025.04.01（见 §4）；其自带 E-Ink View 层适配（溢出菜单/WaitDialog 等）与 Compose 版并存不冲突 |
+
+### 3.1 目标仓环境级事项（与代码无关，实测踩坑）
+
+- **签名**：其 `gradle.properties` 提交了 `RELEASE_STORE_FILE=../legado.jks`
+  （维护者本机路径）。无该文件时用命令行覆盖临时密钥：
+  `-PRELEASE_STORE_FILE=<绝对路径> -PRELEASE_STORE_PASSWORD=… -PRELEASE_KEY_ALIAS=… -PRELEASE_KEY_PASSWORD=…`。
+- **google-services.json**：仓库不含（本机/CI 提供），本地构建需放占位
+  （覆盖全部 applicationId 含 `.debug` 后缀变体；其 .gitignore 已排除该文件）。
+- **cronetlib**：`app/cronetlib/*.jar` 为本机依赖（gitignore），缺失时
+  `lib/cronet` 全量编译失败——从任一已有环境复制 5 个 jar。
+- **Gradle wrapper**：对方 8.14，本机已有 8.13 可直接用
+  `<gradle-8.13>/bin/gradle.bat` 调用（AGP 8.13.2 最低要求即 8.13）。
+- **构建变体**：appLegacy / appMax / appS 三 flavor，验证用
+  `assembleAppLegacyDebug`。
 
 ## 4. 兼容性注意事项
 
