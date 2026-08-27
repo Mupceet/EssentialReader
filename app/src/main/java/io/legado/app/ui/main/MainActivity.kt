@@ -46,6 +46,9 @@ import io.legado.app.domain.gateway.MangaSettingsGateway
 import io.legado.app.domain.gateway.OtherSettingsGateway
 import io.legado.app.help.book.BookHelp
 import io.legado.app.help.config.LocalConfig
+import io.legado.app.constant.PreferKey
+import io.legado.app.eink.EInkMainActivity
+import io.legado.app.help.config.AppConfigStore
 import io.legado.app.help.coroutine.Coroutine
 import io.legado.app.help.storage.Backup
 import io.legado.app.help.update.AppUpdateGitHub
@@ -287,6 +290,12 @@ open class MainActivity : BaseComposeActivity(), AudioPlay.CallBack,
         super.onCreate(savedInstanceState)
 
         if (checkStartupRoute()) return
+        // 实验室「墨水屏显示」开关打开时接管界面（首次引导完成后才可能为 true）
+        if (AppConfigStore.getBoolean(PreferKey.labEInkDisplay) == true) {
+            startActivity<EInkMainActivity>()
+            finish()
+            return
+        }
         val shouldAutoCheckUpdate = startupUpdateCheckGate.consume(
             otherSettingsGateway.currentSettings.autoCheckUpdateOnStart
         )

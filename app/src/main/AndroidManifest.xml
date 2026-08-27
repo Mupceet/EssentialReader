@@ -190,6 +190,12 @@
                 android:name="com.samsung.android.support.REMOTE_ACTION"
                 android:resource="@xml/spen_remote_actions" />
         </activity>
+        <!-- E-Ink 墨水屏界面（实验室「墨水屏显示」开关打开时接管界面） -->
+        <activity
+            android:name=".eink.EInkMainActivity"
+            android:label="@string/lab_eink_display_title"
+            android:configChanges="locale|layoutDirection|orientation|screenSize|smallestScreenSize|screenLayout|uiMode"
+            android:windowSoftInputMode="adjustResize" />
         <activity
             android:name=".ui.welcome.WelcomeActivity"
             android:configChanges="locale|layoutDirection|uiMode|screenLayout"
