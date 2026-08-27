@@ -20,6 +20,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.legado.app.R
 import io.legado.app.ui.theme.LegadoTheme
 import io.legado.app.ui.theme.adaptiveContentPadding
+import io.legado.app.utils.startActivity
 import io.legado.app.ui.widget.components.AppScaffold
 import io.legado.app.ui.widget.components.SplicedColumnGroup
 import io.legado.app.ui.widget.components.settingItem.SwitchSettingItem
@@ -50,8 +51,18 @@ fun LabConfigRouteScreen(
             }
         }
     }
+    val state = viewModel.uiState.collectAsStateWithLifecycle().value
+    // 「墨水屏显示」打开即进入 E-Ink 界面（CLEAR_TASK 清空返回栈整体切换）
+    LaunchedEffect(state.settings.enabled && state.settings.eInkDisplay) {
+        if (state.settings.enabled && state.settings.eInkDisplay) {
+            context.startActivity<io.legado.app.eink.EInkMainActivity> {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                addFlags(Intent.FLAG_ACTIVITY_CLEAR_TASK)
+            }
+        }
+    }
     LabConfigScreen(
-        state = viewModel.uiState.collectAsStateWithLifecycle().value,
+        state = state,
         onIntent = viewModel::onIntent,
         onBackClick = onBackClick,
     )
