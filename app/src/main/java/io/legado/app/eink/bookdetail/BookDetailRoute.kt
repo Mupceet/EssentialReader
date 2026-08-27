@@ -33,6 +33,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import io.legado.app.R
+import io.legado.app.eink.R as EinkR
 import io.legado.app.eink.component.EInkLoading
 import io.legado.app.eink.component.EInkOperationBar
 import io.legado.app.eink.component.EInkOperationBarIcon
@@ -174,7 +175,7 @@ internal fun BookDetailScreen(
             state.isEmpty -> {
                 Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
                     EInkText(
-                        text = LocalContext.current.getString(R.string.eink_book_not_found),
+                        text = LocalContext.current.getString(EinkR.string.eink_book_not_found),
                         style = EInkTheme.typography.bodyLarge
                     )
                 }

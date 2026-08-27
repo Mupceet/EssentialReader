@@ -12,7 +12,7 @@ import io.legado.app.data.appDb
 import io.legado.app.data.entities.Book
 import io.legado.app.data.entities.BookProgress
 import io.legado.app.eink.arch.UserMessage
-import io.legado.app.R
+import io.legado.app.eink.R
 import io.legado.app.help.book.BookHelp
 import io.legado.app.help.book.addType
 import io.legado.app.help.book.isLocal

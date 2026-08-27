@@ -27,7 +27,7 @@ private val NoOpRequestBuilderTransform: (RequestBuilder<Drawable>) -> RequestBu
  */
 @OptIn(ExperimentalGlideComposeApi::class)
 @Composable
-internal fun EInkAsyncImage(
+fun EInkAsyncImage(
     model: Any?,
     contentDescription: String?,
     modifier: Modifier = Modifier,

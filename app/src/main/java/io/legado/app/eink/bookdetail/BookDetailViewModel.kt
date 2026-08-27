@@ -3,7 +3,7 @@ package io.legado.app.eink.bookdetail
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import io.legado.app.R
+import io.legado.app.eink.R
 import io.legado.app.constant.AppLog
 import io.legado.app.constant.BookType
 import io.legado.app.data.appDb

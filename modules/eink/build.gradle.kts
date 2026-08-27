@@ -9,7 +9,9 @@ android {
     compileSdk = 36
 
     defaultConfig {
-        minSdk = 23
+        // minSdk 21：可被低 minSdk 宿主（如 legadoM-Ink 上游）直接依赖，
+        // 库 minSdk 高于宿主会导致 manifest merge 失败
+        minSdk = 21
     }
 
     kotlin {
@@ -42,6 +44,10 @@ dependencies {
     implementation(libs.compose.ui.graphics)
     implementation(libs.compose.foundation)
     implementation(libs.compose.runtime)
+
+    // 图片加载（EInkAsyncImage / EInkBookCover 封面）
+    implementation(libs.glide.glide)
+    implementation(libs.glide.compose)
 
     // Tooling (debug only)
     debugImplementation(libs.compose.ui.tooling)
