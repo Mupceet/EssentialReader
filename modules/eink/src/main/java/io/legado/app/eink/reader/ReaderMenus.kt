@@ -33,7 +33,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import io.legado.app.R
+import io.legado.app.eink.R
 import io.legado.app.eink.component.EInkHorizontalDivider
 import io.legado.app.eink.component.EInkOperationBarIcon
 import io.legado.app.eink.component.EInkSteppedSlider
@@ -211,7 +211,7 @@ internal fun ReaderBottomBar(
         ) {
             // 分层返回：关闭设置面板 → 退出阅读
             EInkOperationBarIcon(
-                icon = painterResource(R.drawable.ic_arrow_back),
+                icon = painterResource(R.drawable.ic_eink_arrow_back),
                 contentDescription = "返回",
                 onClick = onBarBack,
             )

@@ -33,10 +33,11 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import io.legado.app.eink.component.EInkText
+import io.legado.app.eink.engine.EinkEngineRegistry
+import io.legado.app.eink.engine.EinkPageContent
 import io.legado.app.eink.modifier.staticClickable
 import io.legado.app.eink.theme.EInkTheme
 import android.view.WindowManager
-import io.legado.app.help.config.AppConfig
 
 /**
  * 阅读 Route — ViewModel 感知层。
@@ -58,6 +59,7 @@ fun ReaderRoute(
     onChangeSource: (String) -> Unit,
     onOpenDetail: (name: String, author: String, bookUrl: String) -> Unit,
     viewModel: ReaderViewModel = viewModel(),
+    pageRenderer: @Composable (page: EinkPageContent?, pageVersion: Int, modifier: Modifier) -> Unit,
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
@@ -106,6 +108,8 @@ fun ReaderRoute(
     Box(modifier = Modifier.fillMaxSize()) {
         ReaderScreen(
             state = uiState,
+            // 绘制叶子（引擎排版产物的画布）由宿主注入
+            pageRenderer = pageRenderer,
             // 顶栏在设置面板打开期间隐藏（保持页眉等顶部调参预览不被遮挡）；
             // 底部操作条常驻可见，承载面板期间的返回与选中态；
             // 边距调整弹框例外：操作条隐藏，保证正文四周边距实时可见
@@ -228,13 +232,14 @@ fun ReaderRoute(
  * 手势（规范 §16）：
  * - 操作条可见时：点/滑动正文任意处收起操作条；
  * - 操作条隐藏时：点中间 40% 唤出操作条，点其余区域下一页；
- * - 水平滑动翻页，判定对齐 View 版：触发距离读 AppConfig.pageTouchSlop
+ * - 水平滑动翻页，判定对齐 View 版：触发距离读引擎 pageTouchSlop（AppConfig.pageTouchSlop 经端口）
  *   （完整版设置"翻页触发距离"，0 = 系统 slop，Compose 版只读不设），
  *   松手前反向回拖取消；无跟手移动，翻页整页立即替换。
  */
 @Composable
 internal fun ReaderScreen(
     state: ReaderUiState,
+    pageRenderer: @Composable (page: EinkPageContent?, pageVersion: Int, modifier: Modifier) -> Unit,
     topBarVisible: Boolean,
     bottomBarVisible: Boolean,
     onPrevPage: () -> Unit,
@@ -289,7 +294,7 @@ internal fun ReaderScreen(
                     }
                     .pointerInput(state.controlsVisible) {
                         // 水平滑动翻页，判定对齐 View 版：
-                        // - 触发距离 = AppConfig.pageTouchSlop（px），0 = 系统 touch slop
+                        // - 触发距离 = 引擎 pageTouchSlop（px），0 = 系统 touch slop
                         //   （该 slop 已由 detectHorizontalDragGestures 消费）；
                         // - 松手前最后一次增量与滑动方向相反则取消（等价 View 版 isCancel）。
                         var dragAccum = 0f
@@ -303,7 +308,7 @@ internal fun ReaderScreen(
                                 if (state.controlsVisible) {
                                     onCenterTap() // 收起操作条，不翻页
                                 } else {
-                                    val slop = AppConfig.pageTouchSlop.toFloat()
+                                    val slop = EinkEngineRegistry.readerEngine.pageTouchSlop.toFloat()
                                     when {
                                         lastDelta * dragAccum < 0f -> Unit // 回拖取消
                                         dragAccum < -slop -> onNextPage()
@@ -324,12 +329,12 @@ internal fun ReaderScreen(
                         }
                     }
             ) {
-                ReaderPageCanvas(
-                    page = state.textPage,
-                    pageVersion = state.pageVersion,
-                    modifier = Modifier.fillMaxSize(),
+                pageRenderer(
+                    state.page,
+                    state.pageVersion,
+                    Modifier.fillMaxSize(),
                 )
-                if (state.isLoading && state.textPage == null) {
+                if (state.isLoading && state.page == null) {
                     Box(
                         modifier = Modifier.fillMaxSize(),
                         contentAlignment = Alignment.Center,

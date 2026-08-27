@@ -21,10 +21,12 @@ import androidx.lifecycle.viewmodel.MutableCreationExtras
 import androidx.lifecycle.viewmodel.compose.LocalViewModelStoreOwner
 import io.legado.app.eink.bookdetail.BookDetailRoute
 import io.legado.app.eink.changesource.ChangeSourceRoute
+import io.legado.app.eink.bridge.TextPageContent
 import io.legado.app.eink.debug.ThemeDebugRoute
 import io.legado.app.eink.home.HomeRoute
 import io.legado.app.eink.navigation.EInkNavController
 import io.legado.app.eink.navigation.EInkScreen
+import io.legado.app.eink.reader.ReaderPageCanvas
 import io.legado.app.eink.reader.ReaderRoute
 import io.legado.app.eink.search.SearchRoute
 import io.legado.app.eink.toc.TocRoute
@@ -89,6 +91,15 @@ fun EInkApp(
                 // 后续支持收起状态栏时，该区域即页眉区域，正文始终从页眉之下开始
                 ReaderRoute(
                     bookUrl = screen.bookUrl,
+                    // 绘制叶子留在 app（直接操作引擎 ChapterProvider 画笔与
+                    // TextPage 坐标），经槽位注入模块的 ReaderScreen
+                    pageRenderer = { page, version, modifier ->
+                        ReaderPageCanvas(
+                            page = (page as? TextPageContent)?.textPage,
+                            pageVersion = version,
+                            modifier = modifier,
+                        )
+                    },
                     onBack = { controller.pop() },
                     onOpenToc = { bookUrl ->
                         controller.navigate(EInkScreen.Toc(bookUrl, fromReader = true))

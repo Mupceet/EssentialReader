@@ -51,6 +51,7 @@ dependencies {
     implementation(libs.bundles.coroutines)
     implementation(libs.lifecycle.viewmodel.compose)
     implementation(libs.lifecycle.runtime.compose)
+    implementation(libs.activity.compose)
 
     // 图片加载（EInkAsyncImage / EInkBookCover 封面）
     implementation(libs.glide.glide)

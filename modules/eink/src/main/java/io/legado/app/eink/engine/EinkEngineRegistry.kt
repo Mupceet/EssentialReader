@@ -32,6 +32,8 @@ object EinkEngineRegistry {
         private set
     lateinit var coverEngine: CoverEngine
         private set
+    lateinit var readerEngine: ReaderEngine
+        private set
 
     @Volatile
     var installed: Boolean = false
@@ -49,6 +51,7 @@ object EinkEngineRegistry {
         bookDetailEngine: BookDetailEngine,
         changeSourceEngine: ChangeSourceEngine,
         coverEngine: CoverEngine,
+        readerEngine: ReaderEngine,
     ) {
         this.globalSettings = globalSettings
         this.bookshelfEngine = bookshelfEngine
@@ -57,6 +60,7 @@ object EinkEngineRegistry {
         this.bookDetailEngine = bookDetailEngine
         this.changeSourceEngine = changeSourceEngine
         this.coverEngine = coverEngine
+        this.readerEngine = readerEngine
         installed = true
     }
 }

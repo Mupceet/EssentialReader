@@ -37,6 +37,7 @@ object EinkBridge {
             bookDetailEngine = BookDetailEngineImpl,
             changeSourceEngine = ChangeSourceEngineImpl,
             coverEngine = CoverEngineImpl,
+            readerEngine = ReaderEngineImpl,
         )
     }
 }
