@@ -1,6 +1,7 @@
 package io.legado.app.eink
 
 import android.app.Activity
+import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -12,12 +13,18 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
 import androidx.lifecycle.lifecycleScope
 import io.legado.app.data.appDb
 import io.legado.app.eink.bridge.EinkBridge
+import io.legado.app.eink.bridge.TextPageContent
+import io.legado.app.eink.reader.ReaderPageCanvas
 import io.legado.app.eink.theme.EInkTheme
+import io.legado.app.help.config.AppConfig
+import io.legado.app.ui.main.MainActivity
+import io.legado.app.utils.startActivity
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
@@ -88,11 +95,33 @@ private fun EInkRoot(initialReaderBookUrl: String?) {
         onDispose { }
     }
 
+    val context = LocalContext.current
+
     Box(
         modifier = Modifier
             .fillMaxSize()
             .background(scheme.background)
     ) {
-        EInkApp(initialReaderBookUrl = initialReaderBookUrl)
+        EInkApp(
+            initialReaderBookUrl = initialReaderBookUrl,
+            // 宿主引擎能力出口 1：完整模式（View UI）——恢复原主题并全量
+            // 跳转（导入导出等管理功能在完整模式中完成，再次启用需在
+            // 完整模式中选择纯净阅读(墨水屏)主题）
+            onExitToFullMode = {
+                AppConfig.exitEInkPureMode()
+                context.startActivity<MainActivity> {
+                    addFlags(Intent.FLAG_ACTIVITY_CLEAR_TASK)
+                }
+            },
+            // 宿主引擎能力出口 2：阅读绘制叶子——直接操作引擎
+            // ChapterProvider 画笔与 TextPage 坐标，与 View 版渲染零分岔
+            pageRenderer = { page, version, modifier ->
+                ReaderPageCanvas(
+                    page = (page as? TextPageContent)?.textPage,
+                    pageVersion = version,
+                    modifier = modifier,
+                )
+            },
+        )
     }
 }

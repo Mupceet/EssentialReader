@@ -1,7 +1,6 @@
 package io.legado.app.eink
 
 import android.app.Application
-import android.content.Intent
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -21,18 +20,14 @@ import androidx.lifecycle.viewmodel.MutableCreationExtras
 import androidx.lifecycle.viewmodel.compose.LocalViewModelStoreOwner
 import io.legado.app.eink.bookdetail.BookDetailRoute
 import io.legado.app.eink.changesource.ChangeSourceRoute
-import io.legado.app.eink.bridge.TextPageContent
 import io.legado.app.eink.debug.ThemeDebugRoute
+import io.legado.app.eink.engine.EinkPageContent
 import io.legado.app.eink.home.HomeRoute
 import io.legado.app.eink.navigation.EInkNavController
 import io.legado.app.eink.navigation.EInkScreen
-import io.legado.app.eink.reader.ReaderPageCanvas
 import io.legado.app.eink.reader.ReaderRoute
 import io.legado.app.eink.search.SearchRoute
 import io.legado.app.eink.toc.TocRoute
-import io.legado.app.help.config.AppConfig
-import io.legado.app.ui.main.MainActivity
-import io.legado.app.utils.startActivity
 
 /**
  * E-Ink 应用根 Composable。
@@ -47,6 +42,9 @@ import io.legado.app.utils.startActivity
 @Composable
 fun EInkApp(
     initialReaderBookUrl: String? = null,
+    // 宿主注入的引擎能力出口：绘制叶子（引擎画布）与"退出到完整模式"
+    onExitToFullMode: () -> Unit,
+    pageRenderer: @Composable (page: EinkPageContent?, pageVersion: Int, modifier: Modifier) -> Unit,
     controller: EInkNavController = EInkNavController.remember(
         initialStack(initialReaderBookUrl)
     ),
@@ -68,7 +66,6 @@ fun EInkApp(
     // 实现 HasDefaultViewModelProviderFactory 以便 AndroidViewModel(application)
     // 等构造方式仍可正常创建。
     val app = LocalContext.current.applicationContext as Application
-    val context = LocalContext.current
     val viewModelStoreOwner = remember(controller, app) {
         object : ViewModelStoreOwner, HasDefaultViewModelProviderFactory {
             override val viewModelStore: ViewModelStore
@@ -91,15 +88,9 @@ fun EInkApp(
                 // 后续支持收起状态栏时，该区域即页眉区域，正文始终从页眉之下开始
                 ReaderRoute(
                     bookUrl = screen.bookUrl,
-                    // 绘制叶子留在 app（直接操作引擎 ChapterProvider 画笔与
-                    // TextPage 坐标），经槽位注入模块的 ReaderScreen
-                    pageRenderer = { page, version, modifier ->
-                        ReaderPageCanvas(
-                            page = (page as? TextPageContent)?.textPage,
-                            pageVersion = version,
-                            modifier = modifier,
-                        )
-                    },
+                    // 绘制叶子留在宿主 app（直接操作引擎 ChapterProvider 画笔
+                    // 与 TextPage 坐标），经槽位注入
+                    pageRenderer = pageRenderer,
                     onBack = { controller.pop() },
                     onOpenToc = { bookUrl ->
                         controller.navigate(EInkScreen.Toc(bookUrl, fromReader = true))
@@ -130,15 +121,9 @@ fun EInkApp(
                             )
                         },
                         onSearch = { controller.navigate(EInkScreen.Search) },
-                        onOpenFullMode = {
-                            // 完整模式（View UI）：恢复原主题，墨水屏界面退出；
-                            // 导入导出等管理功能在完整模式中完成，
-                            // 再次启用需在完整模式中选择纯净阅读(墨水屏)主题
-                            AppConfig.exitEInkPureMode()
-                            context.startActivity<MainActivity> {
-                                addFlags(Intent.FLAG_ACTIVITY_CLEAR_TASK)
-                            }
-                        },
+                        // 完整模式（View UI）退出由宿主实现：恢复原主题并跳转
+                        // 完整模式首页（导入导出等管理功能在完整模式中完成）
+                        onOpenFullMode = onExitToFullMode,
                         onOpenThemeDebug = {
                             controller.navigate(EInkScreen.ThemeDebug)
                         },
