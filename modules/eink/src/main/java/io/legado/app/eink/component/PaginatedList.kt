@@ -89,7 +89,7 @@ fun <T> PaginatedList(
 
         // Page indicator
         if (showPageIndicator && pagerState.pageCount > 1 && indicatorStyle != PageIndicatorStyle.None) {
-            Spacer(modifier = Modifier.height(EinkPaginatedSpacing))
+            Spacer(modifier = Modifier.height(EInkPaginatedSpacing))
 
             when (indicatorStyle) {
                 PageIndicatorStyle.Dots -> EInkDotPageIndicator(
@@ -136,8 +136,8 @@ fun <T> SimplePaginatedList(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(EinkPaginatedPadding),
-            verticalArrangement = Arrangement.spacedBy(EinkPaginatedItemSpacing)
+                .padding(EInkPaginatedPadding),
+            verticalArrangement = Arrangement.spacedBy(EInkPaginatedItemSpacing)
         ) {
             pageItems.forEachIndexed { localIndex, item ->
                 val globalIndex = pageIndex * itemsPerPage + localIndex
@@ -194,14 +194,14 @@ fun <T> PaginatedGrid(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(EinkPaginatedPadding),
-            verticalArrangement = Arrangement.spacedBy(EinkPaginatedItemSpacing)
+                .padding(EInkPaginatedPadding),
+            verticalArrangement = Arrangement.spacedBy(EInkPaginatedItemSpacing)
         ) {
             // Chunk by columns so each chunk is one visual row.
             pageItems.chunked(columns).forEachIndexed { rowIndex, rowItems ->
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(EinkPaginatedItemSpacing)
+                    horizontalArrangement = Arrangement.spacedBy(EInkPaginatedItemSpacing)
                 ) {
                     rowItems.forEachIndexed { colIndex, item ->
                         // Offset-based index: unique regardless of item equality,
@@ -277,6 +277,6 @@ private fun Modifier.tapToTurnPage(pagerState: PagerState): Modifier = composed 
 
 // Local spacing constants — keep the paginated components consistent with the
 // rest of the kit (16dp page padding, 8dp item gap, 16dp indicator gap).
-private val EinkPaginatedSpacing = EInkSpacing.m
-private val EinkPaginatedPadding = EInkSpacing.m
-private val EinkPaginatedItemSpacing = EInkSpacing.s
+private val EInkPaginatedSpacing = EInkSpacing.m
+private val EInkPaginatedPadding = EInkSpacing.m
+private val EInkPaginatedItemSpacing = EInkSpacing.s

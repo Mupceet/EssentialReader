@@ -9,11 +9,11 @@ import androidx.lifecycle.viewModelScope
 import io.legado.app.eink.R
 import io.legado.app.eink.arch.UserMessage
 import io.legado.app.eink.engine.BookPrepResult
-import io.legado.app.eink.engine.EinkEngineRegistry
-import io.legado.app.eink.engine.EinkPageContent
+import io.legado.app.eink.engine.EInkEngineRegistry
+import io.legado.app.eink.engine.EInkPageContent
 import io.legado.app.eink.engine.ReaderBookSnapshot
 import io.legado.app.eink.engine.ReaderEngineCallback
-import io.legado.app.eink.settings.EinkSettings
+import io.legado.app.eink.settings.EInkSettings
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -64,7 +64,7 @@ data class ReaderUiState(
     val bookAuthor: String = "",
     val bookUrl: String = "",
     val chapterTitle: String = "",
-    val page: EinkPageContent? = null,
+    val page: EInkPageContent? = null,
     val pageVersion: Int = 0,
     val pageIndex: Int = 0,
     val pageCount: Int = 0,
@@ -75,7 +75,7 @@ data class ReaderUiState(
     val error: String? = null,
     val controlsVisible: Boolean = false,
     val autoPlay: Boolean = false,
-    val autoPlayIntervalSec: Int = EinkSettings.DEFAULT_AUTO_INTERVAL_SEC,
+    val autoPlayIntervalSec: Int = EInkSettings.DEFAULT_AUTO_INTERVAL_SEC,
     val isLocalBook: Boolean = false,
     val inBookshelf: Boolean = false,
     val keepScreenOn: Boolean = false,
@@ -109,7 +109,7 @@ data class ReaderUiState(
  *
  * 桥接引擎全局状态机（经 [io.legado.app.eink.engine.ReaderEngine] 端口）
  * 到 Compose StateFlow：
- * - 复用 View 版渲染引擎（宿主 ChapterProvider 排版产物经 EinkPageContent
+ * - 复用 View 版渲染引擎（宿主 ChapterProvider 排版产物经 EInkPageContent
  *   句柄进入状态，绘制由宿主画布槽位完成）；
  * - 排版参数以 ReaderTextStyle 快照整体经端口写回（与 View 版共用一套
  *   阅读配置）；
@@ -117,12 +117,12 @@ data class ReaderUiState(
  */
 class ReaderViewModel(application: Application) : AndroidViewModel(application), ReaderEngineCallback {
 
-    private val engine get() = EinkEngineRegistry.readerEngine
+    private val engine get() = EInkEngineRegistry.readerEngine
 
     private val _uiState = MutableStateFlow(
         ReaderUiState(
-            keepScreenOn = EinkSettings.readerKeepScreenOn,
-            autoPlayIntervalSec = EinkSettings.readerAutoIntervalSec
+            keepScreenOn = EInkSettings.readerKeepScreenOn,
+            autoPlayIntervalSec = EInkSettings.readerAutoIntervalSec
                 .coerceIn(MIN_AUTO_INTERVAL_SEC, MAX_AUTO_INTERVAL_SEC),
             textBold = engine.textBold,
             style = engine.currentStyle(),
@@ -330,7 +330,7 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application),
         _uiState.update {
             val value = (it.autoPlayIntervalSec + deltaSec)
                 .coerceIn(MIN_AUTO_INTERVAL_SEC, MAX_AUTO_INTERVAL_SEC)
-            EinkSettings.readerAutoIntervalSec = value
+            EInkSettings.readerAutoIntervalSec = value
             it.copy(autoPlayIntervalSec = value)
         }
     }
@@ -455,7 +455,7 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application),
 
     fun toggleKeepScreenOn() {
         _uiState.update {
-            EinkSettings.readerKeepScreenOn = !it.keepScreenOn
+            EInkSettings.readerKeepScreenOn = !it.keepScreenOn
             it.copy(keepScreenOn = !it.keepScreenOn)
         }
     }

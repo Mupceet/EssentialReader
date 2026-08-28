@@ -3,7 +3,7 @@ package io.legado.app.eink.search
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import io.legado.app.eink.engine.EinkEngineRegistry
+import io.legado.app.eink.engine.EInkEngineRegistry
 import io.legado.app.eink.engine.SearchSession
 import io.legado.app.eink.engine.SearchSessionCallback
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -37,7 +37,7 @@ data class SearchUiState(
  */
 class SearchViewModel(application: Application) : AndroidViewModel(application) {
 
-    private val engine get() = EinkEngineRegistry.searchEngine
+    private val engine get() = EInkEngineRegistry.searchEngine
 
     private val _uiState = MutableStateFlow(SearchUiState())
     val uiState: StateFlow<SearchUiState> = _uiState.asStateFlow()

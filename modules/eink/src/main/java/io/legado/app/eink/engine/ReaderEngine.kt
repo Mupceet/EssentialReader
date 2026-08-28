@@ -10,7 +10,7 @@ import io.legado.app.eink.reader.ReaderTextStyle
  * 宿主实现类需保证 equals 恒为引用相等（同一实例引擎可能原地更新，
  * 重绘由 pageVersion 驱动）。
  */
-interface EinkPageContent {
+interface EInkPageContent {
     /** 页所属章节标题（页眉/标题展示）。 */
     val title: String
 
@@ -62,7 +62,7 @@ interface ReaderEngineCallback {
  * 阅读器端口：宿主 ReadBook 全局状态机 + ChapterProvider 排版引擎的
  * 转发面。E-Ink 阅读页 VM 通过本端口驱动引擎并接收状态推送；
  * 排版参数以 [ReaderTextStyle] 快照整体写入（内部映射宿主 ReadBookConfig
- * 各字段），排版产物经 [EinkPageContent] 不透明句柄进入模块状态。
+ * 各字段），排版产物经 [EInkPageContent] 不透明句柄进入模块状态。
  */
 interface ReaderEngine {
 
@@ -98,7 +98,7 @@ interface ReaderEngine {
     val currentChapterPageSize: Int
 
     /** 当前页（durPageIndex 对应页；未就绪返回 null）。 */
-    fun currentPage(): EinkPageContent?
+    fun currentPage(): EInkPageContent?
 
     // ---- 会话控制 ----
 

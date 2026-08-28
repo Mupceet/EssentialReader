@@ -153,7 +153,7 @@ fun SearchRoute(
             onTabSelect = {},
             navigationIcon = {
                 EInkOperationBarIcon(
-                    icon = painterResource(R.drawable.ic_eink_arrow_back),
+                    icon = painterResource(R.drawable.eink_ic_arrow_back),
                     contentDescription = "返回",
                     onClick = onBack
                 )
@@ -237,14 +237,14 @@ private fun ResultItem(book: SearchBookUiModel, inShelf: Boolean, onClick: () ->
             }
             // 作者（移除书源信息，与首页一致）
             EInkInfoRow(
-                iconRes = R.drawable.ic_author,
+                iconRes = R.drawable.eink_ic_author,
                 text = book.author.ifBlank { "佚名" },
                 style = EInkTheme.typography.bodySmall
             )
             // 最新章节（有则显示）
             book.latestChapterTitle?.takeIf { it.isNotBlank() }?.let { title ->
                 EInkInfoRow(
-                    iconRes = R.drawable.ic_book_last,
+                    iconRes = R.drawable.eink_ic_book_last,
                     text = title,
                     style = EInkTheme.typography.labelMedium
                 )

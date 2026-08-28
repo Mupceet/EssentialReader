@@ -10,7 +10,7 @@ import android.content.SharedPreferences
  * 且落在同一默认 SharedPreferences 文件（`<packageName>_preferences`），
  * 老用户设置无损迁移。
  */
-object EinkSettings {
+object EInkSettings {
 
     /** 自动翻页默认间隔（秒）。 */
     const val DEFAULT_AUTO_INTERVAL_SEC = 20
@@ -36,7 +36,7 @@ object EinkSettings {
     }
 
     private fun requirePrefs(): SharedPreferences =
-        prefs ?: error("EinkSettings 未初始化：宿主入口需先调用 attach(context)")
+        prefs ?: error("EInkSettings 未初始化：宿主入口需先调用 attach(context)")
 
     /** 书架网格布局（true = 网格）。 */
     var isBookshelfGrid: Boolean

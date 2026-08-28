@@ -18,7 +18,7 @@ import androidx.lifecycle.ViewModelStore
  *  - pop 返回 → 复用原 store（返回时保留界面状态，如搜索结果）；
  *  - 条目出栈 → clear store（触发 ViewModel.onCleared）。
  *
- * 配合 [EinkApp] 中按 entryId 提供 ViewModelStoreOwner 与 SaveableStateProvider，
+ * 配合 [EInkApp] 中按 entryId 提供 ViewModelStoreOwner 与 SaveableStateProvider，
  * 实现"退出界面再进入 == 首次进入"（如搜索界面）。
  */
 class EInkNavController internal constructor(

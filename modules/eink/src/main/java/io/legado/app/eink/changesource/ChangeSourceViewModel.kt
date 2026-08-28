@@ -6,7 +6,7 @@ import androidx.lifecycle.viewModelScope
 import io.legado.app.eink.R
 import io.legado.app.eink.arch.UserMessage
 import io.legado.app.eink.engine.BookHandle
-import io.legado.app.eink.engine.EinkEngineRegistry
+import io.legado.app.eink.engine.EInkEngineRegistry
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.coroutineScope
@@ -56,8 +56,8 @@ class ChangeSourceViewModel(application: Application) : AndroidViewModel(applica
         private const val PARALLELISM = 8
     }
 
-    private val engine get() = EinkEngineRegistry.changeSourceEngine
-    private val settings get() = EinkEngineRegistry.globalSettings
+    private val engine get() = EInkEngineRegistry.changeSourceEngine
+    private val settings get() = EInkEngineRegistry.globalSettings
 
     private val _uiState = MutableStateFlow(ChangeSourceUiState())
     val uiState: StateFlow<ChangeSourceUiState> = _uiState.asStateFlow()

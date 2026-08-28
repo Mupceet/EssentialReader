@@ -211,8 +211,8 @@ internal fun TocScreen(
                 // 图标随状态互换（asc/desc 成对素材）
                 EInkOperationBarIcon(
                     icon = painterResource(
-                        if (state.isReversed) R.drawable.ic_toc_sort_desc
-                        else R.drawable.ic_toc_sort_asc
+                        if (state.isReversed) R.drawable.eink_ic_toc_sort_desc
+                        else R.drawable.eink_ic_toc_sort_asc
                     ),
                     contentDescription = if (state.isReversed) "倒序" else "正序",
                     onClick = onToggleReverse,
@@ -260,19 +260,19 @@ internal fun TocScreen(
             onTabSelect = {},
             navigationIcon = {
                 EInkOperationBarIcon(
-                    icon = painterResource(R.drawable.ic_eink_arrow_back),
+                    icon = painterResource(R.drawable.eink_ic_arrow_back),
                     contentDescription = "返回",
                     onClick = onBack
                 )
             },
             actions = {
                 EInkOperationBarIcon(
-                    icon = painterResource(R.drawable.ic_toc_locate),
+                    icon = painterResource(R.drawable.eink_ic_toc_locate),
                     contentDescription = "回到当前",
                     onClick = onBackToCurrent
                 )
                 EInkOperationBarIcon(
-                    icon = painterResource(R.drawable.ic_toc_to_bottom),
+                    icon = painterResource(R.drawable.eink_ic_toc_to_bottom),
                     contentDescription = "去底部",
                     onClick = onGoToBottom
                 )
@@ -371,7 +371,7 @@ private fun ChapterItem(chapter: ChapterUiModel, isCurrent: Boolean, cached: Boo
         if (!cached) {
             // 未下载缓存标记（云图标，与 View 版一致），颜色随按压反色
             Image(
-                painter = painterResource(id = R.drawable.ic_outline_cloud_24),
+                painter = painterResource(id = R.drawable.eink_ic_outline_cloud_24),
                 contentDescription = "未缓存",
                 modifier = Modifier.size(IconSize),
                 colorFilter = ColorFilter.tint(titleColor),

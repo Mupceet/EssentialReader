@@ -5,7 +5,7 @@ package io.legado.app.eink.engine
  *
  * 只收录 E-Ink VM 编排真正读取的键；E-Ink 自有的界面偏好
  * （书架网格布局、阅读页常亮/自动翻页间隔）不在此列 ——
- * 它们由 [io.legado.app.eink.settings.EinkSettings] 自管，
+ * 它们由 [io.legado.app.eink.settings.EInkSettings] 自管，
  * 随模块走。
  */
 interface GlobalSettings {

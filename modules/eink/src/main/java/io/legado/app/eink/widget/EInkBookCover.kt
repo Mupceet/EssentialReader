@@ -26,7 +26,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.bumptech.glide.RequestBuilder
 import io.legado.app.eink.component.EInkText
-import io.legado.app.eink.engine.EinkEngineRegistry
+import io.legado.app.eink.engine.EInkEngineRegistry
 import io.legado.app.eink.theme.EInkShapes
 import io.legado.app.eink.theme.EInkSpacing
 import io.legado.app.eink.theme.EInkTheme
@@ -55,7 +55,7 @@ fun EInkBookCover(
     height: Dp = EInkCoverHeight,
     sourceOrigin: String? = null,
 ) {
-    val coverEngine = EinkEngineRegistry.coverEngine
+    val coverEngine = EInkEngineRegistry.coverEngine
     if (url.isNullOrBlank() || coverEngine.useDefaultCover) {
         EInkDefaultCover(name = name, author = author, modifier = modifier)
         return
