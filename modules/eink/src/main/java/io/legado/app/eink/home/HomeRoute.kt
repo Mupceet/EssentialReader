@@ -202,7 +202,7 @@ internal fun HomeScreen(
         Box(modifier = Modifier.weight(1f)) {
             // 两个 Tab 常驻组合（E-Ink 零动画规范）：切换只翻转各自 Pane 的
             // 可见性（小作用域），不销毁/重建组合树——书架整页条目（含
-            // Glide 封面请求）在 Tab 往返时零重组；隐藏期间数据更新照常
+            // 封面请求）在 Tab 往返时零重组；隐藏期间数据更新照常
             // 预热，切回即时可见
             HomePane(visible = selectedTab == HomeTabs.BOOKSHELF) { bookshelf() }
             HomePane(visible = selectedTab != HomeTabs.BOOKSHELF) { mine() }

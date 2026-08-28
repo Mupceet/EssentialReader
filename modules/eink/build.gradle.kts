@@ -51,9 +51,9 @@ dependencies {
     implementation(libs.androidx.lifecycle.runtime.compose)
     implementation(libs.activity.compose)
 
-    // 图片加载（EInkAsyncImage / EInkBookCover 封面）
-    implementation(libs.glide.glide)
-    implementation("com.github.bumptech.glide:compose:1.0.0-beta08")
+    // 图片加载（EInkAsyncImage / EInkBookCover 封面）— 与宿主共用 Coil 3
+    // 单例 ImageLoader（拦截器/书源请求头由宿主提供），不走 beta 的 glide-compose
+    implementation(libs.coil.compose)
 
     // Tooling (debug only)
     debugImplementation(libs.androidx.compose.ui.tooling)

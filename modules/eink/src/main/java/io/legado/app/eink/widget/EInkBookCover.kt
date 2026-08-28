@@ -1,6 +1,5 @@
 package io.legado.app.eink.widget
 
-import android.graphics.drawable.Drawable
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -17,6 +16,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.TextStyle
@@ -24,7 +24,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import com.bumptech.glide.RequestBuilder
+import coil3.request.ImageRequest
+import coil3.request.crossfade
 import io.legado.app.eink.component.EInkText
 import io.legado.app.eink.engine.EInkEngineRegistry
 import io.legado.app.eink.theme.EInkShapes
@@ -38,10 +39,11 @@ val EInkCoverHeight = 90.dp
 /**
  * E-Ink 书籍封面（书架/搜索结果等列表项复用）。
  *
- * 封面加载统一通过 [EInkAsyncImage] 进入 Glide Compose，不在 Compose 侧做
- * bitmap copy 或额外 LruCache；内存缓存、磁盘缓存与生命周期由 Glide 管理。
- * url 形态判定与请求选项（Wi-Fi 限制、书源 origin 头）经 CoverEngine 端口
- * 由宿主提供（与 View 版 ImageLoader/CoverImageView 行为对齐）。
+ * 封面加载统一通过 [EInkAsyncImage] 进入 Coil，不在 Compose 侧做
+ * bitmap copy 或额外 LruCache；内存缓存、磁盘缓存与生命周期由宿主
+ * 单例 ImageLoader 管理。url 原样作为 data，请求选项（书源 origin 头、
+ * 目标尺寸）经 CoverEngine 端口由宿主提供（与 MD3 主工程
+ * buildCoverImageRequest 行为对齐）。
  *
  * 无封面地址、用户开启“使用默认封面”、加载中或加载失败时，显示文字占位封面。
  */
@@ -65,18 +67,22 @@ fun EInkBookCover(
     val targetWidthPx = with(density) { width.toPx() }.toInt()
     val targetHeightPx = with(density) { height.toPx() }.toInt()
 
-    // path → Glide model 的判定在宿主 CoverEngine（View 版同款逻辑）
-    val model: Any? = remember(url) { coverEngine.resolveCoverModel(url) }
+    val context = LocalContext.current
 
-    val requestBuilderTransform: (RequestBuilder<Drawable>) -> RequestBuilder<Drawable> =
-        remember(model, sourceOrigin, targetWidthPx, targetHeightPx) {
-            coverEngine.coverRequestTransform(sourceOrigin, targetWidthPx, targetHeightPx)
-        }
+    // 请求实例按入参 remember：重组间保持同一 ImageRequest，避免请求被
+    // 反复重建。crossfade(false) 显式关闭：宿主单例 ImageLoader 全局开
+    // crossfade，与墨水屏零动画规范冲突，必须逐请求覆盖
+    val model: Any? = remember(context, url, sourceOrigin, targetWidthPx, targetHeightPx) {
+        ImageRequest.Builder(context)
+            .data(url)
+            .crossfade(false)
+            .apply(coverEngine.coverRequestOptions(sourceOrigin, targetWidthPx, targetHeightPx))
+            .build()
+    }
 
     // 占位 lambda 稳定实例（键随 name/author 变化）：每次重组新建会让
-    // GlideImage 内部 remember 失效、请求被反复重建。占位内容用
-    // fillMaxSize（单例 Modifier）填满 GlideImage 自身边界，与外层传入
-    // 的尺寸修饰效果一致
+    // EInkAsyncImage 的占位内容反复换实例。占位内容用 fillMaxSize（单例
+    // Modifier）填满 EInkAsyncImage 自身边界，与外层传入的尺寸修饰效果一致
     val placeholderContent: @Composable () -> Unit = remember(name, author) {
         { EInkDefaultCover(name = name, author = author, modifier = Modifier.fillMaxSize()) }
     }
@@ -87,7 +93,6 @@ fun EInkBookCover(
         modifier = modifier,
         loading = placeholderContent,
         failure = placeholderContent,
-        requestBuilderTransform = requestBuilderTransform,
     )
 }
 

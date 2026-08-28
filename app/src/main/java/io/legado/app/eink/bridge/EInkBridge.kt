@@ -1,22 +1,16 @@
 package io.legado.app.eink.bridge
 
 import android.content.Context
-import android.graphics.drawable.Drawable
-import android.net.Uri
-import com.bumptech.glide.RequestBuilder
+import coil3.request.ImageRequest
 import io.legado.app.eink.engine.CoverEngine
 import io.legado.app.eink.engine.EInkEngineRegistry
 import io.legado.app.eink.engine.GlobalSettings
 import io.legado.app.eink.settings.EInkSettings
 import io.legado.app.domain.gateway.OtherSettingsGateway
 import io.legado.app.help.config.AppConfig
-import io.legado.app.help.glide.OkHttpModelLoader
-import io.legado.app.utils.isAbsUrl
-import io.legado.app.utils.isContentScheme
-import io.legado.app.utils.isDataUrl
+import io.legado.app.help.coil.CoverExtras
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
-import java.io.File
 
 /**
  * E-Ink 引擎桥接层装配入口。
@@ -74,28 +68,25 @@ private object GlobalSettingsImpl : GlobalSettings, KoinComponent {
         get() = changeSourceSettingsGateway.currentSettings.checkAuthor
 }
 
-/** 封面加载端口实现（Glide 集成 + View 版同款请求选项）。 */
+/**
+ * 封面加载端口实现（Coil 集成 + MD3 主工程 buildCoverImageRequest 同款
+ * 请求选项）。封面 data 不做形态转换，url 原样交给单例 ImageLoader 的
+ * CoverInterceptor / 内置 fetcher；仅 Wi-Fi 加载固定关闭（不设
+ * LoadOnlyWifi extra 即为关闭）。
+ */
 private object CoverEngineImpl : CoverEngine {
 
     override val useDefaultCover: Boolean
         get() = AppConfig.useDefaultCover
 
-    override fun resolveCoverModel(url: String): Any = when {
-        url.isDataUrl() -> url
-        url.isAbsUrl() -> url
-        url.isContentScheme() -> Uri.parse(url)
-        else -> kotlin.runCatching { File(url) }.getOrElse { url }
-    }
-
-    override fun coverRequestTransform(
+    override fun coverRequestOptions(
         sourceOrigin: String?,
         widthPx: Int,
         heightPx: Int,
-    ): (RequestBuilder<Drawable>) -> RequestBuilder<Drawable> = { request ->
-        var builder = request.set(OkHttpModelLoader.loadOnlyWifiOption, false)
+    ): ImageRequest.Builder.() -> Unit = {
         if (sourceOrigin != null) {
-            builder = builder.set(OkHttpModelLoader.sourceOriginOption, sourceOrigin)
+            extras[CoverExtras.SourceOrigin] = sourceOrigin
         }
-        builder.override(widthPx, heightPx)
+        size(widthPx, heightPx)
     }
 }
