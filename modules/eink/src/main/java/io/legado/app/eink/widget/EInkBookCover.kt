@@ -15,6 +15,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -45,6 +46,10 @@ val EInkCoverHeight = 90.dp
  * 目标尺寸）经 CoverEngine 端口由宿主提供（与 MD3 主工程
  * buildCoverImageRequest 行为对齐）。
  *
+ * 封面统一 [EInkShapes.medium]（4dp）圆角裁剪，对齐 MD3 主工程
+ * CoilBookCover 的 RoundedCornerShape(4.dp)；文字占位封面同理被裁剪，
+ * 保持加载前后轮廓一致。阴影不做（E-Ink 零阴影规范，主工程亦为可选）。
+ *
  * 无封面地址、用户开启“使用默认封面”、加载中或加载失败时，显示文字占位封面。
  */
 @Composable
@@ -58,8 +63,10 @@ fun EInkBookCover(
     sourceOrigin: String? = null,
 ) {
     val coverEngine = EInkEngineRegistry.coverEngine
+    // 单点 clip：加载图与占位共用同一圆角轮廓（draw 阶段裁剪，静态单帧）
+    val coverModifier = modifier.clip(EInkShapes.medium)
     if (url.isNullOrBlank() || coverEngine.useDefaultCover) {
-        EInkDefaultCover(name = name, author = author, modifier = modifier)
+        EInkDefaultCover(name = name, author = author, modifier = coverModifier)
         return
     }
 
@@ -90,7 +97,7 @@ fun EInkBookCover(
     EInkAsyncImage(
         model = model,
         contentDescription = name,
-        modifier = modifier,
+        modifier = coverModifier,
         loading = placeholderContent,
         failure = placeholderContent,
     )
