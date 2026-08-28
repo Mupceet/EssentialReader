@@ -47,8 +47,8 @@ private val HomeTabLabels = listOf("书架", "我的")
 
 /** 首页 Tab 图标素材对（从左到右）：线性（未选中）+ 填充（选中），沿用 View 版底栏图标。 */
 private val HomeTabIcons = listOf(
-    R.drawable.ic_bottom_books_e to R.drawable.ic_bottom_books_s,
-    R.drawable.ic_bottom_person_e to R.drawable.ic_bottom_person_s
+    R.drawable.eink_ic_bottom_books_e to R.drawable.eink_ic_bottom_books_s,
+    R.drawable.eink_ic_bottom_person_e to R.drawable.eink_ic_bottom_person_s
 )
 
 /**
@@ -262,7 +262,7 @@ private fun HomePane(
 private fun RefreshAction(isRefreshing: Boolean, onClick: () -> Unit) {
     // 刷新中禁用置灰（组件 disabledContent 中灰），避免重复点击
     EInkOperationBarIcon(
-        icon = painterResource(R.drawable.ic_refresh_black_24dp),
+        icon = painterResource(R.drawable.eink_ic_refresh_black_24dp),
         contentDescription = if (isRefreshing) "刷新中" else "刷新",
         enabled = !isRefreshing,
         onClick = onClick,
@@ -280,7 +280,7 @@ private fun RefreshAction(isRefreshing: Boolean, onClick: () -> Unit) {
 private fun LayoutToggleAction(isGridLayout: Boolean, onClick: () -> Unit) {
     EInkOperationBarIcon(
         icon = painterResource(
-            if (isGridLayout) R.drawable.list_view_24px else R.drawable.grid_view_24px
+            if (isGridLayout) R.drawable.eink_list_view_24px else R.drawable.eink_grid_view_24px
         ),
         contentDescription = if (isGridLayout) "切换为列表布局" else "切换为网格布局",
         onClick = onClick,

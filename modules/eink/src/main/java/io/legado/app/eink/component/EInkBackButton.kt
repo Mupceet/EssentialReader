@@ -20,7 +20,7 @@ fun EInkBackButton(
 ) {
     EInkIconButton(
         onClick = onClick,
-        painter = painterResource(R.drawable.ic_arrow_back),
+        painter = painterResource(R.drawable.eink_ic_arrow_back),
         contentDescription = contentDescription,
         modifier = modifier,
         tint = EInkTheme.colorScheme.onSurface

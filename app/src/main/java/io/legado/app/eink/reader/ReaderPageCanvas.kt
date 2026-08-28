@@ -36,7 +36,7 @@ import io.legado.app.ui.book.read.page.provider.ChapterProvider
  *
  * 本上游差异：ImageColumn 自带创建时的 book 引用（换书瞬间旧页重绘
  * 不再误取新书目录）；抗锯齿开关经 [antiAlias] 参数注入（本仓架构护栏
- * 禁止 Compose 文件导入兼容 Config，取值走 EinkBridge.useAntiAlias）。
+ * 禁止 Compose 文件导入兼容 Config，取值走 EInkBridge.useAntiAlias）。
  */
 @Composable
 internal fun ReaderPageCanvas(

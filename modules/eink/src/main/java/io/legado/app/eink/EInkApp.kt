@@ -21,7 +21,7 @@ import androidx.lifecycle.viewmodel.compose.LocalViewModelStoreOwner
 import io.legado.app.eink.bookdetail.BookDetailRoute
 import io.legado.app.eink.changesource.ChangeSourceRoute
 import io.legado.app.eink.debug.ThemeDebugRoute
-import io.legado.app.eink.engine.EinkPageContent
+import io.legado.app.eink.engine.EInkPageContent
 import io.legado.app.eink.home.HomeRoute
 import io.legado.app.eink.navigation.EInkNavController
 import io.legado.app.eink.navigation.EInkScreen
@@ -44,7 +44,7 @@ fun EInkApp(
     initialReaderBookUrl: String? = null,
     // 宿主注入的引擎能力出口：绘制叶子（引擎画布）与"退出到完整模式"
     onExitToFullMode: () -> Unit,
-    pageRenderer: @Composable (page: EinkPageContent?, pageVersion: Int, modifier: Modifier) -> Unit,
+    pageRenderer: @Composable (page: EInkPageContent?, pageVersion: Int, modifier: Modifier) -> Unit,
     controller: EInkNavController = EInkNavController.remember(
         initialStack(initialReaderBookUrl)
     ),

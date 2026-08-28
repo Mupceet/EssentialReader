@@ -33,8 +33,8 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import io.legado.app.eink.component.EInkText
-import io.legado.app.eink.engine.EinkEngineRegistry
-import io.legado.app.eink.engine.EinkPageContent
+import io.legado.app.eink.engine.EInkEngineRegistry
+import io.legado.app.eink.engine.EInkPageContent
 import io.legado.app.eink.modifier.staticClickable
 import io.legado.app.eink.theme.EInkTheme
 import android.view.WindowManager
@@ -59,7 +59,7 @@ fun ReaderRoute(
     onChangeSource: (String) -> Unit,
     onOpenDetail: (name: String, author: String, bookUrl: String) -> Unit,
     viewModel: ReaderViewModel = viewModel(),
-    pageRenderer: @Composable (page: EinkPageContent?, pageVersion: Int, modifier: Modifier) -> Unit,
+    pageRenderer: @Composable (page: EInkPageContent?, pageVersion: Int, modifier: Modifier) -> Unit,
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
@@ -239,7 +239,7 @@ fun ReaderRoute(
 @Composable
 internal fun ReaderScreen(
     state: ReaderUiState,
-    pageRenderer: @Composable (page: EinkPageContent?, pageVersion: Int, modifier: Modifier) -> Unit,
+    pageRenderer: @Composable (page: EInkPageContent?, pageVersion: Int, modifier: Modifier) -> Unit,
     topBarVisible: Boolean,
     bottomBarVisible: Boolean,
     onPrevPage: () -> Unit,
@@ -308,7 +308,7 @@ internal fun ReaderScreen(
                                 if (state.controlsVisible) {
                                     onCenterTap() // 收起操作条，不翻页
                                 } else {
-                                    val slop = EinkEngineRegistry.readerEngine.pageTouchSlop.toFloat()
+                                    val slop = EInkEngineRegistry.readerEngine.pageTouchSlop.toFloat()
                                     when {
                                         lastDelta * dragAccum < 0f -> Unit // 回拖取消
                                         dragAccum < -slop -> onNextPage()

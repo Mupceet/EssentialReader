@@ -45,6 +45,7 @@ import io.legado.app.eink.widget.EInkBookCover
 import io.legado.app.eink.widget.EInkInfoRow
 import kotlin.math.roundToInt
 import kotlinx.coroutines.launch
+import androidx.compose.ui.res.stringResource
 
 /** 详情页封面宽高比。 */
 private const val CoverAspectRatio = 0.75f
@@ -146,13 +147,13 @@ internal fun BookDetailScreen(
                 if (state.book != null) {
                     EInkOperationBarIcon(
                         icon = painterResource(
-                            if (state.isInBookshelf) R.drawable.ic_outline_delete else R.drawable.ic_add
+                            if (state.isInBookshelf) R.drawable.eink_ic_outline_delete else R.drawable.eink_ic_add
                         ),
                         contentDescription = if (state.isInBookshelf) "移出书架" else "加入书架",
                         onClick = if (state.isInBookshelf) onRemoveFromShelf else onAddToShelf
                     )
                     EInkOperationBarIcon(
-                        icon = painterResource(R.drawable.ic_exchange),
+                        icon = painterResource(R.drawable.eink_ic_exchange),
                         contentDescription = "切换书源",
                         onClick = onChangeSource
                     )
@@ -174,7 +175,7 @@ internal fun BookDetailScreen(
             state.isEmpty -> {
                 Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
                     EInkText(
-                        text = LocalContext.current.getString(R.string.eink_book_not_found),
+                        text = stringResource(R.string.eink_book_not_found),
                         style = EInkTheme.typography.bodyLarge
                     )
                 }
@@ -279,19 +280,19 @@ internal fun BookDetailScreen(
             onTabSelect = {},
             navigationIcon = {
                 EInkOperationBarIcon(
-                    icon = painterResource(R.drawable.ic_eink_arrow_back),
+                    icon = painterResource(R.drawable.eink_ic_arrow_back),
                     contentDescription = "返回",
                     onClick = onBack
                 )
             },
             actions = {
                 EInkOperationBarIcon(
-                    icon = painterResource(R.drawable.ic_toc),
+                    icon = painterResource(R.drawable.eink_ic_toc),
                     contentDescription = "目录",
                     onClick = onOpenToc
                 )
                 EInkOperationBarIcon(
-                    icon = painterResource(R.drawable.ic_play_outline_24dp),
+                    icon = painterResource(R.drawable.eink_ic_play_outline_24dp),
                     contentDescription = "阅读",
                     onClick = onRead
                 )
@@ -317,7 +318,7 @@ private fun ChapterRows(
     Column(horizontalAlignment = Alignment.Start) {
         latestChapterTitle?.takeIf { it.isNotBlank() }?.let {
             EInkInfoRow(
-                iconRes = R.drawable.ic_book_last,
+                iconRes = R.drawable.eink_ic_book_last,
                 text = it,
                 style = EInkTheme.typography.labelSmall,
                 modifier = Modifier.padding(top = EInkSpacing.s)
@@ -325,7 +326,7 @@ private fun ChapterRows(
         }
         durChapterTitle?.takeIf { it.isNotBlank() }?.let {
             EInkInfoRow(
-                iconRes = R.drawable.ic_history,
+                iconRes = R.drawable.eink_ic_history,
                 text = it,
                 style = EInkTheme.typography.labelSmall,
                 modifier = Modifier.padding(top = EInkSpacing.s)
