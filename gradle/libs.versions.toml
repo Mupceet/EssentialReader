@@ -59,7 +59,7 @@ rhino = "1.8.1"
 media3 = "1.8.0"
 
 #noinspection GradleDependency
-webkit = "1.14.0"
+webkit = "1.17.0"
 #noinspection GradleDependency
 activity = "1.11.0"
 #noinspection GradleDependency
