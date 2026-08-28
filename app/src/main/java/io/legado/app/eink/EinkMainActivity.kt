@@ -1,7 +1,9 @@
 package io.legado.app.eink
 
 import android.app.Activity
+import android.content.Context
 import android.content.Intent
+import android.content.res.Configuration
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -25,6 +27,7 @@ import io.legado.app.eink.reader.ReaderPageCanvas
 import io.legado.app.eink.theme.EInkTheme
 import io.legado.app.help.config.AppConfigStore
 import io.legado.app.ui.main.MainActivity
+import io.legado.app.ui.theme.resolveAppFontScale
 import io.legado.app.utils.startActivity
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -40,6 +43,10 @@ import kotlinx.coroutines.launch
  * 所有 E-Ink 屏幕通过 Compose 状态路由（[EInkApp]）管理，
  * 避免多个 Activity 之间的传统 Android 页面转场。
  *
+ * 应用内字体缩放：经 [attachBaseContext] 应用全局 PreferKey.fontScale
+ * （与 EssentialReader 的 AppContextWrapper.wrap、完整模式 Compose 的
+ * rememberAppDensity 同一设置键），E-Ink「我的」页可读写。
+ *
  * 根布局职责（纯 Foundation，无 Material3）:
  *  - Edge-to-Edge：窗口始终延伸到系统栏后方（[enableEdgeToEdge]），
  *    系统栏透明覆盖在背景之上，进出各界面窗口尺寸恒定，无内容跳动；
@@ -50,6 +57,23 @@ import kotlinx.coroutines.launch
  *    保证状态栏与纯黑白主题一致。
  */
 class EInkMainActivity : ComponentActivity() {
+
+    override fun attachBaseContext(newBase: Context) {
+        super.attachBaseContext(newBase.wrapAppFontScale())
+    }
+
+    /**
+     * 应用内字体缩放（语义对齐 EssentialReader 的 AppContextWrapper.getFontScale）：
+     * 设置值 ÷10，0.8~1.6 之外或未设置时回落系统缩放。attach 阶段经
+     * AppConfigStore 同步快照读取（写入方在其 pending overlay 中立即可见）。
+     */
+    private fun Context.wrapAppFontScale(): Context {
+        val config = Configuration(resources.configuration)
+        AppConfigStore.getInt(PreferKey.fontScale)?.let { setting ->
+            config.fontScale = resolveAppFontScale(setting, config.fontScale)
+        }
+        return createConfigurationContext(config)
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)

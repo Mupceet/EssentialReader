@@ -73,6 +73,7 @@ fun HomeRoute(
     onBookLongClick: (ShelfBookUiModel) -> Unit,
     onSearch: () -> Unit,
     onOpenFullMode: () -> Unit = {},
+    onOpenFontScale: () -> Unit = {},
     onOpenThemeDebug: () -> Unit = {},
     viewModel: BookshelfViewModel = viewModel()
 ) {
@@ -145,6 +146,7 @@ fun HomeRoute(
         },
         mine = {
             MineScreen(
+                onOpenFontScale = onOpenFontScale,
                 onOpenFullMode = onOpenFullMode,
                 onOpenThemeDebug = onOpenThemeDebug
             )

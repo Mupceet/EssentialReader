@@ -5,9 +5,12 @@ import coil3.request.ImageRequest
 import io.legado.app.eink.engine.CoverEngine
 import io.legado.app.eink.engine.EInkEngineRegistry
 import io.legado.app.eink.engine.GlobalSettings
+import io.legado.app.eink.engine.UiSettings
 import io.legado.app.eink.settings.EInkSettings
 import io.legado.app.domain.gateway.OtherSettingsGateway
+import io.legado.app.constant.PreferKey
 import io.legado.app.help.config.AppConfig
+import io.legado.app.help.config.AppConfigStore
 import io.legado.app.help.coil.CoverExtras
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
@@ -37,6 +40,7 @@ object EInkBridge : KoinComponent {
         EInkSettings.attach(context)
         EInkEngineRegistry.install(
             globalSettings = GlobalSettingsImpl,
+            uiSettings = UiSettingsImpl,
             bookshelfEngine = BookshelfEngineImpl,
             searchEngine = SearchEngineImpl,
             tocEngine = TocEngineImpl,
@@ -66,6 +70,24 @@ private object GlobalSettingsImpl : GlobalSettings, KoinComponent {
     override val preDownloadNum: Int get() = AppConfig.preDownloadNum
     override val changeSourceCheckAuthor: Boolean
         get() = changeSourceSettingsGateway.currentSettings.checkAuthor
+}
+
+/**
+ * 宿主级界面设置端口实现：与完整模式共享全局 PreferKey.fontScale
+ * （完整模式经 AppUiConfigurationGateway 读取同键），E-Ink「我的」页
+ * 写入后由模块侧 recreate 入口 Activity 重应用。
+ */
+private object UiSettingsImpl : UiSettings {
+
+    override var fontScaleSetting: Int?
+        get() = AppConfigStore.getInt(PreferKey.fontScale)
+        set(value) {
+            if (value == null) {
+                AppConfigStore.remove(PreferKey.fontScale)
+            } else {
+                AppConfigStore.putInt(PreferKey.fontScale, value)
+            }
+        }
 }
 
 /**
