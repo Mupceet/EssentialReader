@@ -13,9 +13,8 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.zIndex
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -201,9 +200,9 @@ internal fun HomeScreen(
         )
         Box(modifier = Modifier.weight(1f)) {
             // 两个 Tab 常驻组合（E-Ink 零动画规范）：切换只翻转各自 Pane 的
-            // 可见性（小作用域），不销毁/重建组合树——书架整页条目（含
-            // 封面请求）在 Tab 往返时零重组；隐藏期间数据更新照常
-            // 预热，切回即时可见
+            // 放置状态（小作用域），不销毁/重建组合树——书架整页条目（含
+            // 封面请求）的组合与滚动/分页状态在 Tab 往返时保留；隐藏页不
+            // 放置 = 不绘制、不命中、不进语义，触摸不会穿透到下层书架
             HomePane(visible = selectedTab == HomeTabs.BOOKSHELF) { bookshelf() }
             HomePane(visible = selectedTab != HomeTabs.BOOKSHELF) { mine() }
         }
@@ -224,8 +223,11 @@ internal fun HomeScreen(
 }
 
 /**
- * 常驻组合的内容 Pane：可见时 zIndex 置顶承接触摸与绘制；隐藏时跳过
- * 绘制（不产生任何绘制开销）并从语义树移除。不做销毁/重建。
+ * 常驻组合的内容 Pane：可见时 zIndex 置顶承接触摸与绘制；隐藏时「测量但
+ * 不放置」——未放置的子树不绘制、不参与命中测试（Compose 命中遍历只走
+ * isPlaced 的子节点）、不进入语义树，触摸不会穿透到底层 Pane（否则点击
+ * 隐藏页空白会命中下层书架条目）；组合本身不销毁（页面状态与 ViewModel
+ * 保留），切回仅触发一次重布局。
  */
 @Composable
 private fun HomePane(
@@ -240,11 +242,11 @@ private fun HomePane(
                 if (visible) {
                     Modifier
                 } else {
-                    Modifier
-                        .drawWithContent {
-                            // 隐藏页不绘制：跳过整棵子树的 draw 阶段
-                        }
-                        .clearAndSetSemantics { }
+                    Modifier.layout { measurable, constraints ->
+                        // 测量保组合活跃（Lazy 列表预热），但不放置：零绘制/零命中/零语义
+                        measurable.measure(constraints)
+                        layout(0, 0) {}
+                    }
                 }
             )
     ) {
