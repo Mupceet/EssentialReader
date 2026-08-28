@@ -42,7 +42,7 @@ jobs:
           ls -la ${{ github.workspace }}/apk/
 
       - name: Upload Debug APK
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: legado_${{ env.product }}_debug
           path: ${{ github.workspace }}/apk/*.apk
