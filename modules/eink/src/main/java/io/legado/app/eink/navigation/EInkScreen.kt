@@ -43,4 +43,7 @@ sealed interface EInkScreen {
 
     /** 排版样式调试（逐级展示 EInkTheme.typography） */
     data object ThemeDebug : EInkScreen
+
+    /** 字体大小设置（示例文字预览 + 抬手生效的倍率滑条，入口在「我的」页） */
+    data object FontScaleSettings : EInkScreen
 }

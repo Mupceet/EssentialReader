@@ -16,6 +16,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.ProgressBarRangeInfo
 import androidx.compose.ui.semantics.progressBarRangeInfo
@@ -53,6 +54,12 @@ import kotlin.math.roundToInt
  * The value axis is integer steps of [valueRange]; callers map their real
  * units (dp, sp, floats) onto it and format [thumbLabel] for display.
  *
+ * Apply timing: by default [onValueChange] fires on every step change during
+ * the drag (apply-as-you-drag). For deferred-apply settings (attach-time
+ * config that needs a recreate to take effect), pass [onValueChangeFinished]:
+ * keep a local preview state in [onValueChange] and commit once in
+ * [onValueChangeFinished] when the gesture ends (finger lift).
+ *
  * @param value Current step (coerced into [valueRange] when out of bounds)
  * @param onValueChange Invoked only when the step actually changes
  * @param valueRange Discrete step range, e.g. 0..64
@@ -60,6 +67,12 @@ import kotlin.math.roundToInt
  * @param enabled Whether the slider accepts input
  * @param thumbLabel Formats the value printed on the thumb
  * @param tickStep Ruler tick interval in steps; 0 draws no ticks
+ * @param onValueChangeFinished Invoked once per gesture when the finger lifts
+ *   after a non-rejected press/drag (also after a tap that didn't change the
+ *   step); null keeps the apply-as-you-drag behavior
+ * @param markerLabel 静态标识文本（如「默认」）：显示在滑条上方 [markerStep]
+ *   档位对应的 x 位置，纯展示不可点；markerStep 为 null 时不显示
+ * @param markerStep 标识对齐的档位；null 时不显示标识
  */
 @Composable
 fun EInkSteppedSlider(
@@ -70,6 +83,9 @@ fun EInkSteppedSlider(
     enabled: Boolean = true,
     thumbLabel: (Int) -> String = { it.toString() },
     tickStep: Int = 0,
+    onValueChangeFinished: (() -> Unit)? = null,
+    markerStep: Int? = null,
+    markerLabel: String? = null,
 ) {
     val scheme = EInkTheme.colorScheme
     val start = valueRange.start
@@ -81,9 +97,13 @@ fun EInkSteppedSlider(
 
     var isPressed by remember { mutableStateOf(false) }
 
+    // 标识需要占用滑条上方的额外高度（标识行 + 间隙）
+    val hasMarker = markerLabel != null && markerStep != null
+    val minSliderHeight = if (hasMarker) SliderHeight + MarkerLabelSpace else SliderHeight
+
     BoxWithConstraints(
         modifier = modifier
-            .heightIn(min = SliderHeight)
+            .heightIn(min = minSliderHeight)
             .pointerInput(enabled, start, end) {
                 if (!enabled || steps <= 0) return@pointerInput
                 val touchSlop = viewConfiguration.touchSlop
@@ -140,6 +160,11 @@ fun EInkSteppedSlider(
                         if (candidate != lastEmitted) {
                             onValueChange(candidate)
                         }
+                    }
+                    // 抬手生效模式：手势有效结束后统一提交一次（rejected = 竖直
+                    // 滚动抢占,视为未交互,不提交）
+                    if (!rejected) {
+                        onValueChangeFinished?.invoke()
                     }
                 }
             }
@@ -237,11 +262,37 @@ fun EInkSteppedSlider(
                 softWrap = false,
             )
         }
+
+        // 滑条上方的静态标识（如「默认」）：与 markerStep 档位中心对齐，
+        // 几何复用轨道刻度的换算（thumbWidth/2 + stepPx × 档位偏移）
+        if (hasMarker && steps > 0) {
+            val markerCenterX = thumbWidthPx / 2f + stepPx * (markerStep!! - start)
+            EInkText(
+                text = markerLabel,
+                style = EInkTheme.typography.labelSmall,
+                color = scheme.onSurfaceVariant,
+                textAlign = TextAlign.Center,
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .layout { measurable, constraints ->
+                        val placeable = measurable.measure(constraints)
+                        layout(placeable.width, placeable.height) {
+                            placeable.place(
+                                (markerCenterX - placeable.width / 2f).roundToInt(),
+                                0
+                            )
+                        }
+                    }
+            )
+        }
     }
 }
 
 /** 滑条触控目标高度(可点按元素 ≥ 48dp)。 */
 private val SliderHeight = 48.dp
+
+/** 滑条上方标识行（如「默认」）的预留高度（含与滑轨的间隙）。 */
+private val MarkerLabelSpace = 24.dp
 
 /** 滑块固定宽度:文本变化不引起宽度跳变,保证位置映射稳定。 */
 private val ThumbWidth = 48.dp

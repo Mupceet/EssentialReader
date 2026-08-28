@@ -5,7 +5,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelStore
+import androidx.lifecycle.viewmodel.compose.viewModel
 
 /**
  * E-Ink 导航控制器。
@@ -93,15 +95,44 @@ class EInkNavController internal constructor(
         current = entry
     }
 
+    /** 清空全部条目（释放各条目 ViewModelStore）：持有方 ViewModel.onCleared 时调用。 */
+    internal fun clearAll() {
+        backStack.forEach { it.viewModelStore.clear() }
+        backStack.clear()
+    }
+
     companion object {
         /**
          * 创建并记住一个 [EInkNavController]。
+         *
+         * 控制器由 Activity 级 [EInkNavViewModel] 持有：栈与各条目的
+         * ViewModelStore 跨 Activity recreate 存活（字体缩放等 attach 时
+         * 设置的应用走 recreate，用户停留在当前界面而非被弹回首页）；
+         * 进程死亡仍回初始栈。[initialStack] 仅首次创建时生效。
          *
          * @param initialStack 初始屏幕栈（至少一项）；多于一项时用于
          * 冷启动直达（如自动跳转最近阅读：书架之上叠阅读页）
          */
         @Composable
-        fun remember(initialStack: List<EInkScreen> = listOf(EInkScreen.Home)): EInkNavController =
-            remember(initialStack) { EInkNavController(initialStack) }
+        fun remember(initialStack: List<EInkScreen> = listOf(EInkScreen.Home)): EInkNavController {
+            // 求值处位于 EInkApp 的每条目 LocalViewModelStoreOwner 覆盖之外，
+            // viewModel() 解析到 Activity 级 store，即 recreate 存活的作用域
+            val holder: EInkNavViewModel = viewModel()
+            return remember { holder.getOrCreate(initialStack) }
+        }
+    }
+}
+
+/** [EInkNavController] 的 Activity 级持有者（见 [EInkNavController.Companion.remember]）。 */
+internal class EInkNavViewModel : ViewModel() {
+    var controller: EInkNavController? = null
+        private set
+
+    fun getOrCreate(initialStack: List<EInkScreen>): EInkNavController =
+        controller ?: EInkNavController(initialStack).also { controller = it }
+
+    override fun onCleared() {
+        controller?.clearAll()
+        controller = null
     }
 }
