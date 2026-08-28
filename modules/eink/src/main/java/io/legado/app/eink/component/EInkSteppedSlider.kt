@@ -29,6 +29,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import io.legado.app.eink.theme.EInkShapes
 import io.legado.app.eink.theme.EInkTheme
@@ -40,10 +41,11 @@ import kotlin.math.roundToInt
  * value printed directly on the thumb.
  *
  * Interaction (zero motion — every change is an immediate state replacement):
- *  - Press anywhere on the track: the thumb inverts instantly (static press
- *    feedback, spec §35) and follows a horizontal drag, snapping to steps.
- *  - Tap (press + release without dragging): the value jumps to the tapped
- *    position.
+ *  - Press on the track (outside the thumb): the value jumps instantly to the
+ *    step at the pressed position (Material-slider semantics), then follows
+ *    the drag from there.
+ *  - Press on the thumb: no jump; the thumb follows a horizontal drag,
+ *    snapping to steps.
  *  - A vertical-dominant gesture is rejected so a slider inside a scrollable
  *    column still lets the scroll win.
  *
@@ -97,6 +99,10 @@ fun EInkSteppedSlider(
 
     var isPressed by remember { mutableStateOf(false) }
 
+    // 命中判定需要实时值：pointerInput 不以 value 为 key（重挂会打断拖拽），
+    // 闭包内的 value 快照会过期，经 rememberUpdatedState 读取最新值
+    val currentValue by rememberUpdatedState(value)
+
     // 标识需要占用滑条上方的额外高度（标识行 + 间隙）
     val hasMarker = markerLabel != null && markerStep != null
     val minSliderHeight = if (hasMarker) SliderHeight + MarkerLabelSpace else SliderHeight
@@ -121,7 +127,21 @@ fun EInkSteppedSlider(
                     isPressed = true
                     var isDragging = false
                     var rejected = false
-                    var lastEmitted = valueAt(down.position.x)
+                    // 按下分流：命中滑块 → 从当前值起拖；命中轨道 → 立即跳到
+                    // 点按档位（Material 滑条同款；deferred 模式下该次变更由
+                    // 抬手统一提交）。几何用 size 实时换算
+                    val current = currentValue
+                    val travel = (size.width - thumbWidth).coerceAtLeast(0f)
+                    val stepWidth = if (steps > 0) travel / steps else 0f
+                    val thumbLeft = stepWidth * (current - start)
+                    val onThumb = down.position.x >= thumbLeft &&
+                        down.position.x <= thumbLeft + thumbWidth
+                    val downStep = valueAt(down.position.x)
+                    var lastEmitted = current
+                    if (!onThumb && downStep != current) {
+                        lastEmitted = downStep
+                        onValueChange(downStep)
+                    }
                     try {
                         while (true) {
                             val event = awaitPointerEvent()
@@ -153,13 +173,6 @@ fun EInkSteppedSlider(
                         }
                     } finally {
                         isPressed = false
-                    }
-                    // 按下后未拖动也未被父级消费 → 点按轨道,直接跳到点按档位
-                    if (!isDragging && !rejected) {
-                        val candidate = valueAt(down.position.x)
-                        if (candidate != lastEmitted) {
-                            onValueChange(candidate)
-                        }
                     }
                     // 抬手生效模式：手势有效结束后统一提交一次（rejected = 竖直
                     // 滚动抢占,视为未交互,不提交）
