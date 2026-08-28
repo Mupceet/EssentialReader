@@ -308,6 +308,10 @@ internal object ReaderEngineImpl : ReaderEngine, KoinComponent {
     override fun applyStyle(style: ReaderTextStyle) {
         val mutations = listOf(
             ReadStyleMutation.IntValue(ReadStyleIntKey.TextSize, style.textSize),
+            // 标题跟随正文字号：本仓 titleSize 为绝对字号（完整模式排版设置，
+            // 默认 20sp），develop/E-Ink 语义是标题与正文一致——E-Ink 应用
+            // 排版时覆盖完整模式残留的绝对值，保证调整字号后标题同步
+            ReadStyleMutation.IntValue(ReadStyleIntKey.TitleSize, style.textSize),
             ReadStyleMutation.FloatValue(ReadStyleFloatKey.LetterSpacing, style.letterSpacing),
             ReadStyleMutation.StringValue(
                 ReadStyleStringKey.ParagraphIndent,
