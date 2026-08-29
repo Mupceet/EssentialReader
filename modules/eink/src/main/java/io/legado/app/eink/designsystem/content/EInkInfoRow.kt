@@ -10,6 +10,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.TextStyle
@@ -34,11 +35,12 @@ fun EInkInfoRow(
     text: String,
     style: TextStyle,
     modifier: Modifier = Modifier,
+    /** 图标与文字颜色（默认次级色；按压反色行内传瞬时反色内容色）。 */
+    contentColor: Color = EInkTheme.colorScheme.onSurfaceVariant,
 ) {
     // ColorFilter.tint 每次调用都新建实例：列表项最多三行信息行，
     // 缓存避免条目重组时的重复分配
-    val iconTintColor = EInkTheme.colorScheme.onSurfaceVariant
-    val iconTint = remember(iconTintColor) { ColorFilter.tint(iconTintColor) }
+    val iconTint = remember(contentColor) { ColorFilter.tint(contentColor) }
     Row(modifier = modifier, verticalAlignment = Alignment.CenterVertically) {
         Image(
             painter = painterResource(iconRes),
@@ -50,7 +52,7 @@ fun EInkInfoRow(
         EInkText(
             text = text,
             style = style,
-            color = EInkTheme.colorScheme.onSurfaceVariant,
+            color = contentColor,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis
         )

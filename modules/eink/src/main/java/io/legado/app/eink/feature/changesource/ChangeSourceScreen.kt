@@ -156,9 +156,13 @@ fun ChangeSourceRoute(
                 }
             )
             if (uiState.isChanging) {
+                // 不透明 surface 遮盖列表（同目录页初始定位遮盖），
+                // 避免“正在换源”文字与列表重叠
                 EInkLoading(
                     text = "正在换源…",
-                    modifier = Modifier.fillMaxSize(),
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(EInkTheme.colorScheme.surface),
                 )
             }
         }
@@ -262,9 +266,11 @@ private fun SourceItem(
     val scheme = EInkTheme.colorScheme
     val press = rememberImmediatePressState()
     val colors = eInkActionColors(pressed = press.isPressed)
-    // 标记/标签随按压反色；名称：当前源加深，其余为次级色
+    // 标记/标签随按压反色；名称：当前源加深，其余为次级色；
+    // 信息行（最新章节/作者）同步反色，避免深色底上仍是深灰字
     val markColor = if (press.isPressed) scheme.surface else scheme.onSurface
     val titleColor = if (press.isPressed) colors.contentColor else scheme.onSurface
+    val infoColor = if (press.isPressed) colors.contentColor else scheme.onSurfaceVariant
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -308,11 +314,13 @@ private fun SourceItem(
                 iconRes = R.drawable.eink_ic_book_last,
                 text = searchBook.latestChapter?.takeIf { it.isNotBlank() } ?: "无最新章节",
                 style = EInkTheme.typography.bodySmall,
+                contentColor = infoColor,
             )
             EInkInfoRow(
                 iconRes = R.drawable.eink_ic_author,
                 text = searchBook.author.ifBlank { "佚名" },
                 style = EInkTheme.typography.bodySmall,
+                contentColor = infoColor,
             )
         }
     }
