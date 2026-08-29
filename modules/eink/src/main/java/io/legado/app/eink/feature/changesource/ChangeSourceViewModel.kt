@@ -134,6 +134,28 @@ class ChangeSourceViewModel(application: Application) : AndroidViewModel(applica
         }
     }
 
+    /**
+     * 中止搜索：取消任务并保留已到达的结果
+     * （对齐主项目 ChangeBookSourceComposeViewModel.stopSearch 语义）。
+     */
+    fun stopSearch() {
+        searchJob?.cancel()
+        searchJob = null
+        _uiState.update { it.copy(isSearching = false) }
+    }
+
+    /**
+     * 顶栏刷新按钮入口：搜索中点击中止，否则重新搜索
+     * （对齐主项目 startOrStopSearch）。
+     */
+    fun startOrStopSearch() {
+        if (searchJob?.isActive == true) {
+            stopSearch()
+        } else {
+            startSearch()
+        }
+    }
+
     private fun onSearchSuccess(searchBook: ChangeSourceResultUiModel) {
         _uiState.update { state ->
             // 去重：同一书源同一书籍只保留一条

@@ -79,6 +79,7 @@ internal object ChangeSourceEngineImpl : ChangeSourceEngine {
                 author = searchBook.author,
                 origin = searchBook.origin,
                 originName = searchBook.originName,
+                latestChapter = searchBook.latestChapterTitle,
                 primary = searchBook.primaryStr(),
             )
         }

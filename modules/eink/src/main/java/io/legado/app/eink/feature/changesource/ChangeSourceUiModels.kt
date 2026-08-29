@@ -26,6 +26,8 @@ data class ChangeSourceResultUiModel(
     val author: String,
     val origin: String,
     val originName: String,
+    /** 最新章节标题（搜索结果自带，无则为 null）。 */
+    val latestChapter: String?,
     /** 去重键（primaryStr，展示“来源：”列与 LazyColumn key 共用）。 */
     val primary: String,
 ) : SearchResultRef
