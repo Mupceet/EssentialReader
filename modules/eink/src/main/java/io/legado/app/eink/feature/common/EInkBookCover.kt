@@ -1,6 +1,6 @@
 package io.legado.app.eink.feature.common
 
-import androidx.compose.foundation.Image
+import android.content.Context
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
@@ -16,6 +16,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import coil3.request.ImageRequest
@@ -30,6 +31,38 @@ import io.legado.app.eink.designsystem.widget.EInkAsyncImage
 /** 封面尺寸（与 View 版 item_bookshelf_list.xml 一致：66dp × 90dp）。 */
 val EInkCoverWidth = 66.dp
 val EInkCoverHeight = 90.dp
+
+/**
+ * 封面目标像素尺寸（Dp → px 向下取整）。
+ *
+ * 单点换算供三处共用：显示（[EInkBookCover]）、预取（[prefetchCovers]）、
+ * 同步命中（[EInkAsyncImage][io.legado.app.eink.designsystem.widget.EInkAsyncImage]
+ * 的内存缓存键）。像素值必须逐字节一致，预取写入的缓存项才能被显示路径
+ * 以同一键同步命中。
+ */
+internal fun coverTargetSizePx(width: Dp, height: Dp, density: Density): Pair<Int, Int> =
+    with(density) { width.toPx().toInt() to height.toPx().toInt() }
+
+/**
+ * 构建封面请求：显示与预取共用的唯一构造点。
+ *
+ * 二者必须产出完全相同的请求（含显式 `memoryCacheKey`），预取写入的内存
+ * 缓存项才能被显示路径同步命中。显式键带目标尺寸：Coil 默认键不含尺寸
+ * （无 transformations 时），列表 66dp 与网格 ~96dp 两种尺寸会写同一条目
+ * 互相顶替（较小位图被 INEXACT 校验拒绝后又重抓）；分尺寸分键后互不干扰。
+ */
+internal fun buildEInkCoverRequest(
+    context: Context,
+    url: String,
+    sourceOrigin: String?,
+    widthPx: Int,
+    heightPx: Int,
+): ImageRequest = ImageRequest.Builder(context)
+    .data(url)
+    .crossfade(false)
+    .memoryCacheKey("eink-cover|$url|${widthPx}x$heightPx")
+    .apply(EInkEngineRegistry.coverEngine.coverRequestOptions(sourceOrigin, widthPx, heightPx))
+    .build()
 
 /**
  * E-Ink 书籍封面（书架/搜索结果等列表项复用）。
@@ -69,8 +102,7 @@ fun EInkBookCover(
     }
 
     val density = LocalDensity.current
-    val targetWidthPx = with(density) { width.toPx() }.toInt()
-    val targetHeightPx = with(density) { height.toPx() }.toInt()
+    val (targetWidthPx, targetHeightPx) = coverTargetSizePx(width, height, density)
 
     val context = LocalContext.current
 
@@ -78,11 +110,7 @@ fun EInkBookCover(
     // 反复重建。crossfade(false) 显式关闭：宿主单例 ImageLoader 全局开
     // crossfade，与墨水屏零动画规范冲突，必须逐请求覆盖
     val model: Any? = remember(context, url, sourceOrigin, targetWidthPx, targetHeightPx) {
-        ImageRequest.Builder(context)
-            .data(url)
-            .crossfade(false)
-            .apply(coverEngine.coverRequestOptions(sourceOrigin, targetWidthPx, targetHeightPx))
-            .build()
+        buildEInkCoverRequest(context, url, sourceOrigin, targetWidthPx, targetHeightPx)
     }
 
     // 占位 lambda 稳定实例（键随 name/author 变化）：每次重组新建会让

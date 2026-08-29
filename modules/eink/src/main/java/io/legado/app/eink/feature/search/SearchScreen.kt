@@ -15,11 +15,15 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextOverflow
@@ -40,6 +44,8 @@ import io.legado.app.eink.designsystem.theme.EInkTheme
 import io.legado.app.eink.feature.common.EInkBookCover
 import io.legado.app.eink.feature.common.EInkCoverHeight
 import io.legado.app.eink.feature.common.EInkCoverWidth
+import io.legado.app.eink.feature.common.coverTargetSizePx
+import io.legado.app.eink.feature.common.prefetchCovers
 import io.legado.app.eink.designsystem.content.EInkInfoRow
 import io.legado.app.eink.designsystem.refresh.EInkRefreshIntent
 import io.legado.app.eink.designsystem.refresh.LocalEInkRefreshController
@@ -94,6 +100,29 @@ fun SearchRoute(
             scope.launch { pager.pageDown(totalItems) }
             refresh.requestRefresh(EInkRefreshIntent.PageTurn)
         }
+    }
+
+    // 结果列表封面预取：当前页落定后预热下一页（同首页说明，翻页时
+    // EInkAsyncImage 同步命中内存缓存，零占位帧、单次绘制）
+    val prefetchContext = LocalContext.current
+    val prefetchDensity = LocalDensity.current
+    LaunchedEffect(uiState.results) {
+        val (coverWidthPx, coverHeightPx) =
+            coverTargetSizePx(EInkCoverWidth, EInkCoverHeight, prefetchDensity)
+        snapshotFlow { pager.pageStart to pager.pageItemCount }
+            .collect { page ->
+                val start = page.first
+                val pageSize = page.second
+                if (pageSize <= 0) return@collect
+                prefetchCovers(
+                    context = prefetchContext,
+                    items = uiState.results.drop(start + pageSize).take(pageSize),
+                    widthPx = coverWidthPx,
+                    heightPx = coverHeightPx,
+                    coverUrl = { it.coverUrl },
+                    sourceOrigin = { it.origin },
+                )
+            }
     }
 
     // 翻页箭头槽：canPageUp/canPageDown 读取分页状态（pageStart 为

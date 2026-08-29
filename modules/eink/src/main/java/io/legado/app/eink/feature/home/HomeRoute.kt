@@ -12,8 +12,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.layout
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.zIndex
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -21,7 +24,13 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import io.legado.app.eink.R
 import io.legado.app.eink.feature.bookshelf.BookshelfScreen
 import io.legado.app.eink.feature.bookshelf.BookshelfViewModel
+import io.legado.app.eink.feature.bookshelf.EInkBookshelfGridMinCellWidth
+import io.legado.app.eink.feature.bookshelf.EInkGridCoverHeight
 import io.legado.app.eink.feature.bookshelf.ShelfBookUiModel
+import io.legado.app.eink.feature.common.EInkCoverHeight
+import io.legado.app.eink.feature.common.EInkCoverWidth
+import io.legado.app.eink.feature.common.coverTargetSizePx
+import io.legado.app.eink.feature.common.prefetchCovers
 import io.legado.app.eink.designsystem.pager.EInkPageController
 import io.legado.app.eink.designsystem.navigation.EInkOperationBar
 import io.legado.app.eink.designsystem.navigation.EInkOperationBarIcon
@@ -118,6 +127,37 @@ fun HomeRoute(
     // 布局切换也走此处（对新分页状态对齐，未测量前 no-op）
     LaunchedEffect(uiState.books, uiState.isGridLayout) {
         pager.realignToPageStart(uiState.books.size)
+    }
+
+    // 封面预取：当前页落定后预热下一页封面进内存缓存，下次翻页
+    // EInkAsyncImage 同步命中——零占位帧、单次绘制（墨水屏上少一次
+    // 全页重绘=少一次屏幕刷新）。pageStart/pageItemCount 在协程内经
+    // snapshotFlow 读取，不扩大 Route 的重组作用域
+    val prefetchContext = LocalContext.current
+    val prefetchDensity = LocalDensity.current
+    LaunchedEffect(uiState.books, uiState.isGridLayout) {
+        val activePager = if (uiState.isGridLayout) gridPager else listPager
+        // 与 BookGridItem/BookListItem 的显示尺寸严格一致（coverTargetSizePx
+        // 单点换算），否则预取键与显示键错开、命中失效
+        val (coverWidthPx, coverHeightPx) = if (uiState.isGridLayout) {
+            coverTargetSizePx(EInkBookshelfGridMinCellWidth, EInkGridCoverHeight, prefetchDensity)
+        } else {
+            coverTargetSizePx(EInkCoverWidth, EInkCoverHeight, prefetchDensity)
+        }
+        snapshotFlow { activePager.pageStart to activePager.pageItemCount }
+            .collect { page ->
+                val start = page.first
+                val pageSize = page.second
+                if (pageSize <= 0) return@collect
+                prefetchCovers(
+                    context = prefetchContext,
+                    items = uiState.books.drop(start + pageSize).take(pageSize),
+                    widthPx = coverWidthPx,
+                    heightPx = coverHeightPx,
+                    coverUrl = { it.coverUrl },
+                    sourceOrigin = { it.origin },
+                )
+            }
     }
 
     // 翻页箭头槽：canPageUp/canPageDown 读取分页状态（pageStart 为

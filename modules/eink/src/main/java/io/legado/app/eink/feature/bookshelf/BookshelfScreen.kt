@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
@@ -29,6 +30,7 @@ import io.legado.app.eink.designsystem.content.EInkText
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -55,6 +57,16 @@ import io.legado.app.eink.designsystem.content.EInkInfoRow
  *  - 常见密度（560/440/420/330dpi）下 px 取整均不越界翻列。
  */
 internal val EInkBookshelfGridMinCellWidth = 96.dp
+
+/**
+ * 网格封面高度：门槛宽按 View 版封面 66:90 比例换算。
+ *
+ * 显示（[BookGridItem]）与预取（HomeRoute 的下一页封面预热）必须用同一
+ * Dp 尺寸换算像素（[coverTargetSizePx]），保证预取写入的内存缓存项与
+ * 显示请求的缓存键一致。
+ */
+internal val EInkGridCoverHeight =
+    EInkBookshelfGridMinCellWidth * (EInkCoverHeight / EInkCoverWidth)
 
 /**
  * 无状态书架列表 Screen — 纯渲染。
@@ -204,8 +216,10 @@ private fun BookGrid(
  * 网格条目：封面（未读角标叠加右上角）+ 书名，对齐 View 版
  * item_bookshelf_grid 的组成与比例。
  *
- * 书名固定两行高（minLines = maxLines = 2），保证同行各列行高一致、
- * 翻页按完整行计；字体缩放放大（如 1.3）时高度随之增长但不破坏对齐。
+ * 书名固定两行高（两倍行高的最小高度约束 + maxLines = 2），保证同行
+ * 各列行高一致、翻页按完整行计；行高为 sp，字体缩放放大（如 1.3）时
+ * 高度随之增长但不破坏对齐。不用 minLines：实际行数不足时它会补一次
+ * 段落排版，整页组合时在弱 SoC 上被放大。
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -240,7 +254,7 @@ private fun BookGridItem(
                 sourceOrigin = book.origin,
                 modifier = Modifier.fillMaxSize(),
                 width = EInkBookshelfGridMinCellWidth,
-                height = EInkBookshelfGridMinCellWidth * (EInkCoverHeight / EInkCoverWidth)
+                height = EInkGridCoverHeight
             )
             // 角标规则与列表项一致：刷新中"…"，未读章节数（本次刷新
             // 发现新章时高亮）；位置同 View 版网格（封面右上角）
@@ -259,16 +273,21 @@ private fun BookGridItem(
                 )
             }
         }
+        // 最小高度约束替代 minLines：约束只抬高报告尺寸不重排段落，
+        // 行高（sp）经 Density 换算，字体缩放下仍按比例伸缩
+        val twoLineHeight = with(LocalDensity.current) {
+            (EInkTheme.typography.bodySmall.lineHeight * 2).toDp()
+        }
         EInkText(
             text = book.name,
             style = EInkTheme.typography.bodySmall,
             textAlign = TextAlign.Center,
             maxLines = 2,
-            minLines = 2,
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(top = EInkSpacing.xs)
+                .heightIn(min = twoLineHeight)
         )
     }
 }
