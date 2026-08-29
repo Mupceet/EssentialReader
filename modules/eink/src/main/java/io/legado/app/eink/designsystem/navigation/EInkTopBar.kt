@@ -75,7 +75,6 @@ fun EInkTopBar(
             Box(
                 modifier = Modifier
                     .weight(1f)
-                    .padding(start = if (onBack != null) EInkSpacing.m else 0.dp)
                     .then(if (actionsFillMax) Modifier.fillMaxHeight() else Modifier),
                 contentAlignment = Alignment.CenterStart,
             ) {
@@ -85,6 +84,10 @@ fun EInkTopBar(
                         .copy(color = colors.onSurface),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
+                    // 边距内置在文本而非容器：标题区作为整体可点击时，
+                    // 按压背景可贴边展开（容器起点=屏幕边/返回键右侧）；
+                    // 无返回键时同样保证文字距屏幕边 [EInkSpacing.m]
+                    modifier = Modifier.padding(start = EInkSpacing.m)
                 )
             }
             if (actionsFillMax) {
