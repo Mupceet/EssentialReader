@@ -67,7 +67,7 @@ lifecycle = "2.9.4"
 #noinspection GradleDependency
 room = "2.7.1"
 #noinspection GradleDependency
-recyclerview = "1.2.0"
+recyclerview = "1.4.0"
 #noinspection GradleDependency
 viewpager2 = "1.0.0"
 #noinspection GradleDependency
