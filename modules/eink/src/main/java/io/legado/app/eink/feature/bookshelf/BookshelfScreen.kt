@@ -2,6 +2,7 @@ package io.legado.app.eink.feature.bookshelf
 
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -363,14 +364,14 @@ private fun BookListItem(
  * 书架角标：位于书籍标题同一行右侧，不覆盖封面与下方信息行。
  *
  * 样式对齐 MD3 主工程书架的 TextCard 角标：4dp 圆角（[EInkShapes.medium]）
- * 实心 chip、无描边、水平内边距 4dp（[EInkSpacing.xs]）。普通态为
- * surfaceVariant 实心底 + onSurface 文字（灰阶对应主工程
- * surfaceContainer/onSurface）。
+ * 实心 chip、水平内边距 4dp（[EInkSpacing.xs]）。普通态为 surfaceVariant
+ * 实心底 + onSurface 文字 + 1dp outline 标准描边（HighContrast 下
+ * surfaceVariant 与页面背景同色，必须靠描边成形，规范 §7）。
  *
  * E-Ink 约束：静态绘制、零动画零阴影——刷新中不做转圈/闪烁，仅把角标
  * 静态替换为省略号，完成后一次性替换为数字或消失。高亮（本次刷新发现
- * 新章，lastCheckCount > 0）保留反色实心（黑底白字）——灰阶下比主工程
- * 的 Update 图标更醒目，且不引入新图标资源；两种状态均单帧绘制。
+ * 新章，lastCheckCount > 0）保留反色实心（黑底白字、无描边）——灰阶下
+ * 比主工程的 Update 图标更醒目，且不引入新图标资源；两种状态均单帧绘制。
  */
 @Composable
 private fun ShelfBadge(
@@ -384,6 +385,18 @@ private fun ShelfBadge(
             .background(
                 color = if (highlight) colors.onSurface else colors.surfaceVariant,
                 shape = EInkShapes.medium
+            )
+            .then(
+                if (highlight) {
+                    Modifier
+                } else {
+                    // 普通态 1dp 标准描边：浅底 chip 在白色页面上可辨识
+                    Modifier.border(
+                        width = 1.dp,
+                        color = colors.outline,
+                        shape = EInkShapes.medium
+                    )
+                }
             )
             .padding(horizontal = EInkSpacing.xs, vertical = 0.dp),
         contentAlignment = Alignment.Center
