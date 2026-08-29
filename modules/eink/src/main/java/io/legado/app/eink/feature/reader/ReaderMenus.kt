@@ -90,7 +90,7 @@ internal fun ReaderTopBar(
         ) {
             // 书名点击进详情；按下瞬时反色（规范 §35）。
             // 触控高度撑满操作条，与右侧图标按钮一致；
-            // 左端保留屏幕边距（右侧图标按钮居右连续排列、贴右屏，见 BarAction）
+            // 屏幕边距内置在文本上（非容器 padding），按压背景贴屏幕左缘
             val detailPress = rememberImmediatePressState()
             val detailEnabled = state.bookUrl.isNotEmpty()
             val detailColors = eInkActionColors(
@@ -100,7 +100,6 @@ internal fun ReaderTopBar(
             Box(
                 modifier = Modifier
                     .weight(1f)
-                    .padding(start = EInkSpacing.m)
                     .fillMaxHeight()
                     .then(detailPress.modifier)
                     .background(detailColors.containerColor)
@@ -118,6 +117,7 @@ internal fun ReaderTopBar(
                     style = EInkTheme.typography.titleLarge,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.padding(start = EInkSpacing.m)
                 )
             }
             // 顶栏动作按钮较底部操作栏更窄：与 EInkTopBar 动作模式一致收敛为 1.2 倍高度
