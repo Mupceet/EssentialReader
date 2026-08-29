@@ -6,8 +6,8 @@ import io.legado.app.constant.BookType
 import io.legado.app.data.appDb
 import io.legado.app.data.entities.BookSource
 import io.legado.app.data.entities.SearchBook
-import io.legado.app.eink.changesource.ChangeSourceBookUiModel
-import io.legado.app.eink.changesource.ChangeSourceResultUiModel
+import io.legado.app.eink.feature.changesource.ChangeSourceBookUiModel
+import io.legado.app.eink.feature.changesource.ChangeSourceResultUiModel
 import io.legado.app.eink.engine.BookHandle
 import io.legado.app.eink.engine.ChangeSourceEngine
 import io.legado.app.eink.engine.SourceHandle

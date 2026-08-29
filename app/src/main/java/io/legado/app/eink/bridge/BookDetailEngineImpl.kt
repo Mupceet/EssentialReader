@@ -4,7 +4,7 @@ import io.legado.app.constant.AppLog
 import io.legado.app.constant.BookType
 import io.legado.app.data.appDb
 import io.legado.app.data.entities.Book
-import io.legado.app.eink.bookdetail.BookDetailUiModel
+import io.legado.app.eink.feature.bookdetail.BookDetailUiModel
 import io.legado.app.eink.engine.BookDetailEngine
 import io.legado.app.eink.engine.BookHandle
 import io.legado.app.eink.engine.PrefetchResult

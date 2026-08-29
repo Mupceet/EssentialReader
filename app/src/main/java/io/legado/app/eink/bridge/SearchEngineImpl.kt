@@ -16,8 +16,8 @@ import io.legado.app.domain.usecase.SearchRunEvent
 import io.legado.app.eink.engine.SearchEngine
 import io.legado.app.eink.engine.SearchSession
 import io.legado.app.eink.engine.SearchSessionCallback
-import io.legado.app.eink.search.SearchBookUiModel
-import io.legado.app.eink.search.SearchHistoryUiModel
+import io.legado.app.eink.feature.search.SearchBookUiModel
+import io.legado.app.eink.feature.search.SearchHistoryUiModel
 import io.legado.app.help.book.isNotShelf
 import io.legado.app.help.config.AppConfig
 import kotlinx.coroutines.CoroutineScope

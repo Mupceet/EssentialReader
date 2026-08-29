@@ -1,7 +1,7 @@
 package io.legado.app.eink.engine
 
-import io.legado.app.eink.changesource.ChangeSourceBookUiModel
-import io.legado.app.eink.changesource.ChangeSourceResultUiModel
+import io.legado.app.eink.feature.changesource.ChangeSourceBookUiModel
+import io.legado.app.eink.feature.changesource.ChangeSourceResultUiModel
 
 /**
  * 换源端口。

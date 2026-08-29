@@ -21,10 +21,11 @@ import androidx.core.view.WindowCompat
 import androidx.lifecycle.lifecycleScope
 import io.legado.app.constant.PreferKey
 import io.legado.app.data.appDb
+import io.legado.app.eink.app.EInkApp
 import io.legado.app.eink.bridge.EInkBridge
 import io.legado.app.eink.bridge.TextPageContent
 import io.legado.app.eink.reader.ReaderPageCanvas
-import io.legado.app.eink.theme.EInkTheme
+import io.legado.app.eink.designsystem.theme.EInkTheme
 import io.legado.app.help.config.AppConfigStore
 import io.legado.app.ui.main.MainActivity
 import io.legado.app.ui.theme.resolveAppFontScale

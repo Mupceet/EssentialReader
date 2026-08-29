@@ -13,12 +13,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.TextUnit
-import io.legado.app.eink.component.EInkHorizontalDivider
-import io.legado.app.eink.component.EInkText
-import io.legado.app.eink.component.EInkTopBar
-import io.legado.app.eink.theme.EInkSpacing
-import io.legado.app.eink.theme.EInkTheme
-import io.legado.app.eink.theme.EInkTypographySystem
+import io.legado.app.eink.designsystem.content.EInkHorizontalDivider
+import io.legado.app.eink.designsystem.content.EInkText
+import io.legado.app.eink.designsystem.navigation.EInkTopBar
+import io.legado.app.eink.designsystem.theme.EInkSpacing
+import io.legado.app.eink.designsystem.theme.EInkTheme
+import io.legado.app.eink.designsystem.theme.EInkTypographySystem
 
 /** 单条排版样式展示项：中文名 + 该级实际 TextStyle。 */
 private data class TypographyRow(

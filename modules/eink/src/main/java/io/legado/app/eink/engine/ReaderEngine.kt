@@ -1,6 +1,6 @@
 package io.legado.app.eink.engine
 
-import io.legado.app.eink.reader.ReaderTextStyle
+import io.legado.app.eink.feature.reader.ReaderTextStyle
 
 /**
  * 排版引擎产物的不透明包装（宿主 TextPage）。

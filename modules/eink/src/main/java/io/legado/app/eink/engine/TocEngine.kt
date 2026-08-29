@@ -1,7 +1,7 @@
 package io.legado.app.eink.engine
 
-import io.legado.app.eink.toc.ChapterUiModel
-import io.legado.app.eink.toc.TocBookUiModel
+import io.legado.app.eink.feature.toc.ChapterUiModel
+import io.legado.app.eink.feature.toc.TocBookUiModel
 
 /** 目录联网拉取结果。 */
 sealed interface TocFetchResult {
