@@ -166,6 +166,10 @@ fun EInkApp(
                                         controller.navigate(EInkScreen.Reader(bookUrl))
                                     }
                                 },
+                                // 换源成功后详情经 bookChanged 事件跟随刷新
+                                onChangeSource = { bookUrl ->
+                                    controller.navigate(EInkScreen.ChangeSource(bookUrl))
+                                },
                             )
                         }
 
