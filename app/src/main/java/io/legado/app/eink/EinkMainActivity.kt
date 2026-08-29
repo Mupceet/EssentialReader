@@ -13,25 +13,30 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
 import io.legado.app.constant.PreferKey
 import io.legado.app.data.appDb
+import io.legado.app.domain.gateway.AppUiConfigurationGateway
 import io.legado.app.eink.app.EInkApp
 import io.legado.app.eink.bridge.EInkBridge
 import io.legado.app.eink.bridge.TextPageContent
-import io.legado.app.eink.reader.ReaderPageCanvas
 import io.legado.app.eink.designsystem.theme.EInkTheme
+import io.legado.app.eink.reader.ReaderPageCanvas
 import io.legado.app.help.config.AppConfigStore
 import io.legado.app.ui.main.MainActivity
 import io.legado.app.ui.theme.resolveAppFontScale
+import io.legado.app.utils.isNightMode
 import io.legado.app.utils.startActivity
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import org.koin.core.context.GlobalContext
 
 /**
  * E-Ink 版本单 Activity 入口。
@@ -58,6 +63,9 @@ import kotlinx.coroutines.launch
  *    保证状态栏与纯黑白主题一致。
  */
 class EInkMainActivity : ComponentActivity() {
+
+    private val appUiConfigurationGateway: AppUiConfigurationGateway =
+        GlobalContext.get().get()
 
     override fun attachBaseContext(newBase: Context) {
         super.attachBaseContext(newBase.wrapAppFontScale())
@@ -94,11 +102,26 @@ class EInkMainActivity : ComponentActivity() {
         } else {
             null
         }
+        // 初始 UI 配置在组合外同步读取（组合内读同步快照会违反
+        // verifyConfigArchitecture 的 Composable 禁读配置护栏）
+        val initialUiConfiguration = appUiConfigurationGateway.currentConfiguration
         setContent {
-            EInkTheme {
+            // 黑白主题对齐完整模式：AppUiConfiguration.isDarkTheme 与主壳
+            // 同源（themeMode 0=跟随系统 1=浅色 2=深色），经网关 StateFlow
+            // 热切换；系统深浅色变化经下方 onConfigurationChanged 同步进网关
+            //（本 Activity 声明了 uiMode configChanges，不会自动重建）
+            val uiConfiguration by appUiConfigurationGateway.configuration
+                .collectAsStateWithLifecycle(initialUiConfiguration)
+
+            EInkTheme(darkTheme = uiConfiguration.isDarkTheme) {
                 EInkRoot(lastReadBookUrl)
             }
         }
+    }
+
+    override fun onConfigurationChanged(newConfig: Configuration) {
+        appUiConfigurationGateway.synchronizeSystemDarkTheme(newConfig.isNightMode)
+        super.onConfigurationChanged(newConfig)
     }
 }
 
