@@ -103,7 +103,7 @@ fun ComponentGalleryRoute(
                 SearchSamples()
             }
             item(key = "nav-topbar") {
-                SectionHeader("Navigation · 顶栏（内边距动作 / 贴右图标动作）")
+                SectionHeader("Navigation · 顶栏（内边距动作 / 贴右图标 / 可点击标题）")
                 TopBarSamples()
             }
             item(key = "nav-arrows") {
@@ -436,6 +436,22 @@ private fun TopBarSamples() {
                 EInkOperationBarIcon(
                     icon = painterResource(R.drawable.eink_ic_settings),
                     contentDescription = "设置",
+                    onClick = {}
+                )
+            }
+        )
+        // 标题可点击（阅读页书名进详情同款）：按压瞬时反色、背景贴屏幕左缘
+        var titleEnabled by rememberSaveable { mutableStateOf(true) }
+        EInkTopBar(
+            title = if (titleEnabled) "标题可点击（按住看反色贴边）" else "标题禁用（中灰不可点）",
+            onTitleClick = { titleEnabled = !titleEnabled },
+            titleEnabled = titleEnabled,
+            titleClickLabel = "切换标题可用状态",
+            actionsFillMax = true,
+            actions = {
+                EInkOperationBarIcon(
+                    icon = painterResource(R.drawable.eink_ic_toc),
+                    contentDescription = "目录",
                     onClick = {}
                 )
             }

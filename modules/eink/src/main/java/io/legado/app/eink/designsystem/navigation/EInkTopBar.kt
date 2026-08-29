@@ -38,13 +38,22 @@ import io.legado.app.eink.designsystem.theme.EInkTheme
  * 撑满顶栏、宽度收敛上限降为 [TopBarWidthRatio] 倍高度；仅标题+返回
  * 或文本动作的简单顶栏保持默认内边距模式。
  *
+ * 标题可点击（[onTitleClick]，如阅读页书名进详情）：标题区整体作为
+ * 触控目标撑满顶栏高度，按压瞬时反色且背景贴容器边缘（屏幕左缘 /
+ * 返回键右侧），[titleEnabled] = false 时置灰不可点。
+ *
  * E-Ink 约束:
  *  - 零涟漪（全局 NoIndication）、零阴影，层次仅靠分隔线；
  *  - 返回键使用统一的 arrow_back 图标，触控目标 48dp；
- *  - 高度与底部操作栏一致（56dp），上下形成稳定的对称骨架。
+ *  - 高度与底部操作栏一致（56dp），上下形成稳定的对称骨架；
+ *  - 不透明 surface 背景：支持作为覆盖层浮在内容之上（如阅读页），
+ *    普通页面下与页面背景同色、渲染无差异。
  *
  * @param title 标题文本（单行省略）
  * @param onBack 返回回调；为 null 时不显示返回按钮（根页面用）
+ * @param onTitleClick 标题点击回调；非 null 时标题整体可点击（按压反色、贴边背景）
+ * @param titleEnabled 标题可点击性；false 时中灰置灰（仅 [onTitleClick] 非 null 时有意义）
+ * @param titleClickLabel 标题点击的无障碍语义标签（如"书籍详情"）
  * @param titleStyle 标题样式；null 时用默认 titleLarge（首页等传 titleLarge 放大）
  * @param actionsFillMax true 时动作区贴右撑满高度（图标动作模式），
  *   动作内直接使用 [EInkOperationBarIcon]；false 时动作区随顶栏内边距（文本动作模式）
@@ -55,17 +64,29 @@ fun EInkTopBar(
     title: String,
     modifier: Modifier = Modifier,
     onBack: (() -> Unit)? = null,
+    onTitleClick: (() -> Unit)? = null,
+    titleEnabled: Boolean = true,
+    titleClickLabel: String? = null,
     titleStyle: TextStyle? = null,
     actionsFillMax: Boolean = false,
     actions: @Composable () -> Unit = {},
 ) {
     val colors = EInkTheme.colorScheme
+    val titleClickable = onTitleClick != null
+    val titlePress = rememberImmediatePressState()
+    val titleColors = eInkActionColors(
+        pressed = titleClickable && titlePress.isPressed,
+        enabled = titleEnabled,
+    )
 
     Column(modifier = modifier.fillMaxWidth()) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(BarHeight)
+                // 不透明 surface 背景：顶栏可能作为覆盖层浮在内容之上
+                // （阅读页书名栏 overlay 正文），必须遮住其后内容
+                .background(EInkTheme.colorScheme.surface)
                 .then(if (actionsFillMax) Modifier else Modifier.padding(horizontal = EInkSpacing.m)),
             verticalAlignment = Alignment.CenterVertically,
         ) {
@@ -75,13 +96,37 @@ fun EInkTopBar(
             Box(
                 modifier = Modifier
                     .weight(1f)
-                    .then(if (actionsFillMax) Modifier.fillMaxHeight() else Modifier),
+                    // 可点击标题的触控/按压背景撑满顶栏高度并贴容器起点
+                    .then(
+                        if (actionsFillMax || titleClickable) Modifier.fillMaxHeight() else Modifier
+                    )
+                    .then(
+                        if (titleClickable) {
+                            Modifier
+                                .then(titlePress.modifier)
+                                .background(titleColors.containerColor)
+                                .einkClickable(
+                                    enabled = titleEnabled,
+                                    role = Role.Button,
+                                    onClickLabel = titleClickLabel,
+                                    onClick = onTitleClick,
+                                )
+                        } else {
+                            Modifier
+                        }
+                    ),
                 contentAlignment = Alignment.CenterStart,
             ) {
                 BasicText(
                     text = title,
                     style = (titleStyle ?: EInkTheme.typography.titleLarge)
-                        .copy(color = colors.onSurface),
+                        .copy(
+                            color = if (titleClickable) {
+                                titleColors.contentColor
+                            } else {
+                                colors.onSurface
+                            }
+                        ),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                     // 边距内置在文本而非容器：标题区作为整体可点击时，
