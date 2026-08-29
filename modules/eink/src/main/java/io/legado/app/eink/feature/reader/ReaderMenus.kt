@@ -9,7 +9,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.defaultMinSize
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -31,15 +30,13 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import io.legado.app.eink.R
 import io.legado.app.eink.designsystem.content.EInkHorizontalDivider
 import io.legado.app.eink.designsystem.navigation.EInkOperationBarIcon
+import io.legado.app.eink.designsystem.navigation.EInkTopBar
 import io.legado.app.eink.designsystem.control.EInkSteppedSlider
 import io.legado.app.eink.designsystem.content.EInkText
-import io.legado.app.eink.designsystem.navigation.LocalOperationBarWidthRatio
-import io.legado.app.eink.designsystem.navigation.TopBarWidthRatio
 import io.legado.app.eink.designsystem.interaction.eInkActionColors
 import io.legado.app.eink.designsystem.interaction.rememberImmediatePressState
 import io.legado.app.eink.designsystem.interaction.einkClickable
@@ -80,97 +77,40 @@ internal fun ReaderTopBar(
     onOpenCachePanel: () -> Unit,
     onAddToBookshelf: () -> Unit,
 ) {
-    Column(modifier = Modifier.fillMaxWidth()) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(BarHeight)
-                .background(EInkTheme.colorScheme.surface),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            // 书名点击进详情；按下瞬时反色（规范 §35）。
-            // 触控高度撑满操作条，与右侧图标按钮一致；
-            // 屏幕边距内置在文本上（非容器 padding），按压背景贴屏幕左缘
-            val detailPress = rememberImmediatePressState()
-            val detailEnabled = state.bookUrl.isNotEmpty()
-            val detailColors = eInkActionColors(
-                pressed = detailPress.isPressed,
-                enabled = detailEnabled,
+    // 通用顶栏（贴右动作模式）：书名可点击进详情（按压反色、背景贴
+    // 屏幕左缘、禁用中灰），动作按钮直接使用 EInkOperationBarIcon
+    EInkTopBar(
+        title = state.bookName,
+        onTitleClick = onOpenDetail,
+        titleEnabled = state.bookUrl.isNotEmpty(),
+        titleClickLabel = "书籍详情",
+        actionsFillMax = true,
+        actions = {
+            EInkOperationBarIcon(
+                icon = painterResource(R.drawable.eink_ic_exchange),
+                contentDescription = "换源",
+                enabled = !state.isLocalBook,
+                onClick = onChangeSource,
             )
-            Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxHeight()
-                    .then(detailPress.modifier)
-                    .background(detailColors.containerColor)
-                    .einkClickable(
-                        enabled = detailEnabled,
-                        role = Role.Button,
-                        onClickLabel = "书籍详情",
-                        onClick = onOpenDetail,
-                    ),
-                contentAlignment = Alignment.CenterStart,
-            ) {
-                EInkText(
-                    text = state.bookName,
-                    color = detailColors.contentColor,
-                    style = EInkTheme.typography.titleLarge,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.padding(start = EInkSpacing.m)
+            EInkOperationBarIcon(
+                icon = painterResource(R.drawable.eink_ic_refresh_black_24dp),
+                contentDescription = "刷新",
+                onClick = onRefresh,
+            )
+            EInkOperationBarIcon(
+                icon = painterResource(R.drawable.eink_ic_download_line),
+                contentDescription = "缓存",
+                enabled = !state.isLocalBook,
+                onClick = onOpenCachePanel,
+            )
+            if (!state.inBookshelf) {
+                EInkOperationBarIcon(
+                    icon = painterResource(R.drawable.eink_ic_add),
+                    contentDescription = "加书架",
+                    onClick = onAddToBookshelf,
                 )
             }
-            // 顶栏动作按钮较底部操作栏更窄：与 EInkTopBar 动作模式一致收敛为 1.2 倍高度
-            CompositionLocalProvider(LocalOperationBarWidthRatio provides TopBarWidthRatio) {
-                BarAction(
-                    iconRes = R.drawable.eink_ic_exchange,
-                    contentDescription = "换源",
-                    enabled = !state.isLocalBook,
-                    onClick = onChangeSource,
-                )
-                BarAction(
-                    iconRes = R.drawable.eink_ic_refresh_black_24dp,
-                    contentDescription = "刷新",
-                    onClick = onRefresh,
-                )
-                BarAction(
-                    iconRes = R.drawable.eink_ic_download_line,
-                    contentDescription = "缓存",
-                    enabled = !state.isLocalBook,
-                    onClick = onOpenCachePanel,
-                )
-                if (!state.inBookshelf) {
-                    BarAction(
-                        iconRes = R.drawable.eink_ic_add,
-                        contentDescription = "加书架",
-                        onClick = onAddToBookshelf,
-                    )
-                }
-            }
-        }
-        // 分隔线在底部：与下方正文分界
-        EInkHorizontalDivider()
-    }
-}
-
-/**
- * 顶部操作条图标按钮（居右连续排列、贴右屏）：复用 [EInkOperationBarIcon]
- * 默认尺寸（高度撑满操作条，宽度自适应，收敛上限由 [ReaderTopBar] 经
- * [LocalOperationBarWidthRatio] 降为 [TopBarWidthRatio] 倍高度，28dp 图标）。
- * 按压瞬时反色；无选中语义。
- */
-@Composable
-private fun BarAction(
-    iconRes: Int,
-    contentDescription: String,
-    enabled: Boolean = true,
-    onClick: () -> Unit,
-) {
-    EInkOperationBarIcon(
-        icon = painterResource(iconRes),
-        contentDescription = contentDescription,
-        onClick = onClick,
-        enabled = enabled,
+        },
     )
 }
 
