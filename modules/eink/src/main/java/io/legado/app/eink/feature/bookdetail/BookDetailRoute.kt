@@ -75,6 +75,7 @@ fun BookDetailRoute(
     onBack: () -> Unit,
     onOpenToc: (String) -> Unit,
     onRead: (String) -> Unit,
+    onChangeSource: (String) -> Unit,
     viewModel: BookDetailViewModel = viewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -98,7 +99,8 @@ fun BookDetailRoute(
         onRemoveFromShelf = viewModel::removeFromBookshelf,
         onOpenToc = { onOpenToc(effectiveBookUrl) },
         onRead = { onRead(effectiveBookUrl) },
-        onChangeSource = viewModel::changeSource,
+        // 换源后本页经 bookChanged 事件跟随刷新，effectiveBookUrl 即新源地址
+        onChangeSource = { onChangeSource(effectiveBookUrl) },
     )
 }
 

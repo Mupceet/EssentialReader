@@ -16,6 +16,9 @@ import io.legado.app.help.book.removeType
 import io.legado.app.help.config.AppConfig
 import io.legado.app.model.ReadBook
 import io.legado.app.model.webBook.WebBook
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlin.coroutines.cancellation.CancellationException
 
 /** 书源句柄（包装 BookSource）。 */
@@ -35,6 +38,9 @@ internal class SearchResultHandleImpl(val searchBook: SearchBook) : SearchResult
  * getChapterListAwait 返回 Result。
  */
 internal object ChangeSourceEngineImpl : ChangeSourceEngine {
+
+    private val _bookChanged = MutableSharedFlow<String>(extraBufferCapacity = 8)
+    override val bookChanged: SharedFlow<String> = _bookChanged.asSharedFlow()
 
     override suspend fun currentReadingBook(
         bookUrl: String,
@@ -114,6 +120,8 @@ internal object ChangeSourceEngineImpl : ChangeSourceEngine {
             // 重载引擎会话；阅读页返回时会采用引擎当前书籍
             ReadBook.resetData(newBook)
             ReadBook.loadContent(resetPageOffset = true)
+            // 通知栈下方的详情等界面按新 bookUrl 跟随刷新
+            _bookChanged.tryEmit(newBook.bookUrl)
             Result.success(BookHandleImpl(newBook))
         } catch (e: CancellationException) {
             throw e

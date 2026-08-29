@@ -58,6 +58,28 @@ class BookDetailViewModel(application: Application) : AndroidViewModel(applicati
     private var loadedKey: String? = null
     private var bookHandle: BookHandle? = null
 
+    init {
+        // 换源成功后跟随刷新：换源会删除旧记录并以新 bookUrl 重建（阅读
+        // 会话已由引擎重载）。本页位于换源页下方时 ViewModel 仍存活，
+        // 按事件重载，pop 返回即见新源数据（含从下层阅读页发起的换源）
+        viewModelScope.launch {
+            EInkEngineRegistry.changeSourceEngine.bookChanged.collect { newBookUrl ->
+                val current = _uiState.value.book ?: return@collect
+                if (current.bookUrl == newBookUrl) return@collect
+                val fresh = engine.loadBookDetail(newBookUrl) ?: return@collect
+                // 句柄同步替换：后续加/移书架作用于新书记录
+                val found = engine.findBook(fresh.name, fresh.displayAuthor, newBookUrl)
+                if (found != null) {
+                    bookHandle = found.first
+                }
+                val inShelf = engine.isBookInBookshelf(newBookUrl)
+                _uiState.update {
+                    it.copy(book = found?.second ?: fresh, isInBookshelf = inShelf)
+                }
+            }
+        }
+    }
+
     fun loadBook(name: String, author: String, bookUrl: String) {
         val key = "$name\u0000$author\u0000$bookUrl"
         if (loadedKey == key) {
@@ -136,13 +158,6 @@ class BookDetailViewModel(application: Application) : AndroidViewModel(applicati
             } else {
                 _messages.emit(UserMessage.from(R.string.eink_operation_failed))
             }
-        }
-    }
-
-    /** 切换书源：本期占位，后续实现跨书源搜索重载。 */
-    fun changeSource() {
-        viewModelScope.launch {
-            _messages.emit(UserMessage.from(R.string.eink_feature_developing))
         }
     }
 }

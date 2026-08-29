@@ -2,6 +2,7 @@ package io.legado.app.eink.engine
 
 import io.legado.app.eink.feature.changesource.ChangeSourceBookUiModel
 import io.legado.app.eink.feature.changesource.ChangeSourceResultUiModel
+import kotlinx.coroutines.flow.SharedFlow
 
 /**
  * 换源端口。
@@ -11,6 +12,13 @@ import io.legado.app.eink.feature.changesource.ChangeSourceResultUiModel
  * 阅读会话）下沉桥接层。
  */
 interface ChangeSourceEngine {
+
+    /**
+     * 换源成功事件：发射新书 bookUrl（旧记录已删除、阅读会话已重载）。
+     * 仍展示该书且位于导航栈下方的界面（如详情页）订阅后按新 bookUrl
+     * 跟随刷新，返回时即见新源数据。
+     */
+    val bookChanged: SharedFlow<String>
 
     /** 当前阅读会话书籍优先，其次 DB（换源页入口）。 */
     suspend fun currentReadingBook(bookUrl: String): Pair<BookHandle, ChangeSourceBookUiModel>?
