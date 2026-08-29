@@ -36,11 +36,11 @@ import kotlinx.coroutines.flow.first
 class EInkGridPagerState(val gridState: LazyGridState) : EInkPageController {
 
     /** 一页完整展示的项数（完整行数 × 列数，首次布局实测后固定）。 */
-    var pageItemCount: Int by mutableIntStateOf(0)
+    override var pageItemCount: Int by mutableIntStateOf(0)
         private set
 
     /** 当前页首项下标（等差序列：0, k, 2k, ...，k 为 [pageItemCount]）。 */
-    var pageStart: Int by mutableIntStateOf(0)
+    override var pageStart: Int by mutableIntStateOf(0)
         private set
 
     /**

@@ -25,6 +25,12 @@ import kotlinx.coroutines.flow.first
 @Stable
 interface EInkPageController {
 
+    /** 当前页首项下标（等差序列：0, k, 2k, ...）。 */
+    val pageStart: Int
+
+    /** 一页完整展示的项数（首次布局实测，之后固定）。 */
+    val pageItemCount: Int
+
     /** 是否可向前翻页（当前不在第一页）。 */
     fun canPageUp(): Boolean
 
@@ -64,11 +70,11 @@ interface EInkPageController {
 class EInkListPagerState(val listState: LazyListState) : EInkPageController {
 
     /** 一页完整展示的项数（首次布局实测，之后固定）。 */
-    var pageItemCount: Int by mutableIntStateOf(0)
+    override var pageItemCount: Int by mutableIntStateOf(0)
         private set
 
     /** 当前页首项下标（等差序列：0, k, 2k, ...）。 */
-    var pageStart: Int by mutableIntStateOf(0)
+    override var pageStart: Int by mutableIntStateOf(0)
         private set
 
     /**
