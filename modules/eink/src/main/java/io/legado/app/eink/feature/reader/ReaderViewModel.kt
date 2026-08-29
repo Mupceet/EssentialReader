@@ -161,12 +161,24 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application),
             // 永远不会回调（界面停留在加载中）
             withTimeoutOrNull(VIEW_SIZE_TIMEOUT_MS) { viewSizeReady.await() }
 
-            // 换源完成后引擎持有新书（bookUrl 与路由参数不同），优先采用；
+            // 换源完成后引擎持有新书（bookUrl 与路由参数不同）：旧记录连同
+            // 章节已被删除，按路由参数解析要么为 null、要么从 searchBook
+            // 缓存复活死源旧书——会话书是它的换源继任（同名同作者、已换
+            // URL）时优先。不能以 loadedBookUrl 判断：onNotifyBookChanged
+            // 在换源时已把它同步成新值，旧守卫会在重挂时误判"无变化"而
+            // 回落失效参数，表现为内容上叠加"加载失败/书籍不存在"。
             // 未加书架的搜索书（详情页直接阅读）由端口转 notShelf 入库，
             // 与 View 版"未加书架直接阅读"行为一致
-            val book = engine.sessionBook
-                ?.takeIf { loadedBookUrl != null && it.bookUrl != loadedBookUrl }
-                ?: engine.resolveBook(bookUrl)
+            val resolved = engine.resolveBook(bookUrl)
+            val session = engine.sessionBook
+            val book = when {
+                session != null && resolved != null &&
+                    session.bookUrl != resolved.bookUrl &&
+                    session.name == resolved.name &&
+                    session.author == resolved.author -> session
+                resolved != null -> resolved
+                else -> session
+            }
             if (book == null) {
                 _uiState.update {
                     it.copy(isLoading = false, error = "书籍不存在")
