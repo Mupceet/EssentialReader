@@ -6,7 +6,7 @@ import io.legado.app.data.appDb
 import io.legado.app.data.entities.Book
 import io.legado.app.data.entities.BookGroup
 import io.legado.app.data.entities.BookSource
-import io.legado.app.eink.bookshelf.ShelfBookUiModel
+import io.legado.app.eink.feature.bookshelf.ShelfBookUiModel
 import io.legado.app.eink.engine.BookshelfEngine
 import io.legado.app.eink.engine.BookTocRefreshResult
 import io.legado.app.help.book.BookHelp

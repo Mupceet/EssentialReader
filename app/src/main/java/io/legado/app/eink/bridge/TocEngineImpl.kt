@@ -6,8 +6,8 @@ import io.legado.app.data.entities.Book
 import io.legado.app.data.entities.BookChapter
 import io.legado.app.eink.engine.TocEngine
 import io.legado.app.eink.engine.TocFetchResult
-import io.legado.app.eink.toc.ChapterUiModel
-import io.legado.app.eink.toc.TocBookUiModel
+import io.legado.app.eink.feature.toc.ChapterUiModel
+import io.legado.app.eink.feature.toc.TocBookUiModel
 import io.legado.app.help.book.BookHelp
 import io.legado.app.help.book.addType
 import io.legado.app.help.book.isLocal

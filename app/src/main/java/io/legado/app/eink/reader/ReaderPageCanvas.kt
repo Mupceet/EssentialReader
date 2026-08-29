@@ -10,7 +10,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.toArgb
-import io.legado.app.eink.theme.EInkTheme
+import io.legado.app.eink.designsystem.theme.EInkTheme
 import io.legado.app.model.ImageProvider
 import io.legado.app.ui.book.read.page.entities.TextPage
 import io.legado.app.ui.book.read.page.entities.column.ImageColumn

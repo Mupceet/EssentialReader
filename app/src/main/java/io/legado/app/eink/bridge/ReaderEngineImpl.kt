@@ -11,7 +11,7 @@ import io.legado.app.eink.engine.ReaderBookSnapshot
 import io.legado.app.eink.engine.ReaderEngine
 import io.legado.app.eink.engine.ReaderEngineCallback
 import io.legado.app.eink.engine.ReaderTipSpec
-import io.legado.app.eink.reader.ReaderTextStyle
+import io.legado.app.eink.feature.reader.ReaderTextStyle
 import io.legado.app.domain.gateway.ReadStyleGateway
 import io.legado.app.domain.gateway.ReadStyleFloatKey
 import io.legado.app.domain.gateway.ReadStyleIntKey
