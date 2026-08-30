@@ -141,8 +141,11 @@ private fun EInkDefaultCover(
     val colors = EInkTheme.colorScheme
     Box(
         modifier = modifier
-            .background(color = colors.surfaceVariant, shape = EInkShapes.small)
-            .border(width = 1.dp, color = colors.outline, shape = EInkShapes.small)
+            // 形状必须与外层 clip（EInkBookCover 的 coverModifier，medium）
+            // 一致：内层半径小于外层掩模时，1dp 边框的四角弧线落在掩模外
+            // 被切掉，视觉上四角缺损
+            .background(color = colors.surfaceVariant, shape = EInkShapes.medium)
+            .border(width = 1.dp, color = colors.outline, shape = EInkShapes.medium)
             .padding(horizontal = EInkSpacing.xs, vertical = EInkSpacing.xxs),
         contentAlignment = Alignment.Center
     ) {
