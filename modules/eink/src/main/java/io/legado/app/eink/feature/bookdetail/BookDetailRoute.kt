@@ -156,10 +156,10 @@ internal fun BookDetailScreen(
                 if (state.book != null) {
                     EInkOperationBarIcon(
                         icon = painterResource(
-                            // Google Fonts Material Symbols：未加架 = bookmark_add，
-                            // 已在书架 = bookmark_remove（点击移出）
-                            if (state.isInBookshelf) R.drawable.eink_ic_bookmark_remove
-                            else R.drawable.eink_ic_bookmark_add
+                            // 书页 + 加/减号图标对（源：ic_jiarushujia.svg 及其派生）：
+                            // 未加架 = 加号，已在书架 = 减号（点击移出）
+                            if (state.isInBookshelf) R.drawable.eink_ic_book_remove
+                            else R.drawable.eink_ic_book_add
                         ),
                         contentDescription = if (state.isInBookshelf) "移出书架" else "加入书架",
                         onClick = if (state.isInBookshelf) onRemoveFromShelf else onAddToShelf
