@@ -42,4 +42,17 @@ interface GlobalSettings {
 
     /** 换源时是否校验作者。 */
     val changeSourceCheckAuthor: Boolean
+
+    /**
+     * 应用内字体缩放原始设置值：÷10 为倍率（如 11 = 1.1 倍），有效区间
+     * 0.8~1.6（与宿主完整模式的界面字体缩放共享同一存储键，两端语义
+     * 一致：越界/未设置时宿主回落系统缩放）。
+     *
+     * null = 未设置，跟随系统缩放。
+     *
+     * 可写（「我的」页开关）：attach 期配置 —— fontScale 由入口 Activity
+     * 在 attachBaseContext 一次性应用，模块侧写入后须 recreate 入口
+     * Activity 才能生效（消费方负责 recreate）。
+     */
+    var fontScaleSetting: Int?
 }

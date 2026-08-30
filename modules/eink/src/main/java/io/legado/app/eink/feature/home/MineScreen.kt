@@ -50,8 +50,8 @@ internal fun MineScreen(
     onOpenThemeDebug: () -> Unit = {},
     onOpenComponentGallery: () -> Unit = {},
 ) {
-    val fontScale = EInkEngineRegistry.uiSettings.fontScaleSetting
     val globalSettings = EInkEngineRegistry.globalSettings
+    val fontScale = globalSettings.fontScaleSetting
     val coverEngine = EInkEngineRegistry.coverEngine
     var autoRefresh by remember { mutableStateOf(globalSettings.autoRefreshBook) }
     var defaultToRead by remember { mutableStateOf(globalSettings.defaultToRead) }
