@@ -3,8 +3,8 @@ package io.legado.app.eink.engine
 /**
  * 宿主级界面设置端口：E-Ink 版需要「写入后重新应用」的应用全局 UI 偏好。
  *
- * 与只读的 [GlobalSettings]（后台刷新等行为开关）相对，本端口承载的是
- * attach 时配置类设置：模块侧写入后 recreate 承载 Activity 才能生效
+ * 与 [GlobalSettings]（行为开关，写后下次启动生效）相对，本端口承载的
+ * 是 attach 时配置类设置：模块侧写入后 recreate 承载 Activity 才能生效
  * （入口 Activity 的 fontScale 在 attachBaseContext 一次性应用）。
  */
 interface UiSettings {

@@ -12,6 +12,10 @@ import io.legado.app.constant.PreferKey
 import io.legado.app.help.config.AppConfig
 import io.legado.app.help.config.AppConfigStore
 import io.legado.app.help.coil.CoverExtras
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
 
@@ -53,20 +57,44 @@ object EInkBridge : KoinComponent {
 }
 
 /**
- * 全局设置只读视图。
+ * 全局设置视图。
  *
- * threadCount/autoRefreshBook/preDownloadNum 走宿主 @Deprecated 同步门面
- * （"settings" DataStore 的 AppConfigStore 内存快照，主线程零 IO）；
- * changeSourceCheckAuthor 存在独立 local_ui_status DataStore，无同步
- * 门面，经 Koin 的 ChangeSourceSettingsGateway 读取。
+ * threadCount/preDownloadNum 走宿主 @Deprecated 同步门面
+ * （"settings" DataStore 的 AppConfigStore 内存快照，主线程零 IO），
+ * 无 Gateway 等价物；autoRefreshBook/defaultToRead（「我的」页可写）
+ * 与 changeSourceCheckAuthor 经 Koin 的设置 Gateway 读写。
  */
 private object GlobalSettingsImpl : GlobalSettings, KoinComponent {
 
     private val changeSourceSettingsGateway:
         io.legado.app.domain.gateway.ChangeSourceSettingsGateway by inject()
 
+    private val otherSettingsGateway: OtherSettingsGateway by inject()
+
+    // 写入为 suspend（Gateway update 经 DataStore 原子提交），端口契约
+    // 保持同步 setter，异步落盘由本作用域承接；写后立即读 getter 不保证
+    // 可见新值，UI 侧应以本地状态做乐观更新
+    private val writeScope =
+        CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+
     override val threadCount: Int get() = AppConfig.threadCount
-    override val autoRefreshBook: Boolean get() = AppConfig.autoRefreshBook
+
+    override var autoRefreshBook: Boolean
+        get() = otherSettingsGateway.currentSettings.autoRefresh
+        set(value) {
+            writeScope.launch {
+                otherSettingsGateway.update { it.copy(autoRefresh = value) }
+            }
+        }
+
+    override var defaultToRead: Boolean
+        get() = otherSettingsGateway.currentSettings.defaultToRead
+        set(value) {
+            writeScope.launch {
+                otherSettingsGateway.update { it.copy(defaultToRead = value) }
+            }
+        }
+
     override val preDownloadNum: Int get() = AppConfig.preDownloadNum
     override val changeSourceCheckAuthor: Boolean
         get() = changeSourceSettingsGateway.currentSettings.checkAuthor
