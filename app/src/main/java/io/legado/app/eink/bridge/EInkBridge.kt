@@ -1,8 +1,6 @@
 package io.legado.app.eink.bridge
 
 import android.content.Context
-import coil3.request.ImageRequest
-import io.legado.app.eink.engine.CoverEngine
 import io.legado.app.eink.engine.EInkEngineRegistry
 import io.legado.app.eink.engine.EInkKeyEventHub
 import io.legado.app.eink.engine.GlobalSettings
@@ -13,7 +11,6 @@ import io.legado.app.domain.gateway.ReadSettingsGateway
 import io.legado.app.constant.PreferKey
 import io.legado.app.help.config.AppConfig
 import io.legado.app.help.config.AppConfigStore
-import io.legado.app.help.coil.CoverExtras
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -56,8 +53,18 @@ object EInkBridge : KoinComponent {
             readerEngine = ReaderEngineImpl,
             keyEventHub = EInkKeyEventHub(),
         )
+        // 封面开关为快照状态缓存：每次进入 E-Ink 与宿主设置快照对齐，
+        // 防止完整模式（或上一会话）修改后的陈旧值
+        CoverEngineImpl.syncFromGateway()
     }
 }
+
+// E-Ink 设置项的异步落盘作用域：端口契约保持同步 setter，写入经
+// Gateway update（DataStore 原子提交）在本作用域承接；写后立即读
+// getter 不保证可见新值，UI 侧应以本地状态做乐观更新。
+// internal：供同目录拆分出的各端口实现文件（如 CoverEngineImpl）共用
+internal val einkSettingsWriteScope =
+    CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
 
 /**
  * 全局设置视图。
@@ -77,18 +84,12 @@ private object GlobalSettingsImpl : GlobalSettings, KoinComponent {
 
     private val readSettingsGateway: ReadSettingsGateway by inject()
 
-    // 写入为 suspend（Gateway update 经 DataStore 原子提交），端口契约
-    // 保持同步 setter，异步落盘由本作用域承接；写后立即读 getter 不保证
-    // 可见新值，UI 侧应以本地状态做乐观更新
-    private val writeScope =
-        CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
-
     override val threadCount: Int get() = AppConfig.threadCount
 
     override var autoRefreshBook: Boolean
         get() = otherSettingsGateway.currentSettings.autoRefresh
         set(value) {
-            writeScope.launch {
+            einkSettingsWriteScope.launch {
                 otherSettingsGateway.update { it.copy(autoRefresh = value) }
             }
         }
@@ -96,7 +97,7 @@ private object GlobalSettingsImpl : GlobalSettings, KoinComponent {
     override var defaultToRead: Boolean
         get() = otherSettingsGateway.currentSettings.defaultToRead
         set(value) {
-            writeScope.launch {
+            einkSettingsWriteScope.launch {
                 otherSettingsGateway.update { it.copy(defaultToRead = value) }
             }
         }
@@ -104,7 +105,7 @@ private object GlobalSettingsImpl : GlobalSettings, KoinComponent {
     override var volumeKeyPage: Boolean
         get() = readSettingsGateway.currentSettings.volumeKeyPage
         set(value) {
-            writeScope.launch {
+            einkSettingsWriteScope.launch {
                 readSettingsGateway.update { it.copy(volumeKeyPage = value) }
             }
         }
@@ -130,27 +131,4 @@ private object UiSettingsImpl : UiSettings {
                 AppConfigStore.putInt(PreferKey.fontScale, value)
             }
         }
-}
-
-/**
- * 封面加载端口实现（Coil 集成 + MD3 主工程 buildCoverImageRequest 同款
- * 请求选项）。封面 data 不做形态转换，url 原样交给单例 ImageLoader 的
- * CoverInterceptor / 内置 fetcher；仅 Wi-Fi 加载固定关闭（不设
- * LoadOnlyWifi extra 即为关闭）。
- */
-private object CoverEngineImpl : CoverEngine {
-
-    override val useDefaultCover: Boolean
-        get() = AppConfig.useDefaultCover
-
-    override fun coverRequestOptions(
-        sourceOrigin: String?,
-        widthPx: Int,
-        heightPx: Int,
-    ): ImageRequest.Builder.() -> Unit = {
-        if (sourceOrigin != null) {
-            extras[CoverExtras.SourceOrigin] = sourceOrigin
-        }
-        size(widthPx, heightPx)
-    }
 }

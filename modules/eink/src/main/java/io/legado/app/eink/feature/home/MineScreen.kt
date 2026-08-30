@@ -37,9 +37,9 @@ import io.legado.app.eink.designsystem.theme.EInkTheme
  *
  * 设置项为「主信息 + 副信息」单行结构：主信息为设置名，副信息为当前
  * 值（如「字体大小 / 当前倍率 1.0x」），整行点击进入对应设置页；
- * 行为开关（自动刷新 / 自动跳转最近阅读 / 音量键翻页）与宿主完整模式
- * 共享同一存储键 —— 前两项为启动期语义，写入后下次进入生效；音量键
- * 翻页实时生效。
+ * 行为开关与宿主完整模式共享同一存储键：自动刷新 / 自动跳转最近阅读
+ * 为启动期语义（写入后下次进入生效），音量键翻页、总是使用默认封面
+ * 为实时语义（消费方每次读取快照）。
  * 「完整模式」承载进入完整模式的入口（导入导出等管理功能在完整模式
  * 中完成）。无列表翻页（操作栏箭头置灰）。
  */
@@ -52,6 +52,7 @@ internal fun MineScreen(
 ) {
     val fontScale = EInkEngineRegistry.uiSettings.fontScaleSetting
     val globalSettings = EInkEngineRegistry.globalSettings
+    val coverEngine = EInkEngineRegistry.coverEngine
     var autoRefresh by remember { mutableStateOf(globalSettings.autoRefreshBook) }
     var defaultToRead by remember { mutableStateOf(globalSettings.defaultToRead) }
     var volumeKeyPage by remember { mutableStateOf(globalSettings.volumeKeyPage) }
@@ -92,6 +93,17 @@ internal fun MineScreen(
                 val next = !volumeKeyPage
                 globalSettings.volumeKeyPage = next
                 volumeKeyPage = next
+            }
+        )
+        EInkHorizontalDivider()
+        MineToggleRow(
+            label = "总是使用默认封面",
+            description = "总是显示默认封面（不显示网络封面）",
+            // 端口 getter 由宿主快照状态背书：此处读取订阅变化，切换后
+            // 开关行与书架/详情可见封面立即重组，无需本地乐观状态
+            checked = coverEngine.useDefaultCover,
+            onToggle = {
+                coverEngine.useDefaultCover = !coverEngine.useDefaultCover
             }
         )
         EInkHorizontalDivider()
