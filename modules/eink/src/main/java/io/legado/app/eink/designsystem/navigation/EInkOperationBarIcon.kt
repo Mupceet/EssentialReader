@@ -102,6 +102,9 @@ private const val AdaptiveButtonCount = 5
 /** 宽度收敛上限相对高度的倍数（约 95dp，暂定可微调）。 */
 private const val DefaultWidthRatio = 1.7f
 
+/** 底部操作栏图标按钮的宽度收敛上限，供响应式槽位计算封顶（与组件内规则同源）。 */
+internal val OperationBarIconButtonMaxWidth: Dp = DefaultHeight * DefaultWidthRatio
+
 /** 顶栏动作按钮宽度收敛倍数：按钮较底部操作栏更窄（1.2 × 56dp ≈ 67dp）。 */
 const val TopBarWidthRatio = 1.2f
 

@@ -17,6 +17,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import io.legado.app.eink.R
 import io.legado.app.eink.designsystem.interaction.eInkActionColors
@@ -116,3 +117,6 @@ private val CapsuleBorder = 1.dp
 
 /** 上下箭头之间的竖向分隔线宽度。 */
 private val DividerWidth = 1.dp
+
+/** 翻页胶囊总宽（2 × 箭头按钮 + 竖线），供承载层做底部槽位空间判定。 */
+val EInkPageArrowsWidth: Dp = ArrowButtonWidth * 2 + DividerWidth
