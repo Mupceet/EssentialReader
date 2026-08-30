@@ -19,6 +19,7 @@ import androidx.compose.ui.unit.dp
 import io.legado.app.eink.designsystem.interaction.eInkActionColors
 import io.legado.app.eink.designsystem.interaction.rememberImmediatePressState
 import io.legado.app.eink.designsystem.interaction.einkClickable
+import io.legado.app.eink.designsystem.navigation.LocalOperationBarAvailableWidth
 
 /**
  * 操作栏图标按钮（公共组件，规范 §35/§42 操作条图标按钮层）。
@@ -64,8 +65,12 @@ fun EInkOperationBarIcon(
     )
     // 宽度自适应：min(屏幕宽 / 5, 收敛倍数 × 高度)。手机类窄屏均分
     // 屏宽（触控目标仍 ≥48dp），宽屏收敛为固定规格；收敛倍数由所属
-    // 操作条经 [LocalOperationBarWidthRatio] 覆写（顶栏 1.2、底栏默认 1.7）
-    val screenWidth = LocalConfiguration.current.screenWidthDp.dp
+    // 操作条经 [LocalOperationBarWidthRatio] 覆写（顶栏 1.2、底栏默认 1.7）。
+    // 屏宽优先取操作栏实测布局宽（LocalOperationBarAvailableWidth，旋转
+    // 即时更新）；栏外（顶栏动作等）回落 Configuration——其受收敛上限
+    // 约束，configChanges 下滞后值不致溢出
+    val screenWidth = LocalOperationBarAvailableWidth.current
+        ?: LocalConfiguration.current.screenWidthDp.dp
     val resolvedWidth = width ?: minOf(
         screenWidth / AdaptiveButtonCount,
         height * LocalOperationBarWidthRatio.current

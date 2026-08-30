@@ -1,5 +1,6 @@
 package io.legado.app.eink.designsystem.navigation
 
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -7,13 +8,29 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import io.legado.app.eink.designsystem.theme.EInkSpacing
 import io.legado.app.eink.designsystem.content.EInkHorizontalDivider
+
+/**
+ * 操作栏槽位可用宽度（Dp）：由 [EInkOperationBar] 以实测布局约束提供
+ * （右缘距已扣除），栏内图标按钮据此计算自适应宽度。
+ *
+ * 不直接读 Configuration.screenWidthDp 的原因：入口 Activity 声明了
+ * configChanges（含 orientation|screenSize），旋转不重建 Activity，
+ * CompositionLocal 捕获的 Configuration 对象可能一直停留在进入时的
+ * 宽度——以实测约束提供才能保证旋转后槽位即时收敛不溢出。
+ * 栏外使用者（顶栏动作等）取 null，回落 Configuration 屏宽（顶栏动作
+ * 受收敛上限约束，滞后值不致溢出）。
+ */
+val LocalOperationBarAvailableWidth = staticCompositionLocalOf<Dp?> { null }
 
 /**
  * 底部通用操作栏（参考微信读书墨水屏版）。
@@ -67,32 +84,41 @@ fun EInkOperationBar(
 ) {
     Column(modifier = modifier.fillMaxWidth()) {
         EInkHorizontalDivider()
-        Row(
+        // BoxWithConstraints 提供实测布局宽度（右缘距已扣除）给槽内图标：
+        // 单实例静态底栏、不在逐项/滚动路径，子组合仅约束变化时发生
+        BoxWithConstraints(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(BarHeight)
-                .padding(end = EInkSpacing.m),
-            verticalAlignment = Alignment.CenterVertically,
+                .padding(end = EInkSpacing.m)
         ) {
-            navigationIcon?.invoke()
-            tabs.forEachIndexed { index, tab ->
-                EInkOperationBarIcon(
-                    icon = tab.icon,
-                    selectedIcon = tab.selectedIcon,
-                    contentDescription = tab.contentDescription,
-                    selected = index == selectedTabIndex,
-                    role = Role.Tab,
-                    onClick = { onTabSelect(index) },
-                )
+            CompositionLocalProvider(LocalOperationBarAvailableWidth provides maxWidth) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(BarHeight),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    navigationIcon?.invoke()
+                    tabs.forEachIndexed { index, tab ->
+                        EInkOperationBarIcon(
+                            icon = tab.icon,
+                            selectedIcon = tab.selectedIcon,
+                            contentDescription = tab.contentDescription,
+                            selected = index == selectedTabIndex,
+                            role = Role.Tab,
+                            onClick = { onTabSelect(index) },
+                        )
+                    }
+                    actions?.invoke()
+                    Spacer(modifier = Modifier.weight(1f))
+                    pageArrows?.invoke() ?: EInkPageArrows(
+                        pageUpEnabled = pageUpEnabled,
+                        pageDownEnabled = pageDownEnabled,
+                        onPageUp = onPageUp,
+                        onPageDown = onPageDown
+                    )
+                }
             }
-            actions?.invoke()
-            Spacer(modifier = Modifier.weight(1f))
-            pageArrows?.invoke() ?: EInkPageArrows(
-                pageUpEnabled = pageUpEnabled,
-                pageDownEnabled = pageDownEnabled,
-                onPageUp = onPageUp,
-                onPageDown = onPageDown
-            )
         }
     }
 }
