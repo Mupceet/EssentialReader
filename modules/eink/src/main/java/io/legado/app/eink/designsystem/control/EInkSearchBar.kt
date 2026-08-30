@@ -35,7 +35,8 @@ import io.legado.app.eink.designsystem.theme.EInkTheme
  * 搜索条（首页提示样式与搜索页输入样式共用同一外壳）。
  *
  * 几何规格固定：外层高 64dp + 水平 16dp 内边距，输入框高 44dp、
- * 1dp 描边小圆角，右侧可选动作槽。首页点击提示条进入搜索页后，
+ * 1dp 描边两端圆角（胶囊形，EInkShapes.capsule），右侧可选动作槽。
+ * 首页点击提示条进入搜索页后，
  * 输入条落在完全相同的位置，视觉上是"同一个框"从未移动。
  */
 
@@ -151,7 +152,7 @@ private fun SearchBarShell(
                 .border(
                     width = 1.dp,
                     color = EInkTheme.colorScheme.outline,
-                    shape = EInkShapes.small
+                    shape = EInkShapes.capsule
                 ),
             contentAlignment = Alignment.CenterStart
         ) {

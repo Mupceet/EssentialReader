@@ -157,7 +157,9 @@ object EInkColors {
         override val disabledContent = EInkGrayscale.gray300
         override val secondaryContent = PureBlack
         override val borderStrong = PureBlack
-        override val divider = PureBlack
+        // 分隔线不参与最大对比（规范 §11：1dp 结构线优先实灰），
+        // 与 Grayscale 浅色板同值——纯黑分隔线在页面上过于沉重
+        override val divider = EInkGrayscale.gray300
         override val selected = primary
         override val selectedContent = onPrimary
     }
@@ -216,7 +218,8 @@ object EInkColors {
         override val disabledContent = Gray10
         override val secondaryContent = PureWhite
         override val borderStrong = PureWhite
-        override val divider = PureWhite
+        // 深色高分隔线对齐 DarkGrayscale（实灰，不做最大对比）
+        override val divider = EInkGrayscale.gray500
         override val selected = primary
         override val selectedContent = onPrimary
     }
