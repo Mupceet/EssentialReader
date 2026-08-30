@@ -32,7 +32,7 @@ import io.legado.app.eink.designsystem.control.EInkSteppedSlider
 import io.legado.app.eink.designsystem.content.EInkText
 import io.legado.app.eink.designsystem.interaction.eInkActionColors
 import io.legado.app.eink.engine.EInkEngineRegistry
-import io.legado.app.eink.engine.UiSettings
+import io.legado.app.eink.engine.GlobalSettings
 import io.legado.app.eink.designsystem.interaction.rememberImmediatePressState
 import io.legado.app.eink.designsystem.interaction.einkClickable
 import io.legado.app.eink.designsystem.theme.EInkSpacing
@@ -42,7 +42,7 @@ import io.legado.app.eink.designsystem.theme.EInkTheme
 internal const val FONT_SCALE_MIN = 8
 internal const val FONT_SCALE_MAX = 16
 
-/** 未设置时的锚定档位（1.0x）；宿主对 null 的回落语义见 UiSettings 契约。 */
+/** 未设置时的锚定档位（1.0x）；宿主对 null 的回落语义见 GlobalSettings 契约。 */
 internal const val FONT_SCALE_NEUTRAL = 10
 
 /**
@@ -53,14 +53,14 @@ internal const val FONT_SCALE_NEUTRAL = 10
  * 页同款 EInkOperationBar）。
  *
  * 滑条为「抬手生效」（[EInkSteppedSlider.onValueChangeFinished]）：拖动
- * 仅预览档位，抬手写入宿主 UiSettings 并 recreate 入口 Activity 重应用
+ * 仅预览档位，抬手写入宿主 GlobalSettings 并 recreate 入口 Activity 重应用
  * （fontScale 是 attach 时配置）；recreate 后整页含示例文字按新倍率重排，
  * 即所见即所得。
  */
 @Composable
 fun FontScaleSettingsRoute(onBack: () -> Unit) {
-    val uiSettings = EInkEngineRegistry.uiSettings
-    val setting = uiSettings.fontScaleSetting
+    val globalSettings = EInkEngineRegistry.globalSettings
+    val setting = globalSettings.fontScaleSetting
     var pending by remember(setting) { mutableStateOf(setting ?: FONT_SCALE_NEUTRAL) }
     val activity = LocalContext.current as? Activity
 
@@ -109,7 +109,7 @@ fun FontScaleSettingsRoute(onBack: () -> Unit) {
             horizontalArrangement = Arrangement.spacedBy(EInkSpacing.xs),
         ) {
             StepGlyphButton("−", onClickLabel = "减小") {
-                if (applyStep(uiSettings, setting, pending - 1) { pending = it }) {
+                if (applyStep(globalSettings, setting, pending - 1) { pending = it }) {
                     activity?.recreate()
                 }
             }
@@ -118,7 +118,7 @@ fun FontScaleSettingsRoute(onBack: () -> Unit) {
                 onValueChange = { pending = it },
                 onValueChangeFinished = {
                     if (pending != setting) {
-                        uiSettings.fontScaleSetting = pending
+                        globalSettings.fontScaleSetting = pending
                         activity?.recreate()
                     }
                 },
@@ -130,7 +130,7 @@ fun FontScaleSettingsRoute(onBack: () -> Unit) {
                 markerLabel = "默认",
             )
             StepGlyphButton("＋", onClickLabel = "增大") {
-                if (applyStep(uiSettings, setting, pending + 1) { pending = it }) {
+                if (applyStep(globalSettings, setting, pending + 1) { pending = it }) {
                     activity?.recreate()
                 }
             }
@@ -154,7 +154,7 @@ fun FontScaleSettingsRoute(onBack: () -> Unit) {
 
 /** ± 单档步进：越界钳制；与当前生效值相同则不写不刷，返回是否写入（写入方 recreate）。 */
 private fun applyStep(
-    uiSettings: UiSettings,
+    globalSettings: GlobalSettings,
     setting: Int?,
     target: Int,
     onPreview: (Int) -> Unit,
@@ -164,7 +164,7 @@ private fun applyStep(
     if (next == setting) {
         return false
     }
-    uiSettings.fontScaleSetting = next
+    globalSettings.fontScaleSetting = next
     return true
 }
 

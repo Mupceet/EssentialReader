@@ -4,7 +4,6 @@ import android.content.Context
 import io.legado.app.eink.engine.EInkEngineRegistry
 import io.legado.app.eink.engine.EInkKeyEventHub
 import io.legado.app.eink.engine.GlobalSettings
-import io.legado.app.eink.engine.UiSettings
 import io.legado.app.eink.settings.EInkSettings
 import io.legado.app.domain.gateway.OtherSettingsGateway
 import io.legado.app.domain.gateway.ReadSettingsGateway
@@ -43,7 +42,6 @@ object EInkBridge : KoinComponent {
         EInkSettings.attach(context)
         EInkEngineRegistry.install(
             globalSettings = GlobalSettingsImpl,
-            uiSettings = UiSettingsImpl,
             bookshelfEngine = BookshelfEngineImpl,
             searchEngine = SearchEngineImpl,
             tocEngine = TocEngineImpl,
@@ -71,9 +69,11 @@ internal val einkSettingsWriteScope =
  *
  * threadCount/preDownloadNum 走宿主 @Deprecated 同步门面
  * （"settings" DataStore 的 AppConfigStore 内存快照，主线程零 IO），
- * 无 Gateway 等价物；autoRefreshBook/defaultToRead（「我的」页可写）
- * 经 OtherSettingsGateway、volumeKeyPage 经 ReadSettingsGateway、
- * changeSourceCheckAuthor 经 ChangeSourceSettingsGateway 读写。
+ * 无 Gateway 等价物；fontScaleSetting 走 AppConfigStore 同步快照
+ * （attach 期配置，写入后 recreate 入口 Activity 才生效）；
+ * autoRefreshBook/defaultToRead（「我的」页可写）经 OtherSettingsGateway、
+ * volumeKeyPage 经 ReadSettingsGateway、changeSourceCheckAuthor 经
+ * ChangeSourceSettingsGateway 读写。
  */
 private object GlobalSettingsImpl : GlobalSettings, KoinComponent {
 
@@ -85,6 +85,16 @@ private object GlobalSettingsImpl : GlobalSettings, KoinComponent {
     private val readSettingsGateway: ReadSettingsGateway by inject()
 
     override val threadCount: Int get() = AppConfig.threadCount
+
+    override var fontScaleSetting: Int?
+        get() = AppConfigStore.getInt(PreferKey.fontScale)
+        set(value) {
+            if (value == null) {
+                AppConfigStore.remove(PreferKey.fontScale)
+            } else {
+                AppConfigStore.putInt(PreferKey.fontScale, value)
+            }
+        }
 
     override var autoRefreshBook: Boolean
         get() = otherSettingsGateway.currentSettings.autoRefresh
@@ -113,22 +123,4 @@ private object GlobalSettingsImpl : GlobalSettings, KoinComponent {
     override val preDownloadNum: Int get() = AppConfig.preDownloadNum
     override val changeSourceCheckAuthor: Boolean
         get() = changeSourceSettingsGateway.currentSettings.checkAuthor
-}
-
-/**
- * 宿主级界面设置端口实现：与完整模式共享全局 PreferKey.fontScale
- * （完整模式经 AppUiConfigurationGateway 读取同键），E-Ink「我的」页
- * 写入后由模块侧 recreate 入口 Activity 重应用。
- */
-private object UiSettingsImpl : UiSettings {
-
-    override var fontScaleSetting: Int?
-        get() = AppConfigStore.getInt(PreferKey.fontScale)
-        set(value) {
-            if (value == null) {
-                AppConfigStore.remove(PreferKey.fontScale)
-            } else {
-                AppConfigStore.putInt(PreferKey.fontScale, value)
-            }
-        }
 }

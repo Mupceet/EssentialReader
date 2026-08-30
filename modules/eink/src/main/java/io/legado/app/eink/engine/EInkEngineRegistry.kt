@@ -26,7 +26,6 @@ package io.legado.app.eink.engine
 object EInkEngineRegistry {
 
     private var _globalSettings: GlobalSettings? = null
-    private var _uiSettings: UiSettings? = null
     private var _bookshelfEngine: BookshelfEngine? = null
     private var _searchEngine: SearchEngine? = null
     private var _tocEngine: TocEngine? = null
@@ -38,9 +37,6 @@ object EInkEngineRegistry {
 
     val globalSettings: GlobalSettings
         get() = require(_globalSettings, "GlobalSettings")
-
-    val uiSettings: UiSettings
-        get() = require(_uiSettings, "UiSettings")
 
     val bookshelfEngine: BookshelfEngine
         get() = require(_bookshelfEngine, "BookshelfEngine")
@@ -72,7 +68,6 @@ object EInkEngineRegistry {
      */
     fun install(
         globalSettings: GlobalSettings,
-        uiSettings: UiSettings,
         bookshelfEngine: BookshelfEngine,
         searchEngine: SearchEngine,
         tocEngine: TocEngine,
@@ -83,7 +78,6 @@ object EInkEngineRegistry {
         keyEventHub: EInkKeyEventHub,
     ) {
         _globalSettings = globalSettings
-        _uiSettings = uiSettings
         _bookshelfEngine = bookshelfEngine
         _searchEngine = searchEngine
         _tocEngine = tocEngine
