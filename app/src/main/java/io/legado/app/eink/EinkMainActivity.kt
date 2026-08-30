@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.res.Configuration
 import android.os.Bundle
+import android.view.KeyEvent
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -28,6 +29,7 @@ import io.legado.app.eink.app.EInkApp
 import io.legado.app.eink.bridge.EInkBridge
 import io.legado.app.eink.bridge.TextPageContent
 import io.legado.app.eink.designsystem.theme.EInkTheme
+import io.legado.app.eink.engine.EInkEngineRegistry
 import io.legado.app.eink.reader.ReaderPageCanvas
 import io.legado.app.help.config.AppConfigStore
 import io.legado.app.ui.main.MainActivity
@@ -122,6 +124,24 @@ class EInkMainActivity : ComponentActivity() {
     override fun onConfigurationChanged(newConfig: Configuration) {
         appUiConfigurationGateway.synchronizeSystemDarkTheme(newConfig.isNightMode)
         super.onConfigurationChanged(newConfig)
+    }
+
+    /**
+     * 系统按键优先交给活跃屏幕的处理器（[EInkKeyEventHub]，如阅读页
+     * 音量键翻页）；无人消费时交还系统默认行为（音量调节等）。
+     */
+    override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
+        if (event != null && EInkEngineRegistry.keyEventHub.dispatch(event)) {
+            return true
+        }
+        return super.onKeyDown(keyCode, event)
+    }
+
+    override fun onKeyUp(keyCode: Int, event: KeyEvent?): Boolean {
+        if (event != null && EInkEngineRegistry.keyEventHub.dispatch(event)) {
+            return true
+        }
+        return super.onKeyUp(keyCode, event)
     }
 }
 

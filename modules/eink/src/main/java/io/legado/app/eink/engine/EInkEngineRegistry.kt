@@ -34,6 +34,7 @@ object EInkEngineRegistry {
     private var _changeSourceEngine: ChangeSourceEngine? = null
     private var _coverEngine: CoverEngine? = null
     private var _readerEngine: ReaderEngine? = null
+    private var _keyEventHub: EInkKeyEventHub? = null
 
     val globalSettings: GlobalSettings
         get() = require(_globalSettings, "GlobalSettings")
@@ -62,6 +63,9 @@ object EInkEngineRegistry {
     val readerEngine: ReaderEngine
         get() = require(_readerEngine, "ReaderEngine")
 
+    val keyEventHub: EInkKeyEventHub
+        get() = require(_keyEventHub, "KeyEventHub")
+
     /**
      * 注册全部引擎端口实现。宿主 E-Ink 入口 Activity.onCreate 中调用，
      * 必须早于任何 E-Ink Composable 组合（VM 构造）。重复调用为整体替换。
@@ -76,6 +80,7 @@ object EInkEngineRegistry {
         changeSourceEngine: ChangeSourceEngine,
         coverEngine: CoverEngine,
         readerEngine: ReaderEngine,
+        keyEventHub: EInkKeyEventHub,
     ) {
         _globalSettings = globalSettings
         _uiSettings = uiSettings
@@ -86,6 +91,7 @@ object EInkEngineRegistry {
         _changeSourceEngine = changeSourceEngine
         _coverEngine = coverEngine
         _readerEngine = readerEngine
+        _keyEventHub = keyEventHub
     }
 
     /** 未初始化端口的统一报错（指名端口 + 修复入口）。 */
