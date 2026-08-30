@@ -31,4 +31,7 @@ data object EInkShapes {
 
     /** 8dp — emphasized containers. */
     val large: Shape = RoundedCornerShape(8.dp)
+
+    /** 胶囊形（两端全圆角）——搜索框等明确要求两端圆角的容器。 */
+    val capsule: Shape = RoundedCornerShape(percent = 50)
 }
