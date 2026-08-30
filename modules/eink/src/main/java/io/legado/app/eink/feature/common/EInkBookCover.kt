@@ -1,32 +1,32 @@
 package io.legado.app.eink.feature.common
 
 import android.content.Context
+import android.graphics.Paint
+import android.graphics.Typeface
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithCache
+import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
+import androidx.compose.ui.graphics.nativeCanvas
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import coil3.request.ImageRequest
 import coil3.request.crossfade
-import io.legado.app.eink.designsystem.content.EInkText
-import io.legado.app.eink.engine.EInkEngineRegistry
 import io.legado.app.eink.designsystem.theme.EInkShapes
-import io.legado.app.eink.designsystem.theme.EInkSpacing
 import io.legado.app.eink.designsystem.theme.EInkTheme
 import io.legado.app.eink.designsystem.widget.EInkAsyncImage
+import io.legado.app.eink.engine.EInkEngineRegistry
 
 /** 封面尺寸（与 View 版 item_bookshelf_list.xml 一致：66dp × 90dp）。 */
 val EInkCoverWidth = 66.dp
@@ -130,7 +130,19 @@ fun EInkBookCover(
 }
 
 /**
- * 文字占位封面：无封面时保证封面区域正常显示（书名 + 作者）。
+ * 文字占位封面：无封面时保证封面区域正常显示。
+ *
+ * 竖排信息方向：书名加粗逐字下排居左（起点 0.16W/0.16H，步进一个字高，
+ * 超过 0.8H 换列——右移 1.2 倍字宽、列首回落 0.2H），落在左上区域；
+ * 作者逐字下排贴右缘（0.84W），列尾锚定 0.8H——署名落右下角，过长时
+ * 列首不高于 0.2H、溢出底部裁剪。
+ * 字号取封面宽比例（书名 1/7、作者 1/9），随封面尺寸等比缩放；较宿主
+ * 比例（1/8、1/12）放大——本版本封面中部没有 Book 图标填充，原比例
+ * 留白偏空，作者尤其需要加大。
+ *
+ * 不引入宿主的阴影/描边/自定义字色设置（E-Ink 零阴影，颜色由主题下发）。
+ * 形状与外层 clip（EInkBookCover 的 coverModifier，medium）一致：内层
+ * 半径小于外层掩模时，1dp 边框的四角弧线会被掩模切掉，视觉上四角缺损。
  */
 @Composable
 private fun EInkDefaultCover(
@@ -141,33 +153,70 @@ private fun EInkDefaultCover(
     val colors = EInkTheme.colorScheme
     Box(
         modifier = modifier
-            // 形状必须与外层 clip（EInkBookCover 的 coverModifier，medium）
-            // 一致：内层半径小于外层掩模时，1dp 边框的四角弧线落在掩模外
-            // 被切掉，视觉上四角缺损
             .background(color = colors.surfaceVariant, shape = EInkShapes.medium)
             .border(width = 1.dp, color = colors.outline, shape = EInkShapes.medium)
-            .padding(horizontal = EInkSpacing.xs, vertical = EInkSpacing.xxs),
-        contentAlignment = Alignment.Center
     ) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            EInkText(
-                text = name,
-                style = EInkTheme.typography.labelLarge,
-                color = colors.onSurface,
-                textAlign = TextAlign.Center,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis
-            )
-            if (!author.isNullOrBlank()) {
-                EInkText(
-                    text = author,
-                    style = EInkTheme.typography.labelSmall,
-                    color = colors.onSurfaceVariant,
-                    textAlign = TextAlign.Center,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-            }
-        }
+        Spacer(
+            modifier = Modifier
+                .fillMaxSize()
+                .drawWithCache {
+                    val viewWidth = size.width
+                    val viewHeight = size.height
+                    if (viewWidth <= 0f || viewHeight <= 0f) {
+                        return@drawWithCache onDrawBehind { }
+                    }
+
+                    // 书名竖排逐字下排（几何与宿主逐条对齐）
+                    val namePaint = Paint().apply {
+                        isAntiAlias = true
+                        textAlign = Paint.Align.CENTER
+                        typeface = Typeface.DEFAULT_BOLD
+                        textSize = viewWidth / 7f
+                        color = colors.onSurface.toArgb()
+                    }
+                    val nameCharHeight = namePaint.fontMetrics.let { it.bottom - it.top }
+                    var nameX = viewWidth * 0.16f
+                    var nameY = viewHeight * 0.16f
+                    val nameDraws = name.map { char ->
+                        val draw = Triple(char.toString(), nameX, nameY)
+                        nameY += nameCharHeight
+                        if (nameY > viewHeight * 0.8f) {
+                            nameX += namePaint.textSize * 1.2f
+                            nameY = viewHeight * 0.2f
+                        }
+                        draw
+                    }
+
+                    // 作者竖排贴右缘一列，列尾锚定 0.8H（署名落右下角）：
+                    // 过长时列首不高于 0.2H，底部溢出由封面裁剪
+                    val authorPaint = Paint().apply {
+                        isAntiAlias = true
+                        textAlign = Paint.Align.CENTER
+                        textSize = viewWidth / 9f
+                        color = colors.onSurfaceVariant.toArgb()
+                    }
+                    val authorCharHeight = authorPaint.fontMetrics.let { it.bottom - it.top }
+                    val authorText = author.orEmpty()
+                    var authorY = viewHeight * 0.8f -
+                        (authorText.length - 1).coerceAtLeast(0) * authorCharHeight
+                    authorY = authorY.coerceAtLeast(viewHeight * 0.2f)
+                    val authorDraws = authorText.map { char ->
+                        val draw = Triple(char.toString(), viewWidth * 0.84f, authorY)
+                        authorY += authorCharHeight
+                        draw
+                    }
+
+                    onDrawBehind {
+                        drawIntoCanvas { canvas ->
+                            nameDraws.forEach { (text, x, y) ->
+                                canvas.nativeCanvas.drawText(text, x, y, namePaint)
+                            }
+                            authorDraws.forEach { (text, x, y) ->
+                                canvas.nativeCanvas.drawText(text, x, y, authorPaint)
+                            }
+                        }
+                    }
+                }
+        )
     }
 }
