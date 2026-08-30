@@ -105,7 +105,7 @@ internal fun ReaderTopBar(
             )
             if (!state.inBookshelf) {
                 EInkOperationBarIcon(
-                    icon = painterResource(R.drawable.eink_ic_bookmark_add),
+                    icon = painterResource(R.drawable.eink_ic_book_add),
                     contentDescription = "加书架",
                     onClick = onAddToBookshelf,
                 )
