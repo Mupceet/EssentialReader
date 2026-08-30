@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 复制自 Google Fonts Material Symbols Outlined「bookmark_remove」（用户提供
+     的 .kt ImageVector 导出，24dp / wght 400 / FILL 0 / GRAD 0 / ROND 50，
+     builder 调用逐条转为 pathData），宿主详情「已在书架/移出书架」语义，
+     24dp，着色由 EInkOperationBarIcon 统一处理 -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+
+    <path
+        android:fillColor="#FF000000"
+        android:pathData="M21,7 H15 V5 h6 V7 Z M5,21 V5 Q5,4.17 5.59,3.59 T7,3 h6 q0,0.57 0,1 q0,0.42 0,1 H7 V17.95 L12,15.8 l5,2.15 V11 q0.57,0 1,0 t1,0 V21 L12,18 L5,21 Z M7,5 h6 H12 H7 Z" />
+</vector>
