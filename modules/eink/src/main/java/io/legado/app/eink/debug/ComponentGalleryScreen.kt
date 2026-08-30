@@ -429,7 +429,7 @@ private fun TopBarSamples() {
             actionsFillMax = true,
             actions = {
                 EInkOperationBarIcon(
-                    icon = painterResource(R.drawable.eink_ic_add),
+                    icon = painterResource(R.drawable.eink_ic_bookmark_add),
                     contentDescription = "加入书架",
                     onClick = {}
                 )
