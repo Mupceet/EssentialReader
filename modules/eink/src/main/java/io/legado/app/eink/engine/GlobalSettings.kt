@@ -29,6 +29,14 @@ interface GlobalSettings {
      */
     var defaultToRead: Boolean
 
+    /**
+     * 音量键翻页（与完整模式阅读设置共享同一存储键，默认开）。
+     *
+     * 可写（「我的」页开关）：写入语义同 [autoRefreshBook]；与上述两项
+     * 启动期语义不同，本项实时生效 —— 阅读页按键处理器每次按键时读取。
+     */
+    var volumeKeyPage: Boolean
+
     /** 预下载章节数（0 = 关闭预缓存）。 */
     val preDownloadNum: Int
 

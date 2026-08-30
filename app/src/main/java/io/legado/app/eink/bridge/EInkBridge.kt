@@ -4,10 +4,12 @@ import android.content.Context
 import coil3.request.ImageRequest
 import io.legado.app.eink.engine.CoverEngine
 import io.legado.app.eink.engine.EInkEngineRegistry
+import io.legado.app.eink.engine.EInkKeyEventHub
 import io.legado.app.eink.engine.GlobalSettings
 import io.legado.app.eink.engine.UiSettings
 import io.legado.app.eink.settings.EInkSettings
 import io.legado.app.domain.gateway.OtherSettingsGateway
+import io.legado.app.domain.gateway.ReadSettingsGateway
 import io.legado.app.constant.PreferKey
 import io.legado.app.help.config.AppConfig
 import io.legado.app.help.config.AppConfigStore
@@ -52,6 +54,7 @@ object EInkBridge : KoinComponent {
             changeSourceEngine = ChangeSourceEngineImpl,
             coverEngine = CoverEngineImpl,
             readerEngine = ReaderEngineImpl,
+            keyEventHub = EInkKeyEventHub(),
         )
     }
 }
@@ -62,7 +65,8 @@ object EInkBridge : KoinComponent {
  * threadCount/preDownloadNum 走宿主 @Deprecated 同步门面
  * （"settings" DataStore 的 AppConfigStore 内存快照，主线程零 IO），
  * 无 Gateway 等价物；autoRefreshBook/defaultToRead（「我的」页可写）
- * 与 changeSourceCheckAuthor 经 Koin 的设置 Gateway 读写。
+ * 经 OtherSettingsGateway、volumeKeyPage 经 ReadSettingsGateway、
+ * changeSourceCheckAuthor 经 ChangeSourceSettingsGateway 读写。
  */
 private object GlobalSettingsImpl : GlobalSettings, KoinComponent {
 
@@ -70,6 +74,8 @@ private object GlobalSettingsImpl : GlobalSettings, KoinComponent {
         io.legado.app.domain.gateway.ChangeSourceSettingsGateway by inject()
 
     private val otherSettingsGateway: OtherSettingsGateway by inject()
+
+    private val readSettingsGateway: ReadSettingsGateway by inject()
 
     // 写入为 suspend（Gateway update 经 DataStore 原子提交），端口契约
     // 保持同步 setter，异步落盘由本作用域承接；写后立即读 getter 不保证
@@ -92,6 +98,14 @@ private object GlobalSettingsImpl : GlobalSettings, KoinComponent {
         set(value) {
             writeScope.launch {
                 otherSettingsGateway.update { it.copy(defaultToRead = value) }
+            }
+        }
+
+    override var volumeKeyPage: Boolean
+        get() = readSettingsGateway.currentSettings.volumeKeyPage
+        set(value) {
+            writeScope.launch {
+                readSettingsGateway.update { it.copy(volumeKeyPage = value) }
             }
         }
 

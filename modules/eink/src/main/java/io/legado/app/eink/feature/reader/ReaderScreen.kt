@@ -1,6 +1,7 @@
 package io.legado.app.eink.feature.reader
 
 import android.app.Activity
+import android.view.KeyEvent
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
@@ -60,10 +61,11 @@ fun ReaderRoute(
     onOpenDetail: (name: String, author: String, bookUrl: String) -> Unit,
     viewModel: ReaderViewModel = viewModel(),
     pageRenderer: @Composable (page: EInkPageContent?, pageVersion: Int, modifier: Modifier) -> Unit,
-) {
-    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+) {    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val view = LocalView.current
+    // 按键转发枢纽：宿主入口 Activity onKeyDown/onKeyUp 经注册表下发
+    val keyEventHub = EInkEngineRegistry.keyEventHub
     var panel by remember { mutableStateOf<ReaderPanel?>(null) }
     var showMarginDialog by remember { mutableStateOf(false) }
 
@@ -85,6 +87,39 @@ fun ReaderRoute(
             window?.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         }
         onDispose { }
+    }
+
+    // 音量键翻页（对齐 View 版 ReadBookController.volumeKeyPage）：
+    // 音量+ 上一页、音量- 下一页，仅在首按（repeatCount == 0）翻页，
+    // 长按重复不翻（View 版 keyPageDebounce 同样忽略长按）；
+    // 开关关闭或离开阅读页时处理器注销/放行，音量键回归系统调节。
+    // 设置实时读取（GlobalSettings.volumeKeyPage 经桥接层走宿主快照）
+    DisposableEffect(keyEventHub) {
+        keyEventHub.handler = { event ->
+            if (!EInkEngineRegistry.globalSettings.volumeKeyPage) {
+                false
+            } else {
+                when (event.action) {
+                    KeyEvent.ACTION_DOWN -> when (event.keyCode) {
+                        KeyEvent.KEYCODE_VOLUME_UP -> {
+                            if (event.repeatCount == 0) viewModel.prevPage()
+                            true
+                        }
+                        KeyEvent.KEYCODE_VOLUME_DOWN -> {
+                            if (event.repeatCount == 0) viewModel.nextPage()
+                            true
+                        }
+                        else -> false
+                    }
+                    // 消费抬起，保证按键对整体被吞掉
+                    KeyEvent.ACTION_UP ->
+                        event.keyCode == KeyEvent.KEYCODE_VOLUME_UP ||
+                            event.keyCode == KeyEvent.KEYCODE_VOLUME_DOWN
+                    else -> false
+                }
+            }
+        }
+        onDispose { keyEventHub.handler = null }
     }
 
     // 返回键逐级回退：边距弹框 → 设置面板 → 收起操作条 → 退出阅读

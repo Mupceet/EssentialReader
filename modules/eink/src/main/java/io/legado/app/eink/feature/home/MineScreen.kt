@@ -37,8 +37,9 @@ import io.legado.app.eink.designsystem.theme.EInkTheme
  *
  * 设置项为「主信息 + 副信息」单行结构：主信息为设置名，副信息为当前
  * 值（如「字体大小 / 当前倍率 1.0x」），整行点击进入对应设置页；
- * 行为开关（自动刷新 / 自动跳转最近阅读）与宿主完整模式「其它设置」
- * 共享同一存储键，均为启动期语义 —— 写入后下次进入应用生效。
+ * 行为开关（自动刷新 / 自动跳转最近阅读 / 音量键翻页）与宿主完整模式
+ * 共享同一存储键 —— 前两项为启动期语义，写入后下次进入生效；音量键
+ * 翻页实时生效。
  * 「完整模式」承载进入完整模式的入口（导入导出等管理功能在完整模式
  * 中完成）。无列表翻页（操作栏箭头置灰）。
  */
@@ -53,6 +54,7 @@ internal fun MineScreen(
     val globalSettings = EInkEngineRegistry.globalSettings
     var autoRefresh by remember { mutableStateOf(globalSettings.autoRefreshBook) }
     var defaultToRead by remember { mutableStateOf(globalSettings.defaultToRead) }
+    var volumeKeyPage by remember { mutableStateOf(globalSettings.volumeKeyPage) }
     Column(modifier = Modifier.fillMaxSize()) {
         MineEntry(
             label = "字体大小",
@@ -79,6 +81,17 @@ internal fun MineScreen(
                 val next = !defaultToRead
                 globalSettings.defaultToRead = next
                 defaultToRead = next
+            }
+        )
+        EInkHorizontalDivider()
+        MineToggleRow(
+            label = "音量键翻页",
+            description = "阅读时音量键上下翻页",
+            checked = volumeKeyPage,
+            onToggle = {
+                val next = !volumeKeyPage
+                globalSettings.volumeKeyPage = next
+                volumeKeyPage = next
             }
         )
         EInkHorizontalDivider()
