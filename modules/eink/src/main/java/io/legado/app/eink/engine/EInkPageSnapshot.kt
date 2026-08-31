@@ -1,0 +1,85 @@
+package io.legado.app.eink.engine
+
+import android.graphics.Bitmap
+import android.graphics.Typeface
+import androidx.compose.runtime.Stable
+
+/**
+ * 排版引擎产物的模块侧快照（宿主桥接层映射 TextPage 而来）。
+ *
+ * 宿主把引擎排版结果映射为本类型（模块自有类型，零宿主类型渗透），
+ * 模块画布据此绘制；上游 TextLine 的字段漂移（extraLetterSpacing 等）
+ * 由各宿主映射器消化，模块只有一份绘制实现。
+ *
+ * 坐标均为引擎排版坐标系（px），绘制结果与 View 版 ContentTextView 一致。
+ * 实例构建后不可变；每次 pageVersion 变化构建一次（无逐帧开销）。
+ */
+@Stable
+class EInkPageSnapshot(
+    /** 页所属章节标题（页眉/状态展示）。 */
+    val title: String,
+    /** 阅读进度文本。 */
+    val readProgress: String,
+    /** 标题行画笔规格（TextLine.isTitle 行使用）。 */
+    val titleSpec: ReaderPaintSpec,
+    /** 正文行画笔规格。 */
+    val contentSpec: ReaderPaintSpec,
+    /** 文本行（非文本列如评论列不进入）。 */
+    val lines: List<EInkSnapshotLine>,
+    /** 图片槽位。 */
+    val images: List<EInkImageSlot>,
+)
+
+/** 单文本行：chunks[i] 绘制于 x[i]，基线 baseY。 */
+@Stable
+class EInkSnapshotLine(
+    val baseY: Float,
+    val isTitle: Boolean,
+    val chunks: List<String>,
+    val x: FloatArray,
+)
+
+/**
+ * 图片槽位。
+ *
+ * [loader] 由宿主闭包提供（含位图解析与异常吞并，失败返回 null）；
+ * 铺满/等比居中的矩形数学在模块画布完成（需位图实际尺寸，仅绘制期可得）。
+ */
+class EInkImageSlot(
+    val x0: Float,
+    val x1: Float,
+    val lineTop: Float,
+    val lineBottom: Float,
+    val lineHeight: Float,
+    /** true = 图片独占整行（铺满行盒）；false = 行内嵌图（等比居中）。 */
+    val fullLine: Boolean,
+    val loader: (w: Int, h: Int) -> Bitmap?,
+)
+
+/**
+ * 画笔渲染规格（与引擎 upStyle 实际设置的属性一一对齐）。
+ *
+ * 字色不进规格：模块按 EInkTheme 主题色自涂。排版配置与完整模式共享，
+ * 规格必须全量搬运（含斜体/阴影/可变字重），窄化即隐性渲染退化。
+ */
+@Stable
+class ReaderPaintSpec(
+    val textSizePx: Float,
+    val letterSpacing: Float,
+    val typeface: Typeface?,
+    /** 可变字重设置（如 "'wght' 700"）；null = 未设置。 */
+    val fontVariationSettings: String?,
+    /** 斜体倾斜（引擎斜体 = -0.25f）。 */
+    val textSkewX: Float,
+    val isLinearText: Boolean,
+    val shadow: ReaderShadowSpec?,
+)
+
+/** 阴影层参数（引擎画笔 shadowLayer 的快照）。 */
+@Stable
+class ReaderShadowSpec(
+    val radius: Float,
+    val dx: Float,
+    val dy: Float,
+    val color: Int,
+)
