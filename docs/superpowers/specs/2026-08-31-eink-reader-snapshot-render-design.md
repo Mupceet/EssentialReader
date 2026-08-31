@@ -100,7 +100,11 @@ isLinearText/shadowLayer；isAntiAlias 恒 true）。排版配置与完整模式
 TextPage → EInkPageSnapshot 的唯一新增宿主职责。
 
 - **画笔规格**：从 `ChapterProvider.titlePaint/contentPaint` 全量拷贝 §3 属性表
-  （在 `upStyle` 重建画笔后的当前实例上读取）；
+  （在 `upStyle` 重建画笔后的当前实例上读取）。**勘误（实施期）**：阴影例外——
+  `Paint` 的 shadowLayer getter 系 API 29+，而 `:app` minSdk 26，直读会在 Android
+  8.x/9 崩溃；改为从 `ReadBookConfig` 同源字段（`textShadow` 门控 +
+  `shadowRadius/shadowDx/shadowDy/textShadowColor` 原样透传）构造，即 upStyle
+  写入画笔的同一来源，值与引擎画笔逐字节一致；
 - **坐标**：逐 TextLine 映射 chunks/x（charData 为 String 原样保留，不拆并）；API35+
   的 letterSpacing 半格补偿在映射期算进 `x`（`Build.VERSION.SDK_INT` 作参数注入便于
   单测）；模块画布不再感知字距补偿；
