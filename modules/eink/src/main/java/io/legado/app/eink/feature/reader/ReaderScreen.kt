@@ -59,7 +59,8 @@ fun ReaderRoute(
     onChangeSource: (String) -> Unit,
     onOpenDetail: (name: String, author: String, bookUrl: String) -> Unit,
     viewModel: ReaderViewModel = viewModel(),
-) {    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+) {
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val view = LocalView.current
     // 按键转发枢纽：宿主入口 Activity onKeyDown/onKeyUp 经注册表下发
