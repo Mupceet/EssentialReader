@@ -169,7 +169,7 @@ private fun EInkRoot(initialReaderBookUrl: String?) {
     ) {
         EInkApp(
             initialReaderBookUrl = initialReaderBookUrl,
-            // 宿主引擎能力出口 1：完整模式（View UI）——关闭实验室
+            // 宿主引擎能力出口：完整模式（View UI）——关闭实验室
             // 「墨水屏显示」开关并全量跳转（导入导出等管理功能在完整模式
             // 中完成，再次启用需在 实验室 → 墨水屏显示 重新打开）
             onExitToFullMode = {

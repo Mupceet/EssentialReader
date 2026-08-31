@@ -510,7 +510,7 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application),
     }
 
     /** 应用不影响分页的参数：仅经端口写配置、刷新画笔与快照。
-     *  画笔字色由宿主画布每次绘制前按主题钉死。 */
+     *  画笔字色由模块画布每次绘制前按主题钉死。 */
     private fun applyStyleOnly(change: (ReaderTextStyle) -> ReaderTextStyle) {
         val newStyle = change(_uiState.value.style)
         engine.applyStyle(newStyle)

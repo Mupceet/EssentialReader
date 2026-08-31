@@ -27,7 +27,7 @@ import org.koin.core.component.inject
  * 移植到新上游时：本目录（eink/bridge/）是唯一需要按目标引擎重写的
  * 部分，模块侧零改动（见 docs/eink-porting.md 的差异表）。
  */
-object EInkBridge : KoinComponent {
+object EInkBridge {
 
     fun install(context: Context) {
         EInkSettings.attach(context)
