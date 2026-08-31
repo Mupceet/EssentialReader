@@ -4,6 +4,7 @@ import android.app.Application
 import android.graphics.Bitmap
 import io.legado.app.data.entities.Book
 import io.legado.app.eink.engine.ReaderPaintSpec
+import io.legado.app.eink.engine.ReaderShadowSpec
 import io.legado.app.ui.book.read.page.entities.TextLine
 import io.legado.app.ui.book.read.page.entities.TextPage
 import io.legado.app.ui.book.read.page.entities.column.BaseColumn
@@ -250,22 +251,24 @@ class ReaderPageSnapshotMapperTest {
             textSkewX = -0.25f
             typeface = android.graphics.Typeface.MONOSPACE
         }
-        val spec = paint.copyPaintSpec()
+        // 阴影不读 Paint（shadowLayer* getter 系 API 29+，minSdk 26 必崩），
+        // 生产路径经 shadowSpecFromConfig 从 ReadBookConfig 取值后传入。
+        val spec = paint.copyPaintSpec(shadow = null)
 
         assertEquals(42f, spec.textSizePx, 0.001f)
         assertEquals(0.08f, spec.letterSpacing, 0.0001f)
         assertEquals(android.graphics.Typeface.MONOSPACE, spec.typeface)
         assertEquals(-0.25f, spec.textSkewX, 0.0001f)
-        // isLinearText / shadowLayer / fontVariationSettings：Robolectric 4.16 ShadowPaint
-        // 未实现 setLinearText/getShadowLayerRadius/getFontVariationSettings，set/get 不保真，
-        // 不做断言（拷贝逻辑在 copyPaintSpec 中，属 shadow 能力限制；shadow 空路径由下方测试覆盖）。
+        // isLinearText / fontVariationSettings：Robolectric 4.16 ShadowPaint 未实现
+        // setLinearText/getFontVariationSettings，set/get 不保真，不做断言（属 shadow 能力限制）。
     }
 
     @Test
-    fun `无阴影时规格 shadow 为 null`() {
-        val paint = android.text.TextPaint() // 从未 setShadowLayer
-        val spec = paint.copyPaintSpec()
+    fun `阴影规格按参数原样进入规格`() {
+        val paint = android.text.TextPaint()
+        val shadow = ReaderShadowSpec(radius = 4f, dx = 1f, dy = 2f, color = 0xFF00FF00.toInt())
+        val spec = paint.copyPaintSpec(shadow)
 
-        assertNull(spec.shadow)
+        assertEquals(shadow, spec.shadow)
     }
 }
