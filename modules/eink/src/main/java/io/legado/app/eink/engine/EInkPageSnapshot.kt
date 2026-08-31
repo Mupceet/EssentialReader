@@ -12,7 +12,7 @@ import androidx.compose.runtime.Stable
  * 由各宿主映射器消化，模块只有一份绘制实现。
  *
  * 坐标均为引擎排版坐标系（px），绘制结果与 View 版 ContentTextView 一致。
- * 实例构建后不可变；每次 pageVersion 变化构建一次（无逐帧开销）。
+ * 实例构建后引用不可变；映射方交出所有权后不得再修改内部数组与列表。每次 pageVersion 变化构建一次（无逐帧开销）。
  */
 @Stable
 class EInkPageSnapshot(
@@ -30,10 +30,11 @@ class EInkPageSnapshot(
     val images: List<EInkImageSlot>,
 )
 
-/** 单文本行：chunks[i] 绘制于 x[i]，基线 baseY。 */
+/** 单文本行：chunks[i] 绘制于 x[i]，基线 baseY；x 与 chunks 等长。 */
 @Stable
 class EInkSnapshotLine(
     val baseY: Float,
+    /** true = 使用 [EInkPageSnapshot.titleSpec] 的画笔规格。 */
     val isTitle: Boolean,
     val chunks: List<String>,
     val x: FloatArray,
