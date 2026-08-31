@@ -27,10 +27,8 @@ import io.legado.app.data.appDb
 import io.legado.app.domain.gateway.AppUiConfigurationGateway
 import io.legado.app.eink.app.EInkApp
 import io.legado.app.eink.bridge.EInkBridge
-import io.legado.app.eink.bridge.TextPageContent
 import io.legado.app.eink.designsystem.theme.EInkTheme
 import io.legado.app.eink.engine.EInkEngineRegistry
-import io.legado.app.eink.reader.ReaderPageCanvas
 import io.legado.app.help.config.AppConfigStore
 import io.legado.app.ui.main.MainActivity
 import io.legado.app.ui.theme.resolveAppFontScale
@@ -180,16 +178,6 @@ private fun EInkRoot(initialReaderBookUrl: String?) {
                     addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                     addFlags(Intent.FLAG_ACTIVITY_CLEAR_TASK)
                 }
-            },
-            // 宿主引擎能力出口 2：阅读绘制叶子——直接操作引擎
-            // ChapterProvider 画笔与 TextPage 坐标，与 View 版渲染零分岔
-            pageRenderer = { page, version, modifier ->
-                ReaderPageCanvas(
-                    page = (page as? TextPageContent)?.textPage,
-                    pageVersion = version,
-                    antiAlias = EInkBridge.useAntiAlias,
-                    modifier = modifier,
-                )
             },
         )
     }

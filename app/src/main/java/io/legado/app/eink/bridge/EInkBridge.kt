@@ -29,15 +29,6 @@ import org.koin.core.component.inject
  */
 object EInkBridge : KoinComponent {
 
-    private val otherSettingsGateway: OtherSettingsGateway by inject()
-
-    /**
-     * 图片绘制抗锯齿开关（OtherSettings）。Compose 文件按本仓架构护栏
-     * 禁止导入兼容 Config，画布经此处取值。
-     */
-    val useAntiAlias: Boolean
-        get() = otherSettingsGateway.currentSettings.antiAlias
-
     fun install(context: Context) {
         EInkSettings.attach(context)
         EInkEngineRegistry.install(

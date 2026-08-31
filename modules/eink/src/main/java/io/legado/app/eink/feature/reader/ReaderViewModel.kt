@@ -10,7 +10,7 @@ import io.legado.app.eink.R
 import io.legado.app.eink.arch.UserMessage
 import io.legado.app.eink.engine.BookPrepResult
 import io.legado.app.eink.engine.EInkEngineRegistry
-import io.legado.app.eink.engine.EInkPageContent
+import io.legado.app.eink.engine.EInkPageSnapshot
 import io.legado.app.eink.engine.ReaderBookSnapshot
 import io.legado.app.eink.engine.ReaderEngineCallback
 import io.legado.app.eink.settings.EInkSettings
@@ -54,8 +54,8 @@ data class ReaderTextStyle(
  * 阅读器 UiState。
  *
  * 状态是离散的（规范 §49: page = 100，而不是 pageAnimationProgress = 0.73）。
- * [page] 为引擎排版产物的不透明句柄（宿主 ChapterProvider 坐标系），
- * 由宿主注入的画布槽位（ReaderPageCanvas）还原绘制；
+ * [page] 为引擎排版产物的模块快照（宿主映射 TextPage 而来），
+ * 由模块画布 ReaderPageSnapshotCanvas 绘制；
  * [pageVersion] 变化驱动重绘。
  */
 data class ReaderUiState(
@@ -64,7 +64,7 @@ data class ReaderUiState(
     val bookAuthor: String = "",
     val bookUrl: String = "",
     val chapterTitle: String = "",
-    val page: EInkPageContent? = null,
+    val page: EInkPageSnapshot? = null,
     val pageVersion: Int = 0,
     val pageIndex: Int = 0,
     val pageCount: Int = 0,
@@ -109,8 +109,8 @@ data class ReaderUiState(
  *
  * 桥接引擎全局状态机（经 [io.legado.app.eink.engine.ReaderEngine] 端口）
  * 到 Compose StateFlow：
- * - 复用 View 版渲染引擎（宿主 ChapterProvider 排版产物经 EInkPageContent
- *   句柄进入状态，绘制由宿主画布槽位完成）；
+ * - 复用 View 版渲染引擎（宿主 ChapterProvider 排版产物经映射器转为
+ *   EInkPageSnapshot 快照进入状态，绘制由模块画布完成）；
  * - 排版参数以 ReaderTextStyle 快照整体经端口写回（与 View 版共用一套
  *   阅读配置）；
  * - 通过实现 [ReaderEngineCallback] 接收引擎状态推送。

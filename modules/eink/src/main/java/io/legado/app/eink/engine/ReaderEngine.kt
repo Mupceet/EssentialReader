@@ -2,22 +2,6 @@ package io.legado.app.eink.engine
 
 import io.legado.app.eink.feature.reader.ReaderTextStyle
 
-/**
- * 排版引擎产物的不透明包装（宿主 TextPage）。
- *
- * 模块侧只读展示字段（章节标题/阅读进度）；绘制由宿主注入的画布槽位
- * （app 侧 ReaderPageCanvas）把本句柄还原为引擎类型后按坐标绘制。
- * 宿主实现类需保证 equals 恒为引用相等（同一实例引擎可能原地更新，
- * 重绘由 pageVersion 驱动）。
- */
-interface EInkPageContent {
-    /** 页所属章节标题（页眉/标题展示）。 */
-    val title: String
-
-    /** 阅读进度文本（View 版 page.readProgress）。 */
-    val readProgress: String
-}
-
 /** 阅读会话书籍快照（ReadBook.book 的模块侧投影）。 */
 interface ReaderBookSnapshot {
     val handle: BookHandle
@@ -62,7 +46,7 @@ interface ReaderEngineCallback {
  * 阅读器端口：宿主 ReadBook 全局状态机 + ChapterProvider 排版引擎的
  * 转发面。E-Ink 阅读页 VM 通过本端口驱动引擎并接收状态推送；
  * 排版参数以 [ReaderTextStyle] 快照整体写入（内部映射宿主 ReadBookConfig
- * 各字段），排版产物经 [EInkPageContent] 不透明句柄进入模块状态。
+ * 各字段），排版产物经宿主映射为 [EInkPageSnapshot] 快照进入模块状态。
  */
 interface ReaderEngine {
 
@@ -98,7 +82,7 @@ interface ReaderEngine {
     val currentChapterPageSize: Int
 
     /** 当前页（durPageIndex 对应页；未就绪返回 null）。 */
-    fun currentPage(): EInkPageContent?
+    fun currentPage(): EInkPageSnapshot?
 
     // ---- 会话控制 ----
 
