@@ -90,6 +90,8 @@ private fun drawImageSlot(canvas: Canvas, slot: EInkImageSlot, paint: Paint) {
  * 字距保持引擎原值（单字符 drawText 的字形行为与 View 版一致）。
  */
 private fun Paint.applySpec(spec: ReaderPaintSpec, colorArgb: Int) {
+    // 引擎 upStyle 硬编码 isAntiAlias = true，显式对齐（不依赖 Paint() 默认 flags）
+    isAntiAlias = true
     color = colorArgb
     textSize = spec.textSizePx
     letterSpacing = spec.letterSpacing
