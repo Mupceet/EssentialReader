@@ -101,10 +101,17 @@ internal object ReaderPageSnapshotMapper {
 
     /**
      * 位图解析闭包：捕获创建时那一列的书（换书瞬间旧页不误取新书目录，
-     * 与 View 版 ImageColumn 一致）；异常吞并返回 null，由画布跳过槽位。
+     * 与 View 版 ImageColumn 一致）；尺寸 ≤ 0 直接返回 null（对齐旧画布
+     * 取图前防护），异常吞并返回 null，由画布跳过槽位。
      */
     private fun defaultImageLoader(book: Book, src: String): (Int, Int) -> Bitmap? =
-        { w, h -> runCatching { ImageProvider.getImage(book, src, w, h) }.getOrNull() }
+        { w, h ->
+            if (w <= 0 || h <= 0) {
+                null
+            } else {
+                runCatching { ImageProvider.getImage(book, src, w, h) }.getOrNull()
+            }
+        }
 }
 
 /**

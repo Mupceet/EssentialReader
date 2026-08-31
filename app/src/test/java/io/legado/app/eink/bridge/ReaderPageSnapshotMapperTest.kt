@@ -144,7 +144,7 @@ class ReaderPageSnapshotMapperTest {
         )
 
         assertTrue(snapshot.lines[0].isTitle)
-        assertTrue(!snapshot.lines[1].isTitle)
+        assertFalse(snapshot.lines[1].isTitle)
     }
 
     @Test
@@ -181,7 +181,7 @@ class ReaderPageSnapshotMapperTest {
         assertEquals(150f, slot.lineBottom, 0.001f)
         assertEquals(50f, slot.lineHeight, 0.001f)
         assertTrue(slot.fullLine)
-        // 画布调用 loader 时按列宽与行高取图
+        // loader 透传调用方传入的 w/h
         assertNull(slot.loader(20, 50))
         assertEquals(listOf(20 to 50), loaderCalls)
     }
@@ -193,7 +193,27 @@ class ReaderPageSnapshotMapperTest {
             textLine(isImage = false, lineTop = 0f, lineBottom = 50f, columns = listOf(imageColumn))
         )
 
-        assertTrue(!snapshot.images[0].fullLine)
+        assertFalse(snapshot.images[0].fullLine)
+    }
+
+    @Test
+    fun `混合行文本与行内嵌图共存`() {
+        val snapshot = mapLines(
+            textLine(
+                lineBase = 40f,
+                lineTop = 0f,
+                lineBottom = 50f,
+                columns = listOf(
+                    textCol(0f, "文"),
+                    ImageColumn(start = 20f, end = 40f, src = "img.png", book = Book()),
+                ),
+            )
+        )
+
+        assertEquals(1, snapshot.lines.size)
+        assertEquals(listOf("文"), snapshot.lines[0].chunks)
+        assertEquals(1, snapshot.images.size)
+        assertFalse(snapshot.images[0].fullLine)
     }
 
     @Test
