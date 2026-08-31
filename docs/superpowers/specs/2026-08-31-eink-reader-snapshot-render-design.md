@@ -56,8 +56,8 @@
 @Stable class EInkSnapshotLine(
     val baseY: Float,           // TextLine.lineBase
     val isTitle: Boolean,       // 选择哪套画笔规格
-    val chars: CharArray,       // TextColumn.charData 扁平化
-    val x: FloatArray,          // 列起点（已含 API35 letterSpacing 半格补偿）
+    val chunks: List<String>,   // TextColumn.charData 原样保留（通常单字符，不拆并）
+    val x: FloatArray,          // 列起点，与 chunks 等长（已含 API35 半格补偿）
 )
 
 class EInkImageSlot(
@@ -101,9 +101,9 @@ TextPage → EInkPageSnapshot 的唯一新增宿主职责。
 
 - **画笔规格**：从 `ChapterProvider.titlePaint/contentPaint` 全量拷贝 §3 属性表
   （在 `upStyle` 重建画笔后的当前实例上读取）；
-- **坐标**：逐 TextLine 扁平化 chars/x；API35+ 的 letterSpacing 半格补偿在映射期
-  算进 `x`（`Build.VERSION.SDK_INT` 作参数注入便于单测）；模块画布不再感知字距
-  补偿；
+- **坐标**：逐 TextLine 映射 chunks/x（charData 为 String 原样保留，不拆并）；API35+
+  的 letterSpacing 半格补偿在映射期算进 `x`（`Build.VERSION.SDK_INT` 作参数注入便于
+  单测）；模块画布不再感知字距补偿；
 - **图片**：`loader` 闭包捕获 ImageProvider 所需参数（book/src），`runCatching` 吞
   异常移入闭包内，失败返回 null；几何（x0/x1/lineTop/lineBottom/lineHeight/fullLine）
   由映射器决定，等比居中数学留在模块画布（需位图实际尺寸，仅绘制期可得）；
