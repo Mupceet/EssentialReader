@@ -123,4 +123,7 @@ private object GlobalSettingsImpl : GlobalSettings, KoinComponent {
     override val preDownloadNum: Int get() = AppConfig.preDownloadNum
     override val changeSourceCheckAuthor: Boolean
         get() = changeSourceSettingsGateway.currentSettings.checkAuthor
+
+    override val useAntiAlias: Boolean
+        get() = otherSettingsGateway.currentSettings.antiAlias
 }
