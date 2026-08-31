@@ -22,7 +22,6 @@ import io.legado.app.eink.feature.bookdetail.BookDetailRoute
 import io.legado.app.eink.feature.changesource.ChangeSourceRoute
 import io.legado.app.eink.debug.ComponentGalleryRoute
 import io.legado.app.eink.debug.ThemeDebugRoute
-import io.legado.app.eink.engine.EInkPageContent
 import io.legado.app.eink.feature.home.FontScaleSettingsRoute
 import io.legado.app.eink.feature.home.HomeRoute
 import io.legado.app.eink.feature.reader.ReaderRoute
@@ -42,9 +41,8 @@ import io.legado.app.eink.feature.toc.TocRoute
 @Composable
 fun EInkApp(
     initialReaderBookUrl: String? = null,
-    // 宿主注入的引擎能力出口：绘制叶子（引擎画布）与"退出到完整模式"
+    // 宿主注入的引擎能力出口："退出到完整模式"
     onExitToFullMode: () -> Unit,
-    pageRenderer: @Composable (page: EInkPageContent?, pageVersion: Int, modifier: Modifier) -> Unit,
     controller: EInkNavController = EInkNavController.remember(
         initialStack(initialReaderBookUrl)
     ),
@@ -88,9 +86,6 @@ fun EInkApp(
                 // 后续支持收起状态栏时，该区域即页眉区域，正文始终从页眉之下开始
                 ReaderRoute(
                     bookUrl = screen.bookUrl,
-                    // 绘制叶子留在宿主 app（直接操作引擎 ChapterProvider 画笔
-                    // 与 TextPage 坐标），经槽位注入
-                    pageRenderer = pageRenderer,
                     onBack = { controller.pop() },
                     onOpenToc = { bookUrl ->
                         controller.navigate(EInkScreen.Toc(bookUrl, fromReader = true))

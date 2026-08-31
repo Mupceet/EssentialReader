@@ -6,7 +6,7 @@ import io.legado.app.data.appDb
 import io.legado.app.data.entities.Book
 import io.legado.app.eink.engine.BookHandle
 import io.legado.app.eink.engine.BookPrepResult
-import io.legado.app.eink.engine.EInkPageContent
+import io.legado.app.eink.engine.EInkPageSnapshot
 import io.legado.app.eink.engine.ReaderBookSnapshot
 import io.legado.app.eink.engine.ReaderEngine
 import io.legado.app.eink.engine.ReaderEngineCallback
@@ -30,7 +30,6 @@ import io.legado.app.model.cache.CacheDownloadRequest
 import io.legado.app.model.cache.ChapterSelection
 import io.legado.app.model.localBook.LocalBook
 import io.legado.app.model.webBook.WebBook
-import io.legado.app.ui.book.read.page.entities.TextPage
 import io.legado.app.ui.book.read.page.provider.ChapterProvider
 import io.legado.app.ui.config.readConfig.ReadConfig
 import org.koin.core.component.KoinComponent
@@ -39,12 +38,6 @@ import splitties.init.appCtx
 import java.util.Date
 import kotlin.coroutines.cancellation.CancellationException
 import kotlin.math.min
-
-/** TextPage 的不透明包装（模块只读展示字段；画布槽位还原绘制）。 */
-internal class TextPageContent(val textPage: TextPage) : EInkPageContent {
-    override val title: String get() = textPage.title
-    override val readProgress: String get() = textPage.readProgress
-}
 
 /** Book 快照实现。 */
 internal class ReaderBookSnapshotImpl(override val handle: BookHandle) : ReaderBookSnapshot {
@@ -59,6 +52,7 @@ internal class ReaderBookSnapshotImpl(override val handle: BookHandle) : ReaderB
 /**
  * 阅读器端口实现：ReadBook 全局状态机 + ChapterProvider 排版引擎的
  * 纯转发（含宿主双轨回调 → 模块回调的适配与样式快照映射）。
+ * 排版产物经 [ReaderPageSnapshotMapper] 映射为模块快照。
  *
  * 本上游差异：
  *  - ReadBook.CallBack 只剩 4 个业务方法，渲染回调拆在
@@ -136,9 +130,9 @@ internal object ReaderEngineImpl : ReaderEngine, KoinComponent {
     override val currentChapterPageSize: Int
         get() = ReadBook.curTextChapter?.pageSize ?: 0
 
-    override fun currentPage(): EInkPageContent? {
+    override fun currentPage(): EInkPageSnapshot? {
         val chapter = ReadBook.curTextChapter ?: return null
-        return chapter.getPage(ReadBook.durPageIndex)?.let(::TextPageContent)
+        return chapter.getPage(ReadBook.durPageIndex)?.let(ReaderPageSnapshotMapper::map)
     }
 
     // ---- 会话控制 ----

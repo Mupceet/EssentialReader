@@ -35,7 +35,6 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import io.legado.app.eink.designsystem.content.EInkText
 import io.legado.app.eink.engine.EInkEngineRegistry
-import io.legado.app.eink.engine.EInkPageContent
 import io.legado.app.eink.designsystem.interaction.einkClickable
 import io.legado.app.eink.designsystem.theme.EInkTheme
 import android.view.WindowManager
@@ -60,7 +59,6 @@ fun ReaderRoute(
     onChangeSource: (String) -> Unit,
     onOpenDetail: (name: String, author: String, bookUrl: String) -> Unit,
     viewModel: ReaderViewModel = viewModel(),
-    pageRenderer: @Composable (page: EInkPageContent?, pageVersion: Int, modifier: Modifier) -> Unit,
 ) {    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val view = LocalView.current
@@ -143,8 +141,6 @@ fun ReaderRoute(
     Box(modifier = Modifier.fillMaxSize()) {
         ReaderScreen(
             state = uiState,
-            // 绘制叶子（引擎排版产物的画布）由宿主注入
-            pageRenderer = pageRenderer,
             // 顶栏在设置面板打开期间隐藏（保持页眉等顶部调参预览不被遮挡）；
             // 底部操作条常驻可见，承载面板期间的返回与选中态；
             // 边距调整弹框例外：操作条隐藏，保证正文四周边距实时可见
@@ -277,7 +273,6 @@ fun ReaderRoute(
 @Composable
 internal fun ReaderScreen(
     state: ReaderUiState,
-    pageRenderer: @Composable (page: EInkPageContent?, pageVersion: Int, modifier: Modifier) -> Unit,
     topBarVisible: Boolean,
     bottomBarVisible: Boolean,
     onPrevPage: () -> Unit,
@@ -367,10 +362,10 @@ internal fun ReaderScreen(
                         }
                     }
             ) {
-                pageRenderer(
-                    state.page,
-                    state.pageVersion,
-                    Modifier.fillMaxSize(),
+                ReaderPageSnapshotCanvas(
+                    page = state.page,
+                    pageVersion = state.pageVersion,
+                    modifier = Modifier.fillMaxSize(),
                 )
                 if (state.isLoading && state.page == null) {
                     Box(
