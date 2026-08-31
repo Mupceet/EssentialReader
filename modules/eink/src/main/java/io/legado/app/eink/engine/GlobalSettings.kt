@@ -37,6 +37,12 @@ interface GlobalSettings {
      */
     var volumeKeyPage: Boolean
 
+    /**
+     * 图片绘制抗锯齿（OtherSettings.antiAlias，与完整模式共享同一开关）。
+     * 阅读页图片画笔取用；引擎文字画笔恒抗锯齿，不受本项影响。
+     */
+    val useAntiAlias: Boolean
+
     /** 预下载章节数（0 = 关闭预缓存）。 */
     val preDownloadNum: Int
 
