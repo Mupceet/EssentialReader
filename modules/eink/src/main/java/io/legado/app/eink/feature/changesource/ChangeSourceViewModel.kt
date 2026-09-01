@@ -5,8 +5,10 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import io.legado.app.eink.R
 import io.legado.app.eink.arch.UserMessage
-import io.legado.app.eink.engine.BookHandle
-import io.legado.app.eink.engine.EInkEngineRegistry
+import io.legado.app.eink.contract.BookHandle
+import io.legado.app.eink.contract.EInkEngineRegistry
+import io.legado.app.eink.contract.ChangeSourceBookUiModel
+import io.legado.app.eink.contract.ChangeSourceResultUiModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.coroutineScope

@@ -1,8 +1,6 @@
-package io.legado.app.eink.feature.changesource
+package io.legado.app.eink.contract
 
 import io.legado.app.eink.arch.EInkImmutable
-import io.legado.app.eink.engine.SearchResultHandle
-import io.legado.app.eink.engine.SearchResultRef
 
 /** 换源页当前书籍 UiModel。 */
 @EInkImmutable

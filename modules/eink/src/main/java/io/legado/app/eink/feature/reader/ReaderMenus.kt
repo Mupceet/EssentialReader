@@ -43,6 +43,7 @@ import io.legado.app.eink.designsystem.interaction.einkClickable
 import io.legado.app.eink.designsystem.theme.EInkShapes
 import io.legado.app.eink.designsystem.theme.EInkSpacing
 import io.legado.app.eink.designsystem.theme.EInkTheme
+import io.legado.app.eink.contract.ReaderTextStyle
 import kotlin.math.roundToInt
 
 /** 设置面板类型（UI 局部状态，见 Route 中的 remember）。 */

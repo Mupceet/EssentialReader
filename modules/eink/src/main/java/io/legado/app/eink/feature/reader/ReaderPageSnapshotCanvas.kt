@@ -13,10 +13,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.toArgb
 import io.legado.app.eink.designsystem.theme.EInkTheme
-import io.legado.app.eink.engine.EInkEngineRegistry
-import io.legado.app.eink.engine.EInkImageSlot
-import io.legado.app.eink.engine.EInkPageSnapshot
-import io.legado.app.eink.engine.ReaderPaintSpec
+import io.legado.app.eink.contract.EInkEngineRegistry
+import io.legado.app.eink.contract.EInkImageSlot
+import io.legado.app.eink.contract.EInkPageSnapshot
+import io.legado.app.eink.contract.ReaderPaintSpec
 
 /**
  * 阅读页绘制层（模块自持）。

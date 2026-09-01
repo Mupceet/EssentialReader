@@ -59,6 +59,7 @@ import io.legado.app.eink.designsystem.theme.EInkSpacing
 import io.legado.app.eink.designsystem.theme.EInkTheme
 import io.legado.app.eink.designsystem.refresh.EInkRefreshIntent
 import io.legado.app.eink.designsystem.refresh.LocalEInkRefreshController
+import io.legado.app.eink.contract.ChapterUiModel
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt

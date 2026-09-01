@@ -6,9 +6,9 @@ import io.legado.app.data.appDb
 import io.legado.app.data.entities.Book
 import io.legado.app.data.entities.BookGroup
 import io.legado.app.data.entities.BookSource
-import io.legado.app.eink.feature.bookshelf.ShelfBookUiModel
-import io.legado.app.eink.engine.BookshelfEngine
-import io.legado.app.eink.engine.BookTocRefreshResult
+import io.legado.app.eink.contract.ShelfBookUiModel
+import io.legado.app.eink.contract.BookshelfEngine
+import io.legado.app.eink.contract.BookTocRefreshResult
 import io.legado.app.help.book.BookHelp
 import io.legado.app.help.book.addType
 import io.legado.app.help.book.isLocal

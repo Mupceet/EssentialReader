@@ -26,7 +26,7 @@ import io.legado.app.eink.feature.bookshelf.BookshelfScreen
 import io.legado.app.eink.feature.bookshelf.BookshelfViewModel
 import io.legado.app.eink.feature.bookshelf.EInkBookshelfGridMinCellWidth
 import io.legado.app.eink.feature.bookshelf.EInkGridCoverHeight
-import io.legado.app.eink.feature.bookshelf.ShelfBookUiModel
+import io.legado.app.eink.contract.ShelfBookUiModel
 import io.legado.app.eink.feature.common.EInkCoverHeight
 import io.legado.app.eink.feature.common.EInkCoverWidth
 import io.legado.app.eink.feature.common.coverTargetSizePx

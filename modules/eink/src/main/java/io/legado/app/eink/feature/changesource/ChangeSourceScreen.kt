@@ -46,6 +46,7 @@ import io.legado.app.eink.designsystem.refresh.EInkRefreshIntent
 import io.legado.app.eink.designsystem.refresh.LocalEInkRefreshController
 import io.legado.app.eink.designsystem.theme.EInkSpacing
 import io.legado.app.eink.designsystem.theme.EInkTheme
+import io.legado.app.eink.contract.ChangeSourceResultUiModel
 import kotlinx.coroutines.launch
 
 /** 当前源左侧实心标记尺寸（▮，规范 §42 列表行持久选中，同目录页“在读”标记）。 */

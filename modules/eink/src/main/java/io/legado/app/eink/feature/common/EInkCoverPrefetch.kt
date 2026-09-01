@@ -2,7 +2,7 @@ package io.legado.app.eink.feature.common
 
 import android.content.Context
 import coil3.SingletonImageLoader
-import io.legado.app.eink.engine.EInkEngineRegistry
+import io.legado.app.eink.contract.EInkEngineRegistry
 
 /**
  * 封面预取：把下一页的封面提前载入 Coil 内存缓存。

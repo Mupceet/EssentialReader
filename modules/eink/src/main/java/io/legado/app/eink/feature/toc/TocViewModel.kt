@@ -3,8 +3,10 @@ package io.legado.app.eink.feature.toc
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import io.legado.app.eink.engine.EInkEngineRegistry
-import io.legado.app.eink.engine.TocFetchResult
+import io.legado.app.eink.contract.EInkEngineRegistry
+import io.legado.app.eink.contract.TocFetchResult
+import io.legado.app.eink.contract.ChapterUiModel
+import io.legado.app.eink.contract.TocBookUiModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow

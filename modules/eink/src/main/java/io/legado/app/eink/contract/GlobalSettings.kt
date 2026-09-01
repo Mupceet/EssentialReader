@@ -1,11 +1,11 @@
-package io.legado.app.eink.engine
+package io.legado.app.eink.contract
 
 /**
  * 全局设置视图（转发宿主设置存储）。
  *
  * 只收录 E-Ink VM 编排与「我的」页真正读写的键；E-Ink 自有的界面偏好
  * （书架网格布局、阅读页常亮/自动翻页间隔）不在此列 ——
- * 它们由 [io.legado.app.eink.settings.EInkSettings] 自管，
+ * 它们由 [io.legado.app.eink.contract.EInkSettings] 自管，
  * 随模块走。
  */
 interface GlobalSettings {

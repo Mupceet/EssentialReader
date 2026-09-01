@@ -31,8 +31,8 @@ import io.legado.app.eink.designsystem.navigation.EInkOperationBarIcon
 import io.legado.app.eink.designsystem.control.EInkSteppedSlider
 import io.legado.app.eink.designsystem.content.EInkText
 import io.legado.app.eink.designsystem.interaction.eInkActionColors
-import io.legado.app.eink.engine.EInkEngineRegistry
-import io.legado.app.eink.engine.GlobalSettings
+import io.legado.app.eink.contract.EInkEngineRegistry
+import io.legado.app.eink.contract.GlobalSettings
 import io.legado.app.eink.designsystem.interaction.rememberImmediatePressState
 import io.legado.app.eink.designsystem.interaction.einkClickable
 import io.legado.app.eink.designsystem.theme.EInkSpacing

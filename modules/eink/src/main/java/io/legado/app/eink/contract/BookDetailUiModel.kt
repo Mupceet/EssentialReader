@@ -1,11 +1,11 @@
-package io.legado.app.eink.feature.bookdetail
+package io.legado.app.eink.contract
 
 import io.legado.app.eink.arch.EInkImmutable
 
 /**
  * 书籍详情 UiModel（Book → 展示字段快照）。
  * 展示类计算（getRealAuthor/getDisplayCover/getDisplayIntro）在桥接层
- * 预计算一次；引擎身份（Book 实体）经 [io.legado.app.eink.engine.BookHandle]
+ * 预计算一次；引擎身份（Book 实体）经 [io.legado.app.eink.contract.BookHandle]
  * 由 VM 持有，不进组合层。
  */
 @EInkImmutable

@@ -1,6 +1,5 @@
-package io.legado.app.eink.engine
+package io.legado.app.eink.contract
 
-import io.legado.app.eink.feature.reader.ReaderTextStyle
 
 /** 阅读会话书籍快照（ReadBook.book 的模块侧投影）。 */
 interface ReaderBookSnapshot {

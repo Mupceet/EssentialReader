@@ -1,7 +1,5 @@
-package io.legado.app.eink.engine
+package io.legado.app.eink.contract
 
-import io.legado.app.eink.feature.changesource.ChangeSourceBookUiModel
-import io.legado.app.eink.feature.changesource.ChangeSourceResultUiModel
 import kotlinx.coroutines.flow.SharedFlow
 
 /**

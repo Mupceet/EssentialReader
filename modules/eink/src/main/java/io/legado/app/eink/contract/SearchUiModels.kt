@@ -1,4 +1,4 @@
-package io.legado.app.eink.feature.search
+package io.legado.app.eink.contract
 
 import io.legado.app.eink.arch.EInkImmutable
 
