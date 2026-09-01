@@ -143,7 +143,7 @@ Coil3 直接坐标、去掉 kotlin-android 插件、Java 21）。下表是本仓
 | BookshelfEngineImpl | 预缓存入队 `CacheBook.getOrCreate(source, book).addDownload(start, end)`；`startProcessJob(coroutineContext)` 同为 suspend |
 | ReaderEngineImpl (startCache) | `CacheBook.start(ctx, book, start, end)` 为 **suspend**——直接构造 `CacheDownloadRequest(bookUrl, ChapterSelection.Range(...))` 走非 suspend 重载（与其实现等价） |
 | ChangeSourceEngineImpl | `migrateTo(newBook, toc, replaceEnableDefault, chineseConverterType)` 需补两参（对齐其 ChangeBookSourceDialog：AppConfig.replaceEnableDefault / AppConfig.chineseConverterType）；searchBookAwait filter 三参同 legadoM-Ink |
-| EInkBridge (GlobalSettings) | `changeSourceCheckAuthor` 存独立 local_ui_status DataStore，无同步门面——经 Koin `ChangeSourceSettingsGateway` 读；threadCount/autoRefreshBook/preDownloadNum 仍走（@Deprecated 但可用的）AppConfig 门面 |
+| EInkBridge (GlobalSettings) | `changeSourceCheckAuthor` 存独立 local_ui_status DataStore，无同步门面——经 Koin `ChangeSourceSettingsGateway` 读；threadCount/preDownloadNum 经 `DownloadCacheSettingsGateway`、autoRefreshBook 经 OtherSettingsGateway；fontScaleSetting 仍走 AppConfigStore 同步快照（null=跟随系统的未设置语义域模型未覆盖，域化另行专项） |
 | 入口接线 | `MainActivity.onCreate` 在 `checkStartupRoute()`（首启引导）之后分流；`LabConfigRouteScreen` 加 LaunchedEffect：开关为 true 即 CLEAR_TASK 切 `EInkMainActivity`；退出时 `AppConfigStore.putBoolean(labEInkDisplay, false)` + MainActivity CLEAR_TASK；defaultToRead 经 AppConfigStore 同步读，`bookDao.lastReadBook` 存在 |
 
 环境事项：worktree 自带 `local.properties` 不入库需从主 checkout 复制。
