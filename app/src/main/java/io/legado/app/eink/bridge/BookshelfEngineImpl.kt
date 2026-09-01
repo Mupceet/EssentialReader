@@ -6,6 +6,7 @@ import io.legado.app.data.appDb
 import io.legado.app.data.entities.Book
 import io.legado.app.data.entities.BookGroup
 import io.legado.app.data.entities.BookSource
+import io.legado.app.domain.gateway.DownloadCacheSettingsGateway
 import io.legado.app.eink.contract.BookshelfItemUiModel
 import io.legado.app.eink.contract.BookshelfEngine
 import io.legado.app.eink.contract.BookshelfTocRefreshResult
@@ -15,7 +16,6 @@ import io.legado.app.help.book.isLocal
 import io.legado.app.help.book.isUpError
 import io.legado.app.help.book.removeType
 import io.legado.app.help.book.sync
-import io.legado.app.help.config.AppConfig
 import io.legado.app.model.CacheBook
 import io.legado.app.model.ReadBook
 import io.legado.app.model.webBook.WebBook
@@ -23,6 +23,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
+import org.koin.core.component.KoinComponent
+import org.koin.core.component.inject
 import kotlin.coroutines.cancellation.CancellationException
 import kotlin.math.min
 
@@ -34,8 +36,9 @@ import kotlin.math.min
  * 本上游差异：getChapterListAwait 返回 Result（getOrThrow 解包），
  * 预缓存入队走 CacheBook.getOrCreate(...).addDownload(...)。
  */
-internal object BookshelfEngineImpl : BookshelfEngine {
+internal object BookshelfEngineImpl : BookshelfEngine, KoinComponent {
 
+    private val downloadCacheSettingsGateway: DownloadCacheSettingsGateway by inject()
     /** [Book] → [BookshelfItemUiModel]：条目渲染字段的唯一抽取点。 */
     private fun Book.toBookshelfItemUiModel() = BookshelfItemUiModel(
         bookUrl = bookUrl,
@@ -113,10 +116,10 @@ internal object BookshelfEngineImpl : BookshelfEngine {
      * 当前进度起往后 preDownloadNum 章。
      */
     private fun enqueuePreDownload(source: BookSource, book: Book) {
-        if (AppConfig.preDownloadNum == 0) return
+        if (downloadCacheSettingsGateway.currentSettings.preDownloadNum == 0) return
         val endIndex = min(
             book.totalChapterNum - 1,
-            book.durChapterIndex.plus(AppConfig.preDownloadNum)
+            book.durChapterIndex.plus(downloadCacheSettingsGateway.currentSettings.preDownloadNum)
         )
         CacheBook.getOrCreate(source, book).addDownload(book.durChapterIndex, endIndex)
     }

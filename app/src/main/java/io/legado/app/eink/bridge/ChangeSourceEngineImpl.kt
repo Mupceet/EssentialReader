@@ -6,6 +6,8 @@ import io.legado.app.constant.BookType
 import io.legado.app.data.appDb
 import io.legado.app.data.entities.BookSource
 import io.legado.app.data.entities.SearchBook
+import io.legado.app.domain.gateway.OtherSettingsGateway
+import io.legado.app.domain.gateway.ReadSettingsGateway
 import io.legado.app.eink.contract.ChangeSourceBookUiModel
 import io.legado.app.eink.contract.ChangeSourceResultUiModel
 import io.legado.app.eink.contract.BookHandle
@@ -13,12 +15,13 @@ import io.legado.app.eink.contract.ChangeSourceEngine
 import io.legado.app.eink.contract.SourceHandle
 import io.legado.app.eink.contract.SearchResultHandle
 import io.legado.app.help.book.removeType
-import io.legado.app.help.config.AppConfig
 import io.legado.app.model.ReadBook
 import io.legado.app.model.webBook.WebBook
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
+import org.koin.core.component.KoinComponent
+import org.koin.core.component.inject
 import kotlin.coroutines.cancellation.CancellationException
 
 /** 书源句柄（包装 BookSource）。 */
@@ -37,8 +40,11 @@ internal class SearchResultHandleImpl(val searchBook: SearchBook) : SearchResult
  * chineseConverterType（对齐 View 版 ChangeBookSourceDialog）；
  * getChapterListAwait 返回 Result。
  */
-internal object ChangeSourceEngineImpl : ChangeSourceEngine {
+internal object ChangeSourceEngineImpl : ChangeSourceEngine, KoinComponent {
 
+    private val otherSettingsGateway: OtherSettingsGateway by inject()
+
+    private val readSettingsGateway: ReadSettingsGateway by inject()
     private val _bookChanged = MutableSharedFlow<String>(extraBufferCapacity = 8)
     override val bookChanged: SharedFlow<String> = _bookChanged.asSharedFlow()
 
@@ -109,8 +115,8 @@ internal object ChangeSourceEngineImpl : ChangeSourceEngine {
             oldBook.migrateTo(
                 newBook,
                 toc,
-                AppConfig.replaceEnableDefault,
-                AppConfig.chineseConverterType,
+                otherSettingsGateway.currentSettings.replaceEnableDefault,
+                readSettingsGateway.currentSettings.chineseConverterType,
             )
             newBook.removeType(BookType.updateError)
             oldBook.delete()

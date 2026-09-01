@@ -7,6 +7,7 @@ import io.legado.app.data.entities.SearchKeyword
 import io.legado.app.data.local.preferences.LocalPreferencesKeys
 import io.legado.app.data.local.preferences.localDataStore
 import io.legado.app.domain.gateway.BookSearchGateway
+import io.legado.app.domain.gateway.DownloadCacheSettingsGateway
 import io.legado.app.domain.model.BookSearchScope
 import io.legado.app.domain.model.MatchMode
 import io.legado.app.domain.usecase.BookSearchRequest
@@ -19,7 +20,6 @@ import io.legado.app.eink.contract.SearchSessionCallback
 import io.legado.app.eink.contract.SearchBookUiModel
 import io.legado.app.eink.contract.SearchHistoryUiModel
 import io.legado.app.help.book.isNotShelf
-import io.legado.app.help.config.AppConfig
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -31,6 +31,8 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import org.koin.core.component.KoinComponent
+import org.koin.core.component.inject
 import splitties.init.appCtx
 import kotlin.coroutines.cancellation.CancellationException
 
@@ -42,8 +44,9 @@ import kotlin.coroutines.cancellation.CancellationException
  * 驱动 UseCase，事件映射为模块回调；搜索范围沿用 View 搜索页持久化的
  * local_ui_status "search_scope" 键。
  */
-internal object SearchEngineImpl : SearchEngine {
+internal object SearchEngineImpl : SearchEngine, KoinComponent {
 
+    private val downloadCacheSettingsGateway: DownloadCacheSettingsGateway by inject()
     private fun SearchBook.toUiModel() = SearchBookUiModel(
         bookUrl = bookUrl,
         name = name,
@@ -110,7 +113,7 @@ internal object SearchEngineImpl : SearchEngine {
                                 page = 1,
                                 scope = BookSearchScope(scopeRaw),
                                 matchMode = MatchMode.DEFAULT,
-                                concurrency = AppConfig.threadCount,
+                                concurrency = downloadCacheSettingsGateway.currentSettings.threadCount,
                                 types = null,
                             ),
                             BookSearchControl(),
