@@ -29,7 +29,7 @@ fun <T> prefetchCovers(
 ) {
     if (items.isEmpty()) return
     // 「使用默认封面」模式下不显示网络封面，预取纯浪费
-    if (EInkEngineRegistry.coverEngine.useDefaultCover) return
+    if (EInkEngineRegistry.globalSettings.useDefaultCover) return
     val imageLoader = SingletonImageLoader.get(context)
     for (item in items) {
         val url = coverUrl(item)
