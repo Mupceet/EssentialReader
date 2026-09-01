@@ -7,7 +7,7 @@ import io.legado.app.data.entities.Book
 import io.legado.app.eink.contract.BookDetailUiModel
 import io.legado.app.eink.contract.BookDetailEngine
 import io.legado.app.eink.contract.BookHandle
-import io.legado.app.eink.contract.PrefetchResult
+import io.legado.app.eink.contract.BookDetailPrefetchResult
 import io.legado.app.help.book.BookHelp
 import io.legado.app.help.book.addType
 import io.legado.app.help.book.isLocal
@@ -60,14 +60,14 @@ internal object BookDetailEngineImpl : BookDetailEngine {
     override suspend fun isBookInBookshelf(bookUrl: String): Boolean =
         appDb.bookDao.getBook(bookUrl)?.let { !it.isNotShelf } ?: false
 
-    override suspend fun prefetchChapters(handle: BookHandle, inShelf: Boolean): PrefetchResult {
+    override suspend fun prefetchChapters(handle: BookHandle, inShelf: Boolean): BookDetailPrefetchResult {
         val book = (handle as BookHandleImpl).book
-        if (book.isLocal) return PrefetchResult.Skipped
+        if (book.isLocal) return BookDetailPrefetchResult.Skipped
         if (appDb.bookChapterDao.getChapterList(book.bookUrl).isNotEmpty()) {
-            return PrefetchResult.Skipped
+            return BookDetailPrefetchResult.Skipped
         }
         val source = appDb.bookSourceDao.getBookSource(book.origin)
-            ?: return PrefetchResult.Skipped
+            ?: return BookDetailPrefetchResult.Skipped
         val oldBook = book.copy()
         val chapters = try {
             if (book.tocUrl.isEmpty()) {
@@ -78,7 +78,7 @@ internal object BookDetailEngineImpl : BookDetailEngine {
             throw e
         } catch (e: Throwable) {
             AppLog.put("详情页预取目录出错《${book.name}》\n${e.localizedMessage}", e)
-            return PrefetchResult.Skipped
+            return BookDetailPrefetchResult.Skipped
         }
         if (inShelf) {
             if (oldBook.bookUrl == book.bookUrl) {
@@ -94,7 +94,7 @@ internal object BookDetailEngineImpl : BookDetailEngine {
             book.save()
         }
         appDb.bookChapterDao.insert(*chapters.toTypedArray())
-        return PrefetchResult.Updated(BookHandleImpl(book), book.toUiModel())
+        return BookDetailPrefetchResult.Updated(BookHandleImpl(book), book.toUiModel())
     }
 
     override suspend fun addToBookshelf(handle: BookHandle): Boolean {

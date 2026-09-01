@@ -6,7 +6,7 @@ import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import io.legado.app.eink.arch.UserMessage
-import io.legado.app.eink.contract.BookTocRefreshResult
+import io.legado.app.eink.contract.BookshelfTocRefreshResult
 import io.legado.app.eink.contract.EInkEngineRegistry
 import io.legado.app.eink.contract.EInkSettings
 import io.legado.app.eink.util.onEachParallel
@@ -223,10 +223,10 @@ class BookshelfViewModel(application: Application) : AndroidViewModel(applicatio
         val benchName = books.find { it.bookUrl == bookUrl }?.name ?: ""
         try {
             benchResult = when (engine.refreshBookToc(bookUrl)) {
-                BookTocRefreshResult.OK -> "ok"
-                BookTocRefreshResult.NO_BOOK -> "noBook"
-                BookTocRefreshResult.NO_SOURCE -> "noSource"
-                BookTocRefreshResult.ERROR -> "error"
+                BookshelfTocRefreshResult.OK -> "ok"
+                BookshelfTocRefreshResult.NO_BOOK -> "noBook"
+                BookshelfTocRefreshResult.NO_SOURCE -> "noSource"
+                BookshelfTocRefreshResult.ERROR -> "error"
             }
         } finally {
             benchInFlight.decrementAndGet()

@@ -2,12 +2,12 @@ package io.legado.app.eink.contract
 
 
 /** 详情页目录预取结果。 */
-sealed interface PrefetchResult {
+sealed interface BookDetailPrefetchResult {
     /** 无需/无法预取（本地书、无书源、已有目录、静默失败）。 */
-    data object Skipped : PrefetchResult
+    data object Skipped : BookDetailPrefetchResult
 
     /** 预取完成：书籍可能被详情/重定向更新，返回新句柄与展示模型。 */
-    data class Updated(val handle: BookHandle, val model: BookDetailUiModel) : PrefetchResult
+    data class Updated(val handle: BookHandle, val model: BookDetailUiModel) : BookDetailPrefetchResult
 }
 
 /**
@@ -32,7 +32,7 @@ interface BookDetailEngine {
      * 后台预取目录入库（缺详情先拉详情；重定向替换书架记录并迁移缓存；
      * 未加书架落 notShelf 行）。静默失败。
      */
-    suspend fun prefetchChapters(handle: BookHandle, inShelf: Boolean): PrefetchResult
+    suspend fun prefetchChapters(handle: BookHandle, inShelf: Boolean): BookDetailPrefetchResult
 
     /** 加入书架（序号 minOrder-1、合并同名书进度），返回是否成功。 */
     suspend fun addToBookshelf(handle: BookHandle): Boolean

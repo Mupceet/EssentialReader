@@ -8,7 +8,7 @@ import io.legado.app.data.entities.BookGroup
 import io.legado.app.data.entities.BookSource
 import io.legado.app.eink.contract.BookshelfItemUiModel
 import io.legado.app.eink.contract.BookshelfEngine
-import io.legado.app.eink.contract.BookTocRefreshResult
+import io.legado.app.eink.contract.BookshelfTocRefreshResult
 import io.legado.app.help.book.BookHelp
 import io.legado.app.help.book.addType
 import io.legado.app.help.book.isLocal
@@ -63,15 +63,15 @@ internal object BookshelfEngineImpl : BookshelfEngine {
             .filter { !it.isLocal && it.canUpdate }
             .map { it.toBookshelfItemUiModel() }
 
-    override suspend fun refreshBookToc(bookUrl: String): BookTocRefreshResult {
-        val book = appDb.bookDao.getBook(bookUrl) ?: return BookTocRefreshResult.NO_BOOK
+    override suspend fun refreshBookToc(bookUrl: String): BookshelfTocRefreshResult {
+        val book = appDb.bookDao.getBook(bookUrl) ?: return BookshelfTocRefreshResult.NO_BOOK
         val source = appDb.bookSourceDao.getBookSource(book.origin)
         if (source == null) {
             if (!book.isUpError) {
                 book.addType(BookType.updateError)
                 appDb.bookDao.update(book)
             }
-            return BookTocRefreshResult.NO_SOURCE
+            return BookshelfTocRefreshResult.NO_SOURCE
         }
         return try {
             val oldBook = book.copy()
@@ -94,7 +94,7 @@ internal object BookshelfEngineImpl : BookshelfEngine {
             appDb.bookChapterDao.insert(*toc.toTypedArray())
             ReadBook.onChapterListUpdated(book)
             enqueuePreDownload(source, book)
-            BookTocRefreshResult.OK
+            BookshelfTocRefreshResult.OK
         } catch (e: CancellationException) {
             throw e
         } catch (e: Throwable) {
@@ -104,7 +104,7 @@ internal object BookshelfEngineImpl : BookshelfEngine {
                 curBook.addType(BookType.updateError)
                 appDb.bookDao.update(curBook)
             }
-            BookTocRefreshResult.ERROR
+            BookshelfTocRefreshResult.ERROR
         }
     }
 
