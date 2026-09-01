@@ -19,7 +19,7 @@
 │    SearchEngine + TocEngine + BookDetailEngine + ChangeSourceEngine +
 │    CoverEngine + ReaderEngine（各端口及其伴生回调/结果类型）+
 │    EngineHandles（BookHandle/SourceHandle/SearchResultHandle/SearchResultRef）+
-│    EInkPageSnapshot（排版产物快照系）+ ReaderTextStyle（排版参数快照）+
+│    ReaderPageSnapshot（排版产物快照系）+ ReaderTextStyle（排版参数快照）+
 │    各页 UiModel（跨界展示模型）
 ├─ app/                             EInkApp 根 Composable + EInkScreen/EInkNavController 栈导航
 ├─ designsystem/                    设计系统（theme/content/control/interaction/
@@ -45,14 +45,14 @@ app/.../eink/（宿主 = 入口 + 桥接层，移植时按目标引擎重写）
      ChangeSourceEngineImpl 跨源搜索/换源迁移管线（ReadBook 会话重载）
      ReaderEngineImpl       ReadBook 全表面转发 + CallBack 适配 + 样式映射
                             （含 BookHandleImpl/SourceHandleImpl 等句柄包装）
-     ReaderPageSnapshotMapper  TextPage → EInkPageSnapshot 映射（宿主唯一
+     ReaderPageSnapshotMapper  TextPage → ReaderPageSnapshot 映射（宿主唯一
                             新增渲染职责；字段漂移在此消化，模块一份画布）
 ```
 
 数据与渲染规则：端口只进出模块自有类型（UiModel / `ReaderTextStyle` /
-`EInkPageSnapshot` / 不透明句柄）。编排逻辑（并发、状态机、防抖、自动翻页
+`ReaderPageSnapshot` / 不透明句柄）。编排逻辑（并发、状态机、防抖、自动翻页
 定时）全部在模块 VM；桥接层只有一行转发与字段映射。渲染为**快照式**：
-排版引擎留在宿主，宿主映射 `TextPage` → `EInkPageSnapshot`，模块自持画布
+排版引擎留在宿主，宿主映射 `TextPage` → `ReaderPageSnapshot`，模块自持画布
 （`feature/reader/ReaderPageSnapshotCanvas`）绘制——宿主不再有画布注入。
 
 ## 2. 移植步骤（嵌入目标上游）

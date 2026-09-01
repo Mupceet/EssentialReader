@@ -8,9 +8,9 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import io.legado.app.eink.R
 import io.legado.app.eink.arch.UserMessage
-import io.legado.app.eink.contract.BookPrepResult
+import io.legado.app.eink.contract.ReaderPrepResult
 import io.legado.app.eink.contract.EInkEngineRegistry
-import io.legado.app.eink.contract.EInkPageSnapshot
+import io.legado.app.eink.contract.ReaderPageSnapshot
 import io.legado.app.eink.contract.ReaderBookSnapshot
 import io.legado.app.eink.contract.ReaderEngineCallback
 import io.legado.app.eink.contract.EInkSettings
@@ -45,7 +45,7 @@ data class ReaderUiState(
     val bookAuthor: String = "",
     val bookUrl: String = "",
     val chapterTitle: String = "",
-    val page: EInkPageSnapshot? = null,
+    val page: ReaderPageSnapshot? = null,
     val pageVersion: Int = 0,
     val pageIndex: Int = 0,
     val pageCount: Int = 0,
@@ -91,7 +91,7 @@ data class ReaderUiState(
  * 桥接引擎全局状态机（经 [io.legado.app.eink.contract.ReaderEngine] 端口）
  * 到 Compose StateFlow：
  * - 复用 View 版渲染引擎（宿主 ChapterProvider 排版产物经映射器转为
- *   EInkPageSnapshot 快照进入状态，绘制由模块画布完成）；
+ *   ReaderPageSnapshot 快照进入状态，绘制由模块画布完成）；
  * - 排版参数以 ReaderTextStyle 快照整体经端口写回（与 View 版共用一套
  *   阅读配置）；
  * - 通过实现 [ReaderEngineCallback] 接收引擎状态推送。
@@ -191,18 +191,18 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application),
             // E-Ink 经详情页加入书架的书没有目录记录，目录缺失时引擎的
             // loadContent 会静默失败
             when (val prep = engine.prepareBookData(book.handle)) {
-                BookPrepResult.Success -> Unit
-                BookPrepResult.NoSource -> {
+                ReaderPrepResult.Success -> Unit
+                ReaderPrepResult.NoSource -> {
                     _uiState.update { it.copy(isLoading = false, error = "没有书源") }
                     return@launch
                 }
-                is BookPrepResult.InfoFailure -> {
+                is ReaderPrepResult.InfoFailure -> {
                     _uiState.update { state ->
                         state.copy(isLoading = false, error = "详情页出错：${prep.cause.localizedMessage}")
                     }
                     return@launch
                 }
-                is BookPrepResult.TocFailure -> {
+                is ReaderPrepResult.TocFailure -> {
                     _uiState.update { state ->
                         state.copy(isLoading = false, error = "目录加载失败：${prep.cause.localizedMessage}")
                     }

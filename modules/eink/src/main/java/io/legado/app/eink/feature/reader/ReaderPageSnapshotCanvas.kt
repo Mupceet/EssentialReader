@@ -14,14 +14,14 @@ import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.toArgb
 import io.legado.app.eink.designsystem.theme.EInkTheme
 import io.legado.app.eink.contract.EInkEngineRegistry
-import io.legado.app.eink.contract.EInkImageSlot
-import io.legado.app.eink.contract.EInkPageSnapshot
+import io.legado.app.eink.contract.ReaderImageSlot
+import io.legado.app.eink.contract.ReaderPageSnapshot
 import io.legado.app.eink.contract.ReaderPaintSpec
 
 /**
  * 阅读页绘制层（模块自持）。
  *
- * 绘制宿主映射来的 [EInkPageSnapshot]：行 chunk 按预计算 x 坐标画字，
+ * 绘制宿主映射来的 [ReaderPageSnapshot]：行 chunk 按预计算 x 坐标画字，
  * 图片槽位按铺满/等比居中画位图。排版本身由引擎（宿主 ChapterProvider）
  * 完成，这里不做二次排版 —— 结果与 View 版 ContentTextView 一致。
  *
@@ -36,7 +36,7 @@ import io.legado.app.eink.contract.ReaderPaintSpec
  */
 @Composable
 internal fun ReaderPageSnapshotCanvas(
-    page: EInkPageSnapshot?,
+    page: ReaderPageSnapshot?,
     pageVersion: Int,
     modifier: Modifier = Modifier,
 ) {
@@ -69,7 +69,7 @@ internal fun ReaderPageSnapshotCanvas(
  * 绘制图片槽位：按列宽×行高向宿主闭包取图，铺满（fullLine）或以宽度为
  * 基准等比居中（与 View 版 ImageColumn 一致）；取图失败/尺寸异常跳过。
  */
-private fun drawImageSlot(canvas: Canvas, slot: EInkImageSlot, paint: Paint) {
+private fun drawImageSlot(canvas: Canvas, slot: ReaderImageSlot, paint: Paint) {
     val width = (slot.x1 - slot.x0).toInt()
     val height = slot.lineHeight.toInt()
     if (width <= 0 || height <= 0) return

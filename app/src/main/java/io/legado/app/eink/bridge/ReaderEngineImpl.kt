@@ -5,8 +5,8 @@ import io.legado.app.constant.BookType
 import io.legado.app.data.appDb
 import io.legado.app.data.entities.Book
 import io.legado.app.eink.contract.BookHandle
-import io.legado.app.eink.contract.BookPrepResult
-import io.legado.app.eink.contract.EInkPageSnapshot
+import io.legado.app.eink.contract.ReaderPrepResult
+import io.legado.app.eink.contract.ReaderPageSnapshot
 import io.legado.app.eink.contract.ReaderBookSnapshot
 import io.legado.app.eink.contract.ReaderEngine
 import io.legado.app.eink.contract.ReaderEngineCallback
@@ -130,7 +130,7 @@ internal object ReaderEngineImpl : ReaderEngine, KoinComponent {
     override val currentChapterPageSize: Int
         get() = ReadBook.curTextChapter?.pageSize ?: 0
 
-    override fun currentPage(): EInkPageSnapshot? {
+    override fun currentPage(): ReaderPageSnapshot? {
         val chapter = ReadBook.curTextChapter ?: return null
         return chapter.getPage(ReadBook.durPageIndex)?.let(ReaderPageSnapshotMapper::map)
     }
@@ -174,27 +174,27 @@ internal object ReaderEngineImpl : ReaderEngine, KoinComponent {
         return snapshotOf(book)
     }
 
-    override suspend fun prepareBookData(bookHandle: BookHandle): BookPrepResult {
+    override suspend fun prepareBookData(bookHandle: BookHandle): ReaderPrepResult {
         val book = (bookHandle as BookHandleImpl).book
         if (!book.isLocal && book.tocUrl.isEmpty()) {
             val source = ReadBook.bookSource
-                ?: return BookPrepResult.NoSource
+                ?: return ReaderPrepResult.NoSource
             try {
                 WebBook.getBookInfoAwait(source, book, canReName = false)
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Throwable) {
-                return BookPrepResult.InfoFailure(e)
+                return ReaderPrepResult.InfoFailure(e)
             }
         }
         if (ReadBook.chapterSize == 0 || book.isLocalModified()) {
             return loadChapterListIntoDb(book)
         }
-        return BookPrepResult.Success
+        return ReaderPrepResult.Success
     }
 
     /** 目录入库（本地书走 LocalBook；网络书重定向时替换记录并迁移缓存）。 */
-    private suspend fun loadChapterListIntoDb(book: Book): BookPrepResult {
+    private suspend fun loadChapterListIntoDb(book: Book): ReaderPrepResult {
         if (book.isLocal) {
             return try {
                 LocalBook.getChapterList(book).let { chapters ->
@@ -203,22 +203,22 @@ internal object ReaderEngineImpl : ReaderEngine, KoinComponent {
                     appDb.bookDao.update(book)
                     ReadBook.onChapterListUpdated(book)
                 }
-                BookPrepResult.Success
+                ReaderPrepResult.Success
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Throwable) {
-                BookPrepResult.TocFailure(e)
+                ReaderPrepResult.TocFailure(e)
             }
         }
         val source = ReadBook.bookSource
-            ?: return BookPrepResult.NoSource
+            ?: return ReaderPrepResult.NoSource
         val oldBook = book.copy()
         val chapters = try {
             WebBook.getChapterListAwait(source, book, true).getOrThrow()
         } catch (e: CancellationException) {
             throw e
         } catch (e: Throwable) {
-            return BookPrepResult.TocFailure(e)
+            return ReaderPrepResult.TocFailure(e)
         }
         if (oldBook.bookUrl == book.bookUrl) {
             appDb.bookDao.update(book)
@@ -230,7 +230,7 @@ internal object ReaderEngineImpl : ReaderEngine, KoinComponent {
         appDb.bookChapterDao.delByBook(oldBook.bookUrl)
         appDb.bookChapterDao.insert(*chapters.toTypedArray())
         ReadBook.onChapterListUpdated(book)
-        return BookPrepResult.Success
+        return ReaderPrepResult.Success
     }
 
     // ---- 翻页 ----

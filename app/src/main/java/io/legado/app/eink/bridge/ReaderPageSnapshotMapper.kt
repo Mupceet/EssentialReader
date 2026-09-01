@@ -4,9 +4,9 @@ import android.graphics.Bitmap
 import android.graphics.Paint
 import android.os.Build
 import io.legado.app.data.entities.Book
-import io.legado.app.eink.contract.EInkImageSlot
-import io.legado.app.eink.contract.EInkPageSnapshot
-import io.legado.app.eink.contract.EInkSnapshotLine
+import io.legado.app.eink.contract.ReaderImageSlot
+import io.legado.app.eink.contract.ReaderPageSnapshot
+import io.legado.app.eink.contract.ReaderPageLine
 import io.legado.app.eink.contract.ReaderPaintSpec
 import io.legado.app.eink.contract.ReaderShadowSpec
 import io.legado.app.help.config.ReadBookConfig
@@ -19,7 +19,7 @@ import io.legado.app.ui.book.read.page.provider.ChapterProvider
 /**
  * TextPage → 模块快照映射器（宿主唯一新增渲染职责）。
  *
- * 引擎排版完成后把页面映射为 [EInkPageSnapshot]：上游 TextLine 的字段
+ * 引擎排版完成后把页面映射为 [ReaderPageSnapshot]：上游 TextLine 的字段
  * 漂移（extraLetterSpacing/wordSpacing/isHtml 等）由本映射器消化，模块
  * 画布只有一份绘制实现。API35+ 的逐字字距半格补偿（View 版画布行为）
  * 在映射期算进 x 坐标，模块不再感知。
@@ -32,7 +32,7 @@ import io.legado.app.ui.book.read.page.provider.ChapterProvider
 internal object ReaderPageSnapshotMapper {
 
     /** 生产入口：规格取自引擎当前共享画笔，补偿按真实 SDK 版本。 */
-    fun map(page: TextPage): EInkPageSnapshot {
+    fun map(page: TextPage): ReaderPageSnapshot {
         // 阴影不读 Paint：shadowLayer* getter 系 API 29+（minSdk 26 触即 NoSuchMethodError），
         // 改按 upStyle 同源配置构造。upStyle 对标题/正文两支画笔写入同一组阴影值，取一次共用。
         val shadow = shadowSpecFromConfig()
@@ -52,9 +52,9 @@ internal object ReaderPageSnapshotMapper {
         contentSpec: ReaderPaintSpec,
         sdkInt: Int,
         imageLoader: (Book, String) -> (Int, Int) -> Bitmap?,
-    ): EInkPageSnapshot {
-        val lines = ArrayList<EInkSnapshotLine>(page.lines.size)
-        val images = ArrayList<EInkImageSlot>()
+    ): ReaderPageSnapshot {
+        val lines = ArrayList<ReaderPageLine>(page.lines.size)
+        val images = ArrayList<ReaderImageSlot>()
         for (line in page.lines) {
             val spec = if (line.isTitle) titleSpec else contentSpec
             // API 35+ drawText 会将 letterSpacing 应用在两侧，View 版同样补偿半格
@@ -70,7 +70,7 @@ internal object ReaderPageSnapshotMapper {
                     }
 
                     is ImageColumn -> images.add(
-                        EInkImageSlot(
+                        ReaderImageSlot(
                             x0 = column.start,
                             x1 = column.end,
                             lineTop = line.lineTop,
@@ -86,7 +86,7 @@ internal object ReaderPageSnapshotMapper {
             }
             if (chunks.isNotEmpty()) {
                 lines.add(
-                    EInkSnapshotLine(
+                    ReaderPageLine(
                         baseY = line.lineBase,
                         isTitle = line.isTitle,
                         chunks = chunks,
@@ -95,7 +95,7 @@ internal object ReaderPageSnapshotMapper {
                 )
             }
         }
-        return EInkPageSnapshot(
+        return ReaderPageSnapshot(
             title = page.title,
             readProgress = page.readProgress,
             titleSpec = titleSpec,
