@@ -28,7 +28,7 @@ import io.legado.app.domain.gateway.AppUiConfigurationGateway
 import io.legado.app.eink.app.EInkApp
 import io.legado.app.eink.bridge.EInkBridge
 import io.legado.app.eink.designsystem.theme.EInkTheme
-import io.legado.app.eink.engine.EInkEngineRegistry
+import io.legado.app.eink.contract.EInkEngineRegistry
 import io.legado.app.help.config.AppConfigStore
 import io.legado.app.ui.main.MainActivity
 import io.legado.app.ui.theme.resolveAppFontScale

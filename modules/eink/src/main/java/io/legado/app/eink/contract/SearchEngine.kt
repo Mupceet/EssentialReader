@@ -1,7 +1,5 @@
-package io.legado.app.eink.engine
+package io.legado.app.eink.contract
 
-import io.legado.app.eink.feature.search.SearchBookUiModel
-import io.legado.app.eink.feature.search.SearchHistoryUiModel
 import kotlinx.coroutines.flow.Flow
 
 /** 搜索会话（桥接宿主 SearchModel，回调式 → 端口回调）。 */

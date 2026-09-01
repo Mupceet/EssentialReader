@@ -4,11 +4,11 @@ import android.graphics.Bitmap
 import android.graphics.Paint
 import android.os.Build
 import io.legado.app.data.entities.Book
-import io.legado.app.eink.engine.EInkImageSlot
-import io.legado.app.eink.engine.EInkPageSnapshot
-import io.legado.app.eink.engine.EInkSnapshotLine
-import io.legado.app.eink.engine.ReaderPaintSpec
-import io.legado.app.eink.engine.ReaderShadowSpec
+import io.legado.app.eink.contract.EInkImageSlot
+import io.legado.app.eink.contract.EInkPageSnapshot
+import io.legado.app.eink.contract.EInkSnapshotLine
+import io.legado.app.eink.contract.ReaderPaintSpec
+import io.legado.app.eink.contract.ReaderShadowSpec
 import io.legado.app.help.config.ReadBookConfig
 import io.legado.app.model.ImageProvider
 import io.legado.app.ui.book.read.page.entities.TextPage

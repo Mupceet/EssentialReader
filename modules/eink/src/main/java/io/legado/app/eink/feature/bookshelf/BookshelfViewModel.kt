@@ -6,10 +6,11 @@ import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import io.legado.app.eink.arch.UserMessage
-import io.legado.app.eink.engine.BookTocRefreshResult
-import io.legado.app.eink.engine.EInkEngineRegistry
-import io.legado.app.eink.settings.EInkSettings
+import io.legado.app.eink.contract.BookTocRefreshResult
+import io.legado.app.eink.contract.EInkEngineRegistry
+import io.legado.app.eink.contract.EInkSettings
 import io.legado.app.eink.util.onEachParallel
+import io.legado.app.eink.contract.ShelfBookUiModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay

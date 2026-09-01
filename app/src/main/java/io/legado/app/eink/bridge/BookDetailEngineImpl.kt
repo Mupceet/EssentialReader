@@ -4,10 +4,10 @@ import io.legado.app.constant.AppLog
 import io.legado.app.constant.BookType
 import io.legado.app.data.appDb
 import io.legado.app.data.entities.Book
-import io.legado.app.eink.feature.bookdetail.BookDetailUiModel
-import io.legado.app.eink.engine.BookDetailEngine
-import io.legado.app.eink.engine.BookHandle
-import io.legado.app.eink.engine.PrefetchResult
+import io.legado.app.eink.contract.BookDetailUiModel
+import io.legado.app.eink.contract.BookDetailEngine
+import io.legado.app.eink.contract.BookHandle
+import io.legado.app.eink.contract.PrefetchResult
 import io.legado.app.help.book.BookHelp
 import io.legado.app.help.book.addType
 import io.legado.app.help.book.isLocal

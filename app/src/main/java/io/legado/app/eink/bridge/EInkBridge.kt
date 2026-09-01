@@ -1,10 +1,10 @@
 package io.legado.app.eink.bridge
 
 import android.content.Context
-import io.legado.app.eink.engine.EInkEngineRegistry
-import io.legado.app.eink.engine.EInkKeyEventHub
-import io.legado.app.eink.engine.GlobalSettings
-import io.legado.app.eink.settings.EInkSettings
+import io.legado.app.eink.contract.EInkEngineRegistry
+import io.legado.app.eink.contract.EInkKeyEventHub
+import io.legado.app.eink.contract.GlobalSettings
+import io.legado.app.eink.contract.EInkSettings
 import io.legado.app.domain.gateway.OtherSettingsGateway
 import io.legado.app.domain.gateway.ReadSettingsGateway
 import io.legado.app.constant.PreferKey
@@ -20,7 +20,7 @@ import org.koin.core.component.inject
 /**
  * E-Ink 引擎桥接层装配入口。
  *
- * 宿主侧唯一职责：把 app 引擎能力以 [io.legado.app.eink.engine] 端口
+ * 宿主侧唯一职责：把 app 引擎能力以 [io.legado.app.eink.contract] 端口
  * 实现的形式提供给 :modules:eink。E-Ink 入口 Activity onCreate 中调用
  * [install]（必须早于任何 E-Ink Composable 组合）。
  *

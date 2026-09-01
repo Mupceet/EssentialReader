@@ -49,6 +49,7 @@ import io.legado.app.eink.feature.common.prefetchCovers
 import io.legado.app.eink.designsystem.content.EInkInfoRow
 import io.legado.app.eink.designsystem.refresh.EInkRefreshIntent
 import io.legado.app.eink.designsystem.refresh.LocalEInkRefreshController
+import io.legado.app.eink.contract.SearchBookUiModel
 import kotlinx.coroutines.launch
 
 /**

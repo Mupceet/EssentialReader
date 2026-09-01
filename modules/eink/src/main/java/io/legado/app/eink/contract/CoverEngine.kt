@@ -1,4 +1,4 @@
-package io.legado.app.eink.engine
+package io.legado.app.eink.contract
 
 import coil3.request.ImageRequest
 

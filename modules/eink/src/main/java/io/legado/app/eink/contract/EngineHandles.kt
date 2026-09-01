@@ -1,4 +1,4 @@
-package io.legado.app.eink.engine
+package io.legado.app.eink.contract
 
 /**
  * 引擎实体的不透明句柄。

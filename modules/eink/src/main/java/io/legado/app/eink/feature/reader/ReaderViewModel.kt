@@ -8,12 +8,13 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import io.legado.app.eink.R
 import io.legado.app.eink.arch.UserMessage
-import io.legado.app.eink.engine.BookPrepResult
-import io.legado.app.eink.engine.EInkEngineRegistry
-import io.legado.app.eink.engine.EInkPageSnapshot
-import io.legado.app.eink.engine.ReaderBookSnapshot
-import io.legado.app.eink.engine.ReaderEngineCallback
-import io.legado.app.eink.settings.EInkSettings
+import io.legado.app.eink.contract.BookPrepResult
+import io.legado.app.eink.contract.EInkEngineRegistry
+import io.legado.app.eink.contract.EInkPageSnapshot
+import io.legado.app.eink.contract.ReaderBookSnapshot
+import io.legado.app.eink.contract.ReaderEngineCallback
+import io.legado.app.eink.contract.EInkSettings
+import io.legado.app.eink.contract.ReaderTextStyle
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -29,26 +30,6 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
 
-/** 排版参数快照（渲染 + 设置面板双用途）。 */
-data class ReaderTextStyle(
-    val textSize: Int = 20,            // sp
-    val letterSpacing: Float = 0.1f,   // em
-    val indentChars: Int = 2,          // 缩进字符数
-    val lineSpacing: Int = 12,         // x0.1 倍行高
-    val paragraphSpacing: Int = 2,     // x0.1 行高
-    val paddingLeft: Int = 16,         // 正文左边距 dp
-    val paddingTop: Int = 6,           // 正文上边距 dp
-    val paddingRight: Int = 16,        // 正文右边距 dp
-    val paddingBottom: Int = 6,        // 正文下边距 dp
-    val headerPaddingLeft: Int = 16,   // 页眉左边距 dp
-    val headerPaddingTop: Int = 0,     // 页眉上边距 dp
-    val headerPaddingRight: Int = 16,  // 页眉右边距 dp
-    val headerPaddingBottom: Int = 0,  // 页眉下边距 dp
-    val footerPaddingLeft: Int = 16,   // 页脚左边距 dp
-    val footerPaddingTop: Int = 6,     // 页脚上边距 dp
-    val footerPaddingRight: Int = 16,  // 页脚右边距 dp
-    val footerPaddingBottom: Int = 6,  // 页脚下边距 dp
-)
 
 /**
  * 阅读器 UiState。
@@ -107,7 +88,7 @@ data class ReaderUiState(
 /**
  * 阅读器 ViewModel。
  *
- * 桥接引擎全局状态机（经 [io.legado.app.eink.engine.ReaderEngine] 端口）
+ * 桥接引擎全局状态机（经 [io.legado.app.eink.contract.ReaderEngine] 端口）
  * 到 Compose StateFlow：
  * - 复用 View 版渲染引擎（宿主 ChapterProvider 排版产物经映射器转为
  *   EInkPageSnapshot 快照进入状态，绘制由模块画布完成）；

@@ -1,4 +1,4 @@
-package io.legado.app.eink.engine
+package io.legado.app.eink.contract
 
 /**
  * E-Ink 引擎端口注册表（service locator）。

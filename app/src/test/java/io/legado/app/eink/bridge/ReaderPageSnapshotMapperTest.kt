@@ -3,8 +3,8 @@ package io.legado.app.eink.bridge
 import android.app.Application
 import android.graphics.Bitmap
 import io.legado.app.data.entities.Book
-import io.legado.app.eink.engine.ReaderPaintSpec
-import io.legado.app.eink.engine.ReaderShadowSpec
+import io.legado.app.eink.contract.ReaderPaintSpec
+import io.legado.app.eink.contract.ReaderShadowSpec
 import io.legado.app.ui.book.read.page.entities.TextLine
 import io.legado.app.ui.book.read.page.entities.TextPage
 import io.legado.app.ui.book.read.page.entities.column.BaseColumn

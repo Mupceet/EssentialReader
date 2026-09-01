@@ -26,7 +26,7 @@ import coil3.request.crossfade
 import io.legado.app.eink.designsystem.theme.EInkShapes
 import io.legado.app.eink.designsystem.theme.EInkTheme
 import io.legado.app.eink.designsystem.widget.EInkAsyncImage
-import io.legado.app.eink.engine.EInkEngineRegistry
+import io.legado.app.eink.contract.EInkEngineRegistry
 
 /** 封面尺寸（与 View 版 item_bookshelf_list.xml 一致：66dp × 90dp）。 */
 val EInkCoverWidth = 66.dp

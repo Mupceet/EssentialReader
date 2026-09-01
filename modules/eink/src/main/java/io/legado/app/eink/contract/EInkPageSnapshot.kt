@@ -1,4 +1,4 @@
-package io.legado.app.eink.engine
+package io.legado.app.eink.contract
 
 import android.graphics.Bitmap
 import android.graphics.Typeface

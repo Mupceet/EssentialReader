@@ -1,6 +1,5 @@
-package io.legado.app.eink.engine
+package io.legado.app.eink.contract
 
-import io.legado.app.eink.feature.bookdetail.BookDetailUiModel
 
 /** 详情页目录预取结果。 */
 sealed interface PrefetchResult {

@@ -3,7 +3,7 @@ package io.legado.app.eink.bridge
 import androidx.compose.runtime.mutableStateOf
 import coil3.request.ImageRequest
 import io.legado.app.domain.gateway.CoverSettingsGateway
-import io.legado.app.eink.engine.CoverEngine
+import io.legado.app.eink.contract.CoverEngine
 import io.legado.app.help.coil.CoverExtras
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject

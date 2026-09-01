@@ -44,6 +44,7 @@ import io.legado.app.eink.feature.common.EInkBookCover
 import io.legado.app.eink.feature.common.EInkCoverHeight
 import io.legado.app.eink.feature.common.EInkCoverWidth
 import io.legado.app.eink.designsystem.content.EInkInfoRow
+import io.legado.app.eink.contract.ShelfBookUiModel
 
 /**
  * 网格最小格宽门槛（GridCells.Adaptive 的 minSize）。

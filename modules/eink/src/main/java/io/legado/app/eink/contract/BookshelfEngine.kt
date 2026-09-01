@@ -1,6 +1,5 @@
-package io.legado.app.eink.engine
+package io.legado.app.eink.contract
 
-import io.legado.app.eink.feature.bookshelf.ShelfBookUiModel
 import kotlinx.coroutines.flow.Flow
 
 /** 单本书目录刷新结果（驱动 VM 侧 ShelfBench 统计）。 */

@@ -13,11 +13,11 @@ import io.legado.app.domain.usecase.BookSearchRequest
 import io.legado.app.domain.usecase.BookSearchControl
 import io.legado.app.domain.usecase.SearchBooksUseCase
 import io.legado.app.domain.usecase.SearchRunEvent
-import io.legado.app.eink.engine.SearchEngine
-import io.legado.app.eink.engine.SearchSession
-import io.legado.app.eink.engine.SearchSessionCallback
-import io.legado.app.eink.feature.search.SearchBookUiModel
-import io.legado.app.eink.feature.search.SearchHistoryUiModel
+import io.legado.app.eink.contract.SearchEngine
+import io.legado.app.eink.contract.SearchSession
+import io.legado.app.eink.contract.SearchSessionCallback
+import io.legado.app.eink.contract.SearchBookUiModel
+import io.legado.app.eink.contract.SearchHistoryUiModel
 import io.legado.app.help.book.isNotShelf
 import io.legado.app.help.config.AppConfig
 import kotlinx.coroutines.CoroutineScope

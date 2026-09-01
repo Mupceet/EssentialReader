@@ -1,4 +1,4 @@
-package io.legado.app.eink.settings
+package io.legado.app.eink.contract
 
 import android.content.Context
 import android.content.SharedPreferences
