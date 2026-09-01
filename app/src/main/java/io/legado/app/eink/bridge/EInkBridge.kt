@@ -7,8 +7,8 @@ import io.legado.app.eink.contract.GlobalSettings
 import io.legado.app.eink.contract.EInkSettings
 import io.legado.app.domain.gateway.OtherSettingsGateway
 import io.legado.app.domain.gateway.ReadSettingsGateway
+import io.legado.app.domain.gateway.DownloadCacheSettingsGateway
 import io.legado.app.constant.PreferKey
-import io.legado.app.help.config.AppConfig
 import io.legado.app.help.config.AppConfigStore
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -58,13 +58,16 @@ internal val einkSettingsWriteScope =
 /**
  * 全局设置视图。
  *
- * threadCount/preDownloadNum 走宿主 @Deprecated 同步门面
- * （"settings" DataStore 的 AppConfigStore 内存快照，主线程零 IO），
- * 无 Gateway 等价物；fontScaleSetting 走 AppConfigStore 同步快照
- * （attach 期配置，写入后 recreate 入口 Activity 才生效）；
- * autoRefreshBook/defaultToRead（「我的」页可写）经 OtherSettingsGateway、
- * volumeKeyPage 经 ReadSettingsGateway、changeSourceCheckAuthor 经
- * ChangeSourceSettingsGateway 读写。
+ * threadCount/preDownloadNum 经 DownloadCacheSettingsGateway（与旧 AppConfig
+ * 门面同键同默认值的快照）；autoRefreshBook/defaultToRead（「我的」页可写）经
+ * OtherSettingsGateway、volumeKeyPage 经 ReadSettingsGateway、changeSourceCheckAuthor
+ * 经 ChangeSourceSettingsGateway 读写；useDefaultCover 见 CoverEngineImpl（快照状态 +
+ * CoverSettingsGateway）。
+ *
+ * fontScaleSetting 例外地仍走 AppConfigStore 同步快照（护栏允许——禁的是
+ * AppConfig/ui.config.*Config）：端口契约的 null = 未设置/跟随系统缩放语义在域模型中
+ * 不存在（AppShellSettings.fontScale 非空，仓库把未设置映射为 10），且写入需支持
+ * remove 键；域化须先把该字段 nullable 化并处理完整模式读方与主题导出，另行专项。
  */
 private object GlobalSettingsImpl : GlobalSettings, KoinComponent {
 
@@ -75,7 +78,10 @@ private object GlobalSettingsImpl : GlobalSettings, KoinComponent {
 
     private val readSettingsGateway: ReadSettingsGateway by inject()
 
-    override val threadCount: Int get() = AppConfig.threadCount
+    private val downloadCacheSettingsGateway: DownloadCacheSettingsGateway by inject()
+
+    override val threadCount: Int
+        get() = downloadCacheSettingsGateway.currentSettings.threadCount
 
     override var fontScaleSetting: Int?
         get() = AppConfigStore.getInt(PreferKey.fontScale)
@@ -111,7 +117,8 @@ private object GlobalSettingsImpl : GlobalSettings, KoinComponent {
             }
         }
 
-    override val preDownloadNum: Int get() = AppConfig.preDownloadNum
+    override val preDownloadNum: Int
+        get() = downloadCacheSettingsGateway.currentSettings.preDownloadNum
     override val changeSourceCheckAuthor: Boolean
         get() = changeSourceSettingsGateway.currentSettings.checkAuthor
 
