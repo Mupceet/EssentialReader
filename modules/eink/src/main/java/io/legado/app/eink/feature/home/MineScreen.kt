@@ -52,7 +52,6 @@ internal fun MineScreen(
 ) {
     val globalSettings = EInkEngineRegistry.globalSettings
     val fontScale = globalSettings.fontScaleSetting
-    val coverEngine = EInkEngineRegistry.coverEngine
     var autoRefresh by remember { mutableStateOf(globalSettings.autoRefreshBook) }
     var defaultToRead by remember { mutableStateOf(globalSettings.defaultToRead) }
     var volumeKeyPage by remember { mutableStateOf(globalSettings.volumeKeyPage) }
@@ -101,9 +100,9 @@ internal fun MineScreen(
             description = "总是显示默认封面（不显示网络封面）",
             // 端口 getter 由宿主快照状态背书：此处读取订阅变化，切换后
             // 开关行与书架/详情可见封面立即重组，无需本地乐观状态
-            checked = coverEngine.useDefaultCover,
+            checked = globalSettings.useDefaultCover,
             onToggle = {
-                coverEngine.useDefaultCover = !coverEngine.useDefaultCover
+                globalSettings.useDefaultCover = !globalSettings.useDefaultCover
             }
         )
         EInkHorizontalDivider()

@@ -157,7 +157,7 @@ Coil3 直接坐标、去掉 kotlin-android 插件、Java 21）。下表是本仓
   unresolved，回退该 API 的保守写法（改动收敛在模块内，两边同时受益）。
 - **图片加载**：模块与宿主共用 Coil 3 单例 ImageLoader（`EInkAsyncImage` /
   封面组件经 `CoverEngine.coverRequestOptions` 取得宿主策略：书源 origin
-  头、目标尺寸、默认封面开关）。目标上游若用 Glide 等其它栈，桥接层
+  头、目标尺寸；「总是使用默认封面」开关在 GlobalSettings.useDefaultCover）。目标上游若用 Glide 等其它栈，桥接层
   `CoverEngine` 实现内完成请求策略映射，模块不感知。
 - **资源合并**：模块 res 全部资源名以 `eink_` 前缀开头（含 29 个图标，
   均为模块自有副本），与任何宿主 res 零同名——合并时不会被宿主同名资源

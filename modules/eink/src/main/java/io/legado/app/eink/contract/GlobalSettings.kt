@@ -38,6 +38,17 @@ interface GlobalSettings {
     var volumeKeyPage: Boolean
 
     /**
+     * 总是使用默认封面（与完整模式封面设置共享同一存储键）。
+     *
+     * 可写（「我的」页开关）：读取由宿主的 Compose 快照状态背书——组合内
+     * 读取订阅变化，切换后开关行与书架/详情可见封面立即重组（与
+     * [autoRefreshBook] 等的写后读不保证可见语义不同）；写入同步更新状态、
+     * 异步落盘。宿主在入口 install 时与设置快照对齐（防跨模式往返后的
+     * 陈旧值）。
+     */
+    var useDefaultCover: Boolean
+
+    /**
      * 图片绘制抗锯齿（OtherSettings.antiAlias，与完整模式共享同一开关）。
      * 阅读页图片画笔取用；引擎文字画笔恒抗锯齿，不受本项影响。
      */

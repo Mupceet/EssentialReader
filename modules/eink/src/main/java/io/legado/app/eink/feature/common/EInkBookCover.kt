@@ -93,10 +93,9 @@ fun EInkBookCover(
     height: Dp = EInkCoverHeight,
     sourceOrigin: String? = null,
 ) {
-    val coverEngine = EInkEngineRegistry.coverEngine
     // 单点 clip：加载图与占位共用同一圆角轮廓（draw 阶段裁剪，静态单帧）
     val coverModifier = modifier.clip(EInkShapes.medium)
-    if (url.isNullOrBlank() || coverEngine.useDefaultCover) {
+    if (url.isNullOrBlank() || EInkEngineRegistry.globalSettings.useDefaultCover) {
         EInkDefaultCover(name = name, author = author, modifier = coverModifier)
         return
     }
