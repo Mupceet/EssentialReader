@@ -32,7 +32,7 @@
 - **`ReaderTextStyle.kt`** — 排版参数快照：设置面板编辑 →
   `ReaderEngine.applyStyle` 整体写入宿主配置；`currentStyle()` 读回。
   字段单位与编辑区间见文件头 KDoc。
-- **各页 UiModel** — `ShelfBookUiModel` / `BookDetailUiModel` /
+- **各页 UiModel** — `BookshelfItemUiModel` / `BookDetailUiModel` /
   `SearchBookUiModel` + `SearchHistoryUiModel` / `TocBookUiModel` +
   `ChapterUiModel` / `ChangeSourceBookUiModel` + `ChangeSourceResultUiModel`：
   宿主把实体映射为稳定展示快照，计算（作者清洗、未读数、简介 trim 等）

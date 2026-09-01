@@ -44,7 +44,7 @@ import io.legado.app.eink.feature.common.EInkBookCover
 import io.legado.app.eink.feature.common.EInkCoverHeight
 import io.legado.app.eink.feature.common.EInkCoverWidth
 import io.legado.app.eink.designsystem.content.EInkInfoRow
-import io.legado.app.eink.contract.ShelfBookUiModel
+import io.legado.app.eink.contract.BookshelfItemUiModel
 
 /**
  * 网格最小格宽门槛（GridCells.Adaptive 的 minSize）。
@@ -96,7 +96,7 @@ internal val EInkGridCoverHeight =
 fun BookshelfScreen(
     state: BookshelfUiState,
     onBookClick: (String) -> Unit,
-    onBookLongClick: (ShelfBookUiModel) -> Unit,
+    onBookLongClick: (BookshelfItemUiModel) -> Unit,
     listState: LazyListState = rememberLazyListState(),
     gridState: LazyGridState = rememberLazyGridState(),
     onPageUp: () -> Unit = {},
@@ -130,10 +130,10 @@ fun BookshelfScreen(
 
 @Composable
 private fun BookList(
-    books: List<ShelfBookUiModel>,
+    books: List<BookshelfItemUiModel>,
     updatingBookUrls: Set<String>,
     onBookClick: (String) -> Unit,
-    onBookLongClick: (ShelfBookUiModel) -> Unit,
+    onBookLongClick: (BookshelfItemUiModel) -> Unit,
     listState: LazyListState,
     onPageUp: () -> Unit,
     onPageDown: () -> Unit
@@ -176,10 +176,10 @@ private fun BookList(
  */
 @Composable
 private fun BookGrid(
-    books: List<ShelfBookUiModel>,
+    books: List<BookshelfItemUiModel>,
     updatingBookUrls: Set<String>,
     onBookClick: (String) -> Unit,
-    onBookLongClick: (ShelfBookUiModel) -> Unit,
+    onBookLongClick: (BookshelfItemUiModel) -> Unit,
     gridState: LazyGridState,
     onPageUp: () -> Unit,
     onPageDown: () -> Unit
@@ -225,10 +225,10 @@ private fun BookGrid(
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun BookGridItem(
-    book: ShelfBookUiModel,
+    book: BookshelfItemUiModel,
     isUpdating: Boolean,
     onBookClick: (String) -> Unit,
-    onBookLongClick: (ShelfBookUiModel) -> Unit
+    onBookLongClick: (BookshelfItemUiModel) -> Unit
 ) {
     val unreadCount = book.unreadCount
     Column(
@@ -296,10 +296,10 @@ private fun BookGridItem(
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun BookListItem(
-    book: ShelfBookUiModel,
+    book: BookshelfItemUiModel,
     isUpdating: Boolean,
     onBookClick: (String) -> Unit,
-    onBookLongClick: (ShelfBookUiModel) -> Unit
+    onBookLongClick: (BookshelfItemUiModel) -> Unit
 ) {
     val unreadCount = book.unreadCount
     Row(

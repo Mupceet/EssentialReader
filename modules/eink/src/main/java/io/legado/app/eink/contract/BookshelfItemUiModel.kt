@@ -17,7 +17,7 @@ import io.legado.app.eink.arch.EInkImmutable
  *    风暴与整页翻页中零重组）。
  */
 @EInkImmutable
-data class ShelfBookUiModel(
+data class BookshelfItemUiModel(
     /** 书籍唯一键：点击回调与刷新中（updating）标记的匹配键。 */
     val bookUrl: String,
     val name: String,
