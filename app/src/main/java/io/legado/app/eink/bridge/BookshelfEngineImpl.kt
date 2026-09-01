@@ -6,7 +6,7 @@ import io.legado.app.data.appDb
 import io.legado.app.data.entities.Book
 import io.legado.app.data.entities.BookGroup
 import io.legado.app.data.entities.BookSource
-import io.legado.app.eink.contract.ShelfBookUiModel
+import io.legado.app.eink.contract.BookshelfItemUiModel
 import io.legado.app.eink.contract.BookshelfEngine
 import io.legado.app.eink.contract.BookTocRefreshResult
 import io.legado.app.help.book.BookHelp
@@ -36,8 +36,8 @@ import kotlin.math.min
  */
 internal object BookshelfEngineImpl : BookshelfEngine {
 
-    /** [Book] → [ShelfBookUiModel]：条目渲染字段的唯一抽取点。 */
-    private fun Book.toShelfBookUiModel() = ShelfBookUiModel(
+    /** [Book] → [BookshelfItemUiModel]：条目渲染字段的唯一抽取点。 */
+    private fun Book.toBookshelfItemUiModel() = BookshelfItemUiModel(
         bookUrl = bookUrl,
         name = name,
         author = author,
@@ -50,18 +50,18 @@ internal object BookshelfEngineImpl : BookshelfEngine {
         hasNewChapter = lastCheckCount > 0,
     )
 
-    override fun observeShelf(): Flow<List<ShelfBookUiModel>> =
+    override fun observeShelf(): Flow<List<BookshelfItemUiModel>> =
         appDb.bookDao.flowByGroup(BookGroup.IdAll)
-            .map { books -> books.map { it.toShelfBookUiModel() } }
+            .map { books -> books.map { it.toBookshelfItemUiModel() } }
 
     override suspend fun deleteNotShelfBooks() {
         appDb.bookDao.deleteNotShelfBook()
     }
 
-    override suspend fun updatableShelfBooks(): List<ShelfBookUiModel> =
+    override suspend fun updatableShelfBooks(): List<BookshelfItemUiModel> =
         appDb.bookDao.flowByGroup(BookGroup.IdAll).first()
             .filter { !it.isLocal && it.canUpdate }
-            .map { it.toShelfBookUiModel() }
+            .map { it.toBookshelfItemUiModel() }
 
     override suspend fun refreshBookToc(bookUrl: String): BookTocRefreshResult {
         val book = appDb.bookDao.getBook(bookUrl) ?: return BookTocRefreshResult.NO_BOOK

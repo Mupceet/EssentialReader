@@ -10,7 +10,7 @@ import io.legado.app.eink.contract.BookTocRefreshResult
 import io.legado.app.eink.contract.EInkEngineRegistry
 import io.legado.app.eink.contract.EInkSettings
 import io.legado.app.eink.util.onEachParallel
-import io.legado.app.eink.contract.ShelfBookUiModel
+import io.legado.app.eink.contract.BookshelfItemUiModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -35,11 +35,11 @@ import kotlin.math.min
 /**
  * 书架屏幕 UiState（扁平布尔标志位，参考 JBusDriver UDF 模式）。
  *
- * [books] 为预抽取的稳定 UiModel（[ShelfBookUiModel]），条目参数
+ * [books] 为预抽取的稳定 UiModel（[BookshelfItemUiModel]），条目参数
  * 全稳定类型且数据未变时可跳过重组。
  */
 data class BookshelfUiState(
-    val books: List<ShelfBookUiModel> = emptyList(),
+    val books: List<BookshelfItemUiModel> = emptyList(),
     val isLoading: Boolean = true,
     /** 目录刷新进行中（首页头部刷新按钮禁用并置灰） */
     val isRefreshing: Boolean = false,
@@ -214,7 +214,7 @@ class BookshelfViewModel(application: Application) : AndroidViewModel(applicatio
      * 更新一本书的目录（管线在宿主 bridge）：此处只保留
      * updating 标记与 ShelfBench 统计/日志。
      */
-    private suspend fun updateToc(bookUrl: String, books: List<ShelfBookUiModel>) {
+    private suspend fun updateToc(bookUrl: String, books: List<BookshelfItemUiModel>) {
         _updatingUrls.update { it + bookUrl }
         val benchStart = SystemClock.elapsedRealtime()
         val benchCur = benchInFlight.incrementAndGet()

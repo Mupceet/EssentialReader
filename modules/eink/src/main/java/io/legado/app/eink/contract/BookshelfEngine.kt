@@ -18,13 +18,13 @@ enum class BookTocRefreshResult {
 interface BookshelfEngine {
 
     /** 书架全量书籍流（Room flowByGroup(IdAll) + UiModel 映射）。 */
-    fun observeShelf(): Flow<List<ShelfBookUiModel>>
+    fun observeShelf(): Flow<List<BookshelfItemUiModel>>
 
     /** 物理删除 notShelf 隐藏行（进入首页时清理，对齐 View 版）。 */
     suspend fun deleteNotShelfBooks()
 
     /** 本次待刷新目录的书（非本地且可更新）。 */
-    suspend fun updatableShelfBooks(): List<ShelfBookUiModel>
+    suspend fun updatableShelfBooks(): List<BookshelfItemUiModel>
 
     /**
      * 刷新单本书目录（阻塞至该书完成；不抛异常，结果经
