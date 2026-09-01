@@ -3,7 +3,7 @@ package io.legado.app.eink.contract
 import kotlinx.coroutines.flow.Flow
 
 /** 单本书目录刷新结果（驱动 VM 侧 ShelfBench 统计）。 */
-enum class BookTocRefreshResult {
+enum class BookshelfTocRefreshResult {
     OK, NO_BOOK, NO_SOURCE, ERROR
 }
 
@@ -28,10 +28,10 @@ interface BookshelfEngine {
 
     /**
      * 刷新单本书目录（阻塞至该书完成；不抛异常，结果经
-     * [BookTocRefreshResult] 返回）。内部含失败标记 updateError 与
+     * [BookshelfTocRefreshResult] 返回）。内部含失败标记 updateError 与
      * 预缓存入队。
      */
-    suspend fun refreshBookToc(bookUrl: String): BookTocRefreshResult
+    suspend fun refreshBookToc(bookUrl: String): BookshelfTocRefreshResult
 
     /** 预缓存队列是否有任务（CacheBook.isRun）。 */
     val isCacheRunning: Boolean
