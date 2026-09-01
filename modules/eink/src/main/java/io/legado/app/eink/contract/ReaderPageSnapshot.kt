@@ -15,7 +15,7 @@ import androidx.compose.runtime.Stable
  * 实例构建后引用不可变；映射方交出所有权后不得再修改内部数组与列表。每次 pageVersion 变化构建一次（无逐帧开销）。
  */
 @Stable
-class EInkPageSnapshot(
+class ReaderPageSnapshot(
     /** 页所属章节标题（页眉/状态展示）。 */
     val title: String,
     /** 阅读进度文本。 */
@@ -25,16 +25,16 @@ class EInkPageSnapshot(
     /** 正文行画笔规格。 */
     val contentSpec: ReaderPaintSpec,
     /** 文本行（非文本列如评论列不进入）。 */
-    val lines: List<EInkSnapshotLine>,
+    val lines: List<ReaderPageLine>,
     /** 图片槽位。 */
-    val images: List<EInkImageSlot>,
+    val images: List<ReaderImageSlot>,
 )
 
 /** 单文本行：chunks[i] 绘制于 x[i]，基线 baseY；x 与 chunks 等长。 */
 @Stable
-class EInkSnapshotLine(
+class ReaderPageLine(
     val baseY: Float,
-    /** true = 使用 [EInkPageSnapshot.titleSpec] 的画笔规格。 */
+    /** true = 使用 [ReaderPageSnapshot.titleSpec] 的画笔规格。 */
     val isTitle: Boolean,
     val chunks: List<String>,
     val x: FloatArray,
@@ -46,7 +46,7 @@ class EInkSnapshotLine(
  * [loader] 由宿主闭包提供（含位图解析与异常吞并，失败返回 null）；
  * 铺满/等比居中的矩形数学在模块画布完成（需位图实际尺寸，仅绘制期可得）。
  */
-class EInkImageSlot(
+class ReaderImageSlot(
     val x0: Float,
     val x1: Float,
     val lineTop: Float,

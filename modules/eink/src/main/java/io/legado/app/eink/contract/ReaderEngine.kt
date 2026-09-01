@@ -18,11 +18,11 @@ data class ReaderTipSpec(
 )
 
 /** 阅读前置数据准备结果（详情拉取 + 目录入库管线）。 */
-sealed interface BookPrepResult {
-    data object Success : BookPrepResult
-    data object NoSource : BookPrepResult
-    data class InfoFailure(val cause: Throwable) : BookPrepResult
-    data class TocFailure(val cause: Throwable) : BookPrepResult
+sealed interface ReaderPrepResult {
+    data object Success : ReaderPrepResult
+    data object NoSource : ReaderPrepResult
+    data class InfoFailure(val cause: Throwable) : ReaderPrepResult
+    data class TocFailure(val cause: Throwable) : ReaderPrepResult
 }
 
 /**
@@ -45,7 +45,7 @@ interface ReaderEngineCallback {
  * 阅读器端口：宿主 ReadBook 全局状态机 + ChapterProvider 排版引擎的
  * 转发面。E-Ink 阅读页 VM 通过本端口驱动引擎并接收状态推送；
  * 排版参数以 [ReaderTextStyle] 快照整体写入（内部映射宿主 ReadBookConfig
- * 各字段），排版产物经宿主映射为 [EInkPageSnapshot] 快照进入模块状态。
+ * 各字段），排版产物经宿主映射为 [ReaderPageSnapshot] 快照进入模块状态。
  */
 interface ReaderEngine {
 
@@ -81,7 +81,7 @@ interface ReaderEngine {
     val currentChapterPageSize: Int
 
     /** 当前页（durPageIndex 对应页；未就绪返回 null）。 */
-    fun currentPage(): EInkPageSnapshot?
+    fun currentPage(): ReaderPageSnapshot?
 
     // ---- 会话控制 ----
 
@@ -105,7 +105,7 @@ interface ReaderEngine {
      * 补齐阅读前置数据（网络书缺 tocUrl 先拉详情；目录缺失/本地书变更
      * 重新拉取目录并入库，含重定向替换）。不抛异常。
      */
-    suspend fun prepareBookData(book: BookHandle): BookPrepResult
+    suspend fun prepareBookData(book: BookHandle): ReaderPrepResult
 
     // ---- 翻页 ----
 
