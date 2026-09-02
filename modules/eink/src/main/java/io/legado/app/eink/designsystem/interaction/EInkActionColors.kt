@@ -52,16 +52,19 @@ fun eInkActionColors(
             contentColor = scheme.disabledContent,
             secondaryContentColor = scheme.disabledContent,
         )
+
         pressed -> EInkActionColors(
             containerColor = scheme.onSurface,
             contentColor = scheme.surface,
             secondaryContentColor = scheme.surface,
         )
+
         selected -> EInkActionColors(
             containerColor = scheme.selected,
             contentColor = scheme.selectedContent,
             secondaryContentColor = scheme.selectedContent,
         )
+
         else -> EInkActionColors(
             containerColor = Color.Transparent,
             contentColor = scheme.onSurface,

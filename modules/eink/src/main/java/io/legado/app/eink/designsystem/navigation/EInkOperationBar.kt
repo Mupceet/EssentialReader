@@ -16,8 +16,8 @@ import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import io.legado.app.eink.designsystem.theme.EInkSpacing
 import io.legado.app.eink.designsystem.content.EInkHorizontalDivider
+import io.legado.app.eink.designsystem.theme.EInkSpacing
 
 /**
  * 操作栏槽位可用宽度（Dp）：由 [EInkOperationBar] 以实测布局约束提供

@@ -69,8 +69,9 @@ class ImmediatePressState internal constructor(
                         val event: PointerEvent = awaitPointerEvent()
                         if (event.changes.all { !it.pressed }) {
                             released = true
-                            heldMillis = (event.changes.lastOrNull()?.uptimeMillis ?: down.uptimeMillis) -
-                                down.uptimeMillis
+                            heldMillis =
+                                (event.changes.lastOrNull()?.uptimeMillis ?: down.uptimeMillis) -
+                                        down.uptimeMillis
                             break
                         }
                         if (event.changes.any { it.isConsumed }) break

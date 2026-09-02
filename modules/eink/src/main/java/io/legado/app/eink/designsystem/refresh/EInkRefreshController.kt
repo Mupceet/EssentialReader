@@ -1,6 +1,7 @@
 package io.legado.app.eink.designsystem.refresh
 
 import androidx.compose.runtime.staticCompositionLocalOf
+import io.legado.app.eink.designsystem.refresh.NoOpRefreshController.requestRefresh
 
 /**
  * 刷新调度入口（规范 §67 Refresh-aware Rendering）。

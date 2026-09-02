@@ -7,7 +7,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -43,23 +42,23 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import io.legado.app.eink.R
+import io.legado.app.eink.contract.ChapterUiModel
 import io.legado.app.eink.designsystem.content.EInkLoading
+import io.legado.app.eink.designsystem.content.EInkText
+import io.legado.app.eink.designsystem.interaction.eInkActionColors
+import io.legado.app.eink.designsystem.interaction.einkClickable
+import io.legado.app.eink.designsystem.interaction.rememberImmediatePressState
 import io.legado.app.eink.designsystem.navigation.EInkOperationBar
 import io.legado.app.eink.designsystem.navigation.EInkOperationBarIcon
 import io.legado.app.eink.designsystem.navigation.EInkPageArrows
-import io.legado.app.eink.designsystem.content.EInkText
 import io.legado.app.eink.designsystem.navigation.EInkTopBar
-import io.legado.app.eink.designsystem.interaction.eInkActionColors
-import io.legado.app.eink.designsystem.pager.rememberEInkListPagerState
 import io.legado.app.eink.designsystem.pager.EInkPageSwipe
-import io.legado.app.eink.designsystem.interaction.rememberImmediatePressState
-import io.legado.app.eink.designsystem.interaction.einkClickable
+import io.legado.app.eink.designsystem.pager.rememberEInkListPagerState
+import io.legado.app.eink.designsystem.refresh.EInkRefreshIntent
+import io.legado.app.eink.designsystem.refresh.LocalEInkRefreshController
 import io.legado.app.eink.designsystem.theme.EInkShapes
 import io.legado.app.eink.designsystem.theme.EInkSpacing
 import io.legado.app.eink.designsystem.theme.EInkTheme
-import io.legado.app.eink.designsystem.refresh.EInkRefreshIntent
-import io.legado.app.eink.designsystem.refresh.LocalEInkRefreshController
-import io.legado.app.eink.contract.ChapterUiModel
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
@@ -342,7 +341,12 @@ private fun ChapterList(
  * 未缓存章节显示云端图标。
  */
 @Composable
-private fun ChapterItem(chapter: ChapterUiModel, isCurrent: Boolean, cached: Boolean, onClick: () -> Unit) {
+private fun ChapterItem(
+    chapter: ChapterUiModel,
+    isCurrent: Boolean,
+    cached: Boolean,
+    onClick: () -> Unit
+) {
     val scheme = EInkTheme.colorScheme
     val press = rememberImmediatePressState()
     val colors = eInkActionColors(pressed = press.isPressed)
@@ -399,7 +403,6 @@ private fun ChapterItem(chapter: ChapterUiModel, isCurrent: Boolean, cached: Boo
 }
 
 
-
 // ====================================================================
 // 右侧快速滑动手柄
 // ====================================================================
@@ -439,8 +442,9 @@ private fun FastScrollHandle(
                         val usable = trackHeightPx - thumbHeightPx
                         if (usable > 0 && lastIndex > 0) {
                             val current = listState.firstVisibleItemIndex.toFloat() / lastIndex
-                            val target = ((current + dragAmount / usable).coerceIn(0f, 1f) * lastIndex)
-                                .roundToInt()
+                            val target =
+                                ((current + dragAmount / usable).coerceIn(0f, 1f) * lastIndex)
+                                    .roundToInt()
                             onScrub(target)
                         }
                     },

@@ -3,6 +3,13 @@ package io.legado.app.eink.designsystem.theme
 import androidx.compose.runtime.Stable
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import io.legado.app.eink.designsystem.theme.EInkSpacing.l
+import io.legado.app.eink.designsystem.theme.EInkSpacing.m
+import io.legado.app.eink.designsystem.theme.EInkSpacing.s
+import io.legado.app.eink.designsystem.theme.EInkSpacing.xl
+import io.legado.app.eink.designsystem.theme.EInkSpacing.xs
+import io.legado.app.eink.designsystem.theme.EInkSpacing.xxl
+import io.legado.app.eink.designsystem.theme.EInkSpacing.xxs
 
 /**
  * Standard spacing scale for E-Ink optimized layouts.

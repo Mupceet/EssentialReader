@@ -6,9 +6,9 @@ import androidx.lifecycle.viewModelScope
 import io.legado.app.eink.R
 import io.legado.app.eink.arch.UserMessage
 import io.legado.app.eink.contract.BookHandle
-import io.legado.app.eink.contract.EInkEngineRegistry
 import io.legado.app.eink.contract.ChangeSourceBookUiModel
 import io.legado.app.eink.contract.ChangeSourceResultUiModel
+import io.legado.app.eink.contract.EInkEngineRegistry
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.coroutineScope
@@ -27,6 +27,7 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.math.min
+import kotlin.time.Duration.Companion.milliseconds
 
 /**
  * 换源 UiState。
@@ -109,8 +110,13 @@ class ChangeSourceViewModel(application: Application) : AndroidViewModel(applica
                     launch {
                         semaphore.withPermit {
                             try {
-                                withTimeout(SEARCH_TIMEOUT_MS) {
-                                    engine.searchSourceBook(source, book.name, book.author, checkAuthor)
+                                withTimeout(SEARCH_TIMEOUT_MS.milliseconds) {
+                                    engine.searchSourceBook(
+                                        source,
+                                        book.name,
+                                        book.author,
+                                        checkAuthor
+                                    )
                                         .forEach { searchBook ->
                                             if (searchBook.bookUrl != book.bookUrl) {
                                                 onSearchSuccess(searchBook)

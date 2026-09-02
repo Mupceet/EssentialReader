@@ -18,10 +18,10 @@ import androidx.lifecycle.ViewModelStoreOwner
 import androidx.lifecycle.viewmodel.CreationExtras
 import androidx.lifecycle.viewmodel.MutableCreationExtras
 import androidx.lifecycle.viewmodel.compose.LocalViewModelStoreOwner
-import io.legado.app.eink.feature.bookdetail.BookDetailRoute
-import io.legado.app.eink.feature.changesource.ChangeSourceRoute
 import io.legado.app.eink.debug.ComponentGalleryRoute
 import io.legado.app.eink.debug.ThemeDebugRoute
+import io.legado.app.eink.feature.bookdetail.BookDetailRoute
+import io.legado.app.eink.feature.changesource.ChangeSourceRoute
 import io.legado.app.eink.feature.home.FontScaleSettingsRoute
 import io.legado.app.eink.feature.home.HomeRoute
 import io.legado.app.eink.feature.reader.ReaderRoute
@@ -101,35 +101,37 @@ fun EInkApp(
                 )
             } else {
                 // 其余界面统一避让系统栏（Edge-to-Edge 下系统栏透明覆盖在背景上）
-                Box(modifier = Modifier.fillMaxSize().safeDrawingPadding()) {
+                Box(modifier = Modifier
+                    .fillMaxSize()
+                    .safeDrawingPadding()) {
                     when (screen) {
-                is EInkScreen.Home -> {
-                    HomeRoute(
-                        onBookClick = { bookUrl ->
-                            // 书架点击直接进入阅读
-                            controller.navigate(EInkScreen.Reader(bookUrl))
-                        },
-                        onBookLongClick = { book ->
-                            // 长按进详情页（对齐 View 版书架交互）
-                            controller.navigate(
-                                EInkScreen.BookDetail(book.name, book.author, book.bookUrl)
+                        is EInkScreen.Home -> {
+                            HomeRoute(
+                                onBookClick = { bookUrl ->
+                                    // 书架点击直接进入阅读
+                                    controller.navigate(EInkScreen.Reader(bookUrl))
+                                },
+                                onBookLongClick = { book ->
+                                    // 长按进详情页（对齐 View 版书架交互）
+                                    controller.navigate(
+                                        EInkScreen.BookDetail(book.name, book.author, book.bookUrl)
+                                    )
+                                },
+                                onSearch = { controller.navigate(EInkScreen.Search) },
+                                // 完整模式（View UI）退出由宿主实现：恢复原主题并跳转
+                                // 完整模式首页（导入导出等管理功能在完整模式中完成）
+                                onOpenFullMode = onExitToFullMode,
+                                onOpenFontScale = {
+                                    controller.navigate(EInkScreen.FontScaleSettings)
+                                },
+                                onOpenThemeDebug = {
+                                    controller.navigate(EInkScreen.ThemeDebug)
+                                },
+                                onOpenComponentGallery = {
+                                    controller.navigate(EInkScreen.ComponentGallery)
+                                },
                             )
-                        },
-                        onSearch = { controller.navigate(EInkScreen.Search) },
-                        // 完整模式（View UI）退出由宿主实现：恢复原主题并跳转
-                        // 完整模式首页（导入导出等管理功能在完整模式中完成）
-                        onOpenFullMode = onExitToFullMode,
-                        onOpenFontScale = {
-                            controller.navigate(EInkScreen.FontScaleSettings)
-                        },
-                        onOpenThemeDebug = {
-                            controller.navigate(EInkScreen.ThemeDebug)
-                        },
-                        onOpenComponentGallery = {
-                            controller.navigate(EInkScreen.ComponentGallery)
-                        },
-                    )
-                }
+                        }
 
                         is EInkScreen.Search -> {
                             SearchRoute(

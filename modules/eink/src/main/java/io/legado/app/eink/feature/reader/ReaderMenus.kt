@@ -19,7 +19,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
@@ -32,18 +31,18 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import io.legado.app.eink.R
+import io.legado.app.eink.contract.ReaderTextStyle
 import io.legado.app.eink.designsystem.content.EInkHorizontalDivider
+import io.legado.app.eink.designsystem.content.EInkText
+import io.legado.app.eink.designsystem.control.EInkSteppedSlider
+import io.legado.app.eink.designsystem.interaction.eInkActionColors
+import io.legado.app.eink.designsystem.interaction.einkClickable
+import io.legado.app.eink.designsystem.interaction.rememberImmediatePressState
 import io.legado.app.eink.designsystem.navigation.EInkOperationBarIcon
 import io.legado.app.eink.designsystem.navigation.EInkTopBar
-import io.legado.app.eink.designsystem.control.EInkSteppedSlider
-import io.legado.app.eink.designsystem.content.EInkText
-import io.legado.app.eink.designsystem.interaction.eInkActionColors
-import io.legado.app.eink.designsystem.interaction.rememberImmediatePressState
-import io.legado.app.eink.designsystem.interaction.einkClickable
 import io.legado.app.eink.designsystem.theme.EInkShapes
 import io.legado.app.eink.designsystem.theme.EInkSpacing
 import io.legado.app.eink.designsystem.theme.EInkTheme
-import io.legado.app.eink.contract.ReaderTextStyle
 import kotlin.math.roundToInt
 
 /** 设置面板类型（UI 局部状态，见 Route 中的 remember）。 */

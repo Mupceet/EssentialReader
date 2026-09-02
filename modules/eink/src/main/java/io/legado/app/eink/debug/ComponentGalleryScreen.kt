@@ -29,7 +29,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import io.legado.app.eink.R
-import io.legado.app.eink.feature.common.EInkBookCover
 import io.legado.app.eink.designsystem.content.EInkHorizontalDivider
 import io.legado.app.eink.designsystem.content.EInkInfoRow
 import io.legado.app.eink.designsystem.content.EInkLoading
@@ -50,10 +49,10 @@ import io.legado.app.eink.designsystem.pager.EInkPageSwipe
 import io.legado.app.eink.designsystem.pager.rememberEInkListPagerState
 import io.legado.app.eink.designsystem.refresh.EInkRefreshIntent
 import io.legado.app.eink.designsystem.refresh.LocalEInkRefreshController
-import io.legado.app.eink.designsystem.theme.EInkGrayscale
 import io.legado.app.eink.designsystem.theme.EInkShapes
 import io.legado.app.eink.designsystem.theme.EInkSpacing
 import io.legado.app.eink.designsystem.theme.EInkTheme
+import io.legado.app.eink.feature.common.EInkBookCover
 import kotlinx.coroutines.launch
 
 /**
@@ -329,7 +328,9 @@ private fun DemoTile(
 
 @Composable
 private fun ContentSamples() {
-    Column(modifier = Modifier.fillMaxWidth().padding(horizontal = EInkSpacing.m)) {
+    Column(modifier = Modifier
+        .fillMaxWidth()
+        .padding(horizontal = EInkSpacing.m)) {
         EInkText(text = "titleLarge 标题样式", style = EInkTheme.typography.titleLarge)
         EInkText(
             text = "bodyMedium 正文样式：可读性优先，14sp 下限。",
@@ -366,7 +367,9 @@ private fun SliderSample() {
     // 拖动仅更新预览值，抬手 onValueChangeFinished 才提交（recreate 类设置范式）
     var preview by remember { mutableIntStateOf(SliderDefault) }
     var committed by rememberSaveable { mutableIntStateOf(SliderDefault) }
-    Column(modifier = Modifier.fillMaxWidth().padding(horizontal = EInkSpacing.m)) {
+    Column(modifier = Modifier
+        .fillMaxWidth()
+        .padding(horizontal = EInkSpacing.m)) {
         EInkSteppedSlider(
             value = preview,
             onValueChange = { preview = it },
@@ -536,7 +539,9 @@ private fun PagerSample() {
     val currentPage = pager.pageStart / pageSize + 1
     val pageCount = ((items.size - 1) / pageSize) + 1
 
-    Column(modifier = Modifier.fillMaxWidth().height(PagerDemoHeight)) {
+    Column(modifier = Modifier
+        .fillMaxWidth()
+        .height(PagerDemoHeight)) {
         LazyColumn(
             state = pager.listState,
             userScrollEnabled = false,

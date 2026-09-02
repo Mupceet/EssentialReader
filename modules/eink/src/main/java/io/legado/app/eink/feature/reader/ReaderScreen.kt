@@ -2,6 +2,7 @@ package io.legado.app.eink.feature.reader
 
 import android.app.Activity
 import android.view.KeyEvent
+import android.view.WindowManager
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
@@ -33,11 +34,10 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
-import io.legado.app.eink.designsystem.content.EInkText
 import io.legado.app.eink.contract.EInkEngineRegistry
+import io.legado.app.eink.designsystem.content.EInkText
 import io.legado.app.eink.designsystem.interaction.einkClickable
 import io.legado.app.eink.designsystem.theme.EInkTheme
-import android.view.WindowManager
 
 /**
  * 阅读 Route — ViewModel 感知层。
@@ -104,16 +104,19 @@ fun ReaderRoute(
                             if (event.repeatCount == 0) viewModel.prevPage()
                             true
                         }
+
                         KeyEvent.KEYCODE_VOLUME_DOWN -> {
                             if (event.repeatCount == 0) viewModel.nextPage()
                             true
                         }
+
                         else -> false
                     }
                     // 消费抬起，保证按键对整体被吞掉
                     KeyEvent.ACTION_UP ->
                         event.keyCode == KeyEvent.KEYCODE_VOLUME_UP ||
-                            event.keyCode == KeyEvent.KEYCODE_VOLUME_DOWN
+                                event.keyCode == KeyEvent.KEYCODE_VOLUME_DOWN
+
                     else -> false
                 }
             }
@@ -193,26 +196,32 @@ fun ReaderRoute(
                     .padding(bottom = ReaderBottomBarInset)
             ) {
                 when (current) {
-                ReaderPanel.LAYOUT -> ReaderPanelContainer(title = "排版设置", onClose = onClose) {
-                    ReaderLayoutPanel(
-                        style = uiState.style,
-                        onSetTextSize = viewModel::setTextSize,
-                        onSetLetterSpacing = viewModel::setLetterSpacing,
-                        onSetIndent = viewModel::setIndent,
-                        onSetLineSpacing = viewModel::setLineSpacing,
-                        onSetParagraphSpacing = viewModel::setParagraphSpacing,
-                        // 排版面板保留（不置空 panel），返回键回到排版展开态
-                        onOpenMargins = { showMarginDialog = true },
-                    )
-                }
+                    ReaderPanel.LAYOUT -> ReaderPanelContainer(
+                        title = "排版设置",
+                        onClose = onClose
+                    ) {
+                        ReaderLayoutPanel(
+                            style = uiState.style,
+                            onSetTextSize = viewModel::setTextSize,
+                            onSetLetterSpacing = viewModel::setLetterSpacing,
+                            onSetIndent = viewModel::setIndent,
+                            onSetLineSpacing = viewModel::setLineSpacing,
+                            onSetParagraphSpacing = viewModel::setParagraphSpacing,
+                            // 排版面板保留（不置空 panel），返回键回到排版展开态
+                            onOpenMargins = { showMarginDialog = true },
+                        )
+                    }
 
-                    ReaderPanel.OTHER -> ReaderPanelContainer(title = "其它设置", onClose = onClose) {
-                    ReaderOtherPanel(
-                        state = uiState,
-                        onToggleKeepScreenOn = viewModel::toggleKeepScreenOn,
-                        onToggleTextBold = viewModel::toggleTextBold,
-                        onAdjustAutoInterval = viewModel::adjustAutoPlayInterval,
-                    )
+                    ReaderPanel.OTHER -> ReaderPanelContainer(
+                        title = "其它设置",
+                        onClose = onClose
+                    ) {
+                        ReaderOtherPanel(
+                            state = uiState,
+                            onToggleKeepScreenOn = viewModel::toggleKeepScreenOn,
+                            onToggleTextBold = viewModel::toggleTextBold,
+                            onAdjustAutoInterval = viewModel::adjustAutoPlayInterval,
+                        )
                     }
 
                     ReaderPanel.CACHE -> ReaderPanelContainer(title = "缓存", onClose = onClose) {
@@ -342,7 +351,8 @@ internal fun ReaderScreen(
                                 if (state.controlsVisible) {
                                     onCenterTap() // 收起操作条，不翻页
                                 } else {
-                                    val slop = EInkEngineRegistry.readerEngine.pageTouchSlop.toFloat()
+                                    val slop =
+                                        EInkEngineRegistry.readerEngine.pageTouchSlop.toFloat()
                                     when {
                                         lastDelta * dragAccum < 0f -> Unit // 回拖取消
                                         dragAccum < -slop -> onNextPage()

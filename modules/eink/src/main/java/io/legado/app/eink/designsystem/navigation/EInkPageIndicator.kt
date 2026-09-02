@@ -3,8 +3,8 @@ package io.legado.app.eink.designsystem.navigation
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import io.legado.app.eink.designsystem.theme.EInkSpacing
 import io.legado.app.eink.designsystem.content.EInkText
+import io.legado.app.eink.designsystem.theme.EInkSpacing
 import io.legado.app.eink.designsystem.theme.EInkTheme
 
 /**
