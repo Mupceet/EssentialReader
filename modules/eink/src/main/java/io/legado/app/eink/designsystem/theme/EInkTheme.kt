@@ -12,6 +12,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalCursorBlinkEnabled
 import androidx.compose.ui.text.TextStyle
 import io.legado.app.eink.designsystem.interaction.NoIndication
+import io.legado.app.eink.designsystem.theme.EInkTheme.colorScheme
+import io.legado.app.eink.designsystem.theme.EInkTheme.contentColor
+import io.legado.app.eink.designsystem.theme.EInkTheme.typography
 
 /**
  * E-Ink color scheme variants.
@@ -109,6 +112,7 @@ private fun resolveColorScheme(
     val palette = when (variant) {
         EInkColorVariant.HighContrast ->
             if (darkTheme) EInkColors.DarkHighContrast else EInkColors.HighContrast
+
         EInkColorVariant.Grayscale ->
             if (darkTheme) EInkColors.DarkGrayscale else EInkColors.Grayscale
     }

@@ -29,24 +29,24 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import io.legado.app.eink.R
+import io.legado.app.eink.contract.ChangeSourceResultUiModel
 import io.legado.app.eink.designsystem.content.EInkHorizontalDivider
 import io.legado.app.eink.designsystem.content.EInkInfoRow
 import io.legado.app.eink.designsystem.content.EInkLoading
 import io.legado.app.eink.designsystem.content.EInkText
+import io.legado.app.eink.designsystem.interaction.eInkActionColors
+import io.legado.app.eink.designsystem.interaction.einkClickable
+import io.legado.app.eink.designsystem.interaction.rememberImmediatePressState
 import io.legado.app.eink.designsystem.navigation.EInkOperationBar
 import io.legado.app.eink.designsystem.navigation.EInkOperationBarIcon
 import io.legado.app.eink.designsystem.navigation.EInkPageArrows
 import io.legado.app.eink.designsystem.navigation.EInkTopBar
-import io.legado.app.eink.designsystem.interaction.eInkActionColors
-import io.legado.app.eink.designsystem.interaction.einkClickable
-import io.legado.app.eink.designsystem.interaction.rememberImmediatePressState
 import io.legado.app.eink.designsystem.pager.EInkPageSwipe
 import io.legado.app.eink.designsystem.pager.rememberEInkListPagerState
 import io.legado.app.eink.designsystem.refresh.EInkRefreshIntent
 import io.legado.app.eink.designsystem.refresh.LocalEInkRefreshController
 import io.legado.app.eink.designsystem.theme.EInkSpacing
 import io.legado.app.eink.designsystem.theme.EInkTheme
-import io.legado.app.eink.contract.ChangeSourceResultUiModel
 import kotlinx.coroutines.launch
 
 /** 当前源左侧实心标记尺寸（▮，规范 §42 列表行持久选中，同目录页“在读”标记）。 */
@@ -204,6 +204,7 @@ internal fun ChangeSourceScreen(
                     modifier = Modifier.fillMaxSize(),
                 )
             }
+
             state.isEmpty -> CenterMessage("未找到其它书源")
             else -> SourceList(
                 state = state,

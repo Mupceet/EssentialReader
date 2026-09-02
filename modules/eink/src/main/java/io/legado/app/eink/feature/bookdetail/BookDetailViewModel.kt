@@ -5,10 +5,10 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import io.legado.app.eink.R
 import io.legado.app.eink.arch.UserMessage
-import io.legado.app.eink.contract.BookHandle
-import io.legado.app.eink.contract.EInkEngineRegistry
 import io.legado.app.eink.contract.BookDetailPrefetchResult
 import io.legado.app.eink.contract.BookDetailUiModel
+import io.legado.app.eink.contract.BookHandle
+import io.legado.app.eink.contract.EInkEngineRegistry
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -129,6 +129,7 @@ class BookDetailViewModel(application: Application) : AndroidViewModel(applicati
                     bookHandle = result.handle
                     _uiState.update { it.copy(book = result.model) }
                 }
+
                 BookDetailPrefetchResult.Skipped -> Unit
             }
         }

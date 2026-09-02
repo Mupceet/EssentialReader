@@ -10,10 +10,15 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.size
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.layout
@@ -25,14 +30,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.isFinite
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberUpdatedState
-import androidx.compose.runtime.setValue
-import io.legado.app.eink.designsystem.theme.EInkShapes
 import io.legado.app.eink.designsystem.content.EInkText
+import io.legado.app.eink.designsystem.theme.EInkShapes
 import io.legado.app.eink.designsystem.theme.EInkTheme
 import kotlin.math.abs
 import kotlin.math.roundToInt
@@ -115,6 +114,7 @@ fun EInkSteppedSlider(
                 if (!enabled || steps <= 0) return@pointerInput
                 val touchSlop = viewConfiguration.touchSlop
                 val thumbWidth = ThumbWidth.toPx()
+
                 // x 坐标 → 档位:滑块中心对齐档位位置,两端档位时滑块贴边
                 fun valueAt(xPx: Float): Int {
                     val travel = (size.width - thumbWidth).coerceAtLeast(0f)
@@ -136,7 +136,7 @@ fun EInkSteppedSlider(
                     val stepWidth = if (steps > 0) travel / steps else 0f
                     val thumbLeft = stepWidth * (current - start)
                     val onThumb = down.position.x >= thumbLeft &&
-                        down.position.x <= thumbLeft + thumbWidth
+                            down.position.x <= thumbLeft + thumbWidth
                     val downStep = valueAt(down.position.x)
                     var lastEmitted = current
                     if (!onThumb && downStep != current) {
@@ -161,6 +161,7 @@ fun EInkSteppedSlider(
                                         rejected = true
                                         break
                                     }
+
                                     abs(dx) > touchSlop -> isDragging = true
                                     else -> continue
                                 }

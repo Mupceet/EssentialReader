@@ -8,12 +8,12 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import io.legado.app.eink.R
 import io.legado.app.eink.arch.UserMessage
-import io.legado.app.eink.contract.ReaderPrepResult
 import io.legado.app.eink.contract.EInkEngineRegistry
-import io.legado.app.eink.contract.ReaderPageSnapshot
+import io.legado.app.eink.contract.EInkSettings
 import io.legado.app.eink.contract.ReaderBookSnapshot
 import io.legado.app.eink.contract.ReaderEngineCallback
-import io.legado.app.eink.contract.EInkSettings
+import io.legado.app.eink.contract.ReaderPageSnapshot
+import io.legado.app.eink.contract.ReaderPrepResult
 import io.legado.app.eink.contract.ReaderTextStyle
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
@@ -96,7 +96,8 @@ data class ReaderUiState(
  *   阅读配置）；
  * - 通过实现 [ReaderEngineCallback] 接收引擎状态推送。
  */
-class ReaderViewModel(application: Application) : AndroidViewModel(application), ReaderEngineCallback {
+class ReaderViewModel(application: Application) : AndroidViewModel(application),
+    ReaderEngineCallback {
 
     private val engine get() = EInkEngineRegistry.readerEngine
 
@@ -154,9 +155,10 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application),
             val session = engine.sessionBook
             val book = when {
                 session != null && resolved != null &&
-                    session.bookUrl != resolved.bookUrl &&
-                    session.name == resolved.name &&
-                    session.author == resolved.author -> session
+                        session.bookUrl != resolved.bookUrl &&
+                        session.name == resolved.name &&
+                        session.author == resolved.author -> session
+
                 resolved != null -> resolved
                 else -> session
             }
@@ -196,15 +198,23 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application),
                     _uiState.update { it.copy(isLoading = false, error = "没有书源") }
                     return@launch
                 }
+
                 is ReaderPrepResult.InfoFailure -> {
                     _uiState.update { state ->
-                        state.copy(isLoading = false, error = "详情页出错：${prep.cause.localizedMessage}")
+                        state.copy(
+                            isLoading = false,
+                            error = "详情页出错：${prep.cause.localizedMessage}"
+                        )
                     }
                     return@launch
                 }
+
                 is ReaderPrepResult.TocFailure -> {
                     _uiState.update { state ->
-                        state.copy(isLoading = false, error = "目录加载失败：${prep.cause.localizedMessage}")
+                        state.copy(
+                            isLoading = false,
+                            error = "目录加载失败：${prep.cause.localizedMessage}"
+                        )
                     }
                     return@launch
                 }
@@ -359,6 +369,7 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application),
                     _uiState.update { it.copy(inBookshelf = true) }
                     _messages.emit(UserMessage.from(R.string.eink_added_to_bookshelf))
                 }
+
                 false -> _messages.emit(UserMessage.from(R.string.eink_operation_failed))
                 null -> Unit
             }
@@ -370,7 +381,8 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application),
     // 钳制在本地完成后以快照整体经端口写回，由 applyLayoutStyle /
     // applyStyleOnly 持久化。
 
-    fun setTextSize(value: Int) = applyLayoutStyle { it.copy(textSize = value.coerceIn(MIN_TEXT_SIZE, MAX_TEXT_SIZE)) }
+    fun setTextSize(value: Int) =
+        applyLayoutStyle { it.copy(textSize = value.coerceIn(MIN_TEXT_SIZE, MAX_TEXT_SIZE)) }
 
     /** 字距按 0.05 步进索引设置（0..[LETTER_SPACING_STEPS]），避免浮点累加漂移。 */
     fun setLetterSpacing(step: Int) = applyLayoutStyle {

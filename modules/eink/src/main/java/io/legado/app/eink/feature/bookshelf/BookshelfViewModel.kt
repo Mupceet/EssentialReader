@@ -6,16 +6,15 @@ import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import io.legado.app.eink.arch.UserMessage
+import io.legado.app.eink.contract.BookshelfItemUiModel
 import io.legado.app.eink.contract.BookshelfTocRefreshResult
 import io.legado.app.eink.contract.EInkEngineRegistry
 import io.legado.app.eink.contract.EInkSettings
 import io.legado.app.eink.util.onEachParallel
-import io.legado.app.eink.contract.BookshelfItemUiModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.isActive
 import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -27,9 +26,9 @@ import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import java.util.concurrent.atomic.AtomicInteger
-import kotlin.coroutines.coroutineContext
 import kotlin.math.min
 
 /**
@@ -141,7 +140,10 @@ class BookshelfViewModel(application: Application) : AndroidViewModel(applicatio
                 refresh("auto")
             }
         }
-        Log.i(TAG, "EInk VM init autoRefreshBook=${settings.autoRefreshBook} threadCount=${settings.threadCount}")
+        Log.i(
+            TAG,
+            "EInk VM init autoRefreshBook=${settings.autoRefreshBook} threadCount=${settings.threadCount}"
+        )
     }
 
     /**
@@ -166,7 +168,10 @@ class BookshelfViewModel(application: Application) : AndroidViewModel(applicatio
             try {
                 val books = engine.updatableShelfBooks()
                 val concurrency = min(settings.threadCount, MAX_REFRESH_CONCURRENCY)
-                Log.i(TAG, "EInk refresh start trigger=$trigger scope=${books.size} concurrency=$concurrency")
+                Log.i(
+                    TAG,
+                    "EInk refresh start trigger=$trigger scope=${books.size} concurrency=$concurrency"
+                )
                 books.asFlow()
                     .onEachParallel(concurrency) { book ->
                         updateToc(book.bookUrl, books)
@@ -178,7 +183,7 @@ class BookshelfViewModel(application: Application) : AndroidViewModel(applicatio
                     Log.i(
                         TAG,
                         "EInk refresh end elapsedMs=${SystemClock.elapsedRealtime() - benchStart} " +
-                            "ok=${benchOk.get()} err=${benchErr.get()} peakInFlight=$benchPeak"
+                                "ok=${benchOk.get()} err=${benchErr.get()} peakInFlight=$benchPeak"
                     )
                     // 无论正常完成还是被取消/失败，都启动预缓存泵处理已入队
                     // 章节，避免重复点击刷新导致上一轮已入队任务被遗留
@@ -234,8 +239,8 @@ class BookshelfViewModel(application: Application) : AndroidViewModel(applicatio
             Log.i(
                 TAG,
                 "EInk book done name=<$benchName> result=$benchResult " +
-                    "inFlight=${benchInFlight.get()} " +
-                    "elapsedMs=${SystemClock.elapsedRealtime() - benchStart} url=$bookUrl"
+                        "inFlight=${benchInFlight.get()} " +
+                        "elapsedMs=${SystemClock.elapsedRealtime() - benchStart} url=$bookUrl"
             )
             _updatingUrls.update { it - bookUrl }
         }

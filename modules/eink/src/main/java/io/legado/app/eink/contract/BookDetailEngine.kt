@@ -7,7 +7,8 @@ sealed interface BookDetailPrefetchResult {
     data object Skipped : BookDetailPrefetchResult
 
     /** 预取完成：书籍可能被详情/重定向更新，返回新句柄与展示模型。 */
-    data class Updated(val handle: BookHandle, val model: BookDetailUiModel) : BookDetailPrefetchResult
+    data class Updated(val handle: BookHandle, val model: BookDetailUiModel) :
+        BookDetailPrefetchResult
 }
 
 /**
@@ -20,7 +21,11 @@ sealed interface BookDetailPrefetchResult {
 interface BookDetailEngine {
 
     /** 按导航参数查找书籍（书架优先，其次搜索记录），找不到返回 null。 */
-    suspend fun findBook(name: String, author: String, bookUrl: String): Pair<BookHandle, BookDetailUiModel>?
+    suspend fun findBook(
+        name: String,
+        author: String,
+        bookUrl: String
+    ): Pair<BookHandle, BookDetailUiModel>?
 
     /** 读取书籍当前展示数据（DB 最新，null = 已不存在）。 */
     suspend fun loadBookDetail(bookUrl: String): BookDetailUiModel?

@@ -23,10 +23,10 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import coil3.request.ImageRequest
 import coil3.request.crossfade
+import io.legado.app.eink.contract.EInkEngineRegistry
 import io.legado.app.eink.designsystem.theme.EInkShapes
 import io.legado.app.eink.designsystem.theme.EInkTheme
 import io.legado.app.eink.designsystem.widget.EInkAsyncImage
-import io.legado.app.eink.contract.EInkEngineRegistry
 
 /** 封面尺寸（与 View 版 item_bookshelf_list.xml 一致：66dp × 90dp）。 */
 val EInkCoverWidth = 66.dp
@@ -108,7 +108,7 @@ fun EInkBookCover(
     // 请求实例按入参 remember：重组间保持同一 ImageRequest，避免请求被
     // 反复重建。crossfade(false) 显式关闭：宿主单例 ImageLoader 全局开
     // crossfade，与墨水屏零动画规范冲突，必须逐请求覆盖
-    val model: Any? = remember(context, url, sourceOrigin, targetWidthPx, targetHeightPx) {
+    val model: Any = remember(context, url, sourceOrigin, targetWidthPx, targetHeightPx) {
         buildEInkCoverRequest(context, url, sourceOrigin, targetWidthPx, targetHeightPx)
     }
 
@@ -197,7 +197,7 @@ private fun EInkDefaultCover(
                     val authorCharHeight = authorPaint.fontMetrics.let { it.bottom - it.top }
                     val authorText = author.orEmpty()
                     var authorY = viewHeight * 0.8f -
-                        (authorText.length - 1).coerceAtLeast(0) * authorCharHeight
+                            (authorText.length - 1).coerceAtLeast(0) * authorCharHeight
                     authorY = authorY.coerceAtLeast(viewHeight * 0.2f)
                     val authorDraws = authorText.map { char ->
                         val draw = Triple(char.toString(), viewWidth * 0.84f, authorY)

@@ -4,6 +4,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Stable
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.unit.dp
+import io.legado.app.eink.designsystem.theme.EInkShapes.large
+import io.legado.app.eink.designsystem.theme.EInkShapes.medium
+import io.legado.app.eink.designsystem.theme.EInkShapes.none
+import io.legado.app.eink.designsystem.theme.EInkShapes.small
 
 /**
  * Corner-radius scale for E-Ink optimized UI.

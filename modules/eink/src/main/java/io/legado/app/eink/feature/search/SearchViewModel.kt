@@ -4,10 +4,10 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import io.legado.app.eink.contract.EInkEngineRegistry
-import io.legado.app.eink.contract.SearchSession
-import io.legado.app.eink.contract.SearchSessionCallback
 import io.legado.app.eink.contract.SearchBookUiModel
 import io.legado.app.eink.contract.SearchHistoryUiModel
+import io.legado.app.eink.contract.SearchSession
+import io.legado.app.eink.contract.SearchSessionCallback
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow

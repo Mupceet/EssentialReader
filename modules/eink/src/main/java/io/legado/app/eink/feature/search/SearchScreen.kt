@@ -5,8 +5,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -30,15 +30,18 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import io.legado.app.eink.R
-
+import io.legado.app.eink.contract.SearchBookUiModel
 import io.legado.app.eink.designsystem.content.EInkHorizontalDivider
+import io.legado.app.eink.designsystem.content.EInkInfoRow
+import io.legado.app.eink.designsystem.content.EInkText
+import io.legado.app.eink.designsystem.control.EInkSearchInputBar
 import io.legado.app.eink.designsystem.navigation.EInkOperationBar
 import io.legado.app.eink.designsystem.navigation.EInkOperationBarIcon
 import io.legado.app.eink.designsystem.navigation.EInkPageArrows
 import io.legado.app.eink.designsystem.pager.EInkPageSwipe
-import io.legado.app.eink.designsystem.control.EInkSearchInputBar
-import io.legado.app.eink.designsystem.content.EInkText
 import io.legado.app.eink.designsystem.pager.rememberEInkListPagerState
+import io.legado.app.eink.designsystem.refresh.EInkRefreshIntent
+import io.legado.app.eink.designsystem.refresh.LocalEInkRefreshController
 import io.legado.app.eink.designsystem.theme.EInkSpacing
 import io.legado.app.eink.designsystem.theme.EInkTheme
 import io.legado.app.eink.feature.common.EInkBookCover
@@ -46,10 +49,6 @@ import io.legado.app.eink.feature.common.EInkCoverHeight
 import io.legado.app.eink.feature.common.EInkCoverWidth
 import io.legado.app.eink.feature.common.coverTargetSizePx
 import io.legado.app.eink.feature.common.prefetchCovers
-import io.legado.app.eink.designsystem.content.EInkInfoRow
-import io.legado.app.eink.designsystem.refresh.EInkRefreshIntent
-import io.legado.app.eink.designsystem.refresh.LocalEInkRefreshController
-import io.legado.app.eink.contract.SearchBookUiModel
 import kotlinx.coroutines.launch
 
 /**
@@ -173,6 +172,7 @@ fun SearchRoute(
                     onPageUp = pageUp,
                     onPageDown = pageDown
                 )
+
                 uiState.showEmpty -> CenterMessage("无搜索结果")
                 uiState.history.isNotEmpty() -> HistoryList(
                     state = uiState,
@@ -182,6 +182,7 @@ fun SearchRoute(
                     onPageUp = pageUp,
                     onPageDown = pageDown
                 )
+
                 else -> CenterMessage("输入书名开始搜索")
             }
         }

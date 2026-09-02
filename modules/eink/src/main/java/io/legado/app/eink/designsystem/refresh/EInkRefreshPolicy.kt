@@ -53,15 +53,15 @@ object DefaultEInkRefreshPolicy : EInkRefreshPolicy {
         EInkRefreshIntent.ContentStable -> EInkRefreshTier.Stable
         EInkRefreshIntent.Interactive,
         EInkRefreshIntent.TextInput,
-        -> if (profile.supportsFastRefresh) EInkRefreshTier.Interactive else EInkRefreshTier.Stable
+            -> if (profile.supportsFastRefresh) EInkRefreshTier.Interactive else EInkRefreshTier.Stable
 
         EInkRefreshIntent.PageTurn -> EInkRefreshTier.PageTurn
         EInkRefreshIntent.Navigation,
         EInkRefreshIntent.Overlay,
-        -> EInkRefreshTier.Stable
+            -> EInkRefreshTier.Stable
 
         EInkRefreshIntent.FullRedraw,
         EInkRefreshIntent.ClearGhosting,
-        -> if (profile.supportsFullRefresh) EInkRefreshTier.FullRedraw else EInkRefreshTier.Stable
+            -> if (profile.supportsFullRefresh) EInkRefreshTier.FullRedraw else EInkRefreshTier.Stable
     }
 }

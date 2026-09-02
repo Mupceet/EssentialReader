@@ -19,14 +19,13 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
-import io.legado.app.eink.designsystem.content.EInkText
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -35,7 +34,10 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import io.legado.app.eink.R
+import io.legado.app.eink.contract.BookshelfItemUiModel
+import io.legado.app.eink.designsystem.content.EInkInfoRow
 import io.legado.app.eink.designsystem.content.EInkLoading
+import io.legado.app.eink.designsystem.content.EInkText
 import io.legado.app.eink.designsystem.pager.EInkPageSwipe
 import io.legado.app.eink.designsystem.theme.EInkShapes
 import io.legado.app.eink.designsystem.theme.EInkSpacing
@@ -43,8 +45,6 @@ import io.legado.app.eink.designsystem.theme.EInkTheme
 import io.legado.app.eink.feature.common.EInkBookCover
 import io.legado.app.eink.feature.common.EInkCoverHeight
 import io.legado.app.eink.feature.common.EInkCoverWidth
-import io.legado.app.eink.designsystem.content.EInkInfoRow
-import io.legado.app.eink.contract.BookshelfItemUiModel
 
 /**
  * 网格最小格宽门槛（GridCells.Adaptive 的 minSize）。
@@ -115,6 +115,7 @@ fun BookshelfScreen(
                 onPageUp = onPageUp,
                 onPageDown = onPageDown
             )
+
             else -> BookList(
                 books = state.books,
                 updatingBookUrls = state.updatingBookUrls,

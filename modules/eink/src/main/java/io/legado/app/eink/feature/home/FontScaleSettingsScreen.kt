@@ -6,7 +6,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -25,16 +24,16 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import io.legado.app.eink.R
-import io.legado.app.eink.designsystem.content.EInkHorizontalDivider
-import io.legado.app.eink.designsystem.navigation.EInkOperationBar
-import io.legado.app.eink.designsystem.navigation.EInkOperationBarIcon
-import io.legado.app.eink.designsystem.control.EInkSteppedSlider
-import io.legado.app.eink.designsystem.content.EInkText
-import io.legado.app.eink.designsystem.interaction.eInkActionColors
 import io.legado.app.eink.contract.EInkEngineRegistry
 import io.legado.app.eink.contract.GlobalSettings
-import io.legado.app.eink.designsystem.interaction.rememberImmediatePressState
+import io.legado.app.eink.designsystem.content.EInkHorizontalDivider
+import io.legado.app.eink.designsystem.content.EInkText
+import io.legado.app.eink.designsystem.control.EInkSteppedSlider
+import io.legado.app.eink.designsystem.interaction.eInkActionColors
 import io.legado.app.eink.designsystem.interaction.einkClickable
+import io.legado.app.eink.designsystem.interaction.rememberImmediatePressState
+import io.legado.app.eink.designsystem.navigation.EInkOperationBar
+import io.legado.app.eink.designsystem.navigation.EInkOperationBarIcon
 import io.legado.app.eink.designsystem.theme.EInkSpacing
 import io.legado.app.eink.designsystem.theme.EInkTheme
 
@@ -90,8 +89,8 @@ fun FontScaleSettingsRoute(onBack: () -> Unit) {
             EInkText(text = "排版是一本书的呼吸", style = EInkTheme.typography.titleMedium)
             EInkText(
                 text = "合适的字号让目光在字里行间从容行走，不必停留，也不必追赶。" +
-                    "拖动下方滑条选择倍率，抬手后整个界面即按新倍率重排，" +
-                    "直到这一段文字读起来最舒服为止。",
+                        "拖动下方滑条选择倍率，抬手后整个界面即按新倍率重排，" +
+                        "直到这一段文字读起来最舒服为止。",
                 style = EInkTheme.typography.bodyLarge,
                 modifier = Modifier.padding(top = EInkSpacing.s)
             )

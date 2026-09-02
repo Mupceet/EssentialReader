@@ -5,7 +5,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -27,6 +26,7 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
@@ -34,23 +34,22 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import io.legado.app.eink.R
+import io.legado.app.eink.designsystem.content.EInkInfoRow
 import io.legado.app.eink.designsystem.content.EInkLoading
+import io.legado.app.eink.designsystem.content.EInkText
 import io.legado.app.eink.designsystem.navigation.EInkOperationBar
 import io.legado.app.eink.designsystem.navigation.EInkOperationBarIcon
 import io.legado.app.eink.designsystem.navigation.EInkPageArrowsWidth
-import io.legado.app.eink.designsystem.navigation.OperationBarIconButtonMaxWidth
-import io.legado.app.eink.designsystem.content.EInkText
 import io.legado.app.eink.designsystem.navigation.EInkTopBar
+import io.legado.app.eink.designsystem.navigation.OperationBarIconButtonMaxWidth
 import io.legado.app.eink.designsystem.pager.EInkPageSwipe
+import io.legado.app.eink.designsystem.refresh.EInkRefreshIntent
+import io.legado.app.eink.designsystem.refresh.LocalEInkRefreshController
 import io.legado.app.eink.designsystem.theme.EInkSpacing
 import io.legado.app.eink.designsystem.theme.EInkTheme
 import io.legado.app.eink.feature.common.EInkBookCover
-import io.legado.app.eink.designsystem.content.EInkInfoRow
-import io.legado.app.eink.designsystem.refresh.EInkRefreshIntent
-import io.legado.app.eink.designsystem.refresh.LocalEInkRefreshController
-import kotlin.math.roundToInt
 import kotlinx.coroutines.launch
-import androidx.compose.ui.res.stringResource
+import kotlin.math.roundToInt
 
 /** 详情页封面宽高比。 */
 private const val CoverAspectRatio = 0.75f
@@ -308,7 +307,8 @@ internal fun BookDetailScreen(
                                     .padding(horizontal = EInkSpacing.m, vertical = EInkSpacing.m)
                             ) {
                                 EInkText(
-                                    text = book.displayIntro?.takeIf { it.isNotBlank() } ?: "暂无简介",
+                                    text = book.displayIntro?.takeIf { it.isNotBlank() }
+                                        ?: "暂无简介",
                                     style = EInkTheme.typography.bodyLarge,
                                     color = EInkTheme.colorScheme.onSurfaceVariant,
                                     modifier = Modifier.padding(top = EInkSpacing.s)
