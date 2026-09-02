@@ -27,12 +27,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import io.legado.app.eink.R
 import io.legado.app.eink.designsystem.content.EInkHorizontalDivider
 import io.legado.app.eink.designsystem.content.EInkInfoRow
 import io.legado.app.eink.designsystem.content.EInkLoading
 import io.legado.app.eink.designsystem.content.EInkText
+import io.legado.app.eink.designsystem.control.EInkDialog
 import io.legado.app.eink.designsystem.control.EInkSearchHintBar
 import io.legado.app.eink.designsystem.control.EInkSearchInputBar
 import io.legado.app.eink.designsystem.control.EInkSteppedSlider
@@ -100,6 +102,10 @@ fun ComponentGalleryRoute(
             item(key = "control-search") {
                 SectionHeader("Control · 搜索条")
                 SearchSamples()
+            }
+            item(key = "control-dialog") {
+                SectionHeader("Control · 对话框（标题 + 内容插槽 + 确认/取消）")
+                DialogSample()
             }
             item(key = "nav-topbar") {
                 SectionHeader("Navigation · 顶栏（内边距动作 / 贴右图标 / 可点击标题）")
@@ -406,6 +412,63 @@ private fun SearchSamples() {
                 )
             }
         )
+    }
+}
+
+@Composable
+private fun DialogSample() {
+    var open by remember { mutableStateOf(false) }
+    var openDisabledConfirm by remember { mutableStateOf(false) }
+
+    // 两个触发按钮各自独立按压态（复用按压反色惯例，不依赖其他 Sample 私件）
+    Column(modifier = Modifier.padding(horizontal = EInkSpacing.m, vertical = EInkSpacing.s)) {
+        Row(horizontalArrangement = Arrangement.spacedBy(EInkSpacing.s)) {
+            SampleTriggerButton(text = "打开演示", onClick = { open = true }, modifier = Modifier.weight(1f))
+            SampleTriggerButton(text = "确认禁用态", onClick = { openDisabledConfirm = true }, modifier = Modifier.weight(1f))
+        }
+    }
+
+    if (open) {
+        EInkDialog(
+            onDismiss = { open = false },
+            title = "演示对话框",
+            onConfirm = { open = false },
+        ) {
+            EInkText(
+                text = "内容插槽：正文、输入行等由调用方组合。",
+                style = EInkTheme.typography.bodyMedium
+            )
+        }
+    }
+    if (openDisabledConfirm) {
+        EInkDialog(
+            onDismiss = { openDisabledConfirm = false },
+            title = "确认禁用态",
+            onConfirm = null,
+        ) {
+            EInkText(
+                text = "确认按钮不可点（弱化描边与文字）。",
+                style = EInkTheme.typography.bodyMedium
+            )
+        }
+    }
+}
+
+/** 预览触发按钮：44dp、描边、按压反色。 */
+@Composable
+private fun SampleTriggerButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    val press = rememberImmediatePressState()
+    val colors = eInkActionColors(pressed = press.isPressed)
+    Box(
+        modifier = modifier
+            .height(44.dp)
+            .then(press.modifier)
+            .background(colors.containerColor, EInkShapes.small)
+            .border(1.dp, EInkTheme.colorScheme.outline, EInkShapes.small)
+            .einkClickable(role = Role.Button, onClick = onClick),
+        contentAlignment = Alignment.Center
+    ) {
+        EInkText(text = text, color = colors.contentColor)
     }
 }
 
