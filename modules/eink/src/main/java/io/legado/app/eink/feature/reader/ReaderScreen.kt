@@ -52,7 +52,8 @@ import io.legado.app.eink.designsystem.theme.EInkTheme
  *
  * 职责：
  * - 按设置保持屏幕常亮；
- * - 返回键：面板 → 控件 → 退出阅读 的逐级回退；
+ * - 返回键：面板 → 控件 → 退出阅读 的逐级回退；面板/弹框外空白区
+ *   点击则一次性收起到干净阅读界面；
  * - 一次性消息 → Toast；
  * - 面板开关为 UI 局部状态（remember），排版数据来自 [ReaderUiState]。
  */
@@ -216,6 +217,13 @@ fun ReaderRoute(
             onRetry = { viewModel.attach(bookUrl) },
         )
 
+        // 面板/弹框外空白区一次性收起：直接回到干净阅读界面
+        // （× 与系统返回、操作条返回仍为逐级回退）
+        val dismissToCleanReading = {
+            panel = null
+            showMarginDialog = false
+            viewModel.hideControls()
+        }
         // 设置面板与阅读内容对齐（Edge-to-Edge 下避免被系统栏遮挡），
         // 底部避开常驻操作条，保持其可见可点；
         // 边距弹框期间面板隐藏（panel 状态保留），关闭弹框后回到展开态
@@ -232,7 +240,8 @@ fun ReaderRoute(
                 when (current) {
                     ReaderPanel.LAYOUT -> ReaderPanelContainer(
                         title = "排版设置",
-                        onClose = onClose
+                        onClose = onClose,
+                        onBackdropClick = dismissToCleanReading,
                     ) {
                         ReaderLayoutPanel(
                             style = uiState.style,
@@ -248,7 +257,8 @@ fun ReaderRoute(
 
                     ReaderPanel.PROGRESS -> ReaderPanelContainer(
                         title = "进度与翻页",
-                        onClose = onClose
+                        onClose = onClose,
+                        onBackdropClick = dismissToCleanReading,
                     ) {
                         ReaderProgressPanel(
                             state = uiState,
@@ -262,7 +272,8 @@ fun ReaderRoute(
 
                     ReaderPanel.OTHER -> ReaderPanelContainer(
                         title = "其它设置",
-                        onClose = onClose
+                        onClose = onClose,
+                        onBackdropClick = dismissToCleanReading,
                     ) {
                         ReaderOtherPanel(
                             state = uiState,
@@ -271,7 +282,11 @@ fun ReaderRoute(
                         )
                     }
 
-                    ReaderPanel.CACHE -> ReaderPanelContainer(title = "缓存", onClose = onClose) {
+                    ReaderPanel.CACHE -> ReaderPanelContainer(
+                        title = "缓存",
+                        onClose = onClose,
+                        onBackdropClick = dismissToCleanReading,
+                    ) {
                         ReaderCachePanel(
                             onCache = { count ->
                                 viewModel.cacheChapters(count)
@@ -302,6 +317,7 @@ fun ReaderRoute(
                 onSetFooterPaddingLeft = viewModel::setFooterPaddingLeft,
                 onSetFooterPaddingRight = viewModel::setFooterPaddingRight,
                 onClose = { showMarginDialog = false },
+                onBackdropClick = dismissToCleanReading,
             )
         }
     }

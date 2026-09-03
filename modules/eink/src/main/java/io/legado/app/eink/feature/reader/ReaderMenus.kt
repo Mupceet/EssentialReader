@@ -312,22 +312,25 @@ private fun PageProgressRow(
  *
  * 不加遮罩色：阅读内容保持可见，调整排版参数时可实时预览效果
  * （参数变化触发的重排会保留旧页面直到新页面就绪，不闪白）。
- * 点击面板外任意区域关闭；零动画直接出现/消失。
+ * 逐级回退（× / 系统返回 / 操作条返回）经 [onClose] 只关本面板；
+ * 点击面板外空白区域经 [onBackdropClick] 一次性收起到干净阅读界面。
+ * 零动画直接出现/消失。
  */
 @Composable
 internal fun ReaderPanelContainer(
     title: String,
     onClose: () -> Unit,
+    onBackdropClick: () -> Unit,
     content: @Composable () -> Unit,
 ) {
     BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
         // 面板内容高度封顶为屏幕 45%，保证正文预览区占多数
         val maxContentHeight = maxHeight * 0.45f
-        // 透明点击区：关闭面板
+        // 透明点击区：一次性收起到干净阅读界面
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .einkClickable(role = Role.Button, onClickLabel = "关闭", onClick = onClose),
+                .einkClickable(role = Role.Button, onClickLabel = "收起菜单", onClick = onBackdropClick),
         )
         Column(
             modifier = Modifier
@@ -439,7 +442,9 @@ internal fun ReaderLayoutPanel(
  * 调整时实时可见效果（档位滑条，逐 dp 可调）。
  *
  * 内含三个 Tab：正文 / 页眉 / 页脚，每个 Tab 各 4 行档位滑条：
- * 上边距、下边距、左边距、右边距。
+ * 上边距、下边距、左边距、右边距。× / 系统返回经 [onClose] 回到
+ * 排版展开态；点击弹框外空白区域经 [onBackdropClick] 一次性收起
+ * 到干净阅读界面。
  */
 @Composable
 internal fun ReaderMarginDialog(
@@ -457,14 +462,15 @@ internal fun ReaderMarginDialog(
     onSetFooterPaddingLeft: (Int) -> Unit,
     onSetFooterPaddingRight: (Int) -> Unit,
     onClose: () -> Unit,
+    onBackdropClick: () -> Unit,
 ) {
     var selectedTab by remember { mutableIntStateOf(0) }
     Box(modifier = Modifier.fillMaxSize()) {
-        // 透明点击区：关闭弹框
+        // 透明点击区：一次性收起到干净阅读界面
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .einkClickable(role = Role.Button, onClickLabel = "关闭", onClick = onClose),
+                .einkClickable(role = Role.Button, onClickLabel = "收起菜单", onClick = onBackdropClick),
         )
         Column(
             modifier = Modifier
