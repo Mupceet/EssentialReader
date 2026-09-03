@@ -293,22 +293,51 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application),
 
     // ==================== 翻页 ====================
 
-    fun nextPage(): Boolean = engine.nextPage()
+    fun nextPage(): Boolean {
+        val moved = engine.nextPage()
+        if (moved) restartAutoPlayCountdown()
+        return moved
+    }
 
-    fun prevPage(): Boolean = engine.prevPage()
+    fun prevPage(): Boolean {
+        val moved = engine.prevPage()
+        if (moved) restartAutoPlayCountdown()
+        return moved
+    }
 
     /** 跳转到当前章指定页（页内进度条）。 */
     fun skipToPage(pageIndex: Int) {
         val pageCount = _uiState.value.pageCount
         if (pageCount <= 0) return
         engine.skipToPage(pageIndex.coerceIn(0, pageCount - 1))
+        restartAutoPlayCountdown()
     }
 
     /** 下一章（无下一章时由引擎返回 false，状态经 onPageChanged 刷新）。 */
-    fun nextChapter(): Boolean = engine.nextChapter()
+    fun nextChapter(): Boolean {
+        val moved = engine.nextChapter()
+        if (moved) restartAutoPlayCountdown()
+        return moved
+    }
 
     /** 上一章（无上一章时由引擎返回 false，状态经 onPageChanged 刷新）。 */
-    fun prevChapter(): Boolean = engine.prevChapter()
+    fun prevChapter(): Boolean {
+        val moved = engine.prevChapter()
+        if (moved) restartAutoPlayCountdown()
+        return moved
+    }
+
+    /**
+     * 手动翻页后重置自动翻页倒计时并清零进度条（对齐宿主
+     * ReadView.onPageChange → autoPager.reset：任何翻页完成都重新
+     * 计满一个间隔）。仅倒计时运行中有意义；暂停态（菜单打开）收起
+     * 菜单时本就按新间隔重新起算。
+     */
+    private fun restartAutoPlayCountdown() {
+        if (autoPlayJob?.isActive != true) return
+        pauseAutoPlay()
+        startAutoPlayJob()
+    }
 
     // ==================== 操作条 ====================
 
@@ -363,7 +392,8 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application),
                 _uiState.update { it.copy(autoPlayProgress = progress) }
                 if (elapsedSec >= interval) {
                     elapsedSec = 0
-                    if (!nextPage()) {
+                    // 直连引擎而非 nextPage()：自动翻页不触发倒计时重置
+                    if (!engine.nextPage()) {
                         stopAutoPlay()
                         _messages.emit(UserMessage.from(R.string.eink_reader_auto_page_end))
                         break
