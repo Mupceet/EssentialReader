@@ -1,6 +1,7 @@
 package io.legado.app.eink.contract
 
 import android.graphics.Bitmap
+import android.graphics.Typeface
 import androidx.compose.runtime.Stable
 
 /**
@@ -10,13 +11,8 @@ import androidx.compose.runtime.Stable
  * 模块画布据此绘制；上游 TextLine 的字段漂移（extraLetterSpacing 等）
  * 由各宿主映射器消化，模块只有一份绘制实现。
  *
- * 快照只携带几何（行/图片），不携带渲染参数：字号/字距/字体/粗体由
- * 模块画布按自身设置（[ReaderTextStyle] + [ReaderEngine.contentTextTypeface]）
- * 渲染，宿主排版配置中的标题类设置（标题字号等）被忽略。
- *
  * 坐标均为引擎排版坐标系（px），绘制结果与 View 版 ContentTextView 一致。
- * 实例构建后引用不可变；映射方交出所有权后不得再修改内部数组与列表。
- * 每次 pageVersion 变化构建一次（无逐帧开销）。
+ * 实例构建后引用不可变；映射方交出所有权后不得再修改内部数组与列表。每次 pageVersion 变化构建一次（无逐帧开销）。
  */
 @Stable
 class ReaderPageSnapshot(
@@ -24,20 +20,21 @@ class ReaderPageSnapshot(
     val title: String,
     /** 阅读进度文本。 */
     val readProgress: String,
+    /** 标题行画笔规格（TextLine.isTitle 行使用）。 */
+    val titleSpec: ReaderPaintSpec,
+    /** 正文行画笔规格。 */
+    val contentSpec: ReaderPaintSpec,
     /** 文本行（非文本列如评论列不进入）。 */
     val lines: List<ReaderPageLine>,
     /** 图片槽位。 */
     val images: List<ReaderImageSlot>,
 )
 
-/**
- * 单文本行：chunks[i] 绘制于 x[i]，基线 baseY；x 与 chunks 等长。
- * x 为引擎排版原始列起点，API35+ 的字距半格补偿由模块画布在绘制期计算。
- */
+/** 单文本行：chunks[i] 绘制于 x[i]，基线 baseY；x 与 chunks 等长。 */
 @Stable
 class ReaderPageLine(
     val baseY: Float,
-    /** true = 标题行，使用模块标题画笔（正文字号+加粗+正文体）绘制。 */
+    /** true = 使用 [ReaderPageSnapshot.titleSpec] 的画笔规格。 */
     val isTitle: Boolean,
     val chunks: List<String>,
     val x: FloatArray,
@@ -58,4 +55,32 @@ class ReaderImageSlot(
     /** true = 图片独占整行（铺满行盒）；false = 行内嵌图（等比居中）。 */
     val fullLine: Boolean,
     val loader: (w: Int, h: Int) -> Bitmap?,
+)
+
+/**
+ * 画笔渲染规格（与引擎 upStyle 实际设置的属性一一对齐）。
+ *
+ * 字色不进规格：模块按 EInkTheme 主题色自涂。排版配置与完整模式共享，
+ * 规格必须全量搬运（含斜体/阴影/可变字重），窄化即隐性渲染退化。
+ */
+@Stable
+class ReaderPaintSpec(
+    val textSizePx: Float,
+    val letterSpacing: Float,
+    val typeface: Typeface?,
+    /** 可变字重设置（如 "'wght' 700"）；null = 未设置。 */
+    val fontVariationSettings: String?,
+    /** 斜体倾斜（引擎斜体 = -0.25f）。 */
+    val textSkewX: Float,
+    val isLinearText: Boolean,
+    val shadow: ReaderShadowSpec?,
+)
+
+/** 阴影层参数（引擎画笔 shadowLayer 的快照）。 */
+@Stable
+class ReaderShadowSpec(
+    val radius: Float,
+    val dx: Float,
+    val dy: Float,
+    val color: Int,
 )
