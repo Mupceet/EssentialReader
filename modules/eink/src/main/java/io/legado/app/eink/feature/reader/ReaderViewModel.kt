@@ -366,6 +366,29 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application),
         }
     }
 
+    /**
+     * 阅读界面不可见时暂停自动翻页倒计时，避免后台继续翻页
+     * （退后台 ON_STOP / 应用内离开阅读目的地触发）。
+     */
+    fun onReaderHidden() {
+        if (autoPlayJob?.isActive == true) {
+            pauseAutoPlay()
+        }
+    }
+
+    /**
+     * 阅读界面回到前台/返回阅读目的地：自动翻页开启且未在倒计时时
+     * 重新起算（菜单展开态保持暂停，收起时再起算）。
+     */
+    fun onReaderShown() {
+        if (_uiState.value.autoPlay &&
+            autoPlayJob?.isActive != true &&
+            !_uiState.value.controlsVisible
+        ) {
+            startAutoPlayJob()
+        }
+    }
+
     /** 自动翻页：每秒推进页脚进度条，间隔到达后翻下一页，翻到书尾自动停止。 */
     fun toggleAutoPlay() {
         if (_uiState.value.autoPlay) {

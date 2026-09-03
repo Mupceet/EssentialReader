@@ -34,6 +34,9 @@ import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import io.legado.app.eink.contract.EInkEngineRegistry
@@ -125,6 +128,27 @@ fun ReaderRoute(
             }
         }
         onDispose { keyEventHub.handler = null }
+    }
+
+    // 自动翻页随界面可见性暂停/恢复：退后台（ON_STOP）暂停倒计时，
+    // 避免后台继续翻页；回前台（ON_START）重新起算。应用内离开阅读
+    // 目的地（目录/换源等）时组合整体卸载（EInkApp when 直换），由
+    // onDispose 暂停、返回时经 effect 体恢复
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner, viewModel) {
+        val observer = LifecycleEventObserver { _, event ->
+            when (event) {
+                Lifecycle.Event.ON_STOP -> viewModel.onReaderHidden()
+                Lifecycle.Event.ON_START -> viewModel.onReaderShown()
+                else -> Unit
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        viewModel.onReaderShown()
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+            viewModel.onReaderHidden()
+        }
     }
 
     // 返回键逐级回退：边距弹框 → 设置面板 → 收起操作条 → 退出阅读
