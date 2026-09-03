@@ -1,16 +1,13 @@
 package io.legado.app.eink.feature.home
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -18,17 +15,13 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import io.legado.app.eink.BuildConfig
 import io.legado.app.eink.contract.EInkEngineRegistry
 import io.legado.app.eink.designsystem.content.EInkHorizontalDivider
 import io.legado.app.eink.designsystem.content.EInkText
-import io.legado.app.eink.designsystem.interaction.eInkActionColors
-import io.legado.app.eink.designsystem.interaction.einkClickable
-import io.legado.app.eink.designsystem.interaction.rememberImmediatePressState
-import io.legado.app.eink.designsystem.theme.EInkShapes
+import io.legado.app.eink.designsystem.control.EInkButton
 import io.legado.app.eink.designsystem.theme.EInkSpacing
 import io.legado.app.eink.designsystem.theme.EInkTheme
 
@@ -156,8 +149,9 @@ private fun MineEntry(
 }
 
 /**
- * 行为开关行：与 [MineEntry] 同款「主信息 + 副信息」结构，右侧为
- * 状态块（开启实心黑，样式对齐阅读页 ToggleRow）；按压时整行反色。
+ * 行为开关行：与 [MineEntry] 同款「主信息 + 副信息」结构（纯展示），
+ * 右侧开/关块即开关本体（EInkButton，开启实心，样式对齐阅读页
+ * ToggleRow）。
  */
 @Composable
 private fun MineToggleRow(
@@ -166,57 +160,33 @@ private fun MineToggleRow(
     checked: Boolean,
     onToggle: () -> Unit
 ) {
-    val scheme = EInkTheme.colorScheme
-    // 按压反色：整行黑底白字，状态块同步反转（块内配色是反色的反色，属特例）
-    val press = rememberImmediatePressState()
-    val isPressed = press.isPressed
-    val rowColors = eInkActionColors(pressed = isPressed)
-    val blockContainer = when {
-        isPressed -> scheme.surface
-        checked -> scheme.primary
-        else -> Color.Transparent
-    }
-    val blockContent = when {
-        isPressed -> scheme.onSurface
-        checked -> scheme.onPrimary
-        else -> scheme.onSurfaceVariant
-    }
-    val blockBorder = if (isPressed) scheme.surface else scheme.outline
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .then(press.modifier)
-            .background(rowColors.containerColor)
-            .einkClickable(role = Role.Switch, onClick = onToggle)
             .padding(horizontal = EInkSpacing.m, vertical = EInkSpacing.m),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(modifier = Modifier.weight(1f)) {
             EInkText(
                 text = label,
-                style = EInkTheme.typography.bodyLarge,
-                color = rowColors.contentColor
+                style = EInkTheme.typography.bodyLarge
             )
             EInkText(
                 text = description,
                 style = EInkTheme.typography.bodyMedium,
-                color = rowColors.secondaryContentColor,
+                color = EInkTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(top = EInkSpacing.xxs)
             )
         }
         Spacer(modifier = Modifier.padding(start = EInkSpacing.s))
-        Box(
-            modifier = Modifier
-                .size(width = 64.dp, height = 36.dp)
-                .background(color = blockContainer, shape = EInkShapes.small)
-                .border(width = 1.dp, color = blockBorder, shape = EInkShapes.small),
-            contentAlignment = Alignment.Center,
-        ) {
-            EInkText(
-                text = if (checked) "开" else "关",
-                color = blockContent,
-                style = EInkTheme.typography.labelLarge,
-            )
-        }
+        // 开/关块即开关本体（EInkButton，开启实心），行内文字纯展示
+        EInkButton(
+            text = if (checked) "开" else "关",
+            onClick = onToggle,
+            modifier = Modifier.width(64.dp),
+            height = 44.dp,
+            selected = checked,
+            role = Role.Switch
+        )
     }
 }

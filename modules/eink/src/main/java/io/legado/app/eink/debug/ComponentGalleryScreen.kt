@@ -34,6 +34,7 @@ import io.legado.app.eink.designsystem.content.EInkHorizontalDivider
 import io.legado.app.eink.designsystem.content.EInkInfoRow
 import io.legado.app.eink.designsystem.content.EInkLoading
 import io.legado.app.eink.designsystem.content.EInkText
+import io.legado.app.eink.designsystem.control.EInkButton
 import io.legado.app.eink.designsystem.control.EInkDialog
 import io.legado.app.eink.designsystem.control.EInkSearchHintBar
 import io.legado.app.eink.designsystem.control.EInkSearchInputBar
@@ -62,7 +63,7 @@ import kotlinx.coroutines.launch
  *
  * 不依赖任何产品界面独立展示全部在用组件，供微调 Token/组件参数后
  * 即时目视验证：灰阶与语义色、形状、按压/选中/禁用交互、内容组件、
- * 滑条与搜索条、顶栏两种动作模式、翻页箭头/页码、底部操作栏、
+ * 滑条、按钮与搜索条、顶栏两种动作模式、翻页箭头/页码、底部操作栏、
  * 固定页分页联动、封面占位。
  *
  * 仅 debug 变体入口可见（MineScreen 内 BuildConfig.DEBUG 门控）。
@@ -98,6 +99,10 @@ fun ComponentGalleryRoute(
             item(key = "control-slider") {
                 SectionHeader("Control · 离散滑条（抬手提交）")
                 SliderSample()
+            }
+            item(key = "control-button") {
+                SectionHeader("Control · 按钮（描边 / 选中 / 禁用）")
+                ButtonSamples()
             }
             item(key = "control-search") {
                 SectionHeader("Control · 搜索条")
@@ -389,6 +394,70 @@ private fun SliderSample() {
             text = "预览 $preview · 已提交 $committed",
             style = EInkTheme.typography.bodyMedium,
             color = EInkTheme.colorScheme.secondaryContent
+        )
+    }
+}
+
+@Composable
+private fun ButtonSamples() {
+    var selected by rememberSaveable { mutableStateOf(false) }
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = EInkSpacing.m, vertical = EInkSpacing.s),
+        verticalArrangement = Arrangement.spacedBy(EInkSpacing.s)
+    ) {
+        Row(horizontalArrangement = Arrangement.spacedBy(EInkSpacing.s)) {
+            EInkButton(
+                text = "默认",
+                onClick = {},
+                modifier = Modifier.weight(1f)
+            )
+            EInkButton(
+                text = "选中",
+                onClick = {},
+                modifier = Modifier.weight(1f),
+                selected = true
+            )
+            EInkButton(
+                text = "禁用",
+                onClick = {},
+                modifier = Modifier.weight(1f),
+                enabled = false
+            )
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(EInkSpacing.s)) {
+            EInkButton(
+                text = "无边框",
+                onClick = {},
+                modifier = Modifier.weight(1f),
+                bordered = false
+            )
+            EInkButton(
+                text = "−",
+                onClick = {},
+                modifier = Modifier.size(44.dp),
+                bordered = false,
+                height = null,
+                style = EInkTheme.typography.titleLarge,
+                onClickLabel = "减小"
+            )
+            Spacer(modifier = Modifier.weight(1f))
+            EInkButton(
+                text = if (selected) "开" else "关",
+                onClick = { selected = !selected },
+                modifier = Modifier.width(64.dp),
+                height = 44.dp,
+                selected = selected,
+                role = Role.Switch
+            )
+        }
+        EInkButton(
+            text = if (selected) "点击取消选中" else "点击选中",
+            onClick = { selected = !selected },
+            modifier = Modifier.fillMaxWidth(),
+            selected = selected,
+            style = EInkTheme.typography.bodyMedium
         )
     }
 }

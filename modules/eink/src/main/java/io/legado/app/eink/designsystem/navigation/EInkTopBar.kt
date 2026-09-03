@@ -4,6 +4,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -23,6 +24,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import io.legado.app.eink.R
 import io.legado.app.eink.designsystem.content.EInkHorizontalDivider
+import io.legado.app.eink.designsystem.control.EInkButton
 import io.legado.app.eink.designsystem.interaction.eInkActionColors
 import io.legado.app.eink.designsystem.interaction.einkClickable
 import io.legado.app.eink.designsystem.interaction.rememberImmediatePressState
@@ -39,8 +41,9 @@ import io.legado.app.eink.designsystem.theme.EInkTheme
  * 或文本动作的简单顶栏保持默认内边距模式。
  *
  * 标题可点击（[onTitleClick]，如阅读页书名进详情）：标题区整体作为
- * 触控目标撑满顶栏高度，按压瞬时反色且背景贴容器边缘（屏幕左缘 /
- * 返回键右侧），[titleEnabled] = false 时置灰不可点。
+ * 无边框按钮（EInkButton 直角按压块）撑满顶栏高度，按压瞬时反色且
+ * 背景贴容器边缘（屏幕左缘 / 返回键右侧），[titleEnabled] = false 时
+ * 置灰不可点。
  *
  * E-Ink 约束:
  *  - 零涟漪（全局 NoIndication）、零阴影，层次仅靠分隔线；
@@ -73,11 +76,6 @@ fun EInkTopBar(
 ) {
     val colors = EInkTheme.colorScheme
     val titleClickable = onTitleClick != null
-    val titlePress = rememberImmediatePressState()
-    val titleColors = eInkActionColors(
-        pressed = titleClickable && titlePress.isPressed,
-        enabled = titleEnabled,
-    )
 
     Column(modifier = modifier.fillMaxWidth()) {
         Row(
@@ -93,47 +91,39 @@ fun EInkTopBar(
             if (onBack != null) {
                 TopBarBackButton(onClick = onBack)
             }
-            Box(
-                modifier = Modifier
-                    .weight(1f)
-                    // 可点击标题的触控/按压背景撑满顶栏高度并贴容器起点
-                    .then(
-                        if (actionsFillMax || titleClickable) Modifier.fillMaxHeight() else Modifier
-                    )
-                    .then(
-                        if (titleClickable) {
-                            Modifier
-                                .then(titlePress.modifier)
-                                .background(titleColors.containerColor)
-                                .einkClickable(
-                                    enabled = titleEnabled,
-                                    role = Role.Button,
-                                    onClickLabel = titleClickLabel,
-                                    onClick = onTitleClick,
-                                )
-                        } else {
-                            Modifier
-                        }
-                    ),
-                contentAlignment = Alignment.CenterStart,
-            ) {
-                BasicText(
+            if (titleClickable) {
+                // 可点击标题：无边框按钮形态（直角按压背景贴容器起点，
+                // 即屏幕左缘/返回键右侧），边距内置在按钮内
+                EInkButton(
                     text = title,
-                    style = (titleStyle ?: EInkTheme.typography.titleLarge)
-                        .copy(
-                            color = if (titleClickable) {
-                                titleColors.contentColor
-                            } else {
-                                colors.onSurface
-                            }
-                        ),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    // 边距内置在文本而非容器：标题区作为整体可点击时，
-                    // 按压背景可贴边展开（容器起点=屏幕边/返回键右侧）；
-                    // 无返回键时同样保证文字距屏幕边 [EInkSpacing.m]
-                    modifier = Modifier.padding(start = EInkSpacing.m)
+                    onClick = onTitleClick,
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxHeight(),
+                    enabled = titleEnabled,
+                    bordered = false,
+                    height = null,
+                    style = titleStyle ?: EInkTheme.typography.titleLarge,
+                    onClickLabel = titleClickLabel,
+                    contentPadding = PaddingValues(start = EInkSpacing.m),
+                    contentAlignment = Alignment.CenterStart,
                 )
+            } else {
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .then(if (actionsFillMax) Modifier.fillMaxHeight() else Modifier),
+                    contentAlignment = Alignment.CenterStart,
+                ) {
+                    BasicText(
+                        text = title,
+                        style = (titleStyle ?: EInkTheme.typography.titleLarge)
+                            .copy(color = colors.onSurface),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.padding(start = EInkSpacing.m)
+                    )
+                }
             }
             if (actionsFillMax) {
                 // 顶栏动作按钮比底部操作栏窄：收敛宽度降为 TopBarWidthRatio 倍高度
