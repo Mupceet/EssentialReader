@@ -58,29 +58,18 @@ class ReaderImageSlot(
 )
 
 /**
- * 画笔渲染规格（与引擎 upStyle 实际设置的属性一一对齐）。
+ * 画笔渲染规格（仅测量耦合参数，与引擎 upStyle 写入画笔的对应属性一致）。
  *
- * 字色不进规格：模块按 EInkTheme 主题色自涂。排版配置与完整模式共享，
- * 规格必须全量搬运（含斜体/阴影/可变字重），窄化即隐性渲染退化。
+ * 只携带影响字形宽度/行盒对齐的参数——快照列坐标是引擎按这些参数测量的，
+ * 模块必须按同值绘制才不错位。字色不进规格：模块按 EInkTheme 主题色自涂；
+ * 纯视觉效果（阴影/斜体/linearText 渲染开关）不跨桥——E-Ink 阅读不渲染
+ * 这些效果，宿主配置了也不生效（既定产品取舍）。
  */
 @Stable
 class ReaderPaintSpec(
     val textSizePx: Float,
     val letterSpacing: Float,
     val typeface: Typeface?,
-    /** 可变字重设置（如 "'wght' 700"）；null = 未设置。 */
+    /** 可变字重设置（如 "'wght' 700"）；null = 未设置。加粗影响字形宽度，测量耦合。 */
     val fontVariationSettings: String?,
-    /** 斜体倾斜（引擎斜体 = -0.25f）。 */
-    val textSkewX: Float,
-    val isLinearText: Boolean,
-    val shadow: ReaderShadowSpec?,
-)
-
-/** 阴影层参数（引擎画笔 shadowLayer 的快照）。 */
-@Stable
-class ReaderShadowSpec(
-    val radius: Float,
-    val dx: Float,
-    val dy: Float,
-    val color: Int,
 )

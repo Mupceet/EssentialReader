@@ -173,3 +173,16 @@ TextPage → EInkPageSnapshot 的唯一新增宿主职责。
    「快照映射器」一行（数据映射而非渲染逻辑）+ GlobalSettings 一属性；
 3. testAppDebugUnitTest 通过（含新增映射器测试）；
 4. 真机 §7 清单通过，翻页性能不劣于基线。
+
+## 10. 修订记录
+
+- **2026-09-03（已回退的实验）**：曾实施「快照去规格化」（快照只带几何，
+  画布按 ReaderTextStyle + 端口字体渲染，标题=正文字号+加粗）——回退
+  （a6e1c4cde）。原因：规格是宿主排版引擎的**测量结果**，字号/字距/字体/
+  字重与分页行盒、列坐标耦合，不透传即布局错位。
+- **2026-09-03（现行）：契约瘦身**。按「是否影响字形宽度」划线，
+  `ReaderPaintSpec` 缩为 4 个测量耦合字段（textSizePx/letterSpacing/
+  typeface/fontVariationSettings），`ReaderShadowSpec` 删除；阴影/斜体/
+  linearText 等纯视觉效果不跨桥、E-Ink 不渲染（既定产品取舍，宿主配置
+  了也不生效）。映射器的 `shadowSpecFromConfig` 与 API29 shadowLayer
+  getter 规避机制随之消失（copyPaintSpec 所剩 getter 均 ≤ API 26）。

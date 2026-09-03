@@ -4,7 +4,6 @@ import android.app.Application
 import android.graphics.Bitmap
 import io.legado.app.data.entities.Book
 import io.legado.app.eink.contract.ReaderPaintSpec
-import io.legado.app.eink.contract.ReaderShadowSpec
 import io.legado.app.ui.book.read.page.entities.TextLine
 import io.legado.app.ui.book.read.page.entities.TextPage
 import io.legado.app.ui.book.read.page.entities.column.BaseColumn
@@ -41,9 +40,6 @@ class ReaderPageSnapshotMapperTest {
         letterSpacing = 0f,
         typeface = null,
         fontVariationSettings = null,
-        textSkewX = 0f,
-        isLinearText = false,
-        shadow = null,
     )
     // ReaderPaintSpec 非 data class（无 copy），标题规格显式构造
     private val titleSpec = ReaderPaintSpec(
@@ -51,9 +47,6 @@ class ReaderPageSnapshotMapperTest {
         letterSpacing = 0.1f,
         typeface = null,
         fontVariationSettings = null,
-        textSkewX = 0f,
-        isLinearText = false,
-        shadow = null,
     )
 
     private fun textPage(lines: List<TextLine>, title: String = "章节标题"): TextPage =
@@ -244,31 +237,18 @@ class ReaderPageSnapshotMapperTest {
     // ==== 画笔规格拷贝（Robolectric：需要 android.graphics 原生行为）====
 
     @Test
-    fun `画笔规格全量拷贝引擎画笔属性`() {
+    fun `画笔规格拷贝测量耦合属性`() {
         val paint = android.text.TextPaint().apply {
             textSize = 42f
             letterSpacing = 0.08f
-            textSkewX = -0.25f
             typeface = android.graphics.Typeface.MONOSPACE
         }
-        // 阴影不读 Paint（shadowLayer* getter 系 API 29+，minSdk 26 必崩），
-        // 生产路径经 shadowSpecFromConfig 从 ReadBookConfig 取值后传入。
-        val spec = paint.copyPaintSpec(shadow = null)
+        val spec = paint.copyPaintSpec()
 
         assertEquals(42f, spec.textSizePx, 0.001f)
         assertEquals(0.08f, spec.letterSpacing, 0.0001f)
         assertEquals(android.graphics.Typeface.MONOSPACE, spec.typeface)
-        assertEquals(-0.25f, spec.textSkewX, 0.0001f)
-        // isLinearText / fontVariationSettings：Robolectric 4.16 ShadowPaint 未实现
-        // setLinearText/getFontVariationSettings，set/get 不保真，不做断言（属 shadow 能力限制）。
-    }
-
-    @Test
-    fun `阴影规格按参数原样进入规格`() {
-        val paint = android.text.TextPaint()
-        val shadow = ReaderShadowSpec(radius = 4f, dx = 1f, dy = 2f, color = 0xFF00FF00.toInt())
-        val spec = paint.copyPaintSpec(shadow)
-
-        assertEquals(shadow, spec.shadow)
+        // fontVariationSettings：Robolectric 4.16 ShadowPaint 未实现 get/set
+        // 往返，不做断言（属 shadow 能力限制）；阴影/斜体不在规格内（E-Ink 不渲染）。
     }
 }
