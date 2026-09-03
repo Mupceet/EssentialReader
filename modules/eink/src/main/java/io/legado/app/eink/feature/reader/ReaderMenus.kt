@@ -118,14 +118,14 @@ internal fun ReaderTopBar(
 // ====================================================================
 
 /**
- * 底部操作条：返回 / 目录 / 自动翻页 / 排版 / 其它，全部为图标按钮。
+ * 底部操作条：返回 / 目录 / 进度与翻页 / 排版 / 其它，全部为图标按钮。
  *
- * 图标沿用 View 版：目录 ic_toc、自动翻页 ic_auto_page(_stop)、
- * 排版（View 版"界面"）ic_interface_setting、其它（设置）ic_settings、
- * 返回统一 arrow_back：关闭设置面板 → 退出阅读。
- * 五枚图标复用 [EInkOperationBarIcon]，居左连续排列、贴屏幕左缘；
- * 设置面板打开期间操作条保持可见：排版/其它按钮呈选中态（无素材对，
- * 回落实心色块），面板在操作条上方展开（覆盖层按
+ * 图标沿用 View 版：目录 ic_toc、进度与翻页 ic_progress（水平滑杆
+ * 旋钮，Material commit）、排版（View 版"界面"）ic_interface_setting、
+ * 其它（设置）ic_settings、返回统一 arrow_back：关闭设置面板 → 退出
+ * 阅读。五枚图标复用 [EInkOperationBarIcon]，居左连续排列、贴屏幕
+ * 左缘；设置面板打开期间操作条保持可见：排版/其它按钮呈选中态
+ * （无素材对，回落实心色块），面板在操作条上方展开（覆盖层按
  * [ReaderBottomBarInset] 避让）。边距调整弹框例外：操作条整体隐藏，
  * 保证正文四周边距实时可见。
  */
@@ -159,7 +159,7 @@ internal fun ReaderBottomBar(
                 onClick = onOpenToc,
             )
             BottomIconAction(
-                iconRes = if (state.autoPlay) R.drawable.eink_ic_auto_page_stop else R.drawable.eink_ic_auto_page,
+                iconRes = R.drawable.eink_ic_progress,
                 contentDescription = "进度与翻页",
                 selected = selectedPanel == ReaderPanel.PROGRESS,
                 onClick = { onOpenPanel(ReaderPanel.PROGRESS) },
