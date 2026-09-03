@@ -3,8 +3,6 @@ package io.legado.app.eink.bridge
 import android.app.Application
 import android.graphics.Bitmap
 import io.legado.app.data.entities.Book
-import io.legado.app.eink.contract.ReaderPaintSpec
-import io.legado.app.eink.contract.ReaderShadowSpec
 import io.legado.app.ui.book.read.page.entities.TextLine
 import io.legado.app.ui.book.read.page.entities.TextPage
 import io.legado.app.ui.book.read.page.entities.column.BaseColumn
@@ -35,26 +33,6 @@ class ReaderPageSnapshotMapperTest {
         // 在 Robolectric 下不运行，按仓库惯例手动注入应用上下文。
         RuntimeEnvironment.getApplication().injectAsAppCtx()
     }
-
-    private val contentSpec = ReaderPaintSpec(
-        textSizePx = 40f,
-        letterSpacing = 0f,
-        typeface = null,
-        fontVariationSettings = null,
-        textSkewX = 0f,
-        isLinearText = false,
-        shadow = null,
-    )
-    // ReaderPaintSpec 非 data class（无 copy），标题规格显式构造
-    private val titleSpec = ReaderPaintSpec(
-        textSizePx = 40f,
-        letterSpacing = 0.1f,
-        typeface = null,
-        fontVariationSettings = null,
-        textSkewX = 0f,
-        isLinearText = false,
-        shadow = null,
-    )
 
     private fun textPage(lines: List<TextLine>, title: String = "章节标题"): TextPage =
         TextPage(
@@ -91,12 +69,8 @@ class ReaderPageSnapshotMapperTest {
 
     private fun mapLines(
         vararg lines: TextLine,
-        sdkInt: Int = 30,
-    ) = ReaderPageSnapshotMapper.mapWithSpecs(
+    ) = ReaderPageSnapshotMapper.mapPage(
         page = textPage(lines.toList()),
-        titleSpec = titleSpec,
-        contentSpec = contentSpec,
-        sdkInt = sdkInt,
         imageLoader = { _, _ -> { _, _ -> null } },
     )
 
@@ -114,27 +88,6 @@ class ReaderPageSnapshotMapperTest {
         assertEquals(2, line.x.size)
         assertEquals(10f, line.x[0], 0.001f)
         assertEquals(30f, line.x[1], 0.001f)
-    }
-
-    @Test
-    fun `API35 以上加字距半格补偿`() {
-        // contentSpec.letterSpacing=0、textSizePx=40 → 补偿 0
-        val s1 = mapLines(textLine(columns = listOf(textCol(10f, "a"))), sdkInt = 35)
-        assertEquals(10f, s1.lines[0].x[0], 0.001f)
-
-        // 标题行：titleSpec.letterSpacing=0.1、textSizePx=40 → 补偿 2.0
-        val s2 = mapLines(
-            textLine(isTitle = true, columns = listOf(textCol(10f, "a"))),
-            sdkInt = 35,
-        )
-        assertEquals(12f, s2.lines[0].x[0], 0.001f)
-
-        // API35 以下无补偿
-        val s3 = mapLines(
-            textLine(isTitle = true, columns = listOf(textCol(10f, "a"))),
-            sdkInt = 34,
-        )
-        assertEquals(10f, s3.lines[0].x[0], 0.001f)
     }
 
     @Test
@@ -165,11 +118,8 @@ class ReaderPageSnapshotMapperTest {
             lineBottom = 150f,
             columns = listOf(imageColumn),
         )
-        val snapshot = ReaderPageSnapshotMapper.mapWithSpecs(
+        val snapshot = ReaderPageSnapshotMapper.mapPage(
             page = textPage(listOf(line)),
-            titleSpec = titleSpec,
-            contentSpec = contentSpec,
-            sdkInt = 30,
             imageLoader = loader,
         )
 
@@ -229,46 +179,12 @@ class ReaderPageSnapshotMapperTest {
 
     @Test
     fun `快照携带标题与进度文本`() {
-        val snapshot = ReaderPageSnapshotMapper.mapWithSpecs(
+        val snapshot = ReaderPageSnapshotMapper.mapPage(
             page = textPage(emptyList(), title = "第一章"),
-            titleSpec = titleSpec,
-            contentSpec = contentSpec,
-            sdkInt = 30,
             imageLoader = { _, _ -> { _, _ -> null } },
         )
 
         assertEquals("第一章", snapshot.title)
         assertEquals("0.0%", snapshot.readProgress)
-    }
-
-    // ==== 画笔规格拷贝（Robolectric：需要 android.graphics 原生行为）====
-
-    @Test
-    fun `画笔规格全量拷贝引擎画笔属性`() {
-        val paint = android.text.TextPaint().apply {
-            textSize = 42f
-            letterSpacing = 0.08f
-            textSkewX = -0.25f
-            typeface = android.graphics.Typeface.MONOSPACE
-        }
-        // 阴影不读 Paint（shadowLayer* getter 系 API 29+，minSdk 26 必崩），
-        // 生产路径经 shadowSpecFromConfig 从 ReadBookConfig 取值后传入。
-        val spec = paint.copyPaintSpec(shadow = null)
-
-        assertEquals(42f, spec.textSizePx, 0.001f)
-        assertEquals(0.08f, spec.letterSpacing, 0.0001f)
-        assertEquals(android.graphics.Typeface.MONOSPACE, spec.typeface)
-        assertEquals(-0.25f, spec.textSkewX, 0.0001f)
-        // isLinearText / fontVariationSettings：Robolectric 4.16 ShadowPaint 未实现
-        // setLinearText/getFontVariationSettings，set/get 不保真，不做断言（属 shadow 能力限制）。
-    }
-
-    @Test
-    fun `阴影规格按参数原样进入规格`() {
-        val paint = android.text.TextPaint()
-        val shadow = ReaderShadowSpec(radius = 4f, dx = 1f, dy = 2f, color = 0xFF00FF00.toInt())
-        val spec = paint.copyPaintSpec(shadow)
-
-        assertEquals(shadow, spec.shadow)
     }
 }

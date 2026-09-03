@@ -12,10 +12,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.sp
 import io.legado.app.eink.contract.EInkEngineRegistry
 import io.legado.app.eink.contract.ReaderImageSlot
 import io.legado.app.eink.contract.ReaderPageSnapshot
-import io.legado.app.eink.contract.ReaderPaintSpec
+import io.legado.app.eink.contract.ReaderTextStyle
 import io.legado.app.eink.designsystem.theme.EInkTheme
 
 /**
@@ -23,11 +25,17 @@ import io.legado.app.eink.designsystem.theme.EInkTheme
  *
  * 绘制宿主映射来的 [ReaderPageSnapshot]：行 chunk 按预计算 x 坐标画字，
  * 图片槽位按铺满/等比居中画位图。排版本身由引擎（宿主 ChapterProvider）
- * 完成，这里不做二次排版 —— 结果与 View 版 ContentTextView 一致。
+ * 完成，这里不做二次排版。
  *
- * 字色随日/夜间主题每次绘制前钉上（首帧即正确，主题切换重组自动重绘）；
- * 画笔渲染规格（字号/字距/字体/斜体/阴影等）取自快照规格 —— 引擎配置与
- * 完整模式共享，完整模式设置的斜体/阴影在 E-Ink 同样可见。
+ * 渲染参数来自模块自身设置：字号/字距取 [style]（与写入引擎排版的同一
+ * 来源），字体取端口正文字体（与引擎排版测量同源，否则字形宽度与列坐
+ * 标错位）。标题 = 正文字号 + 加粗 + 正文体 —— 宿主排版配置中的标题类
+ * 设置（标题字号/标题字重）被忽略，完整模式的斜体/阴影等显示效果也
+ * 不跟随（E-Ink 渲染自治的既定取舍）。
+ *
+ * 字色随日/夜间主题每次绘制前钉上（首帧即正确，主题切换重组自动重绘）。
+ * API35+ 的逐字字距半格补偿在绘制期按本画笔画笔度量计算（View 版画布
+ * 同款），快照 x 保持引擎原始列起点。
  *
  * [pageVersion] 用于强制重绘（引擎可能原地更新同一排版实例后仅推版本号）。
  *
@@ -38,24 +46,47 @@ import io.legado.app.eink.designsystem.theme.EInkTheme
 internal fun ReaderPageSnapshotCanvas(
     page: ReaderPageSnapshot?,
     pageVersion: Int,
+    style: ReaderTextStyle,
     modifier: Modifier = Modifier,
 ) {
     val themeTextColorArgb = EInkTheme.colorScheme.onBackground.toArgb()
     val imageAntiAlias = EInkEngineRegistry.globalSettings.useAntiAlias
-    val titlePaint = remember { Paint() }
-    val contentPaint = remember { Paint() }
+    val contentTextTypeface = EInkEngineRegistry.readerEngine.contentTextTypeface
+    val textSizePx = with(LocalDensity.current) { style.textSize.sp.toPx() }
+    val contentPaint = remember(textSizePx, style.letterSpacing, contentTextTypeface) {
+        Paint().apply {
+            isAntiAlias = true
+            textSize = textSizePx
+            letterSpacing = style.letterSpacing
+            typeface = contentTextTypeface ?: Typeface.DEFAULT
+        }
+    }
+    val titlePaint = remember(textSizePx, style.letterSpacing, contentTextTypeface) {
+        Paint().apply {
+            isAntiAlias = true
+            textSize = textSizePx
+            letterSpacing = style.letterSpacing
+            typeface = boldVariant(contentTextTypeface ?: Typeface.DEFAULT)
+        }
+    }
     val imagePaint = remember(imageAntiAlias) { Paint().apply { isAntiAlias = imageAntiAlias } }
     // 引擎可能原地更新同一排版实例，用版本号强制重建绘制块
     key(pageVersion) {
         Canvas(modifier = modifier) {
             val snapshot = page ?: return@Canvas
             val nativeCanvas = drawContext.canvas.nativeCanvas
-            titlePaint.applySpec(snapshot.titleSpec, themeTextColorArgb)
-            contentPaint.applySpec(snapshot.contentSpec, themeTextColorArgb)
+            // API 35+ drawText 会将 letterSpacing 应用在两侧，绘制期补偿半格
+            // （两支画笔字号字距一致，补偿值相同）
+            val halfSpacing =
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.VANILLA_ICE_CREAM) {
+                    contentPaint.letterSpacing * contentPaint.textSize * 0.5f
+                } else {
+                    0f
+                }
             for (line in snapshot.lines) {
                 val paint = if (line.isTitle) titlePaint else contentPaint
                 for ((index, chunk) in line.chunks.withIndex()) {
-                    nativeCanvas.drawText(chunk, line.x[index], line.baseY, paint)
+                    nativeCanvas.drawText(chunk, line.x[index] + halfSpacing, line.baseY, paint)
                 }
             }
             for (slot in snapshot.images) {
@@ -64,6 +95,18 @@ internal fun ReaderPageSnapshotCanvas(
         }
     }
 }
+
+/**
+ * 标题加粗变体：与引擎 textBold=1 同机制（API 28+ 可变字重 900，
+ * 旧版回退粗体样式）。
+ */
+private fun boldVariant(base: Typeface): Typeface =
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+        Typeface.create(base, 900, false)
+    } else {
+        @Suppress("DEPRECATION")
+        Typeface.create(base, Typeface.BOLD)
+    }
 
 /**
  * 绘制图片槽位：按列宽×行高向宿主闭包取图，铺满（fullLine）或以宽度为
@@ -83,29 +126,4 @@ private fun drawImageSlot(canvas: Canvas, slot: ReaderImageSlot, paint: Paint) {
         RectF(slot.x0, slot.lineTop + div, slot.x1, slot.lineBottom - div)
     }
     canvas.drawBitmap(bitmap, null, rectF, paint)
-}
-
-/**
- * 把快照规格应用到画笔。API35+ 的逐字半格补偿已在映射期算进 x，画笔
- * 字距保持引擎原值（单字符 drawText 的字形行为与 View 版一致）。
- */
-private fun Paint.applySpec(spec: ReaderPaintSpec, colorArgb: Int) {
-    // 引擎 upStyle 硬编码 isAntiAlias = true，显式对齐（不依赖 Paint() 默认 flags）
-    isAntiAlias = true
-    color = colorArgb
-    textSize = spec.textSizePx
-    letterSpacing = spec.letterSpacing
-    typeface = spec.typeface ?: Typeface.DEFAULT
-    textSkewX = spec.textSkewX
-    isLinearText = spec.isLinearText
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-        // 空字符串 = 清除可变字重设置（宿主 null 对应引擎未设置）
-        fontVariationSettings = spec.fontVariationSettings ?: ""
-    }
-    val shadow = spec.shadow
-    if (shadow != null) {
-        setShadowLayer(shadow.radius, shadow.dx, shadow.dy, shadow.color)
-    } else {
-        clearShadowLayer()
-    }
 }

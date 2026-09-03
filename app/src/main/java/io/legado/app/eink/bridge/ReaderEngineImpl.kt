@@ -37,6 +37,7 @@ import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
 import splitties.init.appCtx
 import java.util.Date
+import android.graphics.Typeface
 import kotlin.coroutines.cancellation.CancellationException
 import kotlin.math.min
 
@@ -321,10 +322,8 @@ internal object ReaderEngineImpl : ReaderEngine, KoinComponent {
     override fun applyStyle(style: ReaderTextStyle) {
         val mutations = listOf(
             ReadStyleMutation.IntValue(ReadStyleIntKey.TextSize, style.textSize),
-            // 标题跟随正文字号：本仓 titleSize 为绝对字号（完整模式排版设置，
-            // 默认 20sp），develop/E-Ink 语义是标题与正文一致——E-Ink 应用
-            // 排版时覆盖完整模式残留的绝对值，保证调整字号后标题同步
-            ReadStyleMutation.IntValue(ReadStyleIntKey.TitleSize, style.textSize),
+            // 不写 TitleSize：E-Ink 渲染层标题 = 正文字号 + 加粗 + 正文体，
+            // 宿主排版配置中的标题字号设置被忽略（行盒仍按宿主 titleSize 排布）
             ReadStyleMutation.FloatValue(ReadStyleFloatKey.LetterSpacing, style.letterSpacing),
             ReadStyleMutation.StringValue(
                 ReadStyleStringKey.ParagraphIndent,
@@ -366,6 +365,9 @@ internal object ReaderEngineImpl : ReaderEngine, KoinComponent {
         get() = ReadBookConfig.textBold.let { it == 1 }
 
     override fun currentStyle(): ReaderTextStyle = ReadBookConfig.snapshotStyle()
+
+    override val contentTextTypeface: Typeface?
+        get() = ChapterProvider.contentPaint.typeface
 
     override fun relayout() {
         ReadBook.clearTextChapter()
