@@ -226,7 +226,7 @@ private fun ResultList(
                 onPageDown = onPageDown
             )
     ) {
-        items(state.results, key = { "${it.origin}-${it.bookUrl}" }) { book ->
+        items(state.results, key = { it.resultKey }) { book ->
             ResultItem(book = book, inShelf = isInBookshelf(book), onClick = { onBookClick(book) })
             EInkHorizontalDivider()
         }

@@ -11,6 +11,10 @@ data class SearchBookUiModel(
     val bookUrl: String,
     val name: String,
     val author: String,
+    /** 分类标签（来源 kind，逗号分隔），搜索结果排序的标签命中桶依据。 */
+    val kind: String? = null,
+    /** 命中源数量（SearchBook.origins.size 快照），同桶内按此降序。 */
+    val originsCount: Int = 1,
     val coverUrl: String?,
     /** 简介（已 trimIntro 清洗）。 */
     val intro: String,
