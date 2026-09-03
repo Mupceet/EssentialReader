@@ -34,6 +34,9 @@ interface SearchEngine {
     /** 记录一次搜索词（已存在则 usage+1 并更新时间）。 */
     suspend fun recordSearchKey(key: String)
 
+    /** 删除单条搜索历史。 */
+    suspend fun removeSearchHistory(word: String)
+
     /** 清空搜索历史。 */
     suspend fun clearSearchHistory()
 

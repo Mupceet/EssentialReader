@@ -84,6 +84,12 @@ internal object SearchEngineImpl : SearchEngine, KoinComponent {
         } ?: appDb.searchKeywordDao.insert(SearchKeyword(key, 1))
     }
 
+    override suspend fun removeSearchHistory(word: String) {
+        appDb.searchKeywordDao.get(word)?.let { keyword ->
+            appDb.searchKeywordDao.delete(keyword)
+        }
+    }
+
     override suspend fun clearSearchHistory() {
         appDb.searchKeywordDao.deleteAll()
     }

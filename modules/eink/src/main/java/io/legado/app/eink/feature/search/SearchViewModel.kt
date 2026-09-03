@@ -73,6 +73,39 @@ internal fun sortSearchResults(
 }
 
 /**
+ * 将搜索历史按 chip 宽度贪心分行（每行总宽不超 [rowWidth]）。
+ *
+ * 历史 chip 为流式换行布局，而 E-Ink 固定页分页以 LazyColumn 项
+ * （一行 chip = 一项）为单位整页翻页；「哪些词进同一行」是纯布局
+ * 决策，抽离成函数以便单元测试。[labelWidth] 返回单个 chip 的完整
+ * 占位宽（文字实测宽 + 内边距与描边余量，调用方按需封顶）。
+ */
+internal fun chunkHistoryRows(
+    history: List<SearchHistoryUiModel>,
+    rowWidth: Int,
+    spacing: Int,
+    labelWidth: (SearchHistoryUiModel) -> Int,
+): List<List<SearchHistoryUiModel>> {
+    if (history.isEmpty()) return emptyList()
+    val maxWidth = rowWidth.coerceAtLeast(1)
+    val rows = ArrayList<List<SearchHistoryUiModel>>()
+    var current = ArrayList<SearchHistoryUiModel>()
+    var currentWidth = 0
+    for (keyword in history) {
+        val width = labelWidth(keyword).coerceIn(1, maxWidth)
+        if (current.isNotEmpty() && currentWidth + spacing + width > rowWidth) {
+            rows.add(current)
+            current = ArrayList()
+            currentWidth = 0
+        }
+        currentWidth += if (current.isEmpty()) width else spacing + width
+        current.add(keyword)
+    }
+    if (current.isNotEmpty()) rows.add(current)
+    return rows
+}
+
+/**
  * 搜索 UiState（扁平布尔标志位）。
  */
 data class SearchUiState(
@@ -194,6 +227,13 @@ class SearchViewModel(application: Application) : AndroidViewModel(application) 
     fun clearHistory() {
         viewModelScope.launch {
             engine.clearSearchHistory()
+        }
+    }
+
+    /** 删除单条搜索历史 */
+    fun removeHistory(word: String) {
+        viewModelScope.launch {
+            engine.removeSearchHistory(word)
         }
     }
 
