@@ -134,6 +134,10 @@ internal object SearchEngineImpl : SearchEngine, KoinComponent {
                             when (event) {
                                 SearchRunEvent.Started -> callback.onSearchStart()
                                 is SearchRunEvent.Progress -> {
+                                    callback.onSearchProgress(
+                                        event.processedSources,
+                                        event.totalSources
+                                    )
                                     if (event.upsertBooks.isNotEmpty()) {
                                         callback.onSearchSuccess(
                                             event.upsertBooks.map { it.toUiModel() }

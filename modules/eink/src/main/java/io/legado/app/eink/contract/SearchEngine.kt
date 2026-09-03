@@ -12,6 +12,10 @@ interface SearchSession {
 /** 搜索回调（宿主 SearchModel.CallBack 的模块侧投影）。 */
 interface SearchSessionCallback {
     fun onSearchStart()
+
+    /** 书源维度搜索进展（已完成源数 / 参与源总数），供结果列表顶部进度提示。 */
+    fun onSearchProgress(processedSources: Int, totalSources: Int)
+
     fun onSearchSuccess(books: List<SearchBookUiModel>)
     fun onSearchFinish(isEmpty: Boolean, hasMore: Boolean)
     fun onSearchCancel(exception: Throwable?)
