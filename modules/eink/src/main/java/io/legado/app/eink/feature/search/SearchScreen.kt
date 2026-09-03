@@ -101,7 +101,9 @@ fun SearchRoute(
         if (uiState.history.isEmpty()) isDeletingHistory = false
     }
 
-    val isResultListVisible = uiState.results.isNotEmpty() || uiState.isSearching
+    // 关键词非空才展示结果区：一键清空/逐字删空后即回到历史区
+    val isResultListVisible = uiState.searchKey.isNotBlank() &&
+        (uiState.results.isNotEmpty() || uiState.isSearching)
 
     // 外层用 BoxWithConstraints 提供实测宽度：历史 chip 分行依赖真实可用宽
     //（Configuration 屏宽在 configChanges 下旋转不刷新，见 EInkOperationBar 说明）
@@ -140,8 +142,8 @@ fun SearchRoute(
             )
         }
 
-        // 历史视图的 LazyColumn 项数 = 头部 1 项 + chip 行数
-        val totalItems = if (isResultListVisible) uiState.results.size else historyRows.size + 1
+        // 历史视图的 LazyColumn 项数 = chip 行数（标题行固定在列表外，不参与翻页）
+        val totalItems = if (isResultListVisible) uiState.results.size else historyRows.size
         val canPage = isResultListVisible || uiState.history.isNotEmpty()
 
         // 翻页动作 remember 稳定实例：下传后接收方（列表 / EInkPageSwipe）
@@ -198,7 +200,7 @@ fun SearchRoute(
         // 历史删除/删除态切换都会重排行（条目变少、chip 加 ✕ 变宽）：把实际
         // 滚动位置拉回当前页首；结果列表只增不减，沿用原实现不 realign
         LaunchedEffect(historyRows, isResultListVisible) {
-            if (!isResultListVisible) pager.realignToPageStart(historyRows.size + 1)
+            if (!isResultListVisible) pager.realignToPageStart(historyRows.size)
         }
 
         Column(
@@ -211,6 +213,12 @@ fun SearchRoute(
                 onValueChange = viewModel::updateKey,
                 onImeAction = { triggerSearch(uiState.searchKey) },
                 autoFocus = true,
+                onClear = {
+                    // 清空即回到历史区；进行中的搜索一并停止
+                    //（保留部分结果已无展示意义，重输关键词会整轮重启）
+                    viewModel.updateKey("")
+                    if (uiState.isSearching) viewModel.stopSearch()
+                },
                 action = {
                     EInkText(
                         text = if (uiState.isSearching) "停止" else "搜索",
@@ -224,9 +232,10 @@ fun SearchRoute(
                     )
                 }
             )
-            EInkHorizontalDivider()
 
             Box(modifier = Modifier.weight(1f)) {
+                // 关键词清空（含搜索后清空）不再展示"无搜索结果"，优先回历史区
+                val showEmptyResult = uiState.showEmpty && uiState.searchKey.isNotBlank()
                 when {
                     isResultListVisible -> ResultList(
                         state = uiState,
@@ -237,8 +246,7 @@ fun SearchRoute(
                         onPageDown = pageDown
                     )
 
-                    uiState.showEmpty -> CenterMessage("无搜索结果")
-                    uiState.history.isNotEmpty() -> HistoryList(
+                    !showEmptyResult && uiState.history.isNotEmpty() -> HistoryList(
                         rows = historyRows,
                         isDeleting = showHistoryDeleteMode,
                         maxChipWidth = viewWidth * HistoryMaxChipWidthFraction,
@@ -251,6 +259,7 @@ fun SearchRoute(
                         onPageDown = pageDown
                     )
 
+                    showEmptyResult -> CenterMessage("无搜索结果")
                     else -> CenterMessage("输入书名开始搜索")
                 }
             }
@@ -274,6 +283,11 @@ fun SearchRoute(
 
 /**
  * 无状态结果列表（固定页分页 + 手势整页翻页）。
+ *
+ * 列表上方常驻进度摘要行——复用历史标题行的固定头部位置
+ *（不悬浮、不随翻页滚走），横向居中显示结果数与书源进度：搜索中
+ * 实时更新，停止/完成后保持最终数值；整页翻页手势挂在含摘要行的
+ * 整个区域。
  */
 @Composable
 private fun ResultList(
@@ -284,10 +298,7 @@ private fun ResultList(
     onPageUp: () -> Unit,
     onPageDown: () -> Unit,
 ) {
-    LazyColumn(
-        state = pagerListState,
-        userScrollEnabled = false,
-        overscrollEffect = null,
+    Column(
         modifier = Modifier
             .fillMaxSize()
             .EInkPageSwipe(
@@ -295,9 +306,37 @@ private fun ResultList(
                 onPageDown = onPageDown
             )
     ) {
-        items(state.results, key = { it.resultKey }) { book ->
-            ResultItem(book = book, inShelf = isInBookshelf(book), onClick = { onBookClick(book) })
-            EInkHorizontalDivider()
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(
+                    start = EInkSpacing.m,
+                    end = EInkSpacing.m,
+                    top = EInkSpacing.s,
+                    bottom = EInkSpacing.s
+                ),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.Center,
+        ) {
+            EInkText(
+                text = "结果 ${state.results.size} · 进度 " +
+                    "${state.searchedSources}/${state.totalSources}",
+                style = EInkTheme.typography.labelMedium,
+                color = EInkTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        LazyColumn(
+            state = pagerListState,
+            userScrollEnabled = false,
+            overscrollEffect = null,
+            modifier = Modifier
+                .fillMaxWidth()
+                .weight(1f)
+        ) {
+            items(state.results, key = { it.resultKey }) { book ->
+                ResultItem(book = book, inShelf = isInBookshelf(book), onClick = { onBookClick(book) })
+                EInkHorizontalDivider()
+            }
         }
     }
 }
@@ -377,6 +416,8 @@ private fun ResultItem(book: SearchBookUiModel, inShelf: Boolean, onClick: () ->
  *
  * 每个搜索词为一枚 chip 样式 [EInkButton]，一行 chip =
  * LazyColumn 一项（行内容由上层预计算，见 [chunkHistoryRows]）。
+ * 标题行固定在列表容器之外：翻页只翻动 chip 行，「搜索历史」
+ * 恒在顶部原位置不被翻走；整页翻页手势挂在含标题的整个区域。
  * 交互（参考 JBusDriver 搜索历史）：
  *  - 常态：点 chip 即搜索该词；
  *  - 删除态：chip 文字尾部附加 ✕，整枚 chip 点击删除该条（E-Ink 上
@@ -396,10 +437,7 @@ private fun HistoryList(
     onPageUp: () -> Unit,
     onPageDown: () -> Unit,
 ) {
-    LazyColumn(
-        state = pagerListState,
-        userScrollEnabled = false,
-        overscrollEffect = null,
+    Column(
         modifier = Modifier
             .fillMaxSize()
             .EInkPageSwipe(
@@ -407,69 +445,77 @@ private fun HistoryList(
                 onPageDown = onPageDown
             )
     ) {
-        item(key = "history_header") {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(
-                        start = EInkSpacing.m,
-                        end = EInkSpacing.m,
-                        top = EInkSpacing.xs
-                    ),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(
+                    start = EInkSpacing.m,
+                    end = EInkSpacing.m,
+                    top = EInkSpacing.s,
+                    bottom = EInkSpacing.s
+                ),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            EInkText(
+                text = "搜索历史",
+                style = EInkTheme.typography.titleMedium,
+                modifier = Modifier.weight(1f)
+            )
+            if (isDeleting) {
                 EInkText(
-                    text = "搜索历史",
-                    style = EInkTheme.typography.labelLarge,
-                    modifier = Modifier.weight(1f)
+                    text = "全部删除",
+                    style = EInkTheme.typography.labelMedium,
+                    color = EInkTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.clickable {
+                        onClearHistory()
+                        onDeleteModeChange(false)
+                    }
                 )
-                if (isDeleting) {
-                    EInkText(
-                        text = "全部删除",
-                        style = EInkTheme.typography.labelMedium,
-                        color = EInkTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.clickable {
-                            onClearHistory()
-                            onDeleteModeChange(false)
-                        }
-                    )
-                    Spacer(modifier = Modifier.width(EInkSpacing.m))
-                    EInkText(
-                        text = "完成",
-                        style = EInkTheme.typography.labelMedium,
-                        color = EInkTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.clickable { onDeleteModeChange(false) }
-                    )
-                } else {
-                    EInkText(
-                        text = "删除",
-                        style = EInkTheme.typography.labelMedium,
-                        color = EInkTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.clickable { onDeleteModeChange(true) }
-                    )
-                }
+                Spacer(modifier = Modifier.width(EInkSpacing.m))
+                EInkText(
+                    text = "完成",
+                    style = EInkTheme.typography.labelMedium,
+                    color = EInkTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.clickable { onDeleteModeChange(false) }
+                )
+            } else {
+                EInkText(
+                    text = "删除",
+                    style = EInkTheme.typography.labelMedium,
+                    color = EInkTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.clickable { onDeleteModeChange(true) }
+                )
             }
         }
-        items(rows, key = { it.first().word }) { row ->
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = EInkSpacing.m, vertical = EInkSpacing.xs),
-                horizontalArrangement = Arrangement.spacedBy(HistoryChipSpacing),
-            ) {
-                row.forEach { keyword ->
-                    EInkButton(
-                        text = keyword.word + if (isDeleting) HistoryDeleteMarkSuffix else "",
-                        onClick = {
-                            if (isDeleting) onRemoveHistory(keyword.word)
-                            else onSearch(keyword.word)
-                        },
-                        height = HistoryChipHeight,
-                        style = EInkTheme.typography.labelMedium,
-                        contentPadding = PaddingValues(horizontal = HistoryChipContentPadding),
-                        onClickLabel = if (isDeleting) "删除此搜索记录" else null,
-                        modifier = Modifier.widthIn(max = maxChipWidth),
-                    )
+        LazyColumn(
+            state = pagerListState,
+            userScrollEnabled = false,
+            overscrollEffect = null,
+            modifier = Modifier
+                .fillMaxWidth()
+                .weight(1f)
+        ) {
+            items(rows, key = { it.first().word }) { row ->
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = EInkSpacing.m, vertical = EInkSpacing.xs),
+                    horizontalArrangement = Arrangement.spacedBy(HistoryChipSpacing),
+                ) {
+                    row.forEach { keyword ->
+                        EInkButton(
+                            text = keyword.word + if (isDeleting) HistoryDeleteMarkSuffix else "",
+                            onClick = {
+                                if (isDeleting) onRemoveHistory(keyword.word)
+                                else onSearch(keyword.word)
+                            },
+                            height = HistoryChipHeight,
+                            style = EInkTheme.typography.labelMedium,
+                            contentPadding = PaddingValues(horizontal = HistoryChipContentPadding),
+                            onClickLabel = if (isDeleting) "删除此搜索记录" else null,
+                            modifier = Modifier.widthIn(max = maxChipWidth),
+                        )
+                    }
                 }
             }
         }

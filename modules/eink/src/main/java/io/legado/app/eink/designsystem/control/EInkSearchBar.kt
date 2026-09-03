@@ -1,5 +1,6 @@
 package io.legado.app.eink.designsystem.control
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
@@ -8,6 +9,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
@@ -23,10 +25,15 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
+import io.legado.app.eink.R
 import io.legado.app.eink.designsystem.content.EInkText
+import io.legado.app.eink.designsystem.interaction.einkClickable
 import io.legado.app.eink.designsystem.theme.EInkShapes
 import io.legado.app.eink.designsystem.theme.EInkSpacing
 import io.legado.app.eink.designsystem.theme.EInkTheme
@@ -67,6 +74,7 @@ fun EInkSearchHintBar(
  *
  * @param onImeAction 输入法"搜索"键回调（与点击搜索按钮同一触发）
  * @param autoFocus 进入即聚焦并拉起输入法
+ * @param onClear 输入框内一键清空回调：非空且有输入时在胶囊右端显示 ✕ 图标
  */
 @Composable
 fun EInkSearchInputBar(
@@ -76,6 +84,7 @@ fun EInkSearchInputBar(
     hint: String = "搜索书名 / 作者",
     onImeAction: () -> Unit = {},
     autoFocus: Boolean = false,
+    onClear: (() -> Unit)? = null,
     action: (@Composable () -> Unit)? = null,
 ) {
     val focusRequester = remember { FocusRequester() }
@@ -107,20 +116,47 @@ fun EInkSearchInputBar(
                     .fillMaxWidth()
                     .focusRequester(focusRequester),
                 decorationBox = { innerTextField ->
-                    Box(
+                    Row(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(horizontal = EInkSpacing.m),
-                        contentAlignment = Alignment.CenterStart
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        if (value.isEmpty()) {
-                            EInkText(
-                                text = hint,
-                                style = EInkTheme.typography.bodyMedium,
-                                color = EInkTheme.colorScheme.onSurfaceVariant
-                            )
+                        Box(
+                            modifier = Modifier.weight(1f),
+                            contentAlignment = Alignment.CenterStart
+                        ) {
+                            if (value.isEmpty()) {
+                                EInkText(
+                                    text = hint,
+                                    style = EInkTheme.typography.bodyMedium,
+                                    color = EInkTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                            innerTextField()
                         }
-                        innerTextField()
+                        if (onClear != null && value.isNotEmpty()) {
+                            Box(
+                                modifier = Modifier
+                                    .padding(start = EInkSpacing.s)
+                                    .einkClickable(
+                                        role = Role.Button,
+                                        onClickLabel = "清空输入",
+                                        onClick = onClear,
+                                    )
+                                    .padding(EInkSpacing.s),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Image(
+                                    painter = painterResource(R.drawable.eink_ic_close),
+                                    contentDescription = null,
+                                    modifier = Modifier.size(ClearIconSize),
+                                    colorFilter = ColorFilter.tint(
+                                        EInkTheme.colorScheme.onSurfaceVariant
+                                    )
+                                )
+                            }
+                        }
                     }
                 }
             )
@@ -167,3 +203,6 @@ private fun SearchBarShell(
 
 private val SearchBarHeight = 64.dp
 private val SearchInputHeight = 44.dp
+
+/** 输入框内清空 ✕ 图标尺寸（44dp 胶囊内，热区由两侧 8dp 内边距扩展）。 */
+private val ClearIconSize = 20.dp

@@ -115,6 +115,10 @@ data class SearchUiState(
     val isSearching: Boolean = false,
     val searched: Boolean = false,
     val isEmptyResult: Boolean = false,
+    /** 书源维度搜索进展（已完成源数），搜索中顶部提示用。 */
+    val searchedSources: Int = 0,
+    /** 参与搜索的书源总数。 */
+    val totalSources: Int = 0,
 ) {
 
     /** 无结果且不在搜索中 */
@@ -143,7 +147,15 @@ class SearchViewModel(application: Application) : AndroidViewModel(application) 
         object : SearchSessionCallback {
 
             override fun onSearchStart() {
-                _uiState.update { it.copy(isSearching = true) }
+                _uiState.update {
+                    it.copy(isSearching = true, searchedSources = 0, totalSources = 0)
+                }
+            }
+
+            override fun onSearchProgress(processedSources: Int, totalSources: Int) {
+                _uiState.update {
+                    it.copy(searchedSources = processedSources, totalSources = totalSources)
+                }
             }
 
             override fun onSearchSuccess(books: List<SearchBookUiModel>) {

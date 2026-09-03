@@ -1,0 +1,11 @@
+<!-- Material close（24px）：搜索框内一键清空按钮。着色由渲染侧
+     ColorFilter 统一处理，同模块其它 eink_ic_* 素材约定。 -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:fillColor="#FF000000"
+        android:pathData="M19,6.41l-1.41,-1.41 -5.59,5.58 -5.59,-5.58 -1.41,1.41 5.58,5.59 -5.58,5.59 1.41,1.41 5.59,-5.58 5.59,5.58 1.41,-1.41 -5.58,-5.59z" />
+</vector>
