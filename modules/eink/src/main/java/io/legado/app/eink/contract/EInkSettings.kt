@@ -12,12 +12,8 @@ import android.content.SharedPreferences
  */
 object EInkSettings {
 
-    /** 自动翻页默认间隔（秒）。 */
-    const val DEFAULT_AUTO_INTERVAL_SEC = 20
-
     private const val KEY_BOOKSHELF_GRID = "einkBookshelfGrid"
     private const val KEY_READER_KEEP_SCREEN_ON = "einkReaderKeepScreenOn"
-    private const val KEY_READER_AUTO_INTERVAL_SEC = "einkReaderAutoIntervalSec"
 
     @Volatile
     private var prefs: SharedPreferences? = null
@@ -47,9 +43,4 @@ object EInkSettings {
     var readerKeepScreenOn: Boolean
         get() = requirePrefs().getBoolean(KEY_READER_KEEP_SCREEN_ON, false)
         set(value) = requirePrefs().edit().putBoolean(KEY_READER_KEEP_SCREEN_ON, value).apply()
-
-    /** 自动翻页间隔（秒）。 */
-    var readerAutoIntervalSec: Int
-        get() = requirePrefs().getInt(KEY_READER_AUTO_INTERVAL_SEC, DEFAULT_AUTO_INTERVAL_SEC)
-        set(value) = requirePrefs().edit().putInt(KEY_READER_AUTO_INTERVAL_SEC, value).apply()
 }

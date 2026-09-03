@@ -6,9 +6,9 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -25,28 +25,27 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import io.legado.app.eink.R
 import io.legado.app.eink.contract.ReaderTextStyle
 import io.legado.app.eink.designsystem.content.EInkHorizontalDivider
 import io.legado.app.eink.designsystem.content.EInkText
+import io.legado.app.eink.designsystem.control.EInkButton
 import io.legado.app.eink.designsystem.control.EInkSteppedSlider
 import io.legado.app.eink.designsystem.interaction.eInkActionColors
 import io.legado.app.eink.designsystem.interaction.einkClickable
 import io.legado.app.eink.designsystem.interaction.rememberImmediatePressState
 import io.legado.app.eink.designsystem.navigation.EInkOperationBarIcon
 import io.legado.app.eink.designsystem.navigation.EInkTopBar
-import io.legado.app.eink.designsystem.theme.EInkShapes
 import io.legado.app.eink.designsystem.theme.EInkSpacing
 import io.legado.app.eink.designsystem.theme.EInkTheme
+import kotlin.math.abs
 import kotlin.math.roundToInt
 
 /** 设置面板类型（UI 局部状态，见 Route 中的 remember）。 */
-internal enum class ReaderPanel { LAYOUT, OTHER, CACHE }
+internal enum class ReaderPanel { LAYOUT, PROGRESS, OTHER, CACHE }
 
 /** 操作条高度（与全局顶/底栏一致）。 */
 private val BarHeight = 56.dp
@@ -136,7 +135,6 @@ internal fun ReaderBottomBar(
     selectedPanel: ReaderPanel?,
     onBarBack: () -> Unit,
     onOpenToc: () -> Unit,
-    onToggleAutoPlay: () -> Unit,
     onOpenPanel: (ReaderPanel) -> Unit,
 ) {
     Column(modifier = Modifier.fillMaxWidth()) {
@@ -162,9 +160,9 @@ internal fun ReaderBottomBar(
             )
             BottomIconAction(
                 iconRes = if (state.autoPlay) R.drawable.eink_ic_auto_page_stop else R.drawable.eink_ic_auto_page,
-                contentDescription = if (state.autoPlay) "停止翻页" else "自动翻页",
-                selected = state.autoPlay,
-                onClick = onToggleAutoPlay,
+                contentDescription = "进度与翻页",
+                selected = selectedPanel == ReaderPanel.PROGRESS,
+                onClick = { onOpenPanel(ReaderPanel.PROGRESS) },
             )
             BottomIconAction(
                 iconRes = R.drawable.eink_ic_interface_setting,
@@ -201,6 +199,108 @@ private fun BottomIconAction(
         onClick = onClick,
         selected = selected,
     )
+}
+
+// ====================================================================
+// 进度与翻页面板：页内进度 / 自动翻页间隔 / 自动翻页开关
+// ====================================================================
+
+/**
+ * 自动翻页间隔档位（秒）：非线性映射——短时长逐秒细步进，
+ * 长时长不常用，5/10/30 秒粗步进直到 120。
+ */
+private val AutoIntervalStepsSec = listOf(
+    1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 15, 20, 25, 30, 40, 50, 60, 90, 120
+)
+
+/** 秒 → 最近档位索引（完整模式 UI 写入的表外值显示时就近吸附）。 */
+private fun autoIntervalStepOf(sec: Int): Int =
+    AutoIntervalStepsSec.indices.minByOrNull { abs(AutoIntervalStepsSec[it] - sec) } ?: 0
+
+@Composable
+internal fun ReaderProgressPanel(
+    state: ReaderUiState,
+    onPrevChapter: () -> Unit,
+    onNextChapter: () -> Unit,
+    onSkipToPage: (Int) -> Unit,
+    onSetAutoInterval: (Int) -> Unit,
+    onToggleAutoPlay: () -> Unit,
+) {
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(EInkSpacing.s),
+    ) {
+        PageProgressRow(
+            state = state,
+            onPrevChapter = onPrevChapter,
+            onNextChapter = onNextChapter,
+            onSkipToPage = onSkipToPage,
+        )
+        // 间隔滑条仅在自动翻页开启后出现，供运行中调节
+        // （收起菜单时按新时长启动/重启倒计时）
+        if (state.autoPlay) {
+            SliderRow(
+                label = null,
+                value = autoIntervalStepOf(state.autoPlayIntervalSec),
+                valueRange = 0..AutoIntervalStepsSec.lastIndex,
+                thumbLabel = { "${AutoIntervalStepsSec[it]}s" },
+                tickStep = 0,
+                onSetValue = { step -> onSetAutoInterval(AutoIntervalStepsSec[step]) },
+            )
+        }
+        // 自动翻页动作：横向占满；运行中（含菜单打开时的暂停）实心反白
+        EInkButton(
+            text = if (state.autoPlay) "停止自动翻页" else "开启自动翻页",
+            onClick = onToggleAutoPlay,
+            modifier = Modifier.fillMaxWidth(),
+            selected = state.autoPlay,
+            style = EInkTheme.typography.bodyMedium,
+            onClickLabel = if (state.autoPlay) "停止自动翻页" else "开启自动翻页",
+        )
+    }
+}
+
+@Composable
+private fun PageProgressRow(
+    state: ReaderUiState,
+    onPrevChapter: () -> Unit,
+    onNextChapter: () -> Unit,
+    onSkipToPage: (Int) -> Unit,
+) {
+    val maxPage = (state.pageCount - 1).coerceAtLeast(0)
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(48.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        EInkButton(
+            text = "上一章",
+            onClick = onPrevChapter,
+            enabled = state.chapterIndex > 0,
+            bordered = false,
+            style = EInkTheme.typography.bodyMedium,
+            contentPadding = PaddingValues(horizontal = 14.dp),
+        )
+        EInkSteppedSlider(
+            value = state.pageIndex.coerceIn(0, maxPage),
+            onValueChange = onSkipToPage,
+            valueRange = 0..(if (maxPage > 0) maxPage else 0),
+            modifier = Modifier.weight(1f),
+            enabled = maxPage > 0,
+            thumbLabel = { "${it + 1}" },
+            tickStep = 0,
+        )
+        EInkButton(
+            text = "下一章",
+            onClick = onNextChapter,
+            enabled = state.chapterIndex < state.chapterSize - 1,
+            bordered = false,
+            style = EInkTheme.typography.bodyMedium,
+            contentPadding = PaddingValues(horizontal = 14.dp),
+        )
+    }
 }
 
 // ====================================================================
@@ -524,7 +624,6 @@ private fun CloseButton(onClose: () -> Unit) {
 /** 面板 Tab 行：选中项反白，按压瞬时反色，零动画直接切换。 */
 @Composable
 private fun PanelTabRow(labels: List<String>, selected: Int, onSelect: (Int) -> Unit) {
-    val scheme = EInkTheme.colorScheme
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -532,31 +631,14 @@ private fun PanelTabRow(labels: List<String>, selected: Int, onSelect: (Int) -> 
         horizontalArrangement = Arrangement.spacedBy(EInkSpacing.s),
     ) {
         labels.forEachIndexed { index, label ->
-            val press = rememberImmediatePressState()
-            val colors = eInkActionColors(pressed = press.isPressed, selected = index == selected)
-            // 按压/选中时边框取容器色（黑），常态为轮廓线
-            val borderColor = if (colors.containerColor != Color.Transparent) {
-                colors.containerColor
-            } else {
-                scheme.outline
-            }
-            Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .defaultMinSize(minHeight = 40.dp)
-                    .then(press.modifier)
-                    .background(color = colors.containerColor, shape = EInkShapes.small)
-                    .border(width = 1.dp, color = borderColor, shape = EInkShapes.small)
-                    .einkClickable(role = Role.Tab, onClick = { onSelect(index) }),
-                contentAlignment = Alignment.Center,
-            ) {
-                EInkText(
-                    text = label,
-                    color = colors.contentColor,
-                    style = EInkTheme.typography.labelLarge,
-                    maxLines = 1,
-                )
-            }
+            EInkButton(
+                text = label,
+                onClick = { onSelect(index) },
+                modifier = Modifier.weight(1f),
+                selected = index == selected,
+                height = 40.dp,
+                role = Role.Tab,
+            )
         }
     }
 }
@@ -570,16 +652,9 @@ internal fun ReaderOtherPanel(
     state: ReaderUiState,
     onToggleKeepScreenOn: () -> Unit,
     onToggleTextBold: () -> Unit,
-    onAdjustAutoInterval: (Int) -> Unit,
 ) {
     ToggleRow(label = "保持屏幕常亮", checked = state.keepScreenOn, onToggle = onToggleKeepScreenOn)
     ToggleRow(label = "正文加粗", checked = state.textBold, onToggle = onToggleTextBold)
-    StepperRow(
-        label = "自动翻页间隔",
-        value = "${state.autoPlayIntervalSec} 秒",
-        onDecrement = { onAdjustAutoInterval(-5) },
-        onIncrement = { onAdjustAutoInterval(5) },
-    )
 }
 
 // ====================================================================
@@ -598,48 +673,15 @@ internal fun ReaderCachePanel(onCache: (Int) -> Unit) {
 // 通用行组件
 // ====================================================================
 
-/** 步进行：标签在左，[-] 值 [+] 在右。 */
-@Composable
-private fun StepperRow(
-    label: String,
-    value: String,
-    onDecrement: () -> Unit,
-    onIncrement: () -> Unit,
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(48.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        EInkText(
-            text = label,
-            modifier = Modifier.weight(1f),
-            style = EInkTheme.typography.bodyMedium,
-        )
-        StepButton(glyph = "−", onClickLabel = "减小", onClick = onDecrement)
-        Box(
-            modifier = Modifier.width(76.dp),
-            contentAlignment = Alignment.Center,
-        ) {
-            EInkText(
-                text = value,
-                style = EInkTheme.typography.bodyMedium,
-                textAlign = TextAlign.Center,
-            )
-        }
-        StepButton(glyph = "＋", onClickLabel = "增大", onClick = onIncrement)
-    }
-}
-
 /**
- * 档位滑条行：标签在左，[−] 滑条 [+] 在右，当前数值印在滑块上。
+ * 档位滑条行：标签在左（可空，空时滑条占满），[−] 滑条 [+] 在右，
+ * 当前数值印在滑块上。
  *
- * 滑条支持拖动选值与点按轨道跳档，[−]/[+] 为 ±1 逐级精调（行内按值域钳制）。
+ * 滑条支持拖动选值与点按轨道跳档，[−]/[+] 为逐档精调（行内按值域钳制）。
  */
 @Composable
 private fun SliderRow(
-    label: String,
+    label: String?,
     value: Int,
     valueRange: IntRange,
     thumbLabel: (Int) -> String,
@@ -653,15 +695,21 @@ private fun SliderRow(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(EInkSpacing.xs),
     ) {
-        EInkText(
-            text = label,
-            modifier = Modifier.width(SliderLabelWidth),
-            style = EInkTheme.typography.bodyMedium,
-        )
-        StepButton(
-            glyph = "−",
-            onClickLabel = "减小",
+        if (label != null) {
+            EInkText(
+                text = label,
+                modifier = Modifier.width(SliderLabelWidth),
+                style = EInkTheme.typography.bodyMedium,
+            )
+        }
+        EInkButton(
+            text = "−",
             onClick = { onSetValue((value - 1).coerceIn(valueRange.first, valueRange.last)) },
+            modifier = Modifier.size(StepTouchTarget),
+            bordered = false,
+            height = null,
+            style = EInkTheme.typography.titleLarge,
+            onClickLabel = "减小",
         )
         EInkSteppedSlider(
             value = value,
@@ -671,61 +719,25 @@ private fun SliderRow(
             thumbLabel = thumbLabel,
             tickStep = tickStep,
         )
-        StepButton(
-            glyph = "＋",
-            onClickLabel = "增大",
+        EInkButton(
+            text = "＋",
             onClick = { onSetValue((value + 1).coerceIn(valueRange.first, valueRange.last)) },
-        )
-    }
-}
-
-@Composable
-private fun StepButton(glyph: String, onClickLabel: String, onClick: () -> Unit) {
-    // 按压反色（共享配色解析 + 120ms 最短保持，规范 §35）
-    val press = rememberImmediatePressState()
-    val colors = eInkActionColors(pressed = press.isPressed)
-    Box(
-        modifier = Modifier
-            .size(StepTouchTarget)
-            .then(press.modifier)
-            .background(colors.containerColor)
-            .einkClickable(role = Role.Button, onClickLabel = onClickLabel, onClick = onClick),
-        contentAlignment = Alignment.Center,
-    ) {
-        EInkText(
-            text = glyph,
+            modifier = Modifier.size(StepTouchTarget),
+            bordered = false,
+            height = null,
             style = EInkTheme.typography.titleLarge,
-            color = colors.contentColor,
+            onClickLabel = "增大",
         )
     }
 }
 
-/** 开关行：标签在左，状态块在右（开启实心黑）；按压时整行反色。 */
+/** 开关行：标签在左（纯展示），开/关块在右（EInkButton，开启实心）。 */
 @Composable
 private fun ToggleRow(label: String, checked: Boolean, onToggle: () -> Unit) {
-    val scheme = EInkTheme.colorScheme
-    // 按压反色：整行黑底、文字白字，状态块同步反转（块内配色是反色的反色，属特例）
-    val press = rememberImmediatePressState()
-    val isPressed = press.isPressed
-    val rowColors = eInkActionColors(pressed = isPressed)
-    val blockContainer = when {
-        isPressed -> scheme.surface
-        checked -> scheme.primary
-        else -> Color.Transparent
-    }
-    val blockContent = when {
-        isPressed -> scheme.onSurface
-        checked -> scheme.onPrimary
-        else -> scheme.onSurfaceVariant
-    }
-    val blockBorder = if (isPressed) scheme.surface else scheme.outline
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .height(48.dp)
-            .then(press.modifier)
-            .background(rowColors.containerColor)
-            .einkClickable(role = Role.Switch, onClick = onToggle)
             .padding(end = EInkSpacing.s),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -733,21 +745,15 @@ private fun ToggleRow(label: String, checked: Boolean, onToggle: () -> Unit) {
             text = label,
             modifier = Modifier.weight(1f),
             style = EInkTheme.typography.bodyMedium,
-            color = rowColors.contentColor,
         )
-        Box(
-            modifier = Modifier
-                .size(width = 64.dp, height = 36.dp)
-                .background(color = blockContainer, shape = EInkShapes.small)
-                .border(width = 1.dp, color = blockBorder, shape = EInkShapes.small),
-            contentAlignment = Alignment.Center,
-        ) {
-            EInkText(
-                text = if (checked) "开" else "关",
-                color = blockContent,
-                style = EInkTheme.typography.labelLarge,
-            )
-        }
+        EInkButton(
+            text = if (checked) "开" else "关",
+            onClick = onToggle,
+            modifier = Modifier.width(64.dp),
+            height = 44.dp,
+            selected = checked,
+            role = Role.Switch,
+        )
     }
 }
 
