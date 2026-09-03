@@ -1,7 +1,5 @@
 package io.legado.app.eink.contract
 
-import android.graphics.Typeface
-
 
 /** 阅读会话书籍快照（ReadBook.book 的模块侧投影）。 */
 interface ReaderBookSnapshot {
@@ -166,14 +164,6 @@ interface ReaderEngine {
 
     /** 从宿主配置读取当前排版快照。 */
     fun currentStyle(): ReaderTextStyle
-
-    /**
-     * 与引擎排版测量同源的正文字体（已含 textBold 字重变换）。
-     *
-     * 页面快照的列坐标是引擎按此字体测量的，模块画布必须用同字体绘制，
-     * 否则字形宽度与列坐标错位；null 时模块回落系统默认字体。
-     */
-    val contentTextTypeface: Typeface?
 
     /** 清空章节缓存并按当前进度重新排版（调参防抖后触发）。 */
     fun relayout()
