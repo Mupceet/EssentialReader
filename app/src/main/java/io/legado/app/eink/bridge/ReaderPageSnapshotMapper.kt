@@ -8,8 +8,6 @@ import io.legado.app.eink.contract.ReaderImageSlot
 import io.legado.app.eink.contract.ReaderPageSnapshot
 import io.legado.app.eink.contract.ReaderPageLine
 import io.legado.app.eink.contract.ReaderPaintSpec
-import io.legado.app.eink.contract.ReaderShadowSpec
-import io.legado.app.help.config.ReadBookConfig
 import io.legado.app.model.ImageProvider
 import io.legado.app.ui.book.read.page.entities.TextPage
 import io.legado.app.ui.book.read.page.entities.column.ImageColumn
@@ -24,26 +22,23 @@ import io.legado.app.ui.book.read.page.provider.ChapterProvider
  * 画布只有一份绘制实现。API35+ 的逐字字距半格补偿（View 版画布行为）
  * 在映射期算进 x 坐标，模块不再感知。
  *
- * 画笔规格从 [ChapterProvider] 共享画笔全量拷贝 —— 排版配置与完整模式
- * 共享，斜体/阴影/可变字重等完整模式设置在 E-Ink 必须同样可见。
+ * 画笔规格只拷贝测量耦合参数（字号/字距/字体/可变字重）——快照列坐标
+ * 是引擎按这些参数测量的，模块必须按同值绘制才不错位；阴影/斜体等纯
+ * 视觉效果不跨桥（E-Ink 阅读不渲染，既定产品取舍）。
  *
  * 在引擎回调线程调用（onUpContent 内），产物不可变、跨线程安全。
  */
 internal object ReaderPageSnapshotMapper {
 
     /** 生产入口：规格取自引擎当前共享画笔，补偿按真实 SDK 版本。 */
-    fun map(page: TextPage): ReaderPageSnapshot {
-        // 阴影不读 Paint：shadowLayer* getter 系 API 29+（minSdk 26 触即 NoSuchMethodError），
-        // 改按 upStyle 同源配置构造。upStyle 对标题/正文两支画笔写入同一组阴影值，取一次共用。
-        val shadow = shadowSpecFromConfig()
-        return mapWithSpecs(
+    fun map(page: TextPage): ReaderPageSnapshot =
+        mapWithSpecs(
             page = page,
-            titleSpec = ChapterProvider.titlePaint.copyPaintSpec(shadow),
-            contentSpec = ChapterProvider.contentPaint.copyPaintSpec(shadow),
+            titleSpec = ChapterProvider.titlePaint.copyPaintSpec(),
+            contentSpec = ChapterProvider.contentPaint.copyPaintSpec(),
             sdkInt = Build.VERSION.SDK_INT,
             imageLoader = ::defaultImageLoader,
         )
-    }
 
     /** 纯函数核心（单测直接喂规格与 SDK 版本）。 */
     internal fun mapWithSpecs(
@@ -121,34 +116,13 @@ internal object ReaderPageSnapshotMapper {
 }
 
 /**
- * 引擎画笔 → 渲染规格（全量拷贝 upStyle 设置的属性；color 除外，
- * 由模块主题自涂）。阴影不读 Paint——shadowLayer* getter 系 API 29+ 新增
- * （minSdk 26 下会 NoSuchMethodError），由调用方经 [shadowSpecFromConfig]
- * 按 upStyle 同源配置传入。
+ * 引擎画笔 → 渲染规格（只拷贝测量耦合参数；color 由模块主题自涂，
+ * 阴影/斜体/linearText 等纯视觉效果不跨桥）。这些 getter 的 API 级别
+ * 均 ≤ 26（= :app minSdk），无需门控。
  */
-internal fun Paint.copyPaintSpec(shadow: ReaderShadowSpec?): ReaderPaintSpec = ReaderPaintSpec(
+internal fun Paint.copyPaintSpec(): ReaderPaintSpec = ReaderPaintSpec(
     textSizePx = textSize, // API 1
     letterSpacing = letterSpacing, // API 21
     typeface = typeface, // API 1
     fontVariationSettings = fontVariationSettings, // API 26 = minSdk
-    textSkewX = textSkewX, // API 1
-    isLinearText = isLinearText, // API 1
-    shadow = shadow,
 )
-
-/**
- * 阴影规格：按 [ChapterProvider.upStyle] 的同源条件与字段从 ReadBookConfig
- * 构造（textShadow 门控；shadowRadius/shadowDx/shadowDy/textShadowColor 原样
- * 透传，upStyle 写入画笔时无单位换算）；textShadow 为 false 时返回 null。
- */
-internal fun shadowSpecFromConfig(): ReaderShadowSpec? =
-    if (ReadBookConfig.textShadow) {
-        ReaderShadowSpec(
-            radius = ReadBookConfig.shadowRadius,
-            dx = ReadBookConfig.shadowDx,
-            dy = ReadBookConfig.shadowDy,
-            color = ReadBookConfig.textShadowColor,
-        )
-    } else {
-        null
-    }

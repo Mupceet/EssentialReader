@@ -26,9 +26,11 @@
   `SearchResultRef`：引擎实体的不透明句柄。宿主 bridge 包装真实实体，
   模块只持有、回传，不解读。
 - **`ReaderPageSnapshot.kt`** — 排版产物快照（含 `ReaderPageLine` /
-  `ReaderImageSlot` / `ReaderPaintSpec` / `ReaderShadowSpec`）：宿主把引擎
-  TextPage 映射而来（本仓见宿主 `ReaderPageSnapshotMapper`），模块自持
-  画布据此绘制。坐标系、所有权规则见文件头 KDoc。
+  `ReaderImageSlot` / `ReaderPaintSpec`）：宿主把引擎 TextPage 映射而来
+  （本仓见宿主 `ReaderPageSnapshotMapper`），模块自持画布据此绘制。
+  `ReaderPaintSpec` 只含测量耦合参数（字号/字距/字体/可变字重）——列坐标
+  是引擎按它们测量的；阴影/斜体等纯视觉效果不跨桥，E-Ink 不渲染。
+  坐标系、所有权规则见文件头 KDoc。
 - **`ReaderTextStyle.kt`** — 排版参数快照：设置面板编辑 →
   `ReaderEngine.applyStyle` 整体写入宿主配置；`currentStyle()` 读回。
   字段单位与编辑区间见文件头 KDoc。

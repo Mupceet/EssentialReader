@@ -26,8 +26,9 @@ import io.legado.app.eink.designsystem.theme.EInkTheme
  * 完成，这里不做二次排版 —— 结果与 View 版 ContentTextView 一致。
  *
  * 字色随日/夜间主题每次绘制前钉上（首帧即正确，主题切换重组自动重绘）；
- * 画笔渲染规格（字号/字距/字体/斜体/阴影等）取自快照规格 —— 引擎配置与
- * 完整模式共享，完整模式设置的斜体/阴影在 E-Ink 同样可见。
+ * 画笔渲染规格（字号/字距/字体/可变字重）取自快照规格——这些参数与引擎
+ * 排版测量耦合，必须按同值绘制才不错位。阴影/斜体等纯视觉效果不跨桥、
+ * 不渲染（E-Ink 既定取舍，宿主配置了也不生效）。
  *
  * [pageVersion] 用于强制重绘（引擎可能原地更新同一排版实例后仅推版本号）。
  *
@@ -86,8 +87,10 @@ private fun drawImageSlot(canvas: Canvas, slot: ReaderImageSlot, paint: Paint) {
 }
 
 /**
- * 把快照规格应用到画笔。API35+ 的逐字半格补偿已在映射期算进 x，画笔
- * 字距保持引擎原值（单字符 drawText 的字形行为与 View 版一致）。
+ * 把快照规格应用到画笔。规格只含测量耦合参数（字号/字距/字体/可变字重），
+ * 阴影/斜体等纯视觉效果不跨桥、不渲染（E-Ink 既定取舍）。API35+ 的逐字
+ * 半格补偿已在映射期算进 x，画笔字距保持引擎原值（单字符 drawText 的
+ * 字形行为与 View 版一致）。
  */
 private fun Paint.applySpec(spec: ReaderPaintSpec, colorArgb: Int) {
     // 引擎 upStyle 硬编码 isAntiAlias = true，显式对齐（不依赖 Paint() 默认 flags）
@@ -96,16 +99,8 @@ private fun Paint.applySpec(spec: ReaderPaintSpec, colorArgb: Int) {
     textSize = spec.textSizePx
     letterSpacing = spec.letterSpacing
     typeface = spec.typeface ?: Typeface.DEFAULT
-    textSkewX = spec.textSkewX
-    isLinearText = spec.isLinearText
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
         // 空字符串 = 清除可变字重设置（宿主 null 对应引擎未设置）
         fontVariationSettings = spec.fontVariationSettings ?: ""
-    }
-    val shadow = spec.shadow
-    if (shadow != null) {
-        setShadowLayer(shadow.radius, shadow.dx, shadow.dy, shadow.color)
-    } else {
-        clearShadowLayer()
     }
 }
