@@ -58,4 +58,7 @@ dependencies {
     // Tooling (debug only)
     debugImplementation(libs.androidx.compose.ui.tooling)
     debugImplementation(libs.androidx.compose.ui.tooling.preview)
+
+    // Unit tests（纯函数 JVM 测试，无需 Robolectric）
+    testImplementation(libs.junit)
 }

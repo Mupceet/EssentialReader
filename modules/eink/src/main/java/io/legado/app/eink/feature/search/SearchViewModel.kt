@@ -15,6 +15,64 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 /**
+ * 结果条目身份键（与结果列表 LazyColumn 的 key 同式）。
+ */
+internal val SearchBookUiModel.resultKey: String
+    get() = "$origin-$bookUrl"
+
+/**
+ * 将单源增量合并进已有结果：同 [resultKey] 原位覆盖，保持首见顺序。
+ *
+ * 上游 UseCase 的 upsertBooks 是逐源 delta，同一源返回同名同作者/同
+ * bookUrl 的多条时 delta 内会重复出现同一本书；不合并直接展示会导致
+ * LazyColumn key 重复崩溃。
+ */
+internal fun mergeSearchResults(
+    current: List<SearchBookUiModel>,
+    delta: List<SearchBookUiModel>,
+): List<SearchBookUiModel> {
+    val merged = LinkedHashMap<String, SearchBookUiModel>(current.size + delta.size)
+    current.forEach { merged[it.resultKey] = it }
+    delta.forEach { merged[it.resultKey] = it }
+    return merged.values.toList()
+}
+
+/**
+ * 与主搜索页 sortedWithSearchPriority 同语义的结果排序：
+ * 精确命中（name/author 等于关键词）→ 标签命中（kind 含关键词）→
+ * 包含命中（name/author 含关键词）→ 其他；前三桶按 origins 数降序稳定
+ * 排序（同数保持首见顺序），其他桶保持首见顺序。
+ *
+ * 非 DEFAULT 匹配模式下"其他"桶的剔除已由上游 UseCase 过滤完成，
+ * 这里恒按 DEFAULT 分支分桶，两种模式下顺序与主搜索页一致。
+ */
+internal fun sortSearchResults(
+    books: List<SearchBookUiModel>,
+    keyword: String,
+): List<SearchBookUiModel> {
+    val equalBooks = arrayListOf<SearchBookUiModel>()
+    val tagsBooks = arrayListOf<SearchBookUiModel>()
+    val containsBooks = arrayListOf<SearchBookUiModel>()
+    val otherBooks = arrayListOf<SearchBookUiModel>()
+    books.forEach { book ->
+        when {
+            book.name.equals(keyword, ignoreCase = true) ||
+                book.author.equals(keyword, ignoreCase = true) -> equalBooks.add(book)
+            book.kind?.contains(keyword, ignoreCase = true) == true -> tagsBooks.add(book)
+            book.name.contains(keyword, ignoreCase = true) ||
+                book.author.contains(keyword, ignoreCase = true) -> containsBooks.add(book)
+            else -> otherBooks.add(book)
+        }
+    }
+    return buildList(books.size) {
+        addAll(equalBooks.sortedByDescending { it.originsCount })
+        addAll(tagsBooks.sortedByDescending { it.originsCount })
+        addAll(containsBooks.sortedByDescending { it.originsCount })
+        addAll(otherBooks)
+    }
+}
+
+/**
  * 搜索 UiState（扁平布尔标志位）。
  */
 data class SearchUiState(
@@ -57,9 +115,10 @@ class SearchViewModel(application: Application) : AndroidViewModel(application) 
 
             override fun onSearchSuccess(books: List<SearchBookUiModel>) {
                 _uiState.update { state ->
+                    val merged = mergeSearchResults(state.results, books)
                     state.copy(
-                        results = books,
-                        isEmptyResult = books.isEmpty()
+                        results = sortSearchResults(merged, state.searchKey),
+                        isEmptyResult = merged.isEmpty()
                     )
                 }
             }

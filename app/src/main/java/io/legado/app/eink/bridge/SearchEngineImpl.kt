@@ -51,6 +51,8 @@ internal object SearchEngineImpl : SearchEngine, KoinComponent {
         bookUrl = bookUrl,
         name = name,
         author = author,
+        kind = kind,
+        originsCount = origins.size,
         coverUrl = coverUrl,
         intro = trimIntro(appCtx),
         latestChapterTitle = latestChapterTitle,
@@ -105,14 +107,18 @@ internal object SearchEngineImpl : SearchEngine, KoinComponent {
             cancelSearch()
             searchJob = scope.launch {
                 try {
+                    // 范围与匹配模式均沿用主搜索页的持久化 local_ui_status 键，
+                    // 保证同关键词下两侧结果集一致（MATCH_MODE 非 DEFAULT 时
+                    // UseCase 会在源头过滤）
                     val scopeRaw = persistedSearchScope()
+                    val matchMode = MatchMode.of(persistedMatchModeValue())
                     searchUseCase
                         .execute(
                             BookSearchRequest(
                                 keyword = key,
                                 page = 1,
                                 scope = BookSearchScope(scopeRaw),
-                                matchMode = MatchMode.DEFAULT,
+                                matchMode = matchMode,
                                 concurrency = downloadCacheSettingsGateway.currentSettings.threadCount,
                                 types = null,
                             ),
@@ -128,8 +134,8 @@ internal object SearchEngineImpl : SearchEngine, KoinComponent {
                                         )
                                     }
                                     // removedBookUrls（同书更好源替换）E-Ink 回调面
-                                    // 无对应投影，忽略 —— VM 按 bookUrl|origin 去重，
-                                    // 旧条目自然被新源结果覆盖展示
+                                    // 无对应投影，忽略 —— VM 按 origin-bookUrl
+                                    // 累积合并去重，同书重复增量自然覆盖
                                 }
                                 is SearchRunEvent.Finished ->
                                     callback.onSearchFinish(event.isEmpty, event.hasMore)
@@ -158,6 +164,13 @@ internal object SearchEngineImpl : SearchEngine, KoinComponent {
                 runCatching {
                     appCtx.localDataStore.data.first()[LocalPreferencesKeys.SEARCH_SCOPE]
                 }.getOrNull() ?: ""
+            }
+
+        private suspend fun persistedMatchModeValue(): Int =
+            withContext(Dispatchers.IO) {
+                runCatching {
+                    appCtx.localDataStore.data.first()[LocalPreferencesKeys.MATCH_MODE]
+                }.getOrNull() ?: MatchMode.DEFAULT.value
             }
     }
 }
