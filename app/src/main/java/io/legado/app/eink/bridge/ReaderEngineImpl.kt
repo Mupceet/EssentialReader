@@ -4,6 +4,7 @@ import io.legado.app.constant.AppConst
 import io.legado.app.constant.BookType
 import io.legado.app.data.appDb
 import io.legado.app.data.entities.Book
+import io.legado.app.data.repository.ReadSettingsRepository
 import io.legado.app.eink.contract.BookHandle
 import io.legado.app.eink.contract.ReaderPrepResult
 import io.legado.app.eink.contract.ReaderPageSnapshot
@@ -69,6 +70,7 @@ internal class ReaderBookSnapshotImpl(override val handle: BookHandle) : ReaderB
 internal object ReaderEngineImpl : ReaderEngine, KoinComponent {
 
     private val readStyleGateway: ReadStyleGateway by inject()
+    private val readSettingsRepository: ReadSettingsRepository by inject()
 
     private fun Book.snapshot() = ReaderBookSnapshotImpl(BookHandleImpl(this))
 
@@ -240,6 +242,23 @@ internal object ReaderEngineImpl : ReaderEngine, KoinComponent {
 
     override fun prevPage(): Boolean =
         ReadBook.moveToPrevPage() || ReadBook.moveToPrevChapter(upContent = true, toLast = true)
+
+    override fun skipToPage(pageIndex: Int) {
+        ReadBook.skipToPage(pageIndex)
+    }
+
+    override fun nextChapter(): Boolean =
+        ReadBook.moveToNextChapter(upContent = true)
+
+    override fun prevChapter(): Boolean =
+        ReadBook.moveToPrevChapter(upContent = true, toLast = false)
+
+    override val autoReadIntervalSec: Int
+        get() = ReadBookConfig.autoReadSpeed
+
+    override suspend fun setAutoReadIntervalSec(value: Int) {
+        readSettingsRepository.setAutoReadSpeed(value)
+    }
 
     // ---- 章节操作 ----
 

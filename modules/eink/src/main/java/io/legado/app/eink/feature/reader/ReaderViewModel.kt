@@ -56,7 +56,9 @@ data class ReaderUiState(
     val error: String? = null,
     val controlsVisible: Boolean = false,
     val autoPlay: Boolean = false,
-    val autoPlayIntervalSec: Int = EInkSettings.DEFAULT_AUTO_INTERVAL_SEC,
+    val autoPlayIntervalSec: Int = DEFAULT_AUTO_INTERVAL_SEC,
+    /** 自动翻页页脚进度条进度（0f..1f），1s 刷新一次。 */
+    val autoPlayProgress: Float = 0f,
     val isLocalBook: Boolean = false,
     val inBookshelf: Boolean = false,
     val keepScreenOn: Boolean = false,
@@ -104,7 +106,8 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application),
     private val _uiState = MutableStateFlow(
         ReaderUiState(
             keepScreenOn = EInkSettings.readerKeepScreenOn,
-            autoPlayIntervalSec = EInkSettings.readerAutoIntervalSec
+            // 与完整模式共用宿主 autoReadSpeed 配置（默认 10）
+            autoPlayIntervalSec = engine.autoReadIntervalSec
                 .coerceIn(MIN_AUTO_INTERVAL_SEC, MAX_AUTO_INTERVAL_SEC),
             textBold = engine.textBold,
             style = engine.currentStyle(),
@@ -294,47 +297,99 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application),
 
     fun prevPage(): Boolean = engine.prevPage()
 
+    /** 跳转到当前章指定页（页内进度条）。 */
+    fun skipToPage(pageIndex: Int) {
+        val pageCount = _uiState.value.pageCount
+        if (pageCount <= 0) return
+        engine.skipToPage(pageIndex.coerceIn(0, pageCount - 1))
+    }
+
+    /** 下一章（无下一章时由引擎返回 false，状态经 onPageChanged 刷新）。 */
+    fun nextChapter(): Boolean = engine.nextChapter()
+
+    /** 上一章（无上一章时由引擎返回 false，状态经 onPageChanged 刷新）。 */
+    fun prevChapter(): Boolean = engine.prevChapter()
+
     // ==================== 操作条 ====================
 
     fun toggleControls() {
-        _uiState.update { it.copy(controlsVisible = !it.controlsVisible) }
+        if (_uiState.value.controlsVisible) {
+            hideControls()
+        } else {
+            showControls()
+        }
+    }
+
+    private fun showControls() {
+        // 对齐宿主：自动翻页中点按阅读菜单区域会暂停自动翻页；
+        // 打开菜单后由 Route 负责自动打开进度与翻页面板。
+        if (_uiState.value.autoPlay) {
+            pauseAutoPlay()
+        }
+        _uiState.update { it.copy(controlsVisible = true) }
     }
 
     fun hideControls() {
+        val shouldResume = _uiState.value.autoPlay && autoPlayJob?.isActive != true
         _uiState.update { if (it.controlsVisible) it.copy(controlsVisible = false) else it }
+        if (shouldResume) {
+            startAutoPlayJob()
+        }
     }
 
-    /** 自动翻页：固定间隔翻下一页，翻到书尾自动停止。 */
+    /** 自动翻页：每秒推进页脚进度条，间隔到达后翻下一页，翻到书尾自动停止。 */
     fun toggleAutoPlay() {
         if (_uiState.value.autoPlay) {
             stopAutoPlay()
             return
         }
-        _uiState.update { it.copy(autoPlay = true) }
+        _uiState.update { it.copy(autoPlay = true, autoPlayProgress = 0f) }
+        // 面板打开时先不启动，收起菜单后再按新时长启动。
+        if (!_uiState.value.controlsVisible) {
+            startAutoPlayJob()
+        }
+    }
+
+    private fun startAutoPlayJob() {
+        if (autoPlayJob?.isActive == true) return
+        _uiState.update { it.copy(autoPlayProgress = 0f) }
         autoPlayJob = viewModelScope.launch {
+            var elapsedSec = 0
             while (isActive) {
-                delay(_uiState.value.autoPlayIntervalSec * 1000L)
-                if (!nextPage()) {
-                    stopAutoPlay()
-                    _messages.emit(UserMessage.from(R.string.eink_reader_auto_page_end))
-                    break
+                delay(1000L)
+                elapsedSec += 1
+                val interval = _uiState.value.autoPlayIntervalSec
+                val progress = (elapsedSec.toFloat() / interval.coerceAtLeast(1)).coerceIn(0f, 1f)
+                _uiState.update { it.copy(autoPlayProgress = progress) }
+                if (elapsedSec >= interval) {
+                    elapsedSec = 0
+                    if (!nextPage()) {
+                        stopAutoPlay()
+                        _messages.emit(UserMessage.from(R.string.eink_reader_auto_page_end))
+                        break
+                    }
                 }
             }
         }
     }
 
+    private fun pauseAutoPlay() {
+        autoPlayJob?.cancel()
+        autoPlayJob = null
+    }
+
     private fun stopAutoPlay() {
         autoPlayJob?.cancel()
         autoPlayJob = null
-        _uiState.update { it.copy(autoPlay = false) }
+        _uiState.update { it.copy(autoPlay = false, autoPlayProgress = 0f) }
     }
 
-    fun adjustAutoPlayInterval(deltaSec: Int) {
-        _uiState.update {
-            val value = (it.autoPlayIntervalSec + deltaSec)
-                .coerceIn(MIN_AUTO_INTERVAL_SEC, MAX_AUTO_INTERVAL_SEC)
-            EInkSettings.readerAutoIntervalSec = value
-            it.copy(autoPlayIntervalSec = value)
+    /** 设置自动翻页间隔（进度页滑条直接提交绝对值，逐档持久化对齐宿主）。 */
+    fun setAutoPlayInterval(value: Int) {
+        val clamped = value.coerceIn(MIN_AUTO_INTERVAL_SEC, MAX_AUTO_INTERVAL_SEC)
+        _uiState.update { it.copy(autoPlayIntervalSec = clamped) }
+        viewModelScope.launch(Dispatchers.IO) {
+            engine.setAutoReadIntervalSec(clamped)
         }
     }
 
@@ -642,9 +697,9 @@ internal const val VIEW_SIZE_TIMEOUT_MS = 2000L
 /** 快速连续调参的重排合并窗口（毫秒）。 */
 internal const val RELAYOUT_DEBOUNCE_MS = 200L
 
-/** 自动翻页默认/可调区间（秒）。 */
-internal const val DEFAULT_AUTO_INTERVAL_SEC = 20
-internal const val MIN_AUTO_INTERVAL_SEC = 5
+/** 自动翻页间隔可调区间（秒），与宿主 autoReadSpeed（默认 10）一致。 */
+internal const val DEFAULT_AUTO_INTERVAL_SEC = 10
+internal const val MIN_AUTO_INTERVAL_SEC = 1
 internal const val MAX_AUTO_INTERVAL_SEC = 120
 
 /** 字号可调区间（sp）。 */

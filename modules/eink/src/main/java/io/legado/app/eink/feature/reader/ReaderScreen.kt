@@ -12,8 +12,10 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.runtime.Composable
@@ -77,15 +79,16 @@ fun ReaderRoute(
         }
     }
 
-    // 保持屏幕常亮
-    DisposableEffect(uiState.keepScreenOn) {
+    // 保持屏幕常亮：常亮设置开启或自动翻页运行中时申请；
+    // 离开阅读页时清除标记（常亮只作用于阅读页）
+    DisposableEffect(uiState.keepScreenOn, uiState.autoPlay) {
         val window = (view.context as? Activity)?.window
-        if (uiState.keepScreenOn) {
+        if (uiState.keepScreenOn || uiState.autoPlay) {
             window?.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         } else {
             window?.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         }
-        onDispose { }
+        onDispose { window?.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON) }
     }
 
     // 音量键翻页（对齐 View 版 ReadBookController.volumeKeyPage）：
@@ -152,7 +155,15 @@ fun ReaderRoute(
             bottomBarVisible = uiState.controlsVisible && !showMarginDialog,
             onPrevPage = viewModel::prevPage,
             onNextPage = viewModel::nextPage,
-            onCenterTap = viewModel::toggleControls,
+            onCenterTap = {
+                // 打开阅读菜单时，若自动翻页正在运行则停止；并自动打开
+                // 进度与翻页面板（未开启自动翻页时不自动打开）。
+                val openingControls = !uiState.controlsVisible
+                viewModel.toggleControls()
+                if (openingControls && uiState.autoPlay) {
+                    panel = ReaderPanel.PROGRESS
+                }
+            },
             onContentSized = viewModel::updateViewSize,
             onBack = onBack,
             onBarBack = onBarBack,
@@ -160,7 +171,6 @@ fun ReaderRoute(
             // 与 onOpenDetail 同一取值：优先会话书的当前 bookUrl。目录据此
             // 直接命中换源时已入库的新目录；二次换源也才能解析到当前书
             onOpenToc = { onOpenToc(uiState.bookUrl.ifEmpty { bookUrl }) },
-            onToggleAutoPlay = viewModel::toggleAutoPlay,
             onChangeSource = { onChangeSource(uiState.bookUrl.ifEmpty { bookUrl }) },
             onOpenDetail = {
                 // 换源后以引擎当前持有的书为准（bookUrl 与路由参数可能不同）
@@ -212,6 +222,20 @@ fun ReaderRoute(
                         )
                     }
 
+                    ReaderPanel.PROGRESS -> ReaderPanelContainer(
+                        title = "进度与翻页",
+                        onClose = onClose
+                    ) {
+                        ReaderProgressPanel(
+                            state = uiState,
+                            onPrevChapter = viewModel::prevChapter,
+                            onNextChapter = viewModel::nextChapter,
+                            onSkipToPage = viewModel::skipToPage,
+                            onSetAutoInterval = viewModel::setAutoPlayInterval,
+                            onToggleAutoPlay = viewModel::toggleAutoPlay,
+                        )
+                    }
+
                     ReaderPanel.OTHER -> ReaderPanelContainer(
                         title = "其它设置",
                         onClose = onClose
@@ -220,7 +244,6 @@ fun ReaderRoute(
                             state = uiState,
                             onToggleKeepScreenOn = viewModel::toggleKeepScreenOn,
                             onToggleTextBold = viewModel::toggleTextBold,
-                            onAdjustAutoInterval = viewModel::adjustAutoPlayInterval,
                         )
                     }
 
@@ -292,7 +315,6 @@ internal fun ReaderScreen(
     onBack: () -> Unit,
     onBarBack: () -> Unit,
     onOpenToc: () -> Unit,
-    onToggleAutoPlay: () -> Unit,
     onChangeSource: () -> Unit,
     onOpenDetail: () -> Unit,
     onRefresh: () -> Unit,
@@ -425,7 +447,6 @@ internal fun ReaderScreen(
                     selectedPanel = selectedPanel,
                     onBarBack = onBarBack,
                     onOpenToc = onOpenToc,
-                    onToggleAutoPlay = onToggleAutoPlay,
                     onOpenPanel = onOpenPanel,
                 )
             }
@@ -463,32 +484,59 @@ private fun ReaderHeader(state: ReaderUiState) {
     }
 }
 
-/** 页脚：章节标题（左）+ 页数及进度（右，View 版 pageAndTotal 格式）。 */
+/** 页脚：顶部自动翻页进度条 + 章节标题（左）/ 页数及进度（右，View 版 pageAndTotal 格式）。 */
 @Composable
 private fun ReaderFooter(state: ReaderUiState) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(
-                start = state.style.footerPaddingLeft.dp,
-                top = state.style.footerPaddingTop.dp,
-                end = state.style.footerPaddingRight.dp,
-                bottom = state.style.footerPaddingBottom.dp,
-            ),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        EInkText(
-            text = state.chapterTitle,
-            modifier = Modifier.weight(1f),
-            color = EInkTheme.colorScheme.onSurfaceVariant,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
-        if (state.pageAndTotal.isNotEmpty()) {
+    Column(modifier = Modifier.fillMaxWidth()) {
+        AutoPlayProgressBar(active = state.autoPlay, progress = state.autoPlayProgress)
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(
+                    start = state.style.footerPaddingLeft.dp,
+                    top = state.style.footerPaddingTop.dp,
+                    end = state.style.footerPaddingRight.dp,
+                    bottom = state.style.footerPaddingBottom.dp,
+                ),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
             EInkText(
-                text = state.pageAndTotal,
+                text = state.chapterTitle,
+                modifier = Modifier.weight(1f),
                 color = EInkTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            if (state.pageAndTotal.isNotEmpty()) {
+                EInkText(
+                    text = state.pageAndTotal,
+                    color = EInkTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                )
+            }
+        }
+    }
+}
+
+/**
+ * 自动翻页进度条：2dp 高度常驻占位——开关自动翻页不改变页脚高度，
+ * 正文排版区域尺寸恒定，避免布局跳动/重排；未运行时不绘制（与背景
+ * 融合不可见），运行时从左到右按时间进度以主色（日间纯黑）填充，
+ * 未填充段保持背景色，进度随填充长度可感知。
+ */
+@Composable
+private fun AutoPlayProgressBar(active: Boolean, progress: Float) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(2.dp),
+    ) {
+        if (active) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth(progress.coerceIn(0f, 1f))
+                    .fillMaxHeight()
+                    .background(EInkTheme.colorScheme.primary),
             )
         }
     }

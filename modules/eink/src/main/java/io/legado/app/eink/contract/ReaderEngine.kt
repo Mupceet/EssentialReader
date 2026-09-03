@@ -115,6 +115,24 @@ interface ReaderEngine {
     /** 上一页（章首自动回到上一章末页），无更多页返回 false。 */
     fun prevPage(): Boolean
 
+    /** 跳转到当前章节指定页（页内索引进度条，0-based，越界由引擎钳制）。 */
+    fun skipToPage(pageIndex: Int)
+
+    /** 跳转到下一章，无下一章返回 false。 */
+    fun nextChapter(): Boolean
+
+    /** 跳转到上一章，无上一章返回 false。 */
+    fun prevChapter(): Boolean
+
+    /**
+     * 自动翻页间隔（秒），读写宿主 autoReadSpeed 阅读配置
+     * （与完整模式 UI 共用同一配置项，默认 10，范围 1..120）。
+     */
+    val autoReadIntervalSec: Int
+
+    /** 写入自动翻页间隔（秒），持久化到宿主 autoReadSpeed 配置。 */
+    suspend fun setAutoReadIntervalSec(value: Int)
+
     // ---- 章节操作 ----
 
     /** 刷新当前章节（清缓存重载）。 */
