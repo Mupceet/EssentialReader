@@ -3,22 +3,15 @@ package io.legado.app.eink.designsystem.control
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import io.legado.app.eink.designsystem.content.EInkText
-import io.legado.app.eink.designsystem.interaction.eInkActionColors
-import io.legado.app.eink.designsystem.interaction.einkClickable
-import io.legado.app.eink.designsystem.interaction.rememberImmediatePressState
 import io.legado.app.eink.designsystem.theme.EInkShapes
 import io.legado.app.eink.designsystem.theme.EInkSpacing
 import io.legado.app.eink.designsystem.theme.EInkTheme
@@ -60,57 +53,20 @@ fun EInkDialog(
                     .padding(top = EInkSpacing.m),
                 horizontalArrangement = Arrangement.spacedBy(EInkSpacing.s)
             ) {
-                DialogButton(
+                EInkButton(
                     text = cancelText,
-                    enabled = true,
                     onClick = onDismiss,
-                    modifier = Modifier.weight(1f)
+                    modifier = Modifier.weight(1f),
+                    height = 44.dp,
                 )
-                DialogButton(
+                EInkButton(
                     text = confirmText,
                     enabled = onConfirm != null,
                     onClick = { onConfirm?.invoke() },
-                    modifier = Modifier.weight(1f)
+                    modifier = Modifier.weight(1f),
+                    height = 44.dp,
                 )
             }
         }
-    }
-}
-
-/** 对话框按钮：44dp 高、描边、按压反色；禁用时弱化且不可点。 */
-@Composable
-private fun DialogButton(
-    text: String,
-    enabled: Boolean,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    val press = rememberImmediatePressState()
-    val colors = eInkActionColors(pressed = press.isPressed, enabled = enabled)
-    val borderColor = if (enabled) {
-        EInkTheme.colorScheme.outline
-    } else {
-        EInkTheme.colorScheme.disabledContent
-    }
-    Box(
-        modifier = modifier
-            .height(44.dp)
-            .then(press.modifier)
-            .background(colors.containerColor, EInkShapes.small)
-            .border(1.dp, borderColor, EInkShapes.small)
-            .then(
-                if (enabled) {
-                    Modifier.einkClickable(role = Role.Button, onClick = onClick)
-                } else {
-                    Modifier
-                }
-            ),
-        contentAlignment = Alignment.Center
-    ) {
-        EInkText(
-            text = text,
-            style = EInkTheme.typography.labelLarge,
-            color = colors.contentColor
-        )
     }
 }
