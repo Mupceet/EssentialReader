@@ -173,3 +173,23 @@ TextPage → EInkPageSnapshot 的唯一新增宿主职责。
    「快照映射器」一行（数据映射而非渲染逻辑）+ GlobalSettings 一属性；
 3. testAppDebugUnitTest 通过（含新增映射器测试）；
 4. 真机 §7 清单通过，翻页性能不劣于基线。
+
+## 10. 修订记录（2026-09-03，实施后）
+
+渲染自治切片落地后，§3/§4 的「画笔规格全量拷贝保真」设计被用户决策**推翻**：
+
+1. **快照去规格化**：`ReaderPageSnapshot` 只携带几何（行/图片），
+   `ReaderPaintSpec`/`ReaderShadowSpec` 类型删除；模块画布按自身设置渲染
+   （`ReaderTextStyle` 字号/字距 + `ReaderEngine.contentTextTypeface` 端口
+   正文字体——与引擎排版测量同源，否则字形宽度与列坐标错位）。
+2. **标题语义**：标题 = 正文字号 + 加粗（`Typeface.create(base, 900)`，
+   与引擎 textBold=1 同机制）+ 正文体；宿主排版配置中的标题字号/标题字重
+   设置被忽略，完整模式斜体/阴影等显示效果不再跟随（此前由规格拷贝保真，
+   现为 E-Ink 渲染自治的既定取舍）。
+3. **不再写 TitleSize**：`applyStyle` 删除 TitleSize mutation（此前为
+   持久化钉平 hack）；排版行盒仍由引擎按宿主 titleSize 计算，标题字号
+   覆盖仅发生在绘制层——宿主 titleSize 小于正文时标题行盒偏小为已接受
+   取舍（默认 20=20 无差异）。
+4. **API35 字距半格补偿**移回绘制期（按模块画布自身度量计算，快照 x 为
+   引擎原始列起点）；阴影随规格删除不再渲染，API29 shadowLayer getter
+   风险随之消失。

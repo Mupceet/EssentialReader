@@ -16,7 +16,7 @@
 | `TocEngine`（含 `TocFetchResult`）                                                                        | 书籍解析 + 目录联网拉取 + 进度写回                  | 目录页        |
 | `ChangeSourceEngine`                                                                                   | 跨源搜索 + 换源迁移 + `bookChanged` 事件        | 换源页        |
 | `CoverEngine`                                                                                          | 封面加载策略（Coil 请求选项：书源 origin 头、目标尺寸）    | 封面组件       |
-| `ReaderEngine`（含 `ReaderEngineCallback` / `ReaderBookSnapshot` / `ReaderTipSpec` / `ReaderPrepResult`） | 阅读会话状态机 + 排版参数写入 + 翻页 + 页快照读取         | 阅读页        |
+| `ReaderEngine`（含 `ReaderEngineCallback` / `ReaderBookSnapshot` / `ReaderTipSpec` / `ReaderPrepResult`） | 阅读会话状态机 + 排版参数写入 + 翻页 + 页快照读取 + 正文字体读取        | 阅读页        |
 | `GlobalSettings`                                                                                       | 宿主全局设置视图（并发数、启动开关、音量键、抗锯齿、默认封面、字体缩放等） | 多屏 + 「我的」页 |
 | `EInkKeyEventHub`                                                                                      | 入口 Activity 按键转发枢纽（宿主实例化并 dispatch）   | 阅读页音量键     |
 
@@ -25,10 +25,12 @@
 - **`EngineHandles.kt`** — `BookHandle` / `SourceHandle` / `SearchResultHandle` /
   `SearchResultRef`：引擎实体的不透明句柄。宿主 bridge 包装真实实体，
   模块只持有、回传，不解读。
-- **`ReaderPageSnapshot.kt`** — 排版产物快照（含 `ReaderPageLine` /
-  `ReaderImageSlot` / `ReaderPaintSpec` / `ReaderShadowSpec`）：宿主把引擎
-  TextPage 映射而来（本仓见宿主 `ReaderPageSnapshotMapper`），模块自持
-  画布据此绘制。坐标系、所有权规则见文件头 KDoc。
+- **`ReaderPageSnapshot.kt`** — 排版产物快照（仅几何，含 `ReaderPageLine` /
+  `ReaderImageSlot`）：宿主把引擎 TextPage 映射而来（本仓见宿主
+  `ReaderPageSnapshotMapper`），模块自持画布据此绘制。渲染参数不进快照——
+  模块画布按自身 `ReaderTextStyle` + `ReaderEngine.contentTextTypeface`
+  （与引擎排版测量同源的正文字体）渲染，标题 = 正文字号 + 加粗 + 正文体，
+  宿主排版配置中的标题类设置被忽略。坐标系、所有权规则见文件头 KDoc。
 - **`ReaderTextStyle.kt`** — 排版参数快照：设置面板编辑 →
   `ReaderEngine.applyStyle` 整体写入宿主配置；`currentStyle()` 读回。
   字段单位与编辑区间见文件头 KDoc。

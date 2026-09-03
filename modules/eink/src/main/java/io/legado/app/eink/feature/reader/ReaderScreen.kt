@@ -438,6 +438,7 @@ internal fun ReaderScreen(
                 ReaderPageSnapshotCanvas(
                     page = state.page,
                     pageVersion = state.pageVersion,
+                    style = state.style,
                     modifier = Modifier.fillMaxSize(),
                 )
                 if (state.isLoading && state.page == null) {
