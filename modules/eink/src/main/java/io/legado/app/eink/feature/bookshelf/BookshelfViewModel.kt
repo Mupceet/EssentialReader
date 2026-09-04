@@ -9,7 +9,6 @@ import io.legado.app.eink.arch.UserMessage
 import io.legado.app.eink.contract.BookshelfItemUiModel
 import io.legado.app.eink.contract.BookshelfTocRefreshResult
 import io.legado.app.eink.contract.EInkEngineRegistry
-import io.legado.app.eink.contract.EInkSettings
 import io.legado.app.eink.util.onEachParallel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -44,8 +43,8 @@ data class BookshelfUiState(
     val isRefreshing: Boolean = false,
     /** 正在更新目录的书籍 bookUrl 集合（对应行角标替换为刷新态） */
     val updatingBookUrls: Set<String> = emptySet(),
-    /** 书架网格布局（true = 网格，列数按屏宽自适应；false = 列表） */
-    val isGridLayout: Boolean = false,
+    /** 书架网格布局（true = 网格，列数按屏宽自适应；false = 列表）。默认网格。 */
+    val isGridLayout: Boolean = true,
 ) {
     val isEmpty: Boolean get() = books.isEmpty() && !isLoading
 }
@@ -75,7 +74,9 @@ class BookshelfViewModel(application: Application) : AndroidViewModel(applicatio
 
     private val _isRefreshing = MutableStateFlow(false)
     private val _updatingUrls = MutableStateFlow<Set<String>>(emptySet())
-    private val _isGridLayout = MutableStateFlow(EInkSettings.isBookshelfGrid)
+    // 默认网格；仅内存单次生命周期（VM 存续期），不落盘——布局切换入口
+    // 暂不开放，[toggleGridLayout] 保留供入口回归时复用
+    private val _isGridLayout = MutableStateFlow(true)
 
     // notShelf 行已在宿主查询内过滤，并由宿主物理删除；此处
     // 直接使用查询结果，与 View 版保持一致。
@@ -97,11 +98,9 @@ class BookshelfViewModel(application: Application) : AndroidViewModel(applicatio
             )
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), BookshelfUiState())
 
-    /** 切换列表/网格布局，立即落盘（EInkSettings.isBookshelfGrid）。 */
+    /** 切换列表/网格布局（仅内存态，不落盘；入口暂未开放）。 */
     fun toggleGridLayout() {
-        val next = !_isGridLayout.value
-        EInkSettings.isBookshelfGrid = next
-        _isGridLayout.value = next
+        _isGridLayout.value = !_isGridLayout.value
     }
 
     private var refreshJob: Job? = null

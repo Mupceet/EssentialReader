@@ -86,7 +86,8 @@ internal val EInkGridCoverHeight =
  * 列表项遵循规范 §41: title + secondary text + metadata + divider：
  * 点击进阅读，长按进详情（对齐 View 版书架交互）。
  *
- * 布局模式由 [BookshelfUiState.isGridLayout] 驱动（首页顶栏切换按钮）：
+ * 布局模式由 [BookshelfUiState.isGridLayout] 驱动（默认网格；切换入口
+ * 暂不开放，布局态仅 VM 存续期有效）：
  * 网格模式条目为 封面 + 未读角标 + 书名（对齐 View 版 item_bookshelf_grid），
  * 列数按屏宽自适应（[EInkBookshelfGridMinCellWidth]）。两种模式同为
  * E-Ink 分页模式（禁自由滚动，整页翻页），[listState]/[gridState]
