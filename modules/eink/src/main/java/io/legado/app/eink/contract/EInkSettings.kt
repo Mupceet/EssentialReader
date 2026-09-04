@@ -12,7 +12,6 @@ import android.content.SharedPreferences
  */
 object EInkSettings {
 
-    private const val KEY_BOOKSHELF_GRID = "einkBookshelfGrid"
     private const val KEY_READER_KEEP_SCREEN_ON = "einkReaderKeepScreenOn"
 
     @Volatile
@@ -33,11 +32,6 @@ object EInkSettings {
 
     private fun requirePrefs(): SharedPreferences =
         prefs ?: error("EInkSettings 未初始化：宿主入口需先调用 attach(context)")
-
-    /** 书架网格布局（true = 网格）。 */
-    var isBookshelfGrid: Boolean
-        get() = requirePrefs().getBoolean(KEY_BOOKSHELF_GRID, false)
-        set(value) = requirePrefs().edit().putBoolean(KEY_BOOKSHELF_GRID, value).apply()
 
     /** 阅读页保持屏幕常亮。 */
     var readerKeepScreenOn: Boolean

@@ -66,14 +66,13 @@ private val HomeTabIcons = listOf(
  * 结构参考微信读书墨水屏版：
  *  - 顶部固定搜索框（点击进入搜索页）；
  *  - 搜索框下方一行头部（放大标题 + 右侧动作）：书架 Tab 显示刷新按钮
- *    （行为对齐 View 版下拉刷新）与列表/网格布局切换按钮，"我的" Tab
- *    无动作；
+ *    （行为对齐 View 版下拉刷新），"我的" Tab 无动作；
  *  - 中间内容区：书架 / 我的 两个 Tab；
  *  - 底部通用操作栏（[EInkOperationBar]）：左侧 Tab 切换，
  *    右侧上/下箭头对书架整页翻页，不可翻页时置灰。
  *
- * 书架布局由 [BookshelfUiState.isGridLayout] 驱动，列表与网格各持一套
- * 固定页分页状态（[rememberEInkListPagerState] /
+ * 书架布局默认网格、由 [BookshelfUiState.isGridLayout] 驱动，列表与网格
+ * 各持一套固定页分页状态（[rememberEInkListPagerState] /
  * [rememberEInkGridPagerState]），经 [EInkPageController] 统一驱动
  * 底部操作栏翻页与页首对齐。
  */
@@ -179,8 +178,6 @@ fun HomeRoute(
         showRefresh = selectedTab == HomeTabs.BOOKSHELF,
         isRefreshing = uiState.isRefreshing,
         onRefresh = viewModel::refresh,
-        isGridLayout = uiState.isGridLayout,
-        onToggleLayout = viewModel::toggleGridLayout,
         onSearchClick = onSearch,
         pageArrows = pageArrows,
         bookshelf = {
@@ -221,8 +218,6 @@ internal fun HomeScreen(
     showRefresh: Boolean,
     isRefreshing: Boolean,
     onRefresh: () -> Unit,
-    isGridLayout: Boolean,
-    onToggleLayout: () -> Unit,
     onSearchClick: () -> Unit,
     pageArrows: @Composable () -> Unit,
     bookshelf: @Composable () -> Unit,
@@ -245,10 +240,9 @@ internal fun HomeScreen(
                         isRefreshing = isRefreshing,
                         onClick = onRefresh
                     )
-                    LayoutToggleAction(
-                        isGridLayout = isGridLayout,
-                        onClick = onToggleLayout
-                    )
+                    // 布局切换入口暂不开放：默认网格 + VM 内存切换
+                    //（BookshelfViewModel.toggleGridLayout），入口回归时
+                    // 参考历史 LayoutToggleAction 形态
                 }
             }
         )
@@ -321,24 +315,6 @@ private fun RefreshAction(isRefreshing: Boolean, onClick: () -> Unit) {
         icon = painterResource(R.drawable.eink_ic_refresh_black_24dp),
         contentDescription = if (isRefreshing) "刷新中" else "刷新",
         enabled = !isRefreshing,
-        onClick = onClick,
-    )
-}
-
-/**
- * 头部布局切换按钮：显示目标布局图标（当前列表 → 网格图标，当前网格
- * → 列表图标），点击切换书架布局（[BookshelfViewModel.toggleGridLayout]）。
- *
- * 无选中态（selected 恒 false）：图标本身即当前状态的镜像，切换后
- * 即时整体替换为新目标图标，零动画。
- */
-@Composable
-private fun LayoutToggleAction(isGridLayout: Boolean, onClick: () -> Unit) {
-    EInkOperationBarIcon(
-        icon = painterResource(
-            if (isGridLayout) R.drawable.eink_list_view_24px else R.drawable.eink_grid_view_24px
-        ),
-        contentDescription = if (isGridLayout) "切换为列表布局" else "切换为网格布局",
         onClick = onClick,
     )
 }
