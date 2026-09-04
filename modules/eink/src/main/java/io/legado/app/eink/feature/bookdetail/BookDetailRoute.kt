@@ -17,6 +17,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
@@ -37,6 +38,7 @@ import io.legado.app.eink.R
 import io.legado.app.eink.designsystem.content.EInkInfoRow
 import io.legado.app.eink.designsystem.content.EInkLoading
 import io.legado.app.eink.designsystem.content.EInkText
+import io.legado.app.eink.designsystem.control.EInkDialog
 import io.legado.app.eink.designsystem.navigation.EInkOperationBar
 import io.legado.app.eink.designsystem.navigation.EInkOperationBarIcon
 import io.legado.app.eink.designsystem.navigation.EInkPageArrowsWidth
@@ -90,6 +92,10 @@ fun BookDetailRoute(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
 
+    // 移出书架二次确认（eink 误触防护）：入口按钮只打开确认框，确认后才
+    // 真正执行移出（与阅读页弹窗一致，可见性为本层 remember 局部状态）
+    var showRemoveConfirm by remember { mutableStateOf(false) }
+
     LaunchedEffect(name, author, bookUrl) {
         viewModel.loadBook(name, author, bookUrl)
     }
@@ -105,12 +111,28 @@ fun BookDetailRoute(
         state = uiState,
         onBack = onBack,
         onAddToShelf = viewModel::addToBookshelf,
-        onRemoveFromShelf = viewModel::removeFromBookshelf,
+        onRemoveFromShelf = { showRemoveConfirm = true },
         onOpenToc = { onOpenToc(effectiveBookUrl) },
         onRead = { onRead(effectiveBookUrl) },
         // 换源后本页经 bookChanged 事件跟随刷新，effectiveBookUrl 即新源地址
         onChangeSource = { onChangeSource(effectiveBookUrl) },
     )
+
+    if (showRemoveConfirm) {
+        EInkDialog(
+            onDismiss = { showRemoveConfirm = false },
+            title = "移出书架",
+            onConfirm = {
+                showRemoveConfirm = false
+                viewModel.removeFromBookshelf()
+            },
+        ) {
+            EInkText(
+                text = "确定要将《${uiState.book?.name.orEmpty()}》移出书架吗？",
+                style = EInkTheme.typography.bodyMedium
+            )
+        }
+    }
 }
 
 /**
