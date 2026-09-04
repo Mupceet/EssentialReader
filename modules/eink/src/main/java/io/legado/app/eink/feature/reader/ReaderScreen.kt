@@ -41,6 +41,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import io.legado.app.eink.contract.EInkEngineRegistry
 import io.legado.app.eink.designsystem.content.EInkText
+import io.legado.app.eink.designsystem.control.EInkDialog
 import io.legado.app.eink.designsystem.interaction.einkClickable
 import io.legado.app.eink.designsystem.theme.EInkTheme
 
@@ -73,6 +74,8 @@ fun ReaderRoute(
     val keyEventHub = EInkEngineRegistry.keyEventHub
     var panel by remember { mutableStateOf<ReaderPanel?>(null) }
     var showMarginDialog by remember { mutableStateOf(false) }
+    // 移出书架二次确认（顶栏切换钮在架态点击只打开确认框）
+    var showRemoveConfirm by remember { mutableStateOf(false) }
 
     LaunchedEffect(bookUrl) {
         viewModel.attach(bookUrl)
@@ -206,6 +209,7 @@ fun ReaderRoute(
             onRefresh = viewModel::refreshChapter,
             onOpenCachePanel = { panel = ReaderPanel.CACHE },
             onAddToBookshelf = viewModel::addToBookshelf,
+            onRemoveFromBookshelf = { showRemoveConfirm = true },
             selectedPanel = panel,
             onOpenPanel = { target ->
                 // 再次点击已打开的面板按钮 = 关闭（取消选中）；
@@ -320,6 +324,24 @@ fun ReaderRoute(
                 onBackdropClick = dismissToCleanReading,
             )
         }
+
+        // 移出书架二次确认：确认后执行移出（后果与详情页一致——下次进
+        // 书架时该记录被物理删除、阅读进度丢失）
+        if (showRemoveConfirm) {
+            EInkDialog(
+                onDismiss = { showRemoveConfirm = false },
+                title = "移出书架",
+                onConfirm = {
+                    showRemoveConfirm = false
+                    viewModel.removeFromBookshelf()
+                },
+            ) {
+                EInkText(
+                    text = "确定要将《${uiState.bookName}》移出书架吗？",
+                    style = EInkTheme.typography.bodyMedium
+                )
+            }
+        }
     }
 }
 
@@ -360,6 +382,7 @@ internal fun ReaderScreen(
     onRefresh: () -> Unit,
     onOpenCachePanel: () -> Unit,
     onAddToBookshelf: () -> Unit,
+    onRemoveFromBookshelf: () -> Unit,
     selectedPanel: ReaderPanel?,
     onOpenPanel: (ReaderPanel) -> Unit,
     onRetry: () -> Unit,
@@ -473,6 +496,7 @@ internal fun ReaderScreen(
                     onRefresh = onRefresh,
                     onOpenCachePanel = onOpenCachePanel,
                     onAddToBookshelf = onAddToBookshelf,
+                    onRemoveFromBookshelf = onRemoveFromBookshelf,
                 )
             }
         }
