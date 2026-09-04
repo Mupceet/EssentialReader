@@ -71,8 +71,10 @@ internal object SearchEngineImpl : SearchEngine, KoinComponent {
             }
         }.distinctUntilChanged()
 
+    // 最近使用在前：与 View 搜索页空输入口径一致（flowByUsage 纯次数排序
+    // 无时间维度，并列项顺序不定，旧高频词永远压过新词）
     override fun observeSearchHistory(): Flow<List<SearchHistoryUiModel>> =
-        appDb.searchKeywordDao.flowByUsage().map { history ->
+        appDb.searchKeywordDao.flowByTime().map { history ->
             history.map { SearchHistoryUiModel(word = it.word) }
         }
 

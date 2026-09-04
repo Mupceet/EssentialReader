@@ -32,7 +32,7 @@ interface SearchEngine {
     /** 书架匹配键集合流（name-author / name / bookUrl 三键，判断“已在书架”）。 */
     fun observeBookshelfKeys(): Flow<Set<String>>
 
-    /** 搜索历史流（按使用频次排序）。 */
+    /** 搜索历史流（按最近使用时间倒序，与 View 搜索页空输入口径一致）。 */
     fun observeSearchHistory(): Flow<List<SearchHistoryUiModel>>
 
     /** 记录一次搜索词（已存在则 usage+1 并更新时间）。 */

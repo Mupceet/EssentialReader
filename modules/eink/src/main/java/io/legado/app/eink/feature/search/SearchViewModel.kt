@@ -190,7 +190,7 @@ class SearchViewModel(application: Application) : AndroidViewModel(application) 
                 bookshelfKeys = keys
             }
         }
-        // 搜索历史（按使用频次）
+        // 搜索历史（按最近使用时间倒序）
         viewModelScope.launch {
             engine.observeSearchHistory().collect { history ->
                 _uiState.update { it.copy(history = history) }
