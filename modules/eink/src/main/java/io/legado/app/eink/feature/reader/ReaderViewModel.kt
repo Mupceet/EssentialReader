@@ -469,13 +469,28 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application),
         }
     }
 
-    /** 加入书架（仅未加书架的书；阅读页不提供移出书架）。 */
+    /** 加入书架（仅未加书架的书）。 */
     fun addToBookshelf() {
         viewModelScope.launch(Dispatchers.IO) {
             when (engine.addSessionBookToShelf()) {
                 true -> {
                     _uiState.update { it.copy(inBookshelf = true) }
                     _messages.emit(UserMessage.from(R.string.eink_added_to_bookshelf))
+                }
+
+                false -> _messages.emit(UserMessage.from(R.string.eink_operation_failed))
+                null -> Unit
+            }
+        }
+    }
+
+    /** 移出书架（仅已在书架的书；UI 侧先经 EInkDialog 二次确认）。 */
+    fun removeFromBookshelf() {
+        viewModelScope.launch(Dispatchers.IO) {
+            when (engine.removeSessionBookFromShelf()) {
+                true -> {
+                    _uiState.update { it.copy(inBookshelf = false) }
+                    _messages.emit(UserMessage.from(R.string.eink_removed_from_bookshelf))
                 }
 
                 false -> _messages.emit(UserMessage.from(R.string.eink_operation_failed))

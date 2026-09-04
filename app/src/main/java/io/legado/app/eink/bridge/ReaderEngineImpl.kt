@@ -312,6 +312,24 @@ internal object ReaderEngineImpl : ReaderEngine, KoinComponent {
         }
     }
 
+    override suspend fun removeSessionBookFromShelf(): Boolean? {
+        val book = ReadBook.book ?: return null
+        return try {
+            if (!book.isType(BookType.notShelf)) {
+                book.addType(BookType.notShelf)
+                ReadBook.inBookshelf = false
+                book.save()
+                true
+            } else {
+                null
+            }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (_: Throwable) {
+            false
+        }
+    }
+
     // ---- 排版 ----
 
     override fun updateViewSize(width: Int, height: Int) {

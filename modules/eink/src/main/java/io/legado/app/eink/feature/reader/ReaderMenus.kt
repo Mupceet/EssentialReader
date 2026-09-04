@@ -64,8 +64,7 @@ private val SliderLabelWidth = 64.dp
 private const val MarginTickStep = 8
 
 // ====================================================================
-// 顶部操作条：换源 / 刷新 / 缓存 / 加书架（仅未加书架时显示；
-// 阅读页不提供移出书架，管理书架走书架长按或详情页）
+// 顶部操作条：换源 / 刷新 / 缓存 / 加书架或移出书架（切换钮）
 // ====================================================================
 
 @Composable
@@ -76,6 +75,7 @@ internal fun ReaderTopBar(
     onRefresh: () -> Unit,
     onOpenCachePanel: () -> Unit,
     onAddToBookshelf: () -> Unit,
+    onRemoveFromBookshelf: () -> Unit,
 ) {
     // 通用顶栏（贴右动作模式）：书名可点击进详情（按压反色、背景贴
     // 屏幕左缘、禁用中灰），动作按钮直接使用 EInkOperationBarIcon
@@ -103,13 +103,15 @@ internal fun ReaderTopBar(
                 enabled = !state.isLocalBook,
                 onClick = onOpenCachePanel,
             )
-            if (!state.inBookshelf) {
-                EInkOperationBarIcon(
-                    icon = painterResource(R.drawable.eink_ic_book_add),
-                    contentDescription = "加书架",
-                    onClick = onAddToBookshelf,
-                )
-            }
+            // 书架切换钮：未架显示加入，在架显示移出（点击经确认弹框）
+            EInkOperationBarIcon(
+                icon = painterResource(
+                    if (state.inBookshelf) R.drawable.eink_ic_book_remove
+                    else R.drawable.eink_ic_book_add
+                ),
+                contentDescription = if (state.inBookshelf) "移出书架" else "加入书架",
+                onClick = if (state.inBookshelf) onRemoveFromBookshelf else onAddToBookshelf,
+            )
         },
     )
 }

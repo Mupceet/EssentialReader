@@ -151,6 +151,12 @@ interface ReaderEngine {
      */
     suspend fun addSessionBookToShelf(): Boolean?
 
+    /**
+     * 将当前会话书籍移出书架（仅已在书架的书有效）。
+     * @return null = 无会话书或本就未在书架；true/false = 保存成功/失败
+     */
+    suspend fun removeSessionBookFromShelf(): Boolean?
+
     // ---- 排版（ChapterProvider / ReadBookConfig） ----
 
     /** 阅读区尺寸变化（首帧布局/旋转）。 */
