@@ -1,7 +1,6 @@
 package io.legado.app.eink.feature.reader
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -33,6 +32,8 @@ import io.legado.app.eink.contract.ReaderTextStyle
 import io.legado.app.eink.designsystem.content.EInkHorizontalDivider
 import io.legado.app.eink.designsystem.content.EInkText
 import io.legado.app.eink.designsystem.control.EInkButton
+import io.legado.app.eink.designsystem.control.EInkCloseButton
+import io.legado.app.eink.designsystem.control.EInkDialog
 import io.legado.app.eink.designsystem.control.EInkSteppedSlider
 import io.legado.app.eink.designsystem.interaction.eInkActionColors
 import io.legado.app.eink.designsystem.interaction.einkClickable
@@ -352,7 +353,7 @@ internal fun ReaderPanelContainer(
                     style = EInkTheme.typography.titleMedium,
                     modifier = Modifier.weight(1f),
                 )
-                CloseButton(onClose = onClose)
+                EInkCloseButton(onClose = onClose)
             }
             EInkHorizontalDivider()
             Column(
@@ -439,7 +440,8 @@ internal fun ReaderLayoutPanel(
 
 /**
  * 边距调整弹框：屏幕居中的卡片，四周透明 —— 页眉/页脚/正文边距
- * 调整时实时可见效果（档位滑条，逐 dp 可调）。
+ * 调整时实时可见效果（档位滑条，逐 dp 可调）。经 [EInkDialog] 面板
+ * 形态承载（关 scrim 透出阅读内容）。
  *
  * 内含三个 Tab：正文 / 页眉 / 页脚，每个 Tab 各 4 行档位滑条：
  * 上边距、下边距、左边距、右边距。× / 系统返回经 [onClose] 回到
@@ -465,90 +467,57 @@ internal fun ReaderMarginDialog(
     onBackdropClick: () -> Unit,
 ) {
     var selectedTab by remember { mutableIntStateOf(0) }
-    Box(modifier = Modifier.fillMaxSize()) {
-        // 透明点击区：一次性收起到干净阅读界面
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .einkClickable(role = Role.Button, onClickLabel = "收起菜单", onClick = onBackdropClick),
+    EInkDialog(
+        onDismiss = onClose,
+        title = "边距调整",
+        onClose = onClose,
+        onBackdropClick = onBackdropClick,
+        showActions = false,
+    ) {
+        PanelTabRow(
+            labels = listOf("正文", "页眉", "页脚"),
+            selected = selectedTab,
+            onSelect = { selectedTab = it }
         )
-        Column(
-            modifier = Modifier
-                .align(Alignment.Center)
-                .fillMaxWidth(0.86f)
-                .background(EInkTheme.colorScheme.surface)
-                .border(
-                    width = 1.dp,
-                    color = EInkTheme.colorScheme.outline,
-                )
-                // 消费弹框内空白处点击，避免透传到关闭层
-                .einkClickable(onClick = {}),
-        ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = EInkSpacing.m, vertical = EInkSpacing.s),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                EInkText(
-                    text = "边距调整",
-                    style = EInkTheme.typography.titleMedium,
-                    modifier = Modifier.weight(1f),
-                )
-                CloseButton(onClose = onClose)
-            }
-            EInkHorizontalDivider()
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = EInkSpacing.m, vertical = EInkSpacing.s),
-            ) {
-                PanelTabRow(
-                    labels = listOf("正文", "页眉", "页脚"),
-                    selected = selectedTab,
-                    onSelect = { selectedTab = it }
-                )
-                when (selectedTab) {
-                    0 -> MarginRows(
-                        topDp = style.paddingTop,
-                        bottomDp = style.paddingBottom,
-                        leftDp = style.paddingLeft,
-                        rightDp = style.paddingRight,
-                        maxVertical = MAX_PADDING_VERTICAL,
-                        maxHorizontal = MAX_PADDING_HORIZONTAL,
-                        onSetTop = onSetPaddingTop,
-                        onSetBottom = onSetPaddingBottom,
-                        onSetLeft = onSetPaddingLeft,
-                        onSetRight = onSetPaddingRight,
-                    )
+        when (selectedTab) {
+            0 -> MarginRows(
+                topDp = style.paddingTop,
+                bottomDp = style.paddingBottom,
+                leftDp = style.paddingLeft,
+                rightDp = style.paddingRight,
+                maxVertical = MAX_PADDING_VERTICAL,
+                maxHorizontal = MAX_PADDING_HORIZONTAL,
+                onSetTop = onSetPaddingTop,
+                onSetBottom = onSetPaddingBottom,
+                onSetLeft = onSetPaddingLeft,
+                onSetRight = onSetPaddingRight,
+            )
 
-                    1 -> MarginRows(
-                        topDp = style.headerPaddingTop,
-                        bottomDp = style.headerPaddingBottom,
-                        leftDp = style.headerPaddingLeft,
-                        rightDp = style.headerPaddingRight,
-                        maxVertical = MAX_PADDING_VERTICAL,
-                        maxHorizontal = MAX_PADDING_VERTICAL,
-                        onSetTop = onSetHeaderPaddingTop,
-                        onSetBottom = onSetHeaderPaddingBottom,
-                        onSetLeft = onSetHeaderPaddingLeft,
-                        onSetRight = onSetHeaderPaddingRight,
-                    )
+            1 -> MarginRows(
+                topDp = style.headerPaddingTop,
+                bottomDp = style.headerPaddingBottom,
+                leftDp = style.headerPaddingLeft,
+                rightDp = style.headerPaddingRight,
+                maxVertical = MAX_PADDING_VERTICAL,
+                maxHorizontal = MAX_PADDING_VERTICAL,
+                onSetTop = onSetHeaderPaddingTop,
+                onSetBottom = onSetHeaderPaddingBottom,
+                onSetLeft = onSetHeaderPaddingLeft,
+                onSetRight = onSetHeaderPaddingRight,
+            )
 
-                    else -> MarginRows(
-                        topDp = style.footerPaddingTop,
-                        bottomDp = style.footerPaddingBottom,
-                        leftDp = style.footerPaddingLeft,
-                        rightDp = style.footerPaddingRight,
-                        maxVertical = MAX_PADDING_VERTICAL,
-                        maxHorizontal = MAX_PADDING_VERTICAL,
-                        onSetTop = onSetFooterPaddingTop,
-                        onSetBottom = onSetFooterPaddingBottom,
-                        onSetLeft = onSetFooterPaddingLeft,
-                        onSetRight = onSetFooterPaddingRight,
-                    )
-                }
-            }
+            else -> MarginRows(
+                topDp = style.footerPaddingTop,
+                bottomDp = style.footerPaddingBottom,
+                leftDp = style.footerPaddingLeft,
+                rightDp = style.footerPaddingRight,
+                maxVertical = MAX_PADDING_VERTICAL,
+                maxHorizontal = MAX_PADDING_VERTICAL,
+                onSetTop = onSetFooterPaddingTop,
+                onSetBottom = onSetFooterPaddingBottom,
+                onSetLeft = onSetFooterPaddingLeft,
+                onSetRight = onSetFooterPaddingRight,
+            )
         }
     }
 }
@@ -599,32 +568,6 @@ private fun MarginRows(
         tickStep = MarginTickStep,
         onSetValue = onSetRight,
     )
-}
-
-// ====================================================================
-// 边距调整弹框（屏幕居中）
-// ====================================================================
-
-/** 关闭按钮（×）：按压反色。 */
-@Composable
-private fun CloseButton(onClose: () -> Unit) {
-    // 按压反色；× 常态为次级色（onSurfaceVariant），按压反色为白
-    val press = rememberImmediatePressState()
-    val colors = eInkActionColors(pressed = press.isPressed)
-    Box(
-        modifier = Modifier
-            .size(44.dp)
-            .then(press.modifier)
-            .background(colors.containerColor)
-            .einkClickable(role = Role.Button, onClick = onClose),
-        contentAlignment = Alignment.Center,
-    ) {
-        EInkText(
-            text = "×",
-            style = EInkTheme.typography.titleLarge,
-            color = colors.secondaryContentColor,
-        )
-    }
 }
 
 /** 面板 Tab 行：选中项反白，按压瞬时反色，零动画直接切换。 */

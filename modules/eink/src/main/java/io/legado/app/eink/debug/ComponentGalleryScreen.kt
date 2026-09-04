@@ -69,70 +69,120 @@ import kotlinx.coroutines.launch
  * 仅 debug 变体入口可见（MineScreen 内 BuildConfig.DEBUG 门控）。
  * 翻页手势（EInkPageSwipe）与真实屏幕同款接线，含 PageTurn 意图上报。
  */
+/** 对话框样例的形态枚举：弹框本体须组合在页根（见 [ComponentGalleryRoute]），样例行只持触发钮。 */
+private enum class GalleryDialog { Confirm, ConfirmDisabled, PanelStyle }
+
 @Composable
 fun ComponentGalleryRoute(
     onBack: () -> Unit,
 ) {
-    Column(modifier = Modifier.fillMaxSize()) {
-        EInkTopBar(title = "组件预览", onBack = onBack)
-        LazyColumn(modifier = Modifier.fillMaxSize()) {
-            item(key = "foundation-grayscale") {
-                SectionHeader("Foundation · 灰阶 Token")
-                GrayscaleSwatches()
+    var openDialog by remember { mutableStateOf<GalleryDialog?>(null) }
+    // 页内弹框契约：全屏根容器的子级、置于列表之上（放滚动容器内会被
+    // 裁剪且拦不住列表点击）
+    Box(modifier = Modifier.fillMaxSize()) {
+        Column(modifier = Modifier.fillMaxSize()) {
+            EInkTopBar(title = "组件预览", onBack = onBack)
+            LazyColumn(modifier = Modifier.fillMaxSize()) {
+                item(key = "foundation-grayscale") {
+                    SectionHeader("Foundation · 灰阶 Token")
+                    GrayscaleSwatches()
+                }
+                item(key = "foundation-semantic") {
+                    SectionHeader("Foundation · 语义色角色")
+                    SemanticSwatches()
+                }
+                item(key = "foundation-shapes") {
+                    SectionHeader("Foundation · 形状")
+                    ShapeSamples()
+                }
+                item(key = "interaction") {
+                    SectionHeader("Interaction · 按压 / 选中 / 禁用")
+                    InteractionSamples()
+                }
+                item(key = "content") {
+                    SectionHeader("Content · 文本 / 分隔线 / 信息行 / 加载")
+                    ContentSamples()
+                }
+                item(key = "control-slider") {
+                    SectionHeader("Control · 离散滑条（抬手提交）")
+                    SliderSample()
+                }
+                item(key = "control-button") {
+                    SectionHeader("Control · 按钮（描边 / 选中 / 禁用）")
+                    ButtonSamples()
+                }
+                item(key = "control-search") {
+                    SectionHeader("Control · 搜索条")
+                    SearchSamples()
+                }
+                item(key = "control-dialog") {
+                    SectionHeader("Control · 对话框（标题 + 内容插槽 + 确认/取消）")
+                    DialogSample(onOpen = { openDialog = it })
+                }
+                item(key = "nav-topbar") {
+                    SectionHeader("Navigation · 顶栏（内边距动作 / 贴右图标 / 可点击标题）")
+                    TopBarSamples()
+                }
+                item(key = "nav-arrows") {
+                    SectionHeader("Navigation · 翻页箭头 / 页码指示器")
+                    ArrowsAndIndicatorSample()
+                }
+                item(key = "nav-operationbar") {
+                    SectionHeader("Navigation · 底部操作栏（Tab + 翻页）")
+                    OperationBarSample()
+                }
+                item(key = "pager") {
+                    SectionHeader("Pager · 固定页列表（滑动翻页 + 页码联动）")
+                    PagerSample()
+                }
+                item(key = "feature-cover") {
+                    SectionHeader("Feature · 封面占位（bookshelf 层）")
+                    CoverSample()
+                    Spacer(modifier = Modifier.height(EInkSpacing.xxl))
+                }
             }
-            item(key = "foundation-semantic") {
-                SectionHeader("Foundation · 语义色角色")
-                SemanticSwatches()
-            }
-            item(key = "foundation-shapes") {
-                SectionHeader("Foundation · 形状")
-                ShapeSamples()
-            }
-            item(key = "interaction") {
-                SectionHeader("Interaction · 按压 / 选中 / 禁用")
-                InteractionSamples()
-            }
-            item(key = "content") {
-                SectionHeader("Content · 文本 / 分隔线 / 信息行 / 加载")
-                ContentSamples()
-            }
-            item(key = "control-slider") {
-                SectionHeader("Control · 离散滑条（抬手提交）")
-                SliderSample()
-            }
-            item(key = "control-button") {
-                SectionHeader("Control · 按钮（描边 / 选中 / 禁用）")
-                ButtonSamples()
-            }
-            item(key = "control-search") {
-                SectionHeader("Control · 搜索条")
-                SearchSamples()
-            }
-            item(key = "control-dialog") {
-                SectionHeader("Control · 对话框（标题 + 内容插槽 + 确认/取消）")
-                DialogSample()
-            }
-            item(key = "nav-topbar") {
-                SectionHeader("Navigation · 顶栏（内边距动作 / 贴右图标 / 可点击标题）")
-                TopBarSamples()
-            }
-            item(key = "nav-arrows") {
-                SectionHeader("Navigation · 翻页箭头 / 页码指示器")
-                ArrowsAndIndicatorSample()
-            }
-            item(key = "nav-operationbar") {
-                SectionHeader("Navigation · 底部操作栏（Tab + 翻页）")
-                OperationBarSample()
-            }
-            item(key = "pager") {
-                SectionHeader("Pager · 固定页列表（滑动翻页 + 页码联动）")
-                PagerSample()
-            }
-            item(key = "feature-cover") {
-                SectionHeader("Feature · 封面占位（bookshelf 层）")
-                CoverSample()
-                Spacer(modifier = Modifier.height(EInkSpacing.xxl))
-            }
+        }
+        when (openDialog) {
+            GalleryDialog.Confirm ->
+                EInkDialog(
+                    onDismiss = { openDialog = null },
+                    title = "演示对话框",
+                    onConfirm = { openDialog = null },
+                ) {
+                    EInkText(
+                        text = "内容插槽：正文、输入行等由调用方组合。",
+                        style = EInkTheme.typography.bodyMedium
+                    )
+                }
+
+            GalleryDialog.ConfirmDisabled ->
+                EInkDialog(
+                    onDismiss = { openDialog = null },
+                    title = "确认禁用态",
+                    onConfirm = null,
+                ) {
+                    EInkText(
+                        text = "确认按钮不可点（弱化描边与文字）。",
+                        style = EInkTheme.typography.bodyMedium
+                    )
+                }
+
+            GalleryDialog.PanelStyle ->
+                // 面板形态：标题行 × 关闭钮 + 分隔线，无底部按钮组（参考阅读页边距弹框）
+                EInkDialog(
+                    onDismiss = { openDialog = null },
+                    title = "关闭钮面板",
+                    onClose = { openDialog = null },
+                    onBackdropClick = { openDialog = null },
+                    showActions = false,
+                ) {
+                    EInkText(
+                        text = "标题行右侧 × 关闭钮，标题行下加分隔线；弹框外点击与 × 分离回调。",
+                        style = EInkTheme.typography.bodyMedium
+                    )
+                }
+
+            null -> Unit
         }
     }
 }
@@ -471,6 +521,9 @@ private fun SearchSamples() {
             value = query,
             onValueChange = { query = it },
             hint = "搜索书名 / 作者（输入演示）",
+            onClear = {
+                query = ""
+            },
             action = {
                 EInkOperationBarIcon(
                     icon = painterResource(R.drawable.eink_ic_settings),
@@ -485,40 +538,16 @@ private fun SearchSamples() {
 }
 
 @Composable
-private fun DialogSample() {
-    var open by remember { mutableStateOf(false) }
-    var openDisabledConfirm by remember { mutableStateOf(false) }
-
-    // 两个触发按钮各自独立按压态（复用按压反色惯例，不依赖其他 Sample 私件）
+private fun DialogSample(onOpen: (GalleryDialog) -> Unit) {
+    // 触发按钮各自独立按压态（复用按压反色惯例，不依赖其他 Sample 私件）；
+    // 弹框本体组合在页根 Box（页内弹框契约），此处只发形态事件
     Column(modifier = Modifier.padding(horizontal = EInkSpacing.m, vertical = EInkSpacing.s)) {
         Row(horizontalArrangement = Arrangement.spacedBy(EInkSpacing.s)) {
-            SampleTriggerButton(text = "打开演示", onClick = { open = true }, modifier = Modifier.weight(1f))
-            SampleTriggerButton(text = "确认禁用态", onClick = { openDisabledConfirm = true }, modifier = Modifier.weight(1f))
+            SampleTriggerButton(text = "打开演示", onClick = { onOpen(GalleryDialog.Confirm) }, modifier = Modifier.weight(1f))
+            SampleTriggerButton(text = "确认禁用态", onClick = { onOpen(GalleryDialog.ConfirmDisabled) }, modifier = Modifier.weight(1f))
         }
-    }
-
-    if (open) {
-        EInkDialog(
-            onDismiss = { open = false },
-            title = "演示对话框",
-            onConfirm = { open = false },
-        ) {
-            EInkText(
-                text = "内容插槽：正文、输入行等由调用方组合。",
-                style = EInkTheme.typography.bodyMedium
-            )
-        }
-    }
-    if (openDisabledConfirm) {
-        EInkDialog(
-            onDismiss = { openDisabledConfirm = false },
-            title = "确认禁用态",
-            onConfirm = null,
-        ) {
-            EInkText(
-                text = "确认按钮不可点（弱化描边与文字）。",
-                style = EInkTheme.typography.bodyMedium
-            )
+        Row(modifier = Modifier.padding(top = EInkSpacing.s)) {
+            SampleTriggerButton(text = "关闭钮面板", onClick = { onOpen(GalleryDialog.PanelStyle) }, modifier = Modifier.weight(1f))
         }
     }
 }
