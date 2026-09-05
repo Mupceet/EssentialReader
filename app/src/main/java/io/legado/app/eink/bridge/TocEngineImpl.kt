@@ -4,10 +4,10 @@ import io.legado.app.constant.BookType
 import io.legado.app.data.appDb
 import io.legado.app.data.entities.Book
 import io.legado.app.data.entities.BookChapter
-import io.legado.app.eink.contract.TocEngine
-import io.legado.app.eink.contract.TocFetchResult
 import io.legado.app.eink.contract.ChapterUiModel
 import io.legado.app.eink.contract.TocBookUiModel
+import io.legado.app.eink.contract.TocEngine
+import io.legado.app.eink.contract.TocFetchResult
 import io.legado.app.help.book.BookHelp
 import io.legado.app.help.book.addType
 import io.legado.app.help.book.isLocal

@@ -14,17 +14,17 @@
 ```
 :modules:eink（模块 = 可整体复制的 E-Ink Compose 应用核心，零引擎依赖）
 ├─ contract/                        ★ 移植契约（接入面地图见目录内 README）
-│    EInkEngineRegistry（装配）+
-│    EInkKeyEventHub（按键枢纽）+ GlobalSettings（模块全部设置项的唯一
-│    出入口，含 E-Ink 自有偏好）+ BookshelfEngine +
+│    EInkEngineRegistry（装配）+ EInkHostActivity（入口模板基类，宿主
+│    只实现 onInstallEngines/onExitToFullMode 两钩子）+
+│    GlobalSettings（模块全部设置项的唯一出入口，含 E-Ink 自有偏好）+
+│    BookshelfEngine +
 │    SearchEngine + TocEngine + BookDetailEngine + ChangeSourceEngine +
 │    CoverEngine + ReaderEngine（各端口及其伴生回调/结果类型）+
-│    EngineHandles（BookHandle/SourceHandle/SearchResultHandle/SearchResultRef）+
+│    EngineHandles（BookHandle/SourceHandle/SearchResultHandle）+
 │    ReaderPageSnapshot（排版产物快照系）+ ReaderTextStyle（排版参数快照）+
 │    各页 UiModel（跨界展示模型）
-├─ app/                             EInkHostActivity 入口模板基类（宿主只实现
-│                                   onInstallEngines/onExitToFullMode 两钩子）+
-│                                   EInkApp 根 Composable + EInkScreen/EInkNavController 栈导航
+├─ app/                             EInkKeyEventHub 按键枢纽 + EInkApp 根
+│                                   Composable + EInkScreen/EInkNavController 栈导航
 ├─ designsystem/                    设计系统（theme/content/control/interaction/
 │                                   navigation/pager/refresh/widget，EInkXxx 组件）
 ├─ feature/                         全部 Screen + ViewModel

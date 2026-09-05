@@ -28,7 +28,7 @@ interface BookshelfEngine {
     /**
      * 最近阅读书籍的 bookUrl（启动直达阅读解析用）。
      *
-     * 调用时机：[io.legado.app.eink.app.EInkHostActivity] 在 onCreate
+     * 调用时机：[EInkHostActivity] 在 onCreate
      * **主线程同步**读取一次（仅当 GlobalSettings.defaultToRead 开启）。
      * 宿主实现应保持单行查询的轻量。无最近阅读返回 null。
      */

@@ -103,7 +103,7 @@ fun SearchRoute(
 
     // 关键词非空才展示结果区：一键清空/逐字删空后即回到历史区
     val isResultListVisible = uiState.searchKey.isNotBlank() &&
-        (uiState.results.isNotEmpty() || uiState.isSearching)
+            (uiState.results.isNotEmpty() || uiState.isSearching)
 
     // 外层用 BoxWithConstraints 提供实测宽度：历史 chip 分行依赖真实可用宽
     //（Configuration 屏宽在 configChanges 下旋转不刷新，见 EInkOperationBar 说明）
@@ -135,7 +135,7 @@ fun SearchRoute(
                 spacing = with(density) { HistoryChipSpacing.toPx() }.toInt(),
                 labelWidth = { keyword ->
                     val label = keyword.word +
-                        if (showHistoryDeleteMode) HistoryDeleteMarkSuffix else ""
+                            if (showHistoryDeleteMode) HistoryDeleteMarkSuffix else ""
                     (textMeasurer.measure(label, chipStyle).size.width + chipChromePx)
                         .coerceAtMost(maxChipWidthPx)
                 },
@@ -320,7 +320,7 @@ private fun ResultList(
         ) {
             EInkText(
                 text = "结果 ${state.results.size} · 进度 " +
-                    "${state.searchedSources}/${state.totalSources}",
+                        "${state.searchedSources}/${state.totalSources}",
                 style = EInkTheme.typography.labelMedium,
                 color = EInkTheme.colorScheme.onSurfaceVariant
             )
@@ -334,7 +334,10 @@ private fun ResultList(
                 .weight(1f)
         ) {
             items(state.results, key = { it.resultKey }) { book ->
-                ResultItem(book = book, inShelf = isInBookshelf(book), onClick = { onBookClick(book) })
+                ResultItem(
+                    book = book,
+                    inShelf = isInBookshelf(book),
+                    onClick = { onBookClick(book) })
                 EInkHorizontalDivider()
             }
         }

@@ -26,13 +26,3 @@ interface SourceHandle {
 
 /** 搜索结果句柄：宿主搜索结果实体的包装。 */
 interface SearchResultHandle
-
-/**
- * 搜索结果的展示与操作载体：展示字段 + 引擎身份。
- *
- * 宿主把搜索结果映射为实现了本接口的展示模型（字段由各使用场景的
- * UiModel 定义），[handle] 在应用后续操作（如换源）时回传给端口。
- */
-interface SearchResultRef {
-    val handle: SearchResultHandle
-}

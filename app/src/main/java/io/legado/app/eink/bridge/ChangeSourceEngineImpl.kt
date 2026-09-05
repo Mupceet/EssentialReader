@@ -8,12 +8,12 @@ import io.legado.app.data.entities.BookSource
 import io.legado.app.data.entities.SearchBook
 import io.legado.app.domain.gateway.OtherSettingsGateway
 import io.legado.app.domain.gateway.ReadSettingsGateway
-import io.legado.app.eink.contract.ChangeSourceBookUiModel
-import io.legado.app.eink.contract.ChangeSourceResultUiModel
 import io.legado.app.eink.contract.BookHandle
+import io.legado.app.eink.contract.ChangeSourceBookUiModel
 import io.legado.app.eink.contract.ChangeSourceEngine
-import io.legado.app.eink.contract.SourceHandle
+import io.legado.app.eink.contract.ChangeSourceResultUiModel
 import io.legado.app.eink.contract.SearchResultHandle
+import io.legado.app.eink.contract.SourceHandle
 import io.legado.app.help.book.removeType
 import io.legado.app.model.ReadBook
 import io.legado.app.model.webBook.WebBook

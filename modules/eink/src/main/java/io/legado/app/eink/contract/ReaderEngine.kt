@@ -14,8 +14,10 @@ interface ReaderBookSnapshot {
     val bookUrl: String
     val name: String
     val author: String
+
     /** true = 本地导入书（无书源，不联网拉取目录/正文）。 */
     val isLocal: Boolean
+
     /** true = 已加入书架；false = 未加书架的隐藏行。 */
     val isInBookshelf: Boolean
 }
@@ -39,10 +41,13 @@ data class ReaderHeaderFooterVisibility(
  */
 sealed interface ReaderPrepareResult {
     data object Success : ReaderPrepareResult
+
     /** 书籍没有可用书源（本地书损坏、书源已删除等）。 */
     data object NoSource : ReaderPrepareResult
+
     /** 拉取书籍详情（书名/作者/目录地址）失败。 */
     data class BookInfoFailure(val cause: Throwable) : ReaderPrepareResult
+
     /** 拉取或入库目录失败。 */
     data class TocFailure(val cause: Throwable) : ReaderPrepareResult
 }

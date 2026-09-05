@@ -74,6 +74,7 @@ class BookshelfViewModel(application: Application) : AndroidViewModel(applicatio
 
     private val _isRefreshing = MutableStateFlow(false)
     private val _updatingUrls = MutableStateFlow<Set<String>>(emptySet())
+
     // 默认网格；仅内存单次生命周期（VM 存续期），不落盘——布局切换入口
     // 暂不开放，[toggleGridLayout] 保留供入口回归时复用
     private val _isGridLayout = MutableStateFlow(true)

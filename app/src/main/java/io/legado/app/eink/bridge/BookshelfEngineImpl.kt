@@ -7,8 +7,8 @@ import io.legado.app.data.entities.Book
 import io.legado.app.data.entities.BookGroup
 import io.legado.app.data.entities.BookSource
 import io.legado.app.domain.gateway.DownloadCacheSettingsGateway
-import io.legado.app.eink.contract.BookshelfItemUiModel
 import io.legado.app.eink.contract.BookshelfEngine
+import io.legado.app.eink.contract.BookshelfItemUiModel
 import io.legado.app.eink.contract.BookshelfTocRefreshResult
 import io.legado.app.help.book.BookHelp
 import io.legado.app.help.book.addType
@@ -39,6 +39,7 @@ import kotlin.math.min
 internal object BookshelfEngineImpl : BookshelfEngine, KoinComponent {
 
     private val downloadCacheSettingsGateway: DownloadCacheSettingsGateway by inject()
+
     /** [Book] → [BookshelfItemUiModel]：条目渲染字段的唯一抽取点。 */
     private fun Book.toBookshelfItemUiModel() = BookshelfItemUiModel(
         bookUrl = bookUrl,

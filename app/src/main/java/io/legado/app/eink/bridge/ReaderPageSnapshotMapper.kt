@@ -5,8 +5,8 @@ import android.graphics.Paint
 import android.os.Build
 import io.legado.app.data.entities.Book
 import io.legado.app.eink.contract.ReaderImageSlot
-import io.legado.app.eink.contract.ReaderPageSnapshot
 import io.legado.app.eink.contract.ReaderPageLine
+import io.legado.app.eink.contract.ReaderPageSnapshot
 import io.legado.app.eink.contract.ReaderPaintSpec
 import io.legado.app.model.ImageProvider
 import io.legado.app.ui.book.read.page.entities.TextPage

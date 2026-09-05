@@ -4,8 +4,8 @@ import android.content.Context
 import android.content.Intent
 import io.legado.app.constant.PreferKey
 import io.legado.app.domain.gateway.AppUiConfigurationGateway
-import io.legado.app.eink.app.EInkHostActivity
 import io.legado.app.eink.bridge.EInkBridge
+import io.legado.app.eink.contract.EInkHostActivity
 import io.legado.app.help.config.AppConfigStore
 import io.legado.app.ui.main.MainActivity
 import io.legado.app.utils.isNightMode

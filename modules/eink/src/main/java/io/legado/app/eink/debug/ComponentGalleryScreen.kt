@@ -389,9 +389,11 @@ private fun DemoTile(
 
 @Composable
 private fun ContentSamples() {
-    Column(modifier = Modifier
-        .fillMaxWidth()
-        .padding(horizontal = EInkSpacing.m)) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = EInkSpacing.m)
+    ) {
         EInkText(text = "titleLarge 标题样式", style = EInkTheme.typography.titleLarge)
         EInkText(
             text = "bodyMedium 正文样式：可读性优先，14sp 下限。",
@@ -428,9 +430,11 @@ private fun SliderSample() {
     // 拖动仅更新预览值，抬手 onValueChangeFinished 才提交（recreate 类设置范式）
     var preview by remember { mutableIntStateOf(SliderDefault) }
     var committed by rememberSaveable { mutableIntStateOf(SliderDefault) }
-    Column(modifier = Modifier
-        .fillMaxWidth()
-        .padding(horizontal = EInkSpacing.m)) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = EInkSpacing.m)
+    ) {
         EInkSteppedSlider(
             value = preview,
             onValueChange = { preview = it },
@@ -543,11 +547,23 @@ private fun DialogSample(onOpen: (GalleryDialog) -> Unit) {
     // 弹框本体组合在页根 Box（页内弹框契约），此处只发形态事件
     Column(modifier = Modifier.padding(horizontal = EInkSpacing.m, vertical = EInkSpacing.s)) {
         Row(horizontalArrangement = Arrangement.spacedBy(EInkSpacing.s)) {
-            SampleTriggerButton(text = "打开演示", onClick = { onOpen(GalleryDialog.Confirm) }, modifier = Modifier.weight(1f))
-            SampleTriggerButton(text = "确认禁用态", onClick = { onOpen(GalleryDialog.ConfirmDisabled) }, modifier = Modifier.weight(1f))
+            SampleTriggerButton(
+                text = "打开演示",
+                onClick = { onOpen(GalleryDialog.Confirm) },
+                modifier = Modifier.weight(1f)
+            )
+            SampleTriggerButton(
+                text = "确认禁用态",
+                onClick = { onOpen(GalleryDialog.ConfirmDisabled) },
+                modifier = Modifier.weight(1f)
+            )
         }
         Row(modifier = Modifier.padding(top = EInkSpacing.s)) {
-            SampleTriggerButton(text = "关闭钮面板", onClick = { onOpen(GalleryDialog.PanelStyle) }, modifier = Modifier.weight(1f))
+            SampleTriggerButton(
+                text = "关闭钮面板",
+                onClick = { onOpen(GalleryDialog.PanelStyle) },
+                modifier = Modifier.weight(1f)
+            )
         }
     }
 }
@@ -700,9 +716,11 @@ private fun PagerSample() {
     val currentPage = pager.pageStart / pageSize + 1
     val pageCount = ((items.size - 1) / pageSize) + 1
 
-    Column(modifier = Modifier
-        .fillMaxWidth()
-        .height(PagerDemoHeight)) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(PagerDemoHeight)
+    ) {
         LazyColumn(
             state = pager.listState,
             userScrollEnabled = false,

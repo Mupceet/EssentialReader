@@ -101,9 +101,11 @@ fun EInkApp(
                 )
             } else {
                 // 其余界面统一避让系统栏（Edge-to-Edge 下系统栏透明覆盖在背景上）
-                Box(modifier = Modifier
-                    .fillMaxSize()
-                    .safeDrawingPadding()) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .safeDrawingPadding()
+                ) {
                     when (screen) {
                         is EInkScreen.Home -> {
                             HomeRoute(

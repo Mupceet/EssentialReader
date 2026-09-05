@@ -10,15 +10,15 @@ import io.legado.app.domain.gateway.BookSearchGateway
 import io.legado.app.domain.gateway.DownloadCacheSettingsGateway
 import io.legado.app.domain.model.BookSearchScope
 import io.legado.app.domain.model.MatchMode
-import io.legado.app.domain.usecase.BookSearchRequest
 import io.legado.app.domain.usecase.BookSearchControl
+import io.legado.app.domain.usecase.BookSearchRequest
 import io.legado.app.domain.usecase.SearchBooksUseCase
 import io.legado.app.domain.usecase.SearchRunEvent
+import io.legado.app.eink.contract.SearchBookUiModel
 import io.legado.app.eink.contract.SearchEngine
+import io.legado.app.eink.contract.SearchHistoryUiModel
 import io.legado.app.eink.contract.SearchSession
 import io.legado.app.eink.contract.SearchSessionCallback
-import io.legado.app.eink.contract.SearchBookUiModel
-import io.legado.app.eink.contract.SearchHistoryUiModel
 import io.legado.app.help.book.isNotShelf
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -149,6 +149,7 @@ internal object SearchEngineImpl : SearchEngine, KoinComponent {
                                     // 无对应投影，忽略 —— VM 按 origin-bookUrl
                                     // 累积合并去重，同书重复增量自然覆盖
                                 }
+
                                 is SearchRunEvent.Finished ->
                                     callback.onSearchFinish(event.isEmpty, event.hasMore)
                             }
@@ -199,6 +200,7 @@ private object AppDbSearchGateway : BookSearchGateway {
             scope.isSource -> scope.sourceUrls.forEach { sourceUrl ->
                 appDb.bookSourceDao.getBookSourcePart(sourceUrl)?.let { selected.add(it) }
             }
+
             else -> scope.groupNames.forEach { groupName ->
                 selected.addAll(appDb.bookSourceDao.getEnabledPartByGroup(groupName))
             }

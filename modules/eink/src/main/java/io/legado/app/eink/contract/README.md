@@ -24,11 +24,11 @@
 
 职责三分原则：
 
-| 层 | 保留什么 |
-|---|---|
+| 层          | 保留什么                                    |
+|------------|-----------------------------------------|
 | 模块 feature | 界面编排：加载/错误状态机、翻页交互、调参防抖、搜索合并去重排序、刷新并发调度 |
-| 宿主 bridge | 引擎管线：书籍解析落库、目录/正文网络拉取、排版与分页、缓存、进度迁移 |
-| 入口模板基类 | 生命周期编排：装配时机、字体缩放、启动清理、直达阅读、主题、按键分发 |
+| 宿主 bridge  | 引擎管线：书籍解析落库、目录/正文网络拉取、排版与分页、缓存、进度迁移     |
+| 入口模板基类     | 生命周期编排：装配时机、字体缩放、启动清理、直达阅读、主题、按键分发      |
 
 ## 2. 接入流程（七步）
 
@@ -41,8 +41,8 @@
 3. **写装配入口**：一个无参函数（本仓为 `EInkBridge.install()`），调用
    `EInkEngineRegistry.install(...)` 注册全部实现，并做一次宿主设置快照
    对齐（本仓：封面开关快照）。
-4. **写入口子类**：继承 `EInkHostActivity`（模块 `app/` 包），实现两个
-   钩子：
+4. **写入口子类**：继承本目录的 [EInkHostActivity]（入口模板基类），
+   实现两个钩子：
    ```kotlin
    class EInkMainActivity : EInkHostActivity() {
        override fun onInstallEngines() = EInkBridge.install()
@@ -65,17 +65,16 @@
 
 ## 3. 端口契约总表（宿主实现）
 
-| 接口 | 职责 | 关键实现义务 |
-|---|---|---|
-| `GlobalSettings` | 模块全部设置项的唯一出入口 | 写入语义三档（fire-and-forget / 快照状态 / attach 期），见接口 KDoc |
-| `BookshelfEngine` | 书架流、目录批量刷新管线、预缓存联动 | 刷新单本书不抛异常；`lastReadBookUrl` 主线程同步单行查询 |
-| `SearchEngine` | 搜索历史 + 多书源搜索会话 | 回调事件顺序约定见 `SearchSessionCallback`；搜索范围解析在宿主侧 |
-| `TocEngine` | 目录页：书籍解析、目录拉取、进度写回 | 拉取失败经 `TocFetchResult` 返回，不抛异常 |
-| `BookDetailEngine` | 详情页：查找链、目录预取、书架操作 | 预取静默失败（`Skipped`）；句柄可能被预取/重定向更新 |
-| `ChangeSourceEngine` | 跨源搜索 + 换源迁移 | 成功后重载会话并发射 `bookChanged`；进度迁移完整 |
-| `CoverEngine` | 封面请求策略（防盗链/请求头/尺寸） | 宿主图片栈知识唯一出口；`ImageRequest.Builder` 配置块 |
-| `ReaderEngine` | 阅读会话状态机 + 排版引擎转发面 | 最重的端口：回调注册时序、排版快照读写、页快照映射，逐方法见 KDoc |
-| `EInkKeyEventHub` | 系统按键转发枢纽 | 无实现义务，直接实例化注册 |
+| 接口                   | 职责                 | 关键实现义务                                             |
+|----------------------|--------------------|----------------------------------------------------|
+| `GlobalSettings`     | 模块全部设置项的唯一出入口      | 写入语义三档（fire-and-forget / 快照状态 / attach 期），见接口 KDoc |
+| `BookshelfEngine`    | 书架流、目录批量刷新管线、预缓存联动 | 刷新单本书不抛异常；`lastReadBookUrl` 主线程同步单行查询              |
+| `SearchEngine`       | 搜索历史 + 多书源搜索会话     | 回调事件顺序约定见 `SearchSessionCallback`；搜索范围解析在宿主侧       |
+| `TocEngine`          | 目录页：书籍解析、目录拉取、进度写回 | 拉取失败经 `TocFetchResult` 返回，不抛异常                     |
+| `BookDetailEngine`   | 详情页：查找链、目录预取、书架操作  | 预取静默失败（`Skipped`）；句柄可能被预取/重定向更新                    |
+| `ChangeSourceEngine` | 跨源搜索 + 换源迁移        | 成功后重载会话并发射 `bookChanged`；进度迁移完整                    |
+| `CoverEngine`        | 封面请求策略（防盗链/请求头/尺寸） | 宿主图片栈知识唯一出口；`ImageRequest.Builder` 配置块             |
+| `ReaderEngine`       | 阅读会话状态机 + 排版引擎转发面  | 最重的端口：回调注册时序、排版快照读写、页快照映射，逐方法见 KDoc                |
 
 ## 4. 跨界数据类型（宿主构造/映射）
 
@@ -84,9 +83,8 @@
   简介清洗在映射期完成，模块组合期零计算）；**稳定**（全基元/不可变
   字段）；**无引擎类型**（不携带宿主实体，引擎身份走句柄）。
 - **`EngineHandles.kt`** — `BookHandle` / `SourceHandle` /
-  `SearchResultHandle` / `SearchResultRef`：引擎实体的不透明句柄。宿主
-  bridge 包装真实实体，模块只持有回传不解读；实体被替换时的句柄语义
-  见各端口方法 KDoc。
+  `SearchResultHandle`：引擎实体的不透明句柄。宿主 bridge 包装真实实体，
+  模块只持有回传，不解读；实体被替换时的句柄语义见各端口方法 KDoc。
 - **`ReaderTextStyle.kt`** — 排版参数快照：设置面板编辑 →
   `ReaderEngine.applyStyle` 整体写入；字段单位与编辑区间见文件头 KDoc。
 - **`ReaderPageSnapshot.kt`** — 排版产物页快照：宿主把引擎排版结果映射
