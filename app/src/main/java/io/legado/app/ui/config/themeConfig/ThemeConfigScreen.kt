@@ -207,7 +207,7 @@ fun ThemeConfigScreen(
 
                         if (theme.useMiuixMonet) {
                             val visibleThemes = themes.filter { (_, value) ->
-                                value != "4" || state.showEInkTheme
+                                value != "4" || state.showEInkTheme || theme.appTheme == "4"
                             }
                             DropdownListSettingItem(
                                 title = stringResource(R.string.theme),
@@ -232,7 +232,7 @@ fun ThemeConfigScreen(
                         Spacer(modifier = Modifier.height(16.dp))
 
                         val visibleThemes = themes.filter { (_, value) ->
-                            value != "4" || state.showEInkTheme
+                            value != "4" || state.showEInkTheme || theme.appTheme == "4"
                         }
                         ThemeColorSelector(
                             context = context,
