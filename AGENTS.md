@@ -175,7 +175,7 @@ KMP 任务名在模块实际创建后才存在；不要假装运行尚未定义�
 - 应用代码不依赖 Hutool；Hutool 仅作为书源 JS 的运行时加密库保留在 classpath（书源会直接调用
   `Packages.cn.hutool.*`），版本固定 5.8.22 勿升级。应用内部加密、编码与日期使用现有 JCA、
   `java.time` 和 `help/crypto/CryptoUtils.kt` 路径，KMP 抽取时再通过能力契约替换 JVM API。
-- 代码 namespace 为 `io.legado.app`，Android `applicationId` 为 `io.legato.kazusa`，不要混用。
+- 代码 namespace 为 `io.legado.app`，Android `applicationId` 为 `io.legato.kazusa.eink`，不要混用。
 - 当前 minSdk 26、target/compile SDK 37；Release 启用 R8 与资源压缩，`noR8` 变体用于排障。
 - Rhino 书源/RSS/TTS 规则、Android 服务、Web 服务和阅读器渲染属于高行为风险平台能力，迁移前必须建立兼容测试或
   capability 边界。
