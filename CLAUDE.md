@@ -369,7 +369,7 @@ Book sources, RSS sources, and HTTP TTS use JavaScript rules. `initRhino()` in `
 
 - **Do not update jsoup** beyond 1.16.2 — a breaking change in newer versions (see [jsoup#2017](https://github.com/jhy/jsoup/pull/2017)) affects `AnalyzeByJSoup.kt` and the JsoupXpath library
 - Hutool dependency removed — crypto/编码/日期工具已替换为 JCA (`javax.crypto`/`java.security`) 与 `java.time`，新增内部工具在 `help/crypto/CryptoUtils.kt`
-- Package name discrepancy: code namespace is `io.legado.app` but `applicationId` is `io.legato.kazusa`
+- Package name discrepancy: code namespace is `io.legado.app` but `applicationId` is `io.legato.kazusa.eink`
 - Min SDK 26, target SDK 37, compile SDK 37
 - Release builds enable R8 minification + resource shrinking; `noR8` variant disables both for crash debugging
 - APK is split by ABI (`armeabi-v7a`, `arm64-v8a`, plus universal)
