@@ -14,8 +14,10 @@ interface SearchSession {
     /**
      * 发起多源搜索。
      *
-     * @param searchId 模块侧单调递增的会话内序号——回调事件应携带同值
-     *   才被视为本次搜索的事件（宿主把它与结果关联透传即可，不解读）。
+     * @param searchId 模块侧单调递增的会话内序号：传入宿主会话用于过滤
+     *   过期结果——新搜索发起后，旧搜索仍在途的源结果按宿主机制丢弃
+     *   （无内建序号过滤的宿主至少要保证 [cancelSearch] 语义）。
+     *   回调本身**不携带** searchId，事件归因由模块状态机完成。
      * @param query 搜索词。
      */
     fun search(searchId: Long, query: String)
@@ -47,7 +49,12 @@ interface SearchSessionCallback {
     /** 搜索开始（全部源尚未发起）。 */
     fun onSearchStart()
 
-    /** 书源维度进展（已完成源数 / 参与源总数），结果页顶部进度提示用。 */
+    /**
+     * 书源维度进展（已完成源数 / 参与源总数），结果页顶部进度提示用。
+     * 宿主引擎无源粒度事件时，可用「已返回结果的源数 / 启用源总数」
+     * 近似——无结果的源不计入，进度会偏低后在 finish 跳满；**不可省略
+     * 不调**（进度提示将停留在初始态，属可感知的功能缺失）。
+     */
     fun onSearchProgress(processedSources: Int, totalSources: Int)
 
     /** 一批搜索结果到达（按源粒度增量推送，模块自行合并去重排序）。 */

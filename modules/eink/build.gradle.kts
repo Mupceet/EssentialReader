@@ -1,11 +1,14 @@
 plugins {
     alias(libs.plugins.android.library)
     alias(libs.plugins.compose.compiler)
+    `maven-publish`
 }
 
 android {
     namespace = "io.legado.app.eink"
-    compileSdk = 37
+    // 库取兼容下限：37 宿主向上消费无碍，36 宿主（AGP8.x）也可直接依赖
+    //（compileSdk 37 构建的 AAR 元数据 minCompileSdk=37 会被 AGP 拒绝）
+    compileSdk = 36
 
     defaultConfig {
         // minSdk 21：可被低 minSdk 宿主直接依赖，库 minSdk 高于宿主会导致 manifest merge 失败
@@ -25,8 +28,9 @@ android {
     }
 
     compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_21
-        targetCompatibility = JavaVersion.VERSION_21
+        // 同理取兼容下限：产出 Java 17 字节码（JDK 21 工具链 + target 17）
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
     }
 
     buildTypes {
@@ -34,6 +38,11 @@ android {
             isMinifyEnabled = false
             consumerProguardFiles("consumer-rules.pro")
         }
+    }
+
+    publishing {
+        // 宿主经 Maven Local / 远程仓库消费预构建产物（发布 release 单变体）
+        singleVariant("release") { withSourcesJar() }
     }
 }
 
@@ -47,13 +56,21 @@ dependencies {
 
     // ViewModel + 协程（模块承载全部 E-Ink ViewModel）
     implementation(libs.bundles.coroutines)
-    implementation(libs.androidx.lifecycle.viewmodel.compose)
-    implementation(libs.androidx.lifecycle.runtime.compose)
+    // lifecycle 钉 2.9.4：2.11 的 AAR 元数据 minCompileSdk=37，会把模块
+    // 的兼容下限抬到 37（AGP8/compileSdk36 宿主被拒）。宿主 app 自身
+    // 用更高版本时 Gradle 解析取高，二进制兼容
+    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.9.4")
+    implementation("androidx.lifecycle:lifecycle-runtime-compose:2.9.4")
     implementation(libs.activity.compose)
 
-    // 图片加载（EInkAsyncImage / EInkBookCover 封面）— 与宿主共用 Coil 3
-    // 单例 ImageLoader（拦截器/书源请求头由宿主提供），不走 beta 的 glide-compose
-    implementation(libs.coil.compose)
+    // 图片加载（EInkAsyncImage / EInkBookCover 封面）— api 传递：
+    // 契约 CoverEngine 签名暴露 Coil 类型，宿主 bridge 需编译期可见；
+    // coil-network-okhttp 使 AAR 消费方开箱具备网络封面能力
+    // （Coil 3 的网络抓取器经 ServiceLoader 自动注册，缺它则 http 封面
+    // 全部失败——曾致 develop 宿主封面不显示）。防盗链/书源请求头仍由
+    // 宿主经 CoverEngine 注入（见 contract/CoverEngine KDoc）
+    api(libs.coil.compose)
+    api(libs.coil.network.okhttp)
 
     // Tooling (debug only)
     debugImplementation(libs.androidx.compose.ui.tooling)
@@ -61,4 +78,20 @@ dependencies {
 
     // Unit tests（纯函数 JVM 测试，无需 Robolectric）
     testImplementation(libs.junit)
+}
+
+
+afterEvaluate {
+    publishing {
+        publications {
+            create<MavenPublication>("release") {
+                from(components["release"])
+                groupId = "io.legado.app.eink"
+                artifactId = "eink"
+                // 0.1.0 = 旧栈（AGP8.13/K2.3）构建、develop 宿主在用；
+                // 0.2.0 = 本仓主栈（AGP9/K2.4/Java21）构建，跨栈消费核对 §0
+                version = "0.2.0"
+            }
+        }
+    }
 }
