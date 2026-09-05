@@ -186,7 +186,7 @@ class SearchViewModel(application: Application) : AndroidViewModel(application) 
     init {
         // 书架 key 集合（判断搜索结果是否已在书架）
         viewModelScope.launch {
-            engine.observeBookshelfKeys().collect { keys ->
+            engine.observeBookshelfMatchKeys().collect { keys ->
                 bookshelfKeys = keys
             }
         }
@@ -225,7 +225,7 @@ class SearchViewModel(application: Application) : AndroidViewModel(application) 
             searchSession.cancelSearch()
             searchId = System.currentTimeMillis()
             searchSession.search(searchId, key)
-            engine.recordSearchKey(key)
+            engine.recordSearchQuery(key)
         }
     }
 

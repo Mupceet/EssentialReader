@@ -1,47 +1,65 @@
 package io.legado.app.eink.contract
 
 
-/** 详情页目录预取结果。 */
+/**
+ * [BookDetailEngine.prefetchChapters] 的结果。
+ *
+ * 宿主实现义务：预取是后台增强行为，**静默失败**——任何无法/无需
+ * 预取的情况都返回 [Skipped]，不得抛异常。
+ */
 sealed interface BookDetailPrefetchResult {
-    /** 无需/无法预取（本地书、无书源、已有目录、静默失败）。 */
+    /** 无需/无法预取（本地书、无书源、目录已存在、静默失败）。 */
     data object Skipped : BookDetailPrefetchResult
 
-    /** 预取完成：书籍可能被详情/重定向更新，返回新句柄与展示模型。 */
+    /**
+     * 预取完成且书籍记录可能被详情/重定向更新：返回新的句柄与展示
+     * 模型，模块以此替换本地持有的旧值。
+     */
     data class Updated(val handle: BookHandle, val model: BookDetailUiModel) :
         BookDetailPrefetchResult
 }
 
 /**
- * 书籍详情端口。
+ * 书籍详情端口：详情页的数据与书架操作来源。
  *
- * 书籍查找链（书架 name/author → bookUrl → 搜索记录）与目录预取管线
- * 是引擎侧编排，下沉桥接层；VM 保留加载/书架状态机与消息。引擎身份经
- * [BookHandle] 在 VM 与端口间流转（实体可能被预取就地更新/重定向替换）。
+ * 职责边界：模块详情页 VM 保留加载/书架状态机与消息提示；宿主实现
+ * 负责书籍查找链与目录预取管线。书籍的引擎身份经 [BookHandle] 在
+ * 模块与端口之间流转——**记录可能被预取就地更新或重定向替换**，
+ * 模块回传句柄而非 bookUrl 即为兼容此点。
  */
 interface BookDetailEngine {
 
-    /** 按导航参数查找书籍（书架优先，其次搜索记录），找不到返回 null。 */
+    /**
+     * 按导航参数查找书籍：书架记录优先（书名 + 作者匹配），其次搜索
+     * 结果记录。返回「句柄 + 展示模型」序对，找不到返回 null。
+     */
     suspend fun findBook(
         name: String,
         author: String,
         bookUrl: String
     ): Pair<BookHandle, BookDetailUiModel>?
 
-    /** 读取书籍当前展示数据（DB 最新，null = 已不存在）。 */
+    /** 读取书籍当前展示数据（存储最新值；书籍已不存在返回 null）。 */
     suspend fun loadBookDetail(bookUrl: String): BookDetailUiModel?
 
-    /** 是否在书架（notShelf 隐藏行视为不在）。 */
+    /** 是否在书架（未加书架的隐藏行视为不在）。 */
     suspend fun isBookInBookshelf(bookUrl: String): Boolean
 
     /**
-     * 后台预取目录入库（缺详情先拉详情；重定向替换书架记录并迁移缓存；
-     * 未加书架落 notShelf 行）。静默失败。
+     * 后台预取目录入库：缺书籍详情先拉详情；发生目录重定向时替换
+     * 书架记录并迁移缓存；未加书架则落隐藏行。静默失败（见
+     * [BookDetailPrefetchResult]）。
+     *
+     * @param inShelf 调用时刻的书架状态（宿主据此决定落库形态）。
      */
     suspend fun prefetchChapters(handle: BookHandle, inShelf: Boolean): BookDetailPrefetchResult
 
-    /** 加入书架（序号 minOrder-1、合并同名书进度），返回是否成功。 */
+    /**
+     * 将书籍加入书架（从未加书架的隐藏行转正；序号排到书架最前；
+     * 与书架内同名书合并阅读进度）。返回是否成功。
+     */
     suspend fun addToBookshelf(handle: BookHandle): Boolean
 
-    /** 移出书架（标记 notShelf），返回是否成功。 */
+    /** 将书籍移出书架（退回隐藏行，不物理删除）。返回是否成功。 */
     suspend fun removeFromBookshelf(handle: BookHandle): Boolean
 }

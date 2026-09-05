@@ -2,41 +2,80 @@ package io.legado.app.eink.contract
 
 import kotlinx.coroutines.flow.Flow
 
-/** 搜索会话（桥接宿主 SearchModel，回调式 → 端口回调）。 */
+/**
+ * 一次多书源搜索的会话句柄。
+ *
+ * 生命周期：模块在进入搜索时 [createSearchSession]，会话期间可多次
+ * [search]（新搜索应中断上一次进行中的源搜索），离开搜索页时 [close]。
+ * [close] 后宿主不得再向回调发事件。
+ */
 interface SearchSession {
-    fun search(searchId: Long, key: String)
+
+    /**
+     * 发起多源搜索。
+     *
+     * @param searchId 模块侧单调递增的会话内序号——回调事件应携带同值
+     *   才被视为本次搜索的事件（宿主把它与结果关联透传即可，不解读）。
+     * @param query 搜索词。
+     */
+    fun search(searchId: Long, query: String)
+
+    /** 取消进行中的搜索（已发出的结果保留，回调收到 [SearchSessionCallback.onSearchCancel]）。 */
     fun cancelSearch()
+
+    /** 结束会话，释放宿主侧资源。 */
     fun close()
 }
 
-/** 搜索回调（宿主 SearchModel.CallBack 的模块侧投影）。 */
+/**
+ * 搜索事件回调。
+ *
+ * 宿主实现义务：把多源搜索的中间/最终结果转发到回调。事件顺序约定：
+ * [onSearchStart] → （[onSearchProgress] × N 与 [onSearchSuccess] × N
+ * 交错）→ [onSearchFinish]；取消时以 [onSearchCancel] 结束。
+ * 回调线程不限定，模块侧自行切主线程。
+ */
 interface SearchSessionCallback {
     fun onSearchStart()
 
-    /** 书源维度搜索进展（已完成源数 / 参与源总数），供结果列表顶部进度提示。 */
+    /** 书源维度进展（已完成源数 / 参与源总数），结果页顶部进度提示用。 */
     fun onSearchProgress(processedSources: Int, totalSources: Int)
 
+    /** 一批搜索结果到达（按源粒度增量推送，模块自行合并去重排序）。 */
     fun onSearchSuccess(books: List<SearchBookUiModel>)
+
+    /**
+     * 全部源搜索结束。
+     *
+     * @param isEmpty 本次搜索无任何结果。
+     * @param hasMore true = 存在分页（模块可发起下一页搜索）。
+     */
     fun onSearchFinish(isEmpty: Boolean, hasMore: Boolean)
+
+    /** 搜索被取消（[exception] 为取消原因，无则 null）。 */
     fun onSearchCancel(exception: Throwable?)
 }
 
 /**
- * 搜索端口。
+ * 搜索端口：搜索历史管理与多书源搜索会话。
  *
- * 上游差异（如 legadoM-Ink 的 CallBack 多 onSearchProgress/
- * onSourceStatesChanged、搜索范围 SearchScope 语义）全部由桥接层吸收。
+ * 职责边界：模块搜索页 VM 保留输入状态机、结果合并去重排序与分页
+ * 编排；宿主实现负责书源搜索执行、搜索范围解析与历史存取。
  */
 interface SearchEngine {
 
-    /** 书架匹配键集合流（name-author / name / bookUrl 三键，判断“已在书架”）。 */
-    fun observeBookshelfKeys(): Flow<Set<String>>
+    /**
+     * 书架匹配键集合流：宿主把书架书籍投影为「name-author / name /
+     * bookUrl」三种形态的键，模块用它标记搜索结果的「已在书架」。
+     * 书架增删后流应发射新集合。
+     */
+    fun observeBookshelfMatchKeys(): Flow<Set<String>>
 
-    /** 搜索历史流（按最近使用时间倒序，与 View 搜索页空输入口径一致）。 */
+    /** 搜索历史流（按最近使用时间倒序）。 */
     fun observeSearchHistory(): Flow<List<SearchHistoryUiModel>>
 
-    /** 记录一次搜索词（已存在则 usage+1 并更新时间）。 */
-    suspend fun recordSearchKey(key: String)
+    /** 记录一次搜索词（已存在则使用次数 +1 并置顶；异步落盘即可）。 */
+    suspend fun recordSearchQuery(query: String)
 
     /** 删除单条搜索历史。 */
     suspend fun removeSearchHistory(word: String)
@@ -44,6 +83,6 @@ interface SearchEngine {
     /** 清空搜索历史。 */
     suspend fun clearSearchHistory()
 
-    /** 创建搜索会话（作用域由 VM 持有，onCleared 时调 [SearchSession.close]）。 */
+    /** 创建搜索会话（模块持有其生命周期，离开搜索页时调 [SearchSession.close]）。 */
     fun createSearchSession(callback: SearchSessionCallback): SearchSession
 }

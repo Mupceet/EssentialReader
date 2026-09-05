@@ -47,7 +47,7 @@ internal object BookshelfEngineImpl : BookshelfEngine, KoinComponent {
         displayAuthor = getRealAuthor(),
         coverUrl = getDisplayCover(),
         origin = origin,
-        durChapterTitle = durChapterTitle,
+        currentChapterTitle = durChapterTitle,
         latestChapterTitle = latestChapterTitle,
         unreadCount = getUnreadChapterNum(),
         hasNewChapter = lastCheckCount > 0,
@@ -59,11 +59,11 @@ internal object BookshelfEngineImpl : BookshelfEngine, KoinComponent {
 
     override fun lastReadBookUrl(): String? = appDb.bookDao.lastReadBook?.bookUrl
 
-    override suspend fun deleteNotShelfBooks() {
+    override suspend fun deleteBooksNotInBookshelf() {
         appDb.bookDao.deleteNotShelfBook()
     }
 
-    override suspend fun updatableShelfBooks(): List<BookshelfItemUiModel> =
+    override suspend fun updatableBooks(): List<BookshelfItemUiModel> =
         appDb.bookDao.flowByGroup(BookGroup.IdAll).first()
             .filter { !it.isLocal && it.canUpdate }
             .map { it.toBookshelfItemUiModel() }

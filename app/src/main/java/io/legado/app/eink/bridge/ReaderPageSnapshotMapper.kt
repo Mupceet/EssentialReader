@@ -26,7 +26,7 @@ import io.legado.app.ui.book.read.page.provider.ChapterProvider
  * 是引擎按这些参数测量的，模块必须按同值绘制才不错位；阴影/斜体等纯
  * 视觉效果不跨桥（E-Ink 阅读不渲染，既定产品取舍）。
  *
- * 在引擎回调线程调用（onUpContent 内），产物不可变、跨线程安全。
+ * 在引擎回调线程调用（onContentUpdated 内），产物不可变、跨线程安全。
  */
 internal object ReaderPageSnapshotMapper {
 

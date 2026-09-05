@@ -318,7 +318,7 @@ internal fun BookDetailScreen(
                                 // 最新章节 + 当前进度章节：两行左对齐、整体居中
                                 ChapterRows(
                                     latestChapterTitle = book.latestChapterTitle,
-                                    durChapterTitle = book.durChapterTitle
+                                    currentChapterTitle = book.currentChapterTitle
                                 )
                             }
                             // 简介：区域总高度至少一屏（heightIn 在 padding 外层）
@@ -402,7 +402,7 @@ internal fun BookDetailScreen(
 @Composable
 private fun ChapterRows(
     latestChapterTitle: String?,
-    durChapterTitle: String?
+    currentChapterTitle: String?
 ) {
     Column(horizontalAlignment = Alignment.Start) {
         latestChapterTitle?.takeIf { it.isNotBlank() }?.let {
@@ -413,7 +413,7 @@ private fun ChapterRows(
                 modifier = Modifier.padding(top = EInkSpacing.s)
             )
         }
-        durChapterTitle?.takeIf { it.isNotBlank() }?.let {
+        currentChapterTitle?.takeIf { it.isNotBlank() }?.let {
             EInkInfoRow(
                 iconRes = R.drawable.eink_ic_history,
                 text = it,

@@ -73,13 +73,12 @@ abstract class EInkHostActivity : ComponentActivity() {
     final override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-        // 清理未加书架的隐藏行（对齐 View 版启动时的 deleteNotShelfBook；
-        // 详情页预取/未加架阅读都会落这类行）
+        // 清理未加书架的隐藏行（详情页预取、未加架阅读都会落这类行）
         lifecycleScope.launch(Dispatchers.IO) {
-            EInkEngineRegistry.bookshelfEngine.deleteNotShelfBooks()
+            EInkEngineRegistry.bookshelfEngine.deleteBooksNotInBookshelf()
         }
-        // 自动跳转最近阅读（对齐 View 版 defaultToRead 行为）：开关开启时
-        // 解析最近阅读书并以 [书架, 阅读页] 初始栈启动，阅读页返回即书架
+        // 直达最近阅读：开关开启时解析最近阅读书，以 [书架, 阅读页]
+        // 初始栈启动（阅读页返回即书架）
         val lastReadBookUrl = if (EInkEngineRegistry.globalSettings.defaultToRead) {
             EInkEngineRegistry.bookshelfEngine.lastReadBookUrl()
         } else {

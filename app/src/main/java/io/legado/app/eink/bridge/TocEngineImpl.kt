@@ -25,7 +25,7 @@ internal object TocEngineImpl : TocEngine {
     private fun Book.toUiModel() = TocBookUiModel(
         bookUrl = bookUrl,
         name = name,
-        durChapterIndex = durChapterIndex,
+        currentChapterIndex = durChapterIndex,
         isLocal = isLocal,
     )
 
@@ -37,7 +37,7 @@ internal object TocEngineImpl : TocEngine {
         fileName = getFileName(),
     )
 
-    override suspend fun resolveTocBook(bookUrl: String): TocBookUiModel? {
+    override suspend fun resolveBook(bookUrl: String): TocBookUiModel? {
         // 书架记录优先；未加书架的搜索书转 Book 入库（notShelf，不显示于
         // 书架，与 View 版"未加书架直接阅读"行为一致），使进度与目录缓存可写
         val book = appDb.bookDao.getBook(bookUrl)

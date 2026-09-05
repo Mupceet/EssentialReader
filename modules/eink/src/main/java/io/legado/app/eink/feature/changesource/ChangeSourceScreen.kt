@@ -241,7 +241,7 @@ private fun SourceList(
                 onPageDown = onPageDown
             )
     ) {
-        items(state.results, key = { it.primary }) { searchBook ->
+        items(state.results, key = { it.deduplicationKey }) { searchBook ->
             SourceItem(
                 searchBook = searchBook,
                 isCurrent = searchBook.origin == currentOrigin,

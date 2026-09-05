@@ -6,12 +6,12 @@ import io.legado.app.data.appDb
 import io.legado.app.data.entities.Book
 import io.legado.app.data.repository.ReadSettingsRepository
 import io.legado.app.eink.contract.BookHandle
-import io.legado.app.eink.contract.ReaderPrepResult
+import io.legado.app.eink.contract.ReaderPrepareResult
 import io.legado.app.eink.contract.ReaderPageSnapshot
 import io.legado.app.eink.contract.ReaderBookSnapshot
 import io.legado.app.eink.contract.ReaderEngine
 import io.legado.app.eink.contract.ReaderEngineCallback
-import io.legado.app.eink.contract.ReaderTipSpec
+import io.legado.app.eink.contract.ReaderHeaderFooterVisibility
 import io.legado.app.eink.contract.ReaderTextStyle
 import io.legado.app.domain.gateway.ReadStyleGateway
 import io.legado.app.domain.gateway.ReadStyleFloatKey
@@ -47,7 +47,7 @@ internal class ReaderBookSnapshotImpl(override val handle: BookHandle) : ReaderB
     override val name: String get() = book.name
     override val author: String get() = book.author
     override val isLocal: Boolean get() = book.isLocal
-    override val isNotShelf: Boolean get() = book.isType(BookType.notShelf)
+    override val isInBookshelf: Boolean get() = !book.isType(BookType.notShelf)
 }
 
 /**
@@ -102,7 +102,7 @@ internal object ReaderEngineImpl : ReaderEngine, KoinComponent {
         return current is EngineCallBackAdapter && current.callback === callback
     }
 
-    override fun saveRead() {
+    override fun saveReadingProgress() {
         ReadBook.saveRead()
     }
 
@@ -117,10 +117,10 @@ internal object ReaderEngineImpl : ReaderEngine, KoinComponent {
     override val chapterSize: Int
         get() = ReadBook.chapterSize
 
-    override val durChapterIndex: Int
+    override val currentChapterIndex: Int
         get() = ReadBook.durChapterIndex
 
-    override val durPageIndex: Int
+    override val currentPageIndex: Int
         get() = ReadBook.durPageIndex
 
     override val engineMessage: String?
@@ -139,11 +139,11 @@ internal object ReaderEngineImpl : ReaderEngine, KoinComponent {
 
     // ---- 会话控制 ----
 
-    override fun upData(book: BookHandle) {
+    override fun loadBook(book: BookHandle) {
         ReadBook.upData((book as BookHandleImpl).book)
     }
 
-    override fun resetData(book: BookHandle) {
+    override fun reloadBook(book: BookHandle) {
         ReadBook.resetData((book as BookHandleImpl).book)
     }
 
@@ -163,7 +163,7 @@ internal object ReaderEngineImpl : ReaderEngine, KoinComponent {
         ReadBook.loadContent(chapterIndex, resetPageOffset = resetPageOffset)
     }
 
-    override fun upToc() {
+    override fun refreshToc() {
         ReadBook.upToc()
     }
 
@@ -176,27 +176,27 @@ internal object ReaderEngineImpl : ReaderEngine, KoinComponent {
         return snapshotOf(book)
     }
 
-    override suspend fun prepareBookData(bookHandle: BookHandle): ReaderPrepResult {
+    override suspend fun prepareBookData(bookHandle: BookHandle): ReaderPrepareResult {
         val book = (bookHandle as BookHandleImpl).book
         if (!book.isLocal && book.tocUrl.isEmpty()) {
             val source = ReadBook.bookSource
-                ?: return ReaderPrepResult.NoSource
+                ?: return ReaderPrepareResult.NoSource
             try {
                 WebBook.getBookInfoAwait(source, book, canReName = false)
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Throwable) {
-                return ReaderPrepResult.InfoFailure(e)
+                return ReaderPrepareResult.BookInfoFailure(e)
             }
         }
         if (ReadBook.chapterSize == 0 || book.isLocalModified()) {
             return loadChapterListIntoDb(book)
         }
-        return ReaderPrepResult.Success
+        return ReaderPrepareResult.Success
     }
 
     /** 目录入库（本地书走 LocalBook；网络书重定向时替换记录并迁移缓存）。 */
-    private suspend fun loadChapterListIntoDb(book: Book): ReaderPrepResult {
+    private suspend fun loadChapterListIntoDb(book: Book): ReaderPrepareResult {
         if (book.isLocal) {
             return try {
                 LocalBook.getChapterList(book).let { chapters ->
@@ -205,22 +205,22 @@ internal object ReaderEngineImpl : ReaderEngine, KoinComponent {
                     appDb.bookDao.update(book)
                     ReadBook.onChapterListUpdated(book)
                 }
-                ReaderPrepResult.Success
+                ReaderPrepareResult.Success
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Throwable) {
-                ReaderPrepResult.TocFailure(e)
+                ReaderPrepareResult.TocFailure(e)
             }
         }
         val source = ReadBook.bookSource
-            ?: return ReaderPrepResult.NoSource
+            ?: return ReaderPrepareResult.NoSource
         val oldBook = book.copy()
         val chapters = try {
             WebBook.getChapterListAwait(source, book, true).getOrThrow()
         } catch (e: CancellationException) {
             throw e
         } catch (e: Throwable) {
-            return ReaderPrepResult.TocFailure(e)
+            return ReaderPrepareResult.TocFailure(e)
         }
         if (oldBook.bookUrl == book.bookUrl) {
             appDb.bookDao.update(book)
@@ -232,7 +232,7 @@ internal object ReaderEngineImpl : ReaderEngine, KoinComponent {
         appDb.bookChapterDao.delByBook(oldBook.bookUrl)
         appDb.bookChapterDao.insert(*chapters.toTypedArray())
         ReadBook.onChapterListUpdated(book)
-        return ReaderPrepResult.Success
+        return ReaderPrepareResult.Success
     }
 
     // ---- 翻页 ----
@@ -399,7 +399,7 @@ internal object ReaderEngineImpl : ReaderEngine, KoinComponent {
     override val pageTouchSlop: Int
         get() = ReadConfig.pageTouchSlop
 
-    override fun readTipVisibility(): ReaderTipSpec = ReaderTipSpec(
+    override fun headerFooterVisibility(): ReaderHeaderFooterVisibility = ReaderHeaderFooterVisibility(
         headerVisible = when (ReadBookConfig.headerMode) {
             1 -> true
             2 -> false
@@ -421,7 +421,7 @@ internal object ReaderEngineImpl : ReaderEngine, KoinComponent {
 
         // ---- ReadBook.CallBack（业务轨）----
 
-        override fun upMenuView() = callback.onUpMenuView()
+        override fun upMenuView() = callback.onRequestShowMenu()
 
         override fun loadChapterList(book: Book) {
             callback.onLoadChapterList(
@@ -439,13 +439,13 @@ internal object ReaderEngineImpl : ReaderEngine, KoinComponent {
             relativePosition: Int,
             resetPageOffset: Boolean,
             success: (() -> Unit)?,
-        ) = callback.onUpContent(relativePosition, resetPageOffset, success)
+        ) = callback.onContentUpdated(relativePosition, resetPageOffset, success)
 
         override suspend fun upContentAwait(
             relativePosition: Int,
             resetPageOffset: Boolean,
             success: (() -> Unit)?,
-        ) = callback.onUpContent(relativePosition, resetPageOffset, success)
+        ) = callback.onContentUpdated(relativePosition, resetPageOffset, success)
 
         override fun pageChanged() = callback.onPageChanged()
 
