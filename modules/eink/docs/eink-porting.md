@@ -14,14 +14,17 @@
 ```
 :modules:eink（模块 = 可整体复制的 E-Ink Compose 应用核心，零引擎依赖）
 ├─ contract/                        ★ 移植契约（接入面地图见目录内 README）
-│    EInkEngineRegistry（装配）+ EInkSettings（模块自有偏好）+
-│    EInkKeyEventHub（按键枢纽）+ GlobalSettings + BookshelfEngine +
+│    EInkEngineRegistry（装配）+
+│    EInkKeyEventHub（按键枢纽）+ GlobalSettings（模块全部设置项的唯一
+│    出入口，含 E-Ink 自有偏好）+ BookshelfEngine +
 │    SearchEngine + TocEngine + BookDetailEngine + ChangeSourceEngine +
 │    CoverEngine + ReaderEngine（各端口及其伴生回调/结果类型）+
 │    EngineHandles（BookHandle/SourceHandle/SearchResultHandle/SearchResultRef）+
 │    ReaderPageSnapshot（排版产物快照系）+ ReaderTextStyle（排版参数快照）+
 │    各页 UiModel（跨界展示模型）
-├─ app/                             EInkApp 根 Composable + EInkScreen/EInkNavController 栈导航
+├─ app/                             EInkHostActivity 入口模板基类（宿主只实现
+│                                   onInstallEngines/onExitToFullMode 两钩子）+
+│                                   EInkApp 根 Composable + EInkScreen/EInkNavController 栈导航
 ├─ designsystem/                    设计系统（theme/content/control/interaction/
 │                                   navigation/pager/refresh/widget，EInkXxx 组件）
 ├─ feature/                         全部 Screen + ViewModel
@@ -32,12 +35,15 @@
 └─ res/                             全部资源带 eink_ 前缀（字符串 + 29 个图标，
                                     与宿主 res 零同名，合并零遮蔽，自包含）
 
-app/.../eink/（宿主 = 入口 + 桥接层，移植时按目标引擎重写）
-├─ EInkMainActivity.kt              入口（EInkBridge.install、keyEventHub 分发、
-│                                   fontScale attach、EInkTheme+EInkApp 接线）
+app/.../eink/（宿主 = 入口子类 + 桥接层，移植时按目标引擎重写）
+├─ EInkMainActivity.kt              入口子类（基类承担全部生命周期编排：引擎
+│                                   装配时机、fontScale attach、启动清理、直达
+│                                   最近阅读、跟随系统深浅色主题、按键分发、
+│                                   EInkTheme+EInkApp 接线；子类只剩两钩子）
 └─ bridge/                          ★ 唯一需要重写的部分：端口实现 + 快照映射
-     EInkBridge.kt          装配入口（EInkSettings.attach + Registry.install +
-                            封面开关与设置快照对齐；GlobalSettings 在此）
+     EInkBridge.kt          装配入口（Registry.install + 封面开关与设置快照
+                            对齐；GlobalSettings 在此，含 E-Ink 自有偏好
+                            keepScreenOn 的宿主存储）
      BookshelfEngineImpl    书架流/目录刷新管线（对齐 MainViewModel.updateToc）
      SearchEngineImpl       多源搜索适配 + 搜索历史
      TocEngineImpl          书籍解析(notShelf 落库)/目录拉取管线
@@ -69,9 +75,12 @@ app/.../eink/（宿主 = 入口 + 桥接层，移植时按目标引擎重写）
    以及插件 `android-library`、`compose-compiler`（AGP 9 内置 Kotlin 时
    模块不 apply kotlin-android）。版本跟随目标仓即可（见 §4）。
 4. **app 依赖**：目标 app 模块加 `implementation project(':modules:eink')`。
-5. **复制 app 侧桥接层**：`app/src/main/java/io/legado/app/eink/` 下的
-   `EinkMainActivity.kt` 与 `bridge/`（九个文件，含 ReaderPageSnapshotMapper），
-   然后按 §3 差异表适配引擎调用。
+5. **编写宿主入口与桥接层**：入口不再复制——目标仓写一个
+   `EInkHostActivity` 子类（实现 `onInstallEngines()` 与
+   `onExitToFullMode(context)` 两钩子，约 20 行，形态见本仓
+   `EinkMainActivity`）；`bridge/`（九个文件，含 ReaderPageSnapshotMapper）
+   从本仓 `app/src/main/java/io/legado/app/eink/bridge/` 复制后按
+   §3 差异表适配引擎调用。
 6. **Manifest**：注册入口（无桌面图标，由分流点进入）：
    ```xml
    <activity
@@ -162,12 +171,13 @@ Coil3 直接坐标、去掉 kotlin-android 插件、Java 21）。下表是本仓
 - **资源合并**：模块 res 全部资源名以 `eink_` 前缀开头（含 29 个图标，
   均为模块自有副本），与任何宿主 res 零同名——合并时不会被宿主同名资源
   遮蔽。新增模块资源必须遵守同一前缀规则。
-- **SharedPreferences**：`EInkSettings` 读写宿主默认 prefs 文件
-  （`<packageName>_preferences`），键名 `einkBookshelfGrid /
-  einkReaderKeepScreenOn / einkReaderAutoIntervalSec` 与历史版本一致；
-  其初始化（attach）已折叠进宿主装配模板 `EInkBridge.install(context)`
-  ——宿主入口只需这一处调用（引擎注册表 `EInkEngineRegistry` 同样
-  经此注册）。
+- **模块设置存储（零自有存储）**：模块不再持有 SharedPreferences——
+  全部设置经 `GlobalSettings` 端口读写，存储后端由宿主决定。E-Ink 自有
+  偏好目前仅 `keepScreenOn` 一键；嵌入式宿主以历史键 `einkReaderKeepScreenOn`
+  存默认 prefs 文件（`<packageName>_preferences`，与历史版本逐字一致，
+  存量设置无损——本仓 GlobalSettingsImpl 即此形态），插件宿主可用自有
+  DataStore。引擎注册表 `EInkEngineRegistry` 经宿主装配模板
+  `EInkBridge.install()`（无参）注册，由模块入口基类在 attach 阶段触发。
 - **ProGuard**：模块 `consumer-rules.pro` 随模块走；Compose/Coil 规则由
   各自 consumer 提供。
 

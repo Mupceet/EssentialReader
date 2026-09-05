@@ -9,7 +9,6 @@ import io.legado.app.domain.gateway.OtherSettingsGateway
 import io.legado.app.domain.gateway.ReadSettingsGateway
 import io.legado.app.eink.contract.EInkEngineRegistry
 import io.legado.app.eink.contract.EInkKeyEventHub
-import io.legado.app.eink.contract.EInkSettings
 import io.legado.app.eink.contract.GlobalSettings
 import io.legado.app.help.config.AppConfigStore
 import kotlinx.coroutines.CoroutineScope
@@ -18,21 +17,25 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
+import splitties.init.appCtx
+
+/** [GlobalSettingsImpl.keepScreenOn] 的历史键（EInkSettings 时期逐字继承）。 */
+private const val KEY_READER_KEEP_SCREEN_ON = "einkReaderKeepScreenOn"
 
 /**
  * E-Ink 引擎桥接层装配入口。
  *
  * 宿主侧唯一职责：把 app 引擎能力以 [io.legado.app.eink.contract] 端口
- * 实现的形式提供给 :modules:eink。E-Ink 入口 Activity onCreate 中调用
- * [install]（必须早于任何 E-Ink Composable 组合）。
+ * 实现的形式提供给 :modules:eink。由入口子类 EInkMainActivity 的
+ * onInstallEngines 钩子调用（模块模板基类 EInkHostActivity 在
+ * attachBaseContext 首行触发，早于任何 E-Ink Composable 组合与端口读取）。
  *
  * 移植到新上游时：本目录（eink/bridge/）是唯一需要重写的部分，模块侧
  * 零改动（见 docs/eink-porting.md 的差异表）。
  */
 object EInkBridge {
 
-    fun install(context: Context) {
-        EInkSettings.attach(context)
+    fun install() {
         EInkEngineRegistry.install(
             globalSettings = GlobalSettingsImpl,
             bookshelfEngine = BookshelfEngineImpl,
@@ -67,7 +70,9 @@ internal val einkSettingsWriteScope =
  * changeSourceCheckAuthor 经 ChangeSourceSettingsGateway；
  * useDefaultCover（「我的」页可写）为本对象持有的 Compose 快照状态 +
  * CoverSettingsGateway 异步落盘——组合内读取订阅变化，切换后开关行与
- * 书架/详情可见封面立即重组。
+ * 书架/详情可见封面立即重组；keepScreenOn（阅读菜单开关，E-Ink 自有
+ * 偏好、完整模式无对应设置）为模块 EInkSettings 端口化后的遗留 SP 键，
+ * 存默认 prefs 文件，不经设置网关。
  *
  * fontScaleSetting 例外地仍走 AppConfigStore 同步快照（护栏允许——
  * 禁的是 AppConfig/ui.config.*Config）：端口契约的 null = 未设置/跟随
@@ -94,6 +99,22 @@ private object GlobalSettingsImpl : GlobalSettings, KoinComponent {
     fun syncUseDefaultCover() {
         useDefaultCoverState.value = coverSettingsGateway.currentSettings.useDefaultCover
     }
+
+    /**
+     * E-Ink 自有偏好的历史存储（模块 EInkSettings 时期逐字继承）：
+     * 默认 prefs 文件 + 原键名，存量设置无损。
+     */
+    private val einkLegacyPrefs by lazy {
+        appCtx.getSharedPreferences(
+            appCtx.packageName + "_preferences", Context.MODE_PRIVATE
+        )
+    }
+
+    override var keepScreenOn: Boolean
+        get() = einkLegacyPrefs.getBoolean(KEY_READER_KEEP_SCREEN_ON, false)
+        set(value) {
+            einkLegacyPrefs.edit().putBoolean(KEY_READER_KEEP_SCREEN_ON, value).apply()
+        }
 
     override val threadCount: Int
         get() = downloadCacheSettingsGateway.currentSettings.threadCount

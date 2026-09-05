@@ -9,7 +9,6 @@ import androidx.lifecycle.viewModelScope
 import io.legado.app.eink.R
 import io.legado.app.eink.arch.UserMessage
 import io.legado.app.eink.contract.EInkEngineRegistry
-import io.legado.app.eink.contract.EInkSettings
 import io.legado.app.eink.contract.ReaderBookSnapshot
 import io.legado.app.eink.contract.ReaderEngineCallback
 import io.legado.app.eink.contract.ReaderPageSnapshot
@@ -105,7 +104,7 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application),
 
     private val _uiState = MutableStateFlow(
         ReaderUiState(
-            keepScreenOn = EInkSettings.readerKeepScreenOn,
+            keepScreenOn = EInkEngineRegistry.globalSettings.keepScreenOn,
             // 与完整模式共用宿主 autoReadSpeed 配置（默认 10）
             autoPlayIntervalSec = engine.autoReadIntervalSec
                 .coerceIn(MIN_AUTO_INTERVAL_SEC, MAX_AUTO_INTERVAL_SEC),
@@ -583,7 +582,7 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application),
 
     fun toggleKeepScreenOn() {
         _uiState.update {
-            EInkSettings.readerKeepScreenOn = !it.keepScreenOn
+            EInkEngineRegistry.globalSettings.keepScreenOn = !it.keepScreenOn
             it.copy(keepScreenOn = !it.keepScreenOn)
         }
     }

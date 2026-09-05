@@ -5,23 +5,26 @@ package io.legado.app.eink.contract
  *
  * :modules:eink 内的全部 ViewModel 经此获取宿主提供的引擎能力端口，
  * 模块本身不依赖任何引擎类型 —— 这是「模块可整体嵌入任意 legado 系
- * 上游」的关键。宿主（app 模块的 `eink/bridge/`）在 E-Ink 入口
- * Activity 创建时调用 [install] 注册全部实现。
+ * 上游」的关键。宿主（app 模块的 `eink/bridge/`）经模块入口模板
+ * [io.legado.app.eink.app.EInkHostActivity] 的 onInstallEngines 钩子
+ * 调用 [install] 注册全部实现（attachBaseContext 首行，早于任何
+ * E-Ink Composable 组合 / VM 构造 / 端口读取）。
  *
  * 不选择逐 ViewModel 注入 Factory 的原因：E-Ink 导航控制器
  * （EInkNavController）使用默认 AndroidViewModelFactory 构造 VM，
  * 逐屏改注入管道侵入性大于收益；注册表在单 Activity 架构下由
- * 入口 Activity 生命周期兜底（VM 组合必然晚于 Activity.onCreate）。
+ * 入口模板生命周期兜底（VM 组合必然晚于 Activity onCreate）。
  *
  * 失败模式：端口未注册即被访问时，getter 抛出的
  * IllegalStateException 会指名缺失的端口与修复入口 —— 而非 lateinit
  * 的裸字段崩溃栈。install 允许重复调用（同进程内入口 Activity 重入，
- * 静态注册表仍在），语义为整体替换（last-wins）；正常宿主只在入口
- * onCreate 调用一次，装配模板见 app 侧 EInkBridge.install（含
- * EInkSettings.attach 的折叠，宿主无需单独初始化模块偏好）。
+ * 静态注册表仍在），语义为整体替换（last-wins）；每次进入 E-Ink
+ * 重新装配同时承担宿主设置快照对齐，装配模板见 app 侧
+ * EInkBridge.install。
  *
- * 移植到新上游时：模块树原样复制，仅重写宿主侧 bridge/ 下的实现并
- * 在入口处调用 [install]（见 docs/eink-porting.md）。
+ * 移植到新上游时：模块树原样复制，仅重写宿主侧 bridge/ 下的端口实现
+ * 并在入口子类的 onInstallEngines 钩子中调用 [install]
+ * （见 docs/eink-porting.md）。
  */
 object EInkEngineRegistry {
 
@@ -63,8 +66,9 @@ object EInkEngineRegistry {
         get() = require(_keyEventHub, "KeyEventHub")
 
     /**
-     * 注册全部引擎端口实现。宿主 E-Ink 入口 Activity.onCreate 中调用，
-     * 必须早于任何 E-Ink Composable 组合（VM 构造）。重复调用为整体替换。
+     * 注册全部引擎端口实现。由模块入口模板 [io.legado.app.eink.app.EInkHostActivity]
+     * 在 attachBaseContext（宿主 onInstallEngines 钩子）调用，必须早于任何
+     * E-Ink Composable 组合（VM 构造）。重复调用为整体替换。
      */
     fun install(
         globalSettings: GlobalSettings,
