@@ -27,6 +27,7 @@ import io.legado.app.databinding.DialogEditTextBinding
 import io.legado.app.help.AppWebDav
 import io.legado.app.help.book.BookHelp
 import io.legado.app.help.config.AppConfig
+import io.legado.app.utils.startActivity
 import io.legado.app.help.config.LocalConfig
 import io.legado.app.help.coroutine.Coroutine
 import io.legado.app.help.storage.Backup
@@ -88,6 +89,13 @@ class MainActivity : VMBaseActivity<ActivityMainBinding, MainViewModel>(),
     private var onUpBooksBadgeView: BadgeView? = null
 
     override fun onActivityCreated(savedInstanceState: Bundle?) {
+        // 墨水屏 Compose 模式（themeMode "4"）分流：接管界面，退出由
+        // E-Ink 内「退出到完整模式」写回 "0" 并 CLEAR_TASK 回本页
+        if (AppConfig.themeMode == "4") {
+            startActivity<io.legado.app.eink.EInkMainActivity>()
+            finish()
+            return
+        }
         upBottomMenu()
         initView()
         upHomePage()

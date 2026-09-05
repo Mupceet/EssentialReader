@@ -1,7 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
-
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.READ_PHONE_STATE" />
@@ -450,6 +449,12 @@
                 <data android:pathPattern=".*\\.7Z" />
             </intent-filter>
         </activity>
+
+        <!-- E-Ink 墨水屏界面（themeMode "4" 时 MainActivity 分流进入） -->
+        <activity
+            android:name=".eink.EInkMainActivity"
+            android:configChanges="locale|layoutDirection|orientation|screenSize|smallestScreenSize|screenLayout|uiMode"
+            android:windowSoftInputMode="adjustResize" />
 
         <service
             android:name=".service.CheckSourceService"

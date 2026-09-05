@@ -103,8 +103,14 @@ class MyFragment() : BaseFragment(R.layout.fragment_my_config), MainFragmentInte
                 }
             }
             findPreference<NameListPreference>(PreferKey.themeMode)?.let {
-                it.setOnPreferenceChangeListener { _, _ ->
-                    view?.post { ThemeConfig.applyDayNight(requireContext()) }
+                it.setOnPreferenceChangeListener { _, newValue ->
+                    if (newValue == "4") {
+                        // 纯净阅读（墨水屏 Compose）：立即切换接管界面
+                        startActivity<io.legado.app.eink.EInkMainActivity>()
+                        activity?.finish()
+                    } else {
+                        view?.post { ThemeConfig.applyDayNight(requireContext()) }
+                    }
                     true
                 }
             }

@@ -17,6 +17,7 @@ gson = "2.13.2"
 jsonPath = "2.10.0"
 jsoupxpath = "2.5.3"
 coroutines = "1.10.2"
+coilCompose = "3.5.0"
 liveeventbus = "1.8.14"
 markwon = "4.6.2"
 material = "1.13.0"
@@ -170,6 +171,8 @@ jsoup = { module = "org.jsoup:jsoup", version.ref = "jsoup" }
 jsoupxpath = { module = "cn.wanghaomiao:JsoupXpath", version.ref = "jsoupxpath" }
 junit = { module = "junit:junit", version = "4.13.2" }
 kotlinx-coroutines-android = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-android", version.ref = "coroutines" }
+compose-runtime = { module = "androidx.compose.runtime:runtime" }
+coil-compose = { module = "io.coil-kt.coil3:coil-compose", version.ref = "coilCompose" }
 kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "coroutines" }
 
 kotlin-stdlib = { module = "org.jetbrains.kotlin:kotlin-stdlib", version.ref = "kotlin" }

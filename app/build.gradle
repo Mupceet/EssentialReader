@@ -48,7 +48,7 @@ android {
     }
     defaultConfig {
         applicationId "io.legado.app"
-        minSdk 21
+        minSdk 23
         targetSdk 36
         versionCode 10000 + gitCommits
         versionName version
@@ -155,6 +155,11 @@ android {
 }
 
 dependencies {
+    // E-Ink 模块二进制消费（:modules:eink:publishToMavenLocal 发布；将来换远程坐标）
+    implementation 'io.legado.app.eink:eink:0.2.0'
+    // bridge 适配层需要：契约 CoverEngine 签名暴露 Coil 类型；GlobalSettings 快照状态需 Compose runtime
+    implementation libs.compose.runtime
+    implementation libs.coil.compose
     //compileOnly "com.android.tools.build:gradle:$agp_version"
     //noinspection GradleDependency,GradlePackageUpdate
     //coreLibraryDesugaring('com.android.tools:desugar_jdk_libs_nio:2.0.4')

@@ -22,6 +22,8 @@ pluginManagement {
 dependencyResolutionManagement {
     repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
     repositories {
+        // E-Ink 模块二进制消费入口：本地发布产物（将来替换为远程仓库）
+        mavenLocal()
         //原仓库
         google {
             content {
