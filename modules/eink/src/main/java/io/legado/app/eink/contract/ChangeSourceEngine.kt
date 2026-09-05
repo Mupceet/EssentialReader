@@ -5,6 +5,20 @@ import kotlinx.coroutines.flow.SharedFlow
 /**
  * 换源端口：跨书源搜索与换源迁移。
  *
+ * 换源全链路：
+ * ```text
+ * 换源页入口（bookUrl）
+ *  └─ currentReadingBook(bookUrl) ─► (handle, model)  阅读会话书优先
+ *       └─ enabledSources() ─► 并发逐源 searchSourceBook(source, …)
+ *             └─ 结果按 deduplicationKey 去重、合并展示
+ * 选择结果 ─► changeBookSource(handle, result)
+ *       ├─ 成功：拉新源详情/目录 → 迁移阅读进度 → 替换书籍记录
+ *       │        → 重载引擎阅读会话
+ *       │        └─ bookChanged.emit(新 bookUrl)
+ *       │              └─ 栈下方界面（详情页等）按新 bookUrl 跟随刷新
+ *       └─ 失败：Result.failure(cause) ─► VM 错误提示
+ * ```
+ *
  * 职责边界：模块换源页 VM 保留并发搜索编排（信号量限流、超时、按
  * 到达顺序追加、按 [ChangeSourceResultUiModel.deduplicationKey] 去重）；
  * 宿主实现负责单源搜索、以及换源应用的完整管线（拉详情/目录 →

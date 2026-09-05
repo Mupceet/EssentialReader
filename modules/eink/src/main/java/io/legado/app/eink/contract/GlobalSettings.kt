@@ -3,11 +3,22 @@ package io.legado.app.eink.contract
 /**
  * 全局设置视图：模块全部设置项的唯一出入口。
  *
+ * 读写路径：
+ * ```text
+ * 模块 UI（「我的」页开关 / 阅读菜单开关 / 字体设置页）
+ *        │ 写（var setter，按各键档位语义）
+ *        ▼
+ * 宿主存储（设置网关 / 历史键 / 自有 DataStore——宿主决定）
+ *        │ 读（VM init / 按键时 / 入口 attach 期 / 组合内快照）
+ *        ▼
+ * 模块消费方（预缓存泵门槛、音量键判定、入口 Context 包装、
+ *            图片画笔抗锯齿、书架自动刷新触发…）
+ * ```
+ *
  * 收录 E-Ink VM 编排与「我的」页/阅读菜单真正读写的键——含转发宿主
  * 设置的键（与完整模式共享同一存储）与 E-Ink 自有偏好（如
- * [keepScreenOn]）。存储后端由宿主决定：嵌入式宿主与完整模式共享
- * 存储（自有偏好键以历史键名落宿主默认 prefs 文件），插件宿主可用
- * 自有 DataStore。
+ * [keepScreenOn]）。嵌入式宿主与完整模式共享存储（自有偏好键以历史
+ * 键名落宿主默认 prefs 文件），插件宿主可用自有 DataStore。
  *
  * 写入语义分档（宿主实现须遵守，模块 UI 按档位做乐观更新）：
  *  - fire-and-forget：异步落盘，写后立即读 getter **不保证**可见新值；
@@ -16,7 +27,10 @@ package io.legado.app.eink.contract
  * 各键档位见其 KDoc。
  */
 interface GlobalSettings {
-    /** 线程数（目录刷新并发、换源并发上限用）。 */
+    /**
+     * 线程数：目录刷新并发上限（书架页）与换源搜索并发信号量的共同
+     * 上限。纯性能调优项，模块在 VM init 与操作时读取。
+     */
     val threadCount: Int
 
     /**
@@ -64,14 +78,20 @@ interface GlobalSettings {
 
     /**
      * 图片绘制抗锯齿（仅阅读页图片画笔消费；文字画笔恒抗锯齿不受
-     * 影响）。
+     * 影响）。与灰阶控制立场存在张力，默认关闭。
      */
     val useAntiAlias: Boolean
 
-    /** 预下载章节数（书架预缓存泵的启动门槛，0 = 关闭预缓存）。 */
+    /**
+     * 预下载章节数：书架预缓存泵的启动门槛（0 = 关闭预缓存）。
+     * 也是目录刷新后单本书预缓存入队的前看章数上限。
+     */
     val preDownloadChapterCount: Int
 
-    /** 换源搜索结果是否校验作者一致（防同名异书）。 */
+    /**
+     * 换源搜索结果是否校验作者一致（防同名异书误换）。
+     * 透传给 [ChangeSourceEngine.searchSourceBook] 的 checkAuthor 参数。
+     */
     val changeSourceCheckAuthor: Boolean
 
     /**

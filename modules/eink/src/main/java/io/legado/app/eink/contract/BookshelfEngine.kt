@@ -6,11 +6,37 @@ import kotlinx.coroutines.flow.Flow
  * [BookshelfEngine.refreshBookToc] 的结果（模块据此累计刷新统计）。
  */
 enum class BookshelfTocRefreshResult {
-    OK, NO_BOOK, NO_SOURCE, ERROR
+    /** 刷新成功（目录已更新入库，预缓存已入队）。 */
+    OK,
+
+    /** 书籍记录已不存在（刷新期间被删除）。 */
+    NO_BOOK,
+
+    /** 书籍没有可用书源（本地书损坏、书源已删除等）。 */
+    NO_SOURCE,
+
+    /** 拉取/管线异常。 */
+    ERROR,
 }
 
 /**
  * 书架端口：书架数据流、目录批量刷新与预缓存联动。
+ *
+ * 书架页与启动流程：
+ * ```text
+ * 进入书架页
+ *  ├─ observeShelf() ─────────► 书籍流 ─► 列表渲染（增删/进度变化自动发射）
+ *  ├─ autoRefreshBook 开启
+ *  │    └─ updatableBooks() ─► 并发 refreshBookToc(bookUrl) × N
+ *  │                            ├─ OK/NO_BOOK/NO_SOURCE/ERROR ─► VM 刷新统计
+ *  │                            └─ 成功即预缓存入队（宿主内部）
+ *  └─ preDownloadChapterCount > 0
+ *       └─ startCacheProcessJob()    预缓存泵循环
+ *            └─ 刷新期间 setCacheWorkingState(true) 暂停，结束恢复
+ *
+ * 入口模板 onCreate ─► deleteBooksNotInBookshelf()   隐藏行清理（IO）
+ * defaultToRead 开启 ─► lastReadBookUrl()            直达阅读解析（同步一次）
+ * ```
  *
  * 职责边界：模块书架页 VM 保留界面编排（刷新并发调度、逐条更新中
  * 标记、自动刷新触发、预缓存泵循环）；宿主实现负责单本书的完整

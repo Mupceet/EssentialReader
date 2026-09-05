@@ -8,15 +8,38 @@ package io.legado.app.eink.contract
  * [cause] 用于模块侧错误文案。
  */
 sealed interface TocFetchResult {
-    data class Success(val chapters: List<ChapterUiModel>) : TocFetchResult
+    /** 拉取成功（目录已入库并更新书籍记录）。 */
+    data class Success(
+        /** 拉取到的章节列表（与入库结果一致）。 */
+        val chapters: List<ChapterUiModel>,
+    ) : TocFetchResult
 
     /** 书籍没有可用书源。 */
     data object NoSource : TocFetchResult
-    data class Failure(val cause: Throwable) : TocFetchResult
+
+    /** 拉取或入库失败。 */
+    data class Failure(
+        /** 失败原因（模块错误文案用）。 */
+        val cause: Throwable,
+    ) : TocFetchResult
 }
 
 /**
  * 目录端口：目录页的数据来源。
+ *
+ * 目录页流程：
+ * ```text
+ * 进入目录页（bookUrl）
+ *  └─ resolveBook(bookUrl)
+ *       ├─ null ─► 错误态（书不存在）
+ *       └─ model ─┬─ loadChapters(bookUrl)
+ *                  ├─ 空 ─► fetchChaptersFromSource(bookUrl)
+ *                  │          ├─ Success(chapters) ─► 渲染目录
+ *                  │          └─ NoSource / Failure ─► 错误文案
+ *                  └─ 非空 ─► 渲染目录
+ *  cachedChapterFileNames(bookUrl) ─► 章节缓存标记
+ *  点击章节 ─► saveReadingProgress(bookUrl, index, title) ─► 跳转阅读页
+ * ```
  *
  * 职责边界：模块目录页 VM 保留加载状态机与错误文案；宿主实现负责
  * 书籍解析落库、目录联网拉取与进度写回的完整管线。

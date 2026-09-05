@@ -11,8 +11,14 @@ package io.legado.app.eink.contract
 interface ReaderBookSnapshot {
     /** 书籍在引擎侧的不透明身份，回传给端口方法使用。 */
     val handle: BookHandle
+
+    /** 书籍唯一键（进度写回、书架操作、界面刷新的匹配键）。 */
     val bookUrl: String
+
+    /** 书名（阅读菜单/页眉展示）。 */
     val name: String
+
+    /** 原始作者（未经书源规则清洗）。 */
     val author: String
 
     /** true = 本地导入书（无书源，不联网拉取目录/正文）。 */
@@ -29,7 +35,10 @@ interface ReaderBookSnapshot {
  * 显示模式）。模块只消费结果，不开放设置。
  */
 data class ReaderHeaderFooterVisibility(
+    /** true = 显示页眉（左侧时钟 + 右侧电量）。 */
     val headerVisible: Boolean,
+
+    /** true = 显示页脚（章节标题 + 页数进度）。 */
     val footerVisible: Boolean,
 )
 
@@ -40,16 +49,23 @@ data class ReaderHeaderFooterVisibility(
  * [cause] 用于模块侧错误文案。
  */
 sealed interface ReaderPrepareResult {
+    /** 前置数据齐备（书籍详情与目录均就绪或已入库）。 */
     data object Success : ReaderPrepareResult
 
     /** 书籍没有可用书源（本地书损坏、书源已删除等）。 */
     data object NoSource : ReaderPrepareResult
 
     /** 拉取书籍详情（书名/作者/目录地址）失败。 */
-    data class BookInfoFailure(val cause: Throwable) : ReaderPrepareResult
+    data class BookInfoFailure(
+        /** 失败原因（模块错误文案用）。 */
+        val cause: Throwable,
+    ) : ReaderPrepareResult
 
     /** 拉取或入库目录失败。 */
-    data class TocFailure(val cause: Throwable) : ReaderPrepareResult
+    data class TocFailure(
+        /** 失败原因（模块错误文案用）。 */
+        val cause: Throwable,
+    ) : ReaderPrepareResult
 }
 
 /**
@@ -58,6 +74,18 @@ sealed interface ReaderPrepareResult {
  * 宿主实现义务：把宿主阅读引擎的状态推送转发到当前注册的回调
  * （[ReaderEngine.register]/[ReaderEngine.unregister] 管理）。无注册者时
  * 事件直接丢弃，不得缓存重放。回调线程不限定，模块侧自行切主线程。
+ *
+ * 典型事件时序（打开书籍）：
+ * ```text
+ * loadBook → 引擎装载
+ *   onLoadChapterList(book)          目录就绪
+ *   onContentUpdated(0, true, …)     首章正文排版完成
+ *   onContentLoadFinish()            加载流程结束
+ * 翻页/跳章 → onPageChanged()        页内位置变化
+ * 调参 relayout → onContentUpdated(0, false, …)
+ * 引擎异常 → onLayoutException(e)
+ * 记录被替换 → onNotifyBookChanged()
+ * ```
  */
 interface ReaderEngineCallback {
 
@@ -92,6 +120,23 @@ interface ReaderEngineCallback {
 
 /**
  * 阅读器端口：宿主阅读引擎（会话状态机 + 排版引擎）面向模块的转发面。
+ *
+ * 阅读主流程：
+ * ```text
+ * 打开书籍
+ *  └─ resolveBook(bookUrl) ─► prepareBookData(handle)
+ *        ├─ Success ──► loadBook(handle)      常规装载（复用进度缓存）
+ *        └─ NoSource / BookInfoFailure / TocFailure ──► 错误态
+ * 首帧布局 ─► updateViewSize(w, h) ─► 引擎排版
+ *        └─ onContentUpdated ─► currentPage() ─► 模块画布绘制
+ *
+ * 翻页 nextPage/prevPage/skipToPage/nextChapter/prevChapter
+ *        └─ onPageChanged ─► 页码/进度刷新
+ * 调参 applyStyle(style) ─► 持久化 + 刷新画笔 ─► relayout()
+ *        └─ onContentUpdated ─► 新页快照
+ * 换源/重定向替换后 ─► reloadBook(handle)     全量重建会话
+ * 离开阅读 ─► saveReadingProgress() + unregister(callback)
+ * ```
  *
  * 职责边界：模块阅读页 VM 保留全部界面编排（菜单状态、翻页交互、调参
  * 防抖、自动翻页定时、电量/时钟刷新）；宿主实现负责书籍会话的装载与
@@ -273,6 +318,8 @@ interface ReaderEngine {
 
     /** 写入正文加粗开关（可变字重路径）；[textBold] 读回当前值。 */
     fun setTextBold(enabled: Boolean)
+
+    /** 正文加粗开关当前值。 */
     val textBold: Boolean
 
     /** 从宿主排版配置读回当前参数快照。 */

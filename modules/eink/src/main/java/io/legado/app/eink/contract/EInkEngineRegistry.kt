@@ -9,10 +9,21 @@ import io.legado.app.eink.contract.EInkEngineRegistry.keyEventHub
  *
  * :modules:eink 内的全部 ViewModel 经此获取宿主提供的引擎能力端口，
  * 模块本身不依赖任何引擎类型 —— 这是「模块可整体嵌入任意 legado 系
- * 上游」的关键。宿主（app 模块的 `eink/bridge/`）经模块入口模板
- * [EInkHostActivity] 的 onInstallEngines 钩子
- * 调用 [install] 注册全部实现（attachBaseContext 首行，早于任何
- * E-Ink Composable 组合 / VM 构造 / 端口读取）。
+ * 上游」的关键。
+ *
+ * 装配与取用时序：
+ * ```text
+ * 宿主入口 attachBaseContext
+ *    └─ onInstallEngines() ──► 宿主 bridge（如 EInkBridge.install()）
+ *                                └─ install(8 个端口实现)
+ *                                      └─ 静态注册表整体替换（last-wins）
+ *                                             │ keyEventHub 一并重建
+ *                                             ▼
+ * 模块侧任意取用（VM 构造 / Screen 组合 / 入口模板）
+ *    EInkEngineRegistry.readerEngine / globalSettings / tocEngine / …
+ *    └─ 已注册 ──► 返回端口实现
+ *    └─ 未注册 ──► IllegalStateException（指名缺失端口与修复入口）
+ * ```
  *
  * 不选择逐 ViewModel 注入 Factory 的原因：E-Ink 导航控制器
  * （EInkNavController）使用默认 AndroidViewModelFactory 构造 VM，
@@ -44,30 +55,39 @@ object EInkEngineRegistry {
     /** 模块自有的按键枢纽（非宿主端口）：每次 install 重置，丢弃陈旧 handler。 */
     private var _keyEventHub = EInkKeyEventHub()
 
+    /** 全局设置端口（多屏与「我的」页读写全部设置项）。 */
     val globalSettings: GlobalSettings
         get() = require(_globalSettings, "GlobalSettings")
 
+    /** 书架端口（书架流、目录批量刷新、预缓存联动、启动清理）。 */
     val bookshelfEngine: BookshelfEngine
         get() = require(_bookshelfEngine, "BookshelfEngine")
 
+    /** 搜索端口（搜索历史 + 多书源搜索会话）。 */
     val searchEngine: SearchEngine
         get() = require(_searchEngine, "SearchEngine")
 
+    /** 目录端口（目录页数据、联网拉取、进度写回）。 */
     val tocEngine: TocEngine
         get() = require(_tocEngine, "TocEngine")
 
+    /** 详情端口（查找链、目录预取、书架操作）。 */
     val bookDetailEngine: BookDetailEngine
         get() = require(_bookDetailEngine, "BookDetailEngine")
 
+    /** 换源端口（跨源搜索与换源迁移）。 */
     val changeSourceEngine: ChangeSourceEngine
         get() = require(_changeSourceEngine, "ChangeSourceEngine")
 
+    /** 封面端口（宿主图片请求策略的唯一出口）。 */
     val coverEngine: CoverEngine
         get() = require(_coverEngine, "CoverEngine")
 
+    /** 阅读端口（会话状态机 + 排版引擎转发面）。 */
     val readerEngine: ReaderEngine
         get() = require(_readerEngine, "ReaderEngine")
 
+    /** 模块自有按键枢纽（入口基类分发、阅读页注册处理器；恒可用）。 */
     val keyEventHub: EInkKeyEventHub
         get() = _keyEventHub
 
@@ -75,6 +95,15 @@ object EInkEngineRegistry {
      * 注册全部引擎端口实现。由模块入口模板 [EInkHostActivity]
      * 在 attachBaseContext（宿主 onInstallEngines 钩子）调用，必须早于任何
      * E-Ink Composable 组合（VM 构造）。重复调用为整体替换。
+     *
+     * @param globalSettings 全局设置视图实现。
+     * @param bookshelfEngine 书架端口实现。
+     * @param searchEngine 搜索端口实现。
+     * @param tocEngine 目录端口实现。
+     * @param bookDetailEngine 详情端口实现。
+     * @param changeSourceEngine 换源端口实现。
+     * @param coverEngine 封面端口实现。
+     * @param readerEngine 阅读端口实现。
      */
     fun install(
         globalSettings: GlobalSettings,
@@ -97,7 +126,12 @@ object EInkEngineRegistry {
         _keyEventHub = EInkKeyEventHub()
     }
 
-    /** 未初始化端口的统一报错（指名端口 + 修复入口）。 */
+    /**
+     * 未初始化端口的统一报错。
+     *
+     * @param value 端口实现（null = 未注册）。
+     * @param port 端口名（写进错误信息，指名修复入口）。
+     */
     private fun <T : Any> require(value: T?, port: String): T =
         checkNotNull(value) {
             ":modules:eink 引擎端口未注册：$port。宿主入口需先调用 EInkEngineRegistry.install(...) 完成装配（见 docs/eink-porting.md）"
