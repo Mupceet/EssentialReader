@@ -3,10 +3,20 @@ package io.legado.app.eink.contract
 /**
  * 阅读排版参数快照（渲染 + 设置面板双用途）。
  *
- * 模块对「阅读页长什么样」的全部主张收敛在这一个值对象：阅读页
- * 设置面板编辑它，经 [ReaderEngine.applyStyle] 整体写入宿主排版引擎
- * （映射宿主阅读配置各字段并持久化 + 刷新画笔）；
- * [ReaderEngine.currentStyle] 从宿主配置读回同构快照。嵌入式宿主下
+ * 调参数据流：
+ * ```text
+ * 阅读页排版面板（滑条编辑；模块内已钳制区间）
+ *        │ applyStyle(style)     整体快照写入
+ *        ▼
+ * 宿主排版配置（映射各字段 + 持久化 + 刷新画笔）
+ *        │ relayout()            调参防抖合并后触发
+ *        ▼
+ * 引擎重排 ─► onContentUpdated ─► 新页快照（模块画布重绘）
+ *
+ * currentStyle() ◄── 读回同构快照（面板初值 / VM 构造）
+ * ```
+ *
+ * 模块对「阅读页长什么样」的全部主张收敛在这一个值对象。嵌入式宿主下
  * 这些键与完整模式的阅读排版设置共享存储——任一模式调参，另一模式
  * 同步生效（既定产品语义）。
  *
@@ -32,36 +42,52 @@ package io.legado.app.eink.contract
 data class ReaderTextStyle(
     /** 正文字号（sp），默认 20；标题字号随正文，无独立字段。 */
     val textSize: Int = 20,
+
     /** 字距（em），默认 0.1；宿主引擎按 [textSize] 换算像素。 */
     val letterSpacing: Float = 0.1f,
+
     /** 段首缩进字符数，默认 2；0 = 无缩进。 */
     val indentChars: Int = 2,
+
     /** 行距增量（0.1 倍行高），默认 12（即 1.2 倍行高）。 */
     val lineSpacing: Int = 12,
+
     /** 段距增量（0.1 倍行高），默认 2。 */
     val paragraphSpacing: Int = 2,
+
     /** 正文左边距（dp）。 */
     val paddingLeft: Int = 16,
+
     /** 正文上边距（dp）。 */
     val paddingTop: Int = 6,
+
     /** 正文右边距（dp）。 */
     val paddingRight: Int = 16,
+
     /** 正文下边距（dp）。 */
     val paddingBottom: Int = 6,
+
     /** 页眉左边距（dp）。 */
     val headerPaddingLeft: Int = 16,
+
     /** 页眉上边距（dp）。 */
     val headerPaddingTop: Int = 0,
+
     /** 页眉右边距（dp）。 */
     val headerPaddingRight: Int = 16,
+
     /** 页眉下边距（dp）。 */
     val headerPaddingBottom: Int = 0,
+
     /** 页脚左边距（dp）。 */
     val footerPaddingLeft: Int = 16,
+
     /** 页脚上边距（dp）。 */
     val footerPaddingTop: Int = 6,
+
     /** 页脚右边距（dp）。 */
     val footerPaddingRight: Int = 16,
+
     /** 页脚下边距（dp）。 */
     val footerPaddingBottom: Int = 6,
 )

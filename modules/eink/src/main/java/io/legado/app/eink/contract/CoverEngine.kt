@@ -5,6 +5,18 @@ import coil3.request.ImageRequest
 /**
  * 封面加载端口：宿主图片请求策略的唯一出口。
  *
+ * 封面请求流：
+ * ```text
+ * 封面组件（书架 / 详情 / 搜索，测量出渲染尺寸 w×h + 书源 origin）
+ *        │ coverRequestOptions(origin, w, h)
+ *        ▼
+ * ImageRequest.Builder 配置块（宿主策略）
+ *        │ 应用到模块的 Coil 请求
+ *        ▼
+ * 宿主单例 ImageLoader ─► 拦截器按 origin 解析防盗链/请求头/最终 URL
+ *        └─► 位图（失败走模块占位封面）
+ * ```
+ *
  * 存在原因：封面的防盗链解析与请求头是**宿主知识**（书源 origin 与
  * 请求头的映射由宿主持有），模块图片栈无法自行构造。除本端口外，
  * 模块封面组件不感知任何宿主图片策略。
@@ -20,6 +32,10 @@ interface CoverEngine {
      * 宿主实现义务：按 [sourceOrigin] 附加宿主拦截器识别的源信息
      * （据此解析最终 URL 与请求头），并把 [widthPx]/[heightPx] 设为
      * 请求目标尺寸（模块传入的是封面组件的实际渲染尺寸）。
+     *
+     * @param sourceOrigin 书源 origin 标识（本地书/无源封面为 null）。
+     * @param widthPx 封面组件渲染宽（px）。
+     * @param heightPx 封面组件渲染高（px）。
      */
     fun coverRequestOptions(
         sourceOrigin: String?,

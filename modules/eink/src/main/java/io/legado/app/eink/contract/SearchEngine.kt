@@ -5,9 +5,9 @@ import kotlinx.coroutines.flow.Flow
 /**
  * 一次多书源搜索的会话句柄。
  *
- * 生命周期：模块在进入搜索时 [createSearchSession]，会话期间可多次
- * [search]（新搜索应中断上一次进行中的源搜索），离开搜索页时 [close]。
- * [close] 后宿主不得再向回调发事件。
+ * 生命周期：模块在进入搜索时 [SearchEngine.createSearchSession]，会话
+ * 期间可多次 [search]（新搜索应中断上一次进行中的源搜索），离开搜索页
+ * 时 [close]。[close] 后宿主不得再向回调发事件。
  */
 interface SearchSession {
 
@@ -30,12 +30,21 @@ interface SearchSession {
 /**
  * 搜索事件回调。
  *
- * 宿主实现义务：把多源搜索的中间/最终结果转发到回调。事件顺序约定：
- * [onSearchStart] → （[onSearchProgress] × N 与 [onSearchSuccess] × N
- * 交错）→ [onSearchFinish]；取消时以 [onSearchCancel] 结束。
- * 回调线程不限定，模块侧自行切主线程。
+ * 事件顺序约定：
+ * ```text
+ * search(searchId, query)
+ *  └─ onSearchStart
+ *      ├─ onSearchProgress(已完成源, 总源数) × N   顶部进度提示
+ *      ├─ onSearchSuccess(批次结果) × N ─► VM 合并 + 去重 + 排序
+ *      └─ onSearchFinish(空?, 有下一页?)
+ * cancelSearch ─► onSearchCancel(cause?)
+ * ```
+ *
+ * 宿主实现义务：把多源搜索的中间/最终结果转发到回调（事件须归属到
+ * 正确的 searchId）。回调线程不限定，模块侧自行切主线程。
  */
 interface SearchSessionCallback {
+    /** 搜索开始（全部源尚未发起）。 */
     fun onSearchStart()
 
     /** 书源维度进展（已完成源数 / 参与源总数），结果页顶部进度提示用。 */
@@ -58,6 +67,19 @@ interface SearchSessionCallback {
 
 /**
  * 搜索端口：搜索历史管理与多书源搜索会话。
+ *
+ * 搜索页流程：
+ * ```text
+ * 进入搜索页
+ *  ├─ observeSearchHistory() ─► 历史 chip 流（最近使用倒序）
+ *  └─ observeBookshelfMatchKeys() ─► 结果「已在书架」标记
+ * 输入完成 ─► recordSearchQuery(query) ─► 历史流发射新序
+ * 发起搜索 ─► createSearchSession(callback)
+ *              └─ session.search(searchId, query)
+ *                   └─ 回调事件时序见 [SearchSessionCallback]
+ * 再次搜索 ─► session.search(新 searchId, 新 query)（旧源搜索被中断）
+ * 离开页面 ─► session.close()
+ * ```
  *
  * 职责边界：模块搜索页 VM 保留输入状态机、结果合并去重排序与分页
  * 编排；宿主实现负责书源搜索执行、搜索范围解析与历史存取。

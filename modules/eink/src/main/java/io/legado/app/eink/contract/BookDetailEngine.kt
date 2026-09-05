@@ -15,12 +15,31 @@ sealed interface BookDetailPrefetchResult {
      * 预取完成且书籍记录可能被详情/重定向更新：返回新的句柄与展示
      * 模型，模块以此替换本地持有的旧值。
      */
-    data class Updated(val handle: BookHandle, val model: BookDetailUiModel) :
-        BookDetailPrefetchResult
+    data class Updated(
+        /** 更新后的书籍句柄（可能已不是传入的原句柄）。 */
+        val handle: BookHandle,
+
+        /** 更新后的展示模型（进度/最新章节等可能已变化）。 */
+        val model: BookDetailUiModel,
+    ) : BookDetailPrefetchResult
 }
 
 /**
  * 书籍详情端口：详情页的数据与书架操作来源。
+ *
+ * 详情页流程：
+ * ```text
+ * 详情页导航（name / author / bookUrl）
+ *  └─ findBook(name, author, bookUrl)
+ *       ├─ null ─► 错误态
+ *       └─ (handle, model) ─► 渲染
+ *            ├─ isBookInBookshelf(bookUrl) ─► 书架开关初值
+ *            └─ prefetchChapters(handle, inShelf)（后台）
+ *                 ├─ Skipped ─► 本地书 / 已有目录 / 静默失败
+ *                 └─ Updated(handle', model') ─► VM 替换本地句柄与展示值
+ * 加架 ─► addToBookshelf(handle)   成功 ─► 开关置位（与同名书合并进度）
+ * 移出 ─► removeFromBookshelf(handle)     退回隐藏行（不物理删除）
+ * ```
  *
  * 职责边界：模块详情页 VM 保留加载/书架状态机与消息提示；宿主实现
  * 负责书籍查找链与目录预取管线。书籍的引擎身份经 [BookHandle] 在
