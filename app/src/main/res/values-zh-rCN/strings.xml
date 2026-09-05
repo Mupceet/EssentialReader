@@ -2363,8 +2363,8 @@
     <string name="lab_enabled_summary">开启后显示实验性功能，可能不稳定</string>
     <string name="lab_display">显示</string>
     <string name="lab_eink_display_title">墨水屏显示</string>
-    <string name="lab_eink_display_summary">在平板界面显示墨水屏选项</string>
-    <string name="lab_eink_display_hint">可在 主题 → 显示 中调整墨水屏设置</string>
+    <string name="lab_eink_display_summary">开启后整体切换到墨水屏界面，并默认切换为「电子书」主题</string>
+    <string name="lab_eink_display_hint">已切换为「电子书」主题，退出墨水屏后完整模式将继续使用该主题</string>
     <string name="lab_diagnostics">诊断</string>
     <string name="lab_page_estimate_diagnostics_title">导出全文页码诊断</string>
     <string name="lab_page_estimate_diagnostics_summary">分享本机最近的估算与校正记录，不会自动上传。</string>

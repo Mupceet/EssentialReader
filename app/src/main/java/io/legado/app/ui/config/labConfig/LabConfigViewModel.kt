@@ -3,6 +3,7 @@ package io.legado.app.ui.config.labConfig
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import io.legado.app.domain.gateway.LabSettingsGateway
+import io.legado.app.domain.gateway.ThemeSettingsGateway
 import io.legado.app.ui.book.read.pageestimate.LocalPageEstimateMetrics
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -13,6 +14,7 @@ import kotlinx.coroutines.launch
 
 class LabConfigViewModel(
     private val settingsGateway: LabSettingsGateway,
+    private val themeSettingsGateway: ThemeSettingsGateway,
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(
         LabConfigUiState(
@@ -41,6 +43,10 @@ class LabConfigViewModel(
             return
         }
         viewModelScope.launch {
+            // 主题先落盘再翻开关：中断最坏态是「主题已切、开关未开」（无害），顺序不可颠倒
+            if (intent is LabConfigIntent.SetEInkDisplay && intent.value) {
+                themeSettingsGateway.update { it.copy(appTheme = "4") }
+            }
             settingsGateway.update { settings ->
                 when (intent) {
                     is LabConfigIntent.SetEnabled -> settings.copy(enabled = intent.value)
