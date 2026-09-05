@@ -4,10 +4,10 @@ import io.legado.app.constant.AppLog
 import io.legado.app.constant.BookType
 import io.legado.app.data.appDb
 import io.legado.app.data.entities.Book
-import io.legado.app.eink.contract.BookDetailUiModel
 import io.legado.app.eink.contract.BookDetailEngine
-import io.legado.app.eink.contract.BookHandle
 import io.legado.app.eink.contract.BookDetailPrefetchResult
+import io.legado.app.eink.contract.BookDetailUiModel
+import io.legado.app.eink.contract.BookHandle
 import io.legado.app.help.book.BookHelp
 import io.legado.app.help.book.addType
 import io.legado.app.help.book.isLocal
@@ -60,7 +60,10 @@ internal object BookDetailEngineImpl : BookDetailEngine {
     override suspend fun isBookInBookshelf(bookUrl: String): Boolean =
         appDb.bookDao.getBook(bookUrl)?.let { !it.isNotShelf } ?: false
 
-    override suspend fun prefetchChapters(handle: BookHandle, inShelf: Boolean): BookDetailPrefetchResult {
+    override suspend fun prefetchChapters(
+        handle: BookHandle,
+        inShelf: Boolean
+    ): BookDetailPrefetchResult {
         val book = (handle as BookHandleImpl).book
         if (book.isLocal) return BookDetailPrefetchResult.Skipped
         if (appDb.bookChapterDao.getChapterList(book.bookUrl).isNotEmpty()) {

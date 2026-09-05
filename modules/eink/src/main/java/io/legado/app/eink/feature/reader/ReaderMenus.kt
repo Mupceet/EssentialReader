@@ -333,7 +333,11 @@ internal fun ReaderPanelContainer(
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .einkClickable(role = Role.Button, onClickLabel = "收起菜单", onClick = onBackdropClick),
+                .einkClickable(
+                    role = Role.Button,
+                    onClickLabel = "收起菜单",
+                    onClick = onBackdropClick
+                ),
         )
         Column(
             modifier = Modifier

@@ -57,10 +57,12 @@ internal fun sortSearchResults(
     books.forEach { book ->
         when {
             book.name.equals(keyword, ignoreCase = true) ||
-                book.author.equals(keyword, ignoreCase = true) -> equalBooks.add(book)
+                    book.author.equals(keyword, ignoreCase = true) -> equalBooks.add(book)
+
             book.kind?.contains(keyword, ignoreCase = true) == true -> tagsBooks.add(book)
             book.name.contains(keyword, ignoreCase = true) ||
-                book.author.contains(keyword, ignoreCase = true) -> containsBooks.add(book)
+                    book.author.contains(keyword, ignoreCase = true) -> containsBooks.add(book)
+
             else -> otherBooks.add(book)
         }
     }

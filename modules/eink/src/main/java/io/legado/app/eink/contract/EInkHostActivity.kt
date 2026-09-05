@@ -1,4 +1,4 @@
-package io.legado.app.eink.app
+package io.legado.app.eink.contract
 
 import android.app.Activity
 import android.content.Context
@@ -20,7 +20,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
 import androidx.lifecycle.lifecycleScope
-import io.legado.app.eink.contract.EInkEngineRegistry
+import io.legado.app.eink.app.EInkApp
 import io.legado.app.eink.designsystem.theme.EInkTheme
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -95,7 +95,7 @@ abstract class EInkHostActivity : ComponentActivity() {
     }
 
     /**
-     * 系统按键优先交给活跃屏幕的处理器（[io.legado.app.eink.contract.EInkKeyEventHub]，
+     * 系统按键优先交给活跃屏幕的处理器（[EInkKeyEventHub]，
      * 如阅读页音量键翻页）；无人消费时交还系统默认行为（音量调节等）。
      */
     final override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {

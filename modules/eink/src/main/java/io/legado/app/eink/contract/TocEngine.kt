@@ -9,6 +9,7 @@ package io.legado.app.eink.contract
  */
 sealed interface TocFetchResult {
     data class Success(val chapters: List<ChapterUiModel>) : TocFetchResult
+
     /** 书籍没有可用书源。 */
     data object NoSource : TocFetchResult
     data class Failure(val cause: Throwable) : TocFetchResult

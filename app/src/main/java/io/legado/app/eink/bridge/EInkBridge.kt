@@ -8,7 +8,6 @@ import io.legado.app.domain.gateway.DownloadCacheSettingsGateway
 import io.legado.app.domain.gateway.OtherSettingsGateway
 import io.legado.app.domain.gateway.ReadSettingsGateway
 import io.legado.app.eink.contract.EInkEngineRegistry
-import io.legado.app.eink.contract.EInkKeyEventHub
 import io.legado.app.eink.contract.GlobalSettings
 import io.legado.app.help.config.AppConfigStore
 import kotlinx.coroutines.CoroutineScope
@@ -45,7 +44,6 @@ object EInkBridge {
             changeSourceEngine = ChangeSourceEngineImpl,
             coverEngine = CoverEngineImpl,
             readerEngine = ReaderEngineImpl,
-            keyEventHub = EInkKeyEventHub(),
         )
         // 封面开关为快照状态缓存：每次进入 E-Ink 与宿主设置快照对齐，
         // 防止完整模式（或上一会话）修改后的陈旧值
@@ -83,7 +81,7 @@ internal val einkSettingsWriteScope =
 private object GlobalSettingsImpl : GlobalSettings, KoinComponent {
 
     private val changeSourceSettingsGateway:
-        io.legado.app.domain.gateway.ChangeSourceSettingsGateway by inject()
+            io.legado.app.domain.gateway.ChangeSourceSettingsGateway by inject()
 
     private val otherSettingsGateway: OtherSettingsGateway by inject()
 

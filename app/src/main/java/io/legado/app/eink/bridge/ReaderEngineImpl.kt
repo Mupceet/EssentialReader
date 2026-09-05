@@ -5,19 +5,19 @@ import io.legado.app.constant.BookType
 import io.legado.app.data.appDb
 import io.legado.app.data.entities.Book
 import io.legado.app.data.repository.ReadSettingsRepository
+import io.legado.app.domain.gateway.ReadStyleFloatKey
+import io.legado.app.domain.gateway.ReadStyleGateway
+import io.legado.app.domain.gateway.ReadStyleIntKey
+import io.legado.app.domain.gateway.ReadStyleMutation
+import io.legado.app.domain.gateway.ReadStyleStringKey
 import io.legado.app.eink.contract.BookHandle
-import io.legado.app.eink.contract.ReaderPrepareResult
-import io.legado.app.eink.contract.ReaderPageSnapshot
 import io.legado.app.eink.contract.ReaderBookSnapshot
 import io.legado.app.eink.contract.ReaderEngine
 import io.legado.app.eink.contract.ReaderEngineCallback
 import io.legado.app.eink.contract.ReaderHeaderFooterVisibility
+import io.legado.app.eink.contract.ReaderPageSnapshot
+import io.legado.app.eink.contract.ReaderPrepareResult
 import io.legado.app.eink.contract.ReaderTextStyle
-import io.legado.app.domain.gateway.ReadStyleGateway
-import io.legado.app.domain.gateway.ReadStyleFloatKey
-import io.legado.app.domain.gateway.ReadStyleIntKey
-import io.legado.app.domain.gateway.ReadStyleMutation
-import io.legado.app.domain.gateway.ReadStyleStringKey
 import io.legado.app.help.book.BookHelp
 import io.legado.app.help.book.addType
 import io.legado.app.help.book.isLocal
@@ -360,12 +360,24 @@ internal object ReaderEngineImpl : ReaderEngine, KoinComponent {
             ReadStyleMutation.IntValue(ReadStyleIntKey.PaddingBottom, style.paddingBottom),
             ReadStyleMutation.IntValue(ReadStyleIntKey.HeaderPaddingLeft, style.headerPaddingLeft),
             ReadStyleMutation.IntValue(ReadStyleIntKey.HeaderPaddingTop, style.headerPaddingTop),
-            ReadStyleMutation.IntValue(ReadStyleIntKey.HeaderPaddingRight, style.headerPaddingRight),
-            ReadStyleMutation.IntValue(ReadStyleIntKey.HeaderPaddingBottom, style.headerPaddingBottom),
+            ReadStyleMutation.IntValue(
+                ReadStyleIntKey.HeaderPaddingRight,
+                style.headerPaddingRight
+            ),
+            ReadStyleMutation.IntValue(
+                ReadStyleIntKey.HeaderPaddingBottom,
+                style.headerPaddingBottom
+            ),
             ReadStyleMutation.IntValue(ReadStyleIntKey.FooterPaddingLeft, style.footerPaddingLeft),
             ReadStyleMutation.IntValue(ReadStyleIntKey.FooterPaddingTop, style.footerPaddingTop),
-            ReadStyleMutation.IntValue(ReadStyleIntKey.FooterPaddingRight, style.footerPaddingRight),
-            ReadStyleMutation.IntValue(ReadStyleIntKey.FooterPaddingBottom, style.footerPaddingBottom),
+            ReadStyleMutation.IntValue(
+                ReadStyleIntKey.FooterPaddingRight,
+                style.footerPaddingRight
+            ),
+            ReadStyleMutation.IntValue(
+                ReadStyleIntKey.FooterPaddingBottom,
+                style.footerPaddingBottom
+            ),
         )
         mutations.forEach(readStyleGateway::updateCurrentStyle)
         readStyleGateway.save()
@@ -399,14 +411,15 @@ internal object ReaderEngineImpl : ReaderEngine, KoinComponent {
     override val pageTouchSlop: Int
         get() = ReadConfig.pageTouchSlop
 
-    override fun headerFooterVisibility(): ReaderHeaderFooterVisibility = ReaderHeaderFooterVisibility(
-        headerVisible = when (ReadBookConfig.headerMode) {
-            1 -> true
-            2 -> false
-            else -> ReadBookConfig.hideStatusBar
-        },
-        footerVisible = ReadBookConfig.footerMode != 1,
-    )
+    override fun headerFooterVisibility(): ReaderHeaderFooterVisibility =
+        ReaderHeaderFooterVisibility(
+            headerVisible = when (ReadBookConfig.headerMode) {
+                1 -> true
+                2 -> false
+                else -> ReadBookConfig.hideStatusBar
+            },
+            footerVisible = ReadBookConfig.footerMode != 1,
+        )
 
     override fun formatTimeNow(): String =
         AppConst.timeFormat.format(Date()).toString()

@@ -1,12 +1,16 @@
 package io.legado.app.eink.contract
 
+import io.legado.app.eink.app.EInkKeyEventHub
+import io.legado.app.eink.contract.EInkEngineRegistry.install
+import io.legado.app.eink.contract.EInkEngineRegistry.keyEventHub
+
 /**
  * E-Ink 引擎端口注册表（service locator）。
  *
  * :modules:eink 内的全部 ViewModel 经此获取宿主提供的引擎能力端口，
  * 模块本身不依赖任何引擎类型 —— 这是「模块可整体嵌入任意 legado 系
  * 上游」的关键。宿主（app 模块的 `eink/bridge/`）经模块入口模板
- * [io.legado.app.eink.app.EInkHostActivity] 的 onInstallEngines 钩子
+ * [EInkHostActivity] 的 onInstallEngines 钩子
  * 调用 [install] 注册全部实现（attachBaseContext 首行，早于任何
  * E-Ink Composable 组合 / VM 构造 / 端口读取）。
  *
@@ -19,8 +23,8 @@ package io.legado.app.eink.contract
  * IllegalStateException 会指名缺失的端口与修复入口 —— 而非 lateinit
  * 的裸字段崩溃栈。install 允许重复调用（同进程内入口 Activity 重入，
  * 静态注册表仍在），语义为整体替换（last-wins）；每次进入 E-Ink
- * 重新装配同时承担宿主设置快照对齐，装配模板见 app 侧
- * EInkBridge.install。
+ * 重新装配同时承担宿主设置快照对齐（[keyEventHub] 亦随之重置），
+ * 装配模板见 app 侧 EInkBridge.install。
  *
  * 移植到新上游时：模块树原样复制，仅重写宿主侧 bridge/ 下的端口实现
  * 并在入口子类的 onInstallEngines 钩子中调用 [install]
@@ -36,7 +40,9 @@ object EInkEngineRegistry {
     private var _changeSourceEngine: ChangeSourceEngine? = null
     private var _coverEngine: CoverEngine? = null
     private var _readerEngine: ReaderEngine? = null
-    private var _keyEventHub: EInkKeyEventHub? = null
+
+    /** 模块自有的按键枢纽（非宿主端口）：每次 install 重置，丢弃陈旧 handler。 */
+    private var _keyEventHub = EInkKeyEventHub()
 
     val globalSettings: GlobalSettings
         get() = require(_globalSettings, "GlobalSettings")
@@ -63,10 +69,10 @@ object EInkEngineRegistry {
         get() = require(_readerEngine, "ReaderEngine")
 
     val keyEventHub: EInkKeyEventHub
-        get() = require(_keyEventHub, "KeyEventHub")
+        get() = _keyEventHub
 
     /**
-     * 注册全部引擎端口实现。由模块入口模板 [io.legado.app.eink.app.EInkHostActivity]
+     * 注册全部引擎端口实现。由模块入口模板 [EInkHostActivity]
      * 在 attachBaseContext（宿主 onInstallEngines 钩子）调用，必须早于任何
      * E-Ink Composable 组合（VM 构造）。重复调用为整体替换。
      */
@@ -79,7 +85,6 @@ object EInkEngineRegistry {
         changeSourceEngine: ChangeSourceEngine,
         coverEngine: CoverEngine,
         readerEngine: ReaderEngine,
-        keyEventHub: EInkKeyEventHub,
     ) {
         _globalSettings = globalSettings
         _bookshelfEngine = bookshelfEngine
@@ -89,7 +94,7 @@ object EInkEngineRegistry {
         _changeSourceEngine = changeSourceEngine
         _coverEngine = coverEngine
         _readerEngine = readerEngine
-        _keyEventHub = keyEventHub
+        _keyEventHub = EInkKeyEventHub()
     }
 
     /** 未初始化端口的统一报错（指名端口 + 修复入口）。 */

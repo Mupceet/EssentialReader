@@ -18,7 +18,7 @@ data class ChangeSourceBookUiModel(
  */
 @EInkImmutable
 data class ChangeSourceResultUiModel(
-    override val handle: SearchResultHandle,
+    val handle: SearchResultHandle,
     val bookUrl: String,
     val name: String,
     val author: String,
@@ -31,4 +31,4 @@ data class ChangeSourceResultUiModel(
      * 结果，并作为结果列表项的组合 key（必须同书内唯一且稳定）。
      */
     val deduplicationKey: String,
-) : SearchResultRef
+)
