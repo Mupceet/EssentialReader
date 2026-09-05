@@ -57,6 +57,8 @@ internal object BookshelfEngineImpl : BookshelfEngine, KoinComponent {
         appDb.bookDao.flowByGroup(BookGroup.IdAll)
             .map { books -> books.map { it.toBookshelfItemUiModel() } }
 
+    override fun lastReadBookUrl(): String? = appDb.bookDao.lastReadBook?.bookUrl
+
     override suspend fun deleteNotShelfBooks() {
         appDb.bookDao.deleteNotShelfBook()
     }

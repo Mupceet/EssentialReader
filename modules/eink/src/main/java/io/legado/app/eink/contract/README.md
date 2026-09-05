@@ -17,8 +17,8 @@
 | `ChangeSourceEngine`                                                                                   | 跨源搜索 + 换源迁移 + `bookChanged` 事件        | 换源页        |
 | `CoverEngine`                                                                                          | 封面加载策略（Coil 请求选项：书源 origin 头、目标尺寸）    | 封面组件       |
 | `ReaderEngine`（含 `ReaderEngineCallback` / `ReaderBookSnapshot` / `ReaderTipSpec` / `ReaderPrepResult`） | 阅读会话状态机 + 排版参数写入 + 翻页 + 页快照读取         | 阅读页        |
-| `GlobalSettings`                                                                                       | 宿主全局设置视图（并发数、启动开关、音量键、抗锯齿、默认封面、字体缩放等） | 多屏 + 「我的」页 |
-| `EInkKeyEventHub`                                                                                      | 入口 Activity 按键转发枢纽（宿主实例化并 dispatch）   | 阅读页音量键     |
+| `GlobalSettings`                                                                                       | 模块全部设置项的唯一出入口（并发数、启动开关、音量键、抗锯齿、默认封面、字体缩放、屏幕常亮等；存储后端由宿主决定） | 多屏 + 「我的」页 |
+| `EInkKeyEventHub`                                                                                      | 入口按键转发枢纽（宿主实例化，模块入口模板基类统一 dispatch）    | 阅读页音量键     |
 
 ## ② 跨界数据类型（宿主构造 / 读写）
 
@@ -42,28 +42,26 @@
 
 ## ③ 装配与引导（宿主调用）
 
-- **`EInkEngineRegistry`** — 端口注册表：入口 Activity.onCreate 调用
-  `install(...)` 注册全部实现，必须早于任何 E-Ink Composable 组合
-  （VM 构造期取用）。未注册的端口被访问时会抛出指名端口与修复入口的
+- **`EInkEngineRegistry`** — 端口注册表：入口模板基类
+  `EInkHostActivity` 在 attachBaseContext 首行经宿主 `onInstallEngines`
+  钩子调用 `install(...)` 注册全部实现，早于任何 E-Ink Composable 组合
+  / VM 构造 / 端口读取。未注册的端口被访问时会抛出指名端口与修复入口的
   IllegalStateException。
-- **`EInkSettings`** — 模块自有界面偏好的 SharedPreferences（随模块走，
-  不占宿主配置）；`attach(context)` 已折叠进宿主装配模板
-  `EInkBridge.install(context)`，宿主入口无需单独调用。
+- **`EInkHostActivity`**（模块 `app/`，不在本目录）— 入口模板基类：
+  final 生命周期方法编排引擎装配、字体缩放 attach 包装、启动清理、
+  直达最近阅读解析、主题（跟随系统深浅色）、根布局与按键分发。宿主
+  入口子类只需实现 `onInstallEngines` 与 `onExitToFullMode` 两个钩子。
 
 ## 宿主接入清单（速览）
 
 1. Gradle：宿主 app `implementation project(':modules:eink')`。
-2. 入口 Activity.onCreate：`EInkBridge.install(this)`（内部完成
-   `EInkSettings.attach` + `EInkEngineRegistry.install` + 封面开关与
-   宿主设置快照对齐）。
-3. setContent：`EInkTheme(darkTheme = …) { EInkApp(onExitToFullMode = …) }`。
-   `EInkApp` / `EInkTheme` 不在本目录——它们是模块 UI 的根入口（分别位于
-   模块 `app/` 与 `designsystem/theme/`），接线方式见 porting 文档 §2。
-4. 按键：`onKeyDown` / `onKeyUp` 先经
-   `EInkEngineRegistry.keyEventHub.dispatch(event)`，未消费再交还系统。
-5. 字体缩放：`attachBaseContext` 应用 `GlobalSettings.fontScaleSetting`
-   （写入后需 recreate 入口才生效，语义见其 KDoc）。
-6. Manifest 注册入口 Activity（configChanges 等见 porting 文档 §2）。
+2. 入口 Activity：继承 `EInkHostActivity`，实现两个钩子——
+   `onInstallEngines()`（典型实现即一行 `EInkBridge.install()`：端口
+   注册 + 封面开关与宿主设置快照对齐）与 `onExitToFullMode(context)`
+   （关闭分流开关并跳转完整模式）。
+3. Manifest 注册入口子类（configChanges 等见 porting 文档 §2）。
+4. 字体缩放、启动清理、直达阅读、主题、按键分发、setContent 接线
+   均由基类承担，宿主无需编写。
 
 宿主侧模板代码（本仓）：`app/src/main/java/io/legado/app/eink/`
 （`EinkMainActivity.kt` + `bridge/` 九个文件）。

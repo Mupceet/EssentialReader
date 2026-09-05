@@ -1,12 +1,13 @@
 package io.legado.app.eink.contract
 
 /**
- * 全局设置视图（转发宿主设置存储）。
+ * 全局设置视图（模块全部设置项的唯一出入口）。
  *
- * 只收录 E-Ink VM 编排与「我的」页真正读写的键；E-Ink 自有的界面偏好
- * （书架网格布局、阅读页常亮/自动翻页间隔）不在此列 ——
- * 它们由 [io.legado.app.eink.contract.EInkSettings] 自管，
- * 随模块走。
+ * 收录 E-Ink VM 编排与「我的」页/阅读菜单真正读写的键——含转发宿主
+ * 设置的键（与完整模式共享同一存储）与 E-Ink 自有偏好（如
+ * [keepScreenOn]）。存储后端由宿主决定：嵌入式宿主与完整模式共享
+ * 存储（自有偏好键以历史键名落宿主默认 prefs 文件），插件宿主可用
+ * 自有 DataStore。
  */
 interface GlobalSettings {
     /** 线程数（目录刷新并发、换源并发上限用）。 */
@@ -47,6 +48,16 @@ interface GlobalSettings {
      * 陈旧值）。
      */
     var useDefaultCover: Boolean
+
+    /**
+     * 阅读页保持屏幕常亮（E-Ink 自有界面偏好，完整模式无对应设置）。
+     *
+     * 可写（阅读菜单开关）：读取在阅读 VM 构造时一次，写入即时生效且
+     * 同步落盘。嵌入式宿主实现以历史键 `einkReaderKeepScreenOn` 存于
+     * 默认 prefs 文件（键名/文件与 EInkSettings 时期逐字一致，存量
+     * 设置无损继承）。
+     */
+    var keepScreenOn: Boolean
 
     /**
      * 图片绘制抗锯齿（OtherSettings.antiAlias，与完整模式共享同一开关）。

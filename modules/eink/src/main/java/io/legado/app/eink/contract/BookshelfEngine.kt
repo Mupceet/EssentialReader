@@ -20,6 +20,13 @@ interface BookshelfEngine {
     /** 书架全量书籍流（Room flowByGroup(IdAll) + UiModel 映射）。 */
     fun observeShelf(): Flow<List<BookshelfItemUiModel>>
 
+    /**
+     * 最近阅读书籍的 bookUrl（启动直达阅读解析用）：defaultToRead 开启时
+     * 入口模板在 onCreate 主线程同步读取一次，无最近阅读返回 null。
+     * 宿主实现应保持单行查询的轻量（对齐 View 版 bookDao.lastReadBook）。
+     */
+    fun lastReadBookUrl(): String?
+
     /** 物理删除 notShelf 隐藏行（进入首页时清理，对齐 View 版）。 */
     suspend fun deleteNotShelfBooks()
 
