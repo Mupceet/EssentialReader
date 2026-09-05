@@ -362,7 +362,7 @@ private fun BookListItem(
                 style = EInkTheme.typography.bodySmall
             )
             // 当前进度章节（同 View 版 iv_read / ic_history）
-            book.durChapterTitle?.let { title ->
+            book.currentChapterTitle?.let { title ->
                 EInkInfoRow(
                     iconRes = R.drawable.eink_ic_history,
                     text = title,

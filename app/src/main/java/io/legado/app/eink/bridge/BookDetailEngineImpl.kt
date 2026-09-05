@@ -35,7 +35,7 @@ internal object BookDetailEngineImpl : BookDetailEngine {
         displayCover = getDisplayCover(),
         displayIntro = getDisplayIntro(),
         latestChapterTitle = latestChapterTitle,
-        durChapterTitle = durChapterTitle,
+        currentChapterTitle = durChapterTitle,
         origin = origin,
     )
 

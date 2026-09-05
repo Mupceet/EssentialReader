@@ -99,7 +99,7 @@ fun TocRoute(
     fun displayIndexOfCurrent(): Int {
         val size = uiState.displayChapters.size
         if (size <= 0) return 0
-        val index = uiState.durChapterIndex.coerceIn(0, size - 1)
+        val index = uiState.currentChapterIndex.coerceIn(0, size - 1)
         return if (uiState.isReversed) size - 1 - index else index
     }
 
@@ -321,7 +321,7 @@ private fun ChapterList(
         itemsIndexed(display, key = { _, (_, chapter) -> chapter.url }) { _, (realIndex, chapter) ->
             ChapterItem(
                 chapter = chapter,
-                isCurrent = realIndex == state.durChapterIndex,
+                isCurrent = realIndex == state.currentChapterIndex,
                 // 本地书与卷章节视为已缓存（与 View 版一致）
                 cached = state.isLocalBook
                         || chapter.isVolume

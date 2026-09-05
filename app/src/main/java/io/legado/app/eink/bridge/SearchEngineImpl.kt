@@ -60,7 +60,7 @@ internal object SearchEngineImpl : SearchEngine, KoinComponent {
         originName = originName,
     )
 
-    override fun observeBookshelfKeys(): Flow<Set<String>> =
+    override fun observeBookshelfMatchKeys(): Flow<Set<String>> =
         appDb.bookDao.flowAll().map { books ->
             buildSet {
                 books.filterNot { it.isNotShelf }.forEach {
@@ -78,7 +78,7 @@ internal object SearchEngineImpl : SearchEngine, KoinComponent {
             history.map { SearchHistoryUiModel(word = it.word) }
         }
 
-    override suspend fun recordSearchKey(key: String) {
+    override suspend fun recordSearchQuery(key: String) {
         appDb.searchKeywordDao.get(key)?.let {
             it.usage += 1
             it.lastUseTime = System.currentTimeMillis()
@@ -111,7 +111,7 @@ internal object SearchEngineImpl : SearchEngine, KoinComponent {
         private val searchUseCase = SearchBooksUseCase(AppDbSearchGateway)
         private var searchJob: Job? = null
 
-        override fun search(searchId: Long, key: String) {
+        override fun search(searchId: Long, query: String) {
             cancelSearch()
             searchJob = scope.launch {
                 try {
@@ -123,7 +123,7 @@ internal object SearchEngineImpl : SearchEngine, KoinComponent {
                     searchUseCase
                         .execute(
                             BookSearchRequest(
-                                keyword = key,
+                                keyword = query,
                                 page = 1,
                                 scope = BookSearchScope(scopeRaw),
                                 matchMode = matchMode,

@@ -163,7 +163,7 @@ private object GlobalSettingsImpl : GlobalSettings, KoinComponent {
             }
         }
 
-    override val preDownloadNum: Int
+    override val preDownloadChapterCount: Int
         get() = downloadCacheSettingsGateway.currentSettings.preDownloadNum
 
     override val changeSourceCheckAuthor: Boolean

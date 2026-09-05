@@ -92,7 +92,7 @@ internal object ChangeSourceEngineImpl : ChangeSourceEngine, KoinComponent {
                 origin = searchBook.origin,
                 originName = searchBook.originName,
                 latestChapter = searchBook.latestChapterTitle,
-                primary = searchBook.primaryStr(),
+                deduplicationKey = searchBook.primaryStr(),
             )
         }
     }

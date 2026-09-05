@@ -12,7 +12,7 @@ import io.legado.app.eink.contract.EInkEngineRegistry
 import io.legado.app.eink.contract.ReaderBookSnapshot
 import io.legado.app.eink.contract.ReaderEngineCallback
 import io.legado.app.eink.contract.ReaderPageSnapshot
-import io.legado.app.eink.contract.ReaderPrepResult
+import io.legado.app.eink.contract.ReaderPrepareResult
 import io.legado.app.eink.contract.ReaderTextStyle
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
@@ -172,20 +172,20 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application),
             }
 
             if (engine.sessionBookUrl == book.bookUrl) {
-                engine.upData(book.handle)
+                engine.loadBook(book.handle)
                 // 已有排版页面（含流式排版中）直接刷新展示
                 if (engine.hasLaidOutPages) {
                     loadedBookUrl = book.bookUrl
                     syncBookState(book)
                     upContent()
-                    engine.upToc()
+                    engine.refreshToc()
                     return@launch
                 }
                 // 章节跳转（目录选章等）：清空旧页面显示加载中，
                 // 内容未缓存时由下载完成的 upContent 回调刷新
                 _uiState.update { it.copy(isLoading = true, page = null) }
             } else {
-                engine.resetData(book.handle)
+                engine.reloadBook(book.handle)
                 _uiState.update { it.copy(isLoading = true, page = null) }
             }
             loadedBookUrl = book.bookUrl
@@ -195,13 +195,13 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application),
             // E-Ink 经详情页加入书架的书没有目录记录，目录缺失时引擎的
             // loadContent 会静默失败
             when (val prep = engine.prepareBookData(book.handle)) {
-                ReaderPrepResult.Success -> Unit
-                ReaderPrepResult.NoSource -> {
+                ReaderPrepareResult.Success -> Unit
+                ReaderPrepareResult.NoSource -> {
                     _uiState.update { it.copy(isLoading = false, error = "没有书源") }
                     return@launch
                 }
 
-                is ReaderPrepResult.InfoFailure -> {
+                is ReaderPrepareResult.BookInfoFailure -> {
                     _uiState.update { state ->
                         state.copy(
                             isLoading = false,
@@ -211,7 +211,7 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application),
                     return@launch
                 }
 
-                is ReaderPrepResult.TocFailure -> {
+                is ReaderPrepareResult.TocFailure -> {
                     _uiState.update { state ->
                         state.copy(
                             isLoading = false,
@@ -226,7 +226,7 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application),
 
             engine.clearEngineMessage()
             engine.loadContent(resetPageOffset = true)
-            engine.upToc()
+            engine.refreshToc()
         }
     }
 
@@ -250,7 +250,7 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application),
     }
 
     private fun syncBookState(book: ReaderBookSnapshot) {
-        val inBookshelf = !book.isNotShelf
+        val inBookshelf = book.isInBookshelf
         engine.setInBookshelf(inBookshelf)
         _uiState.update {
             it.copy(
@@ -279,7 +279,7 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application),
         val level = batteryIntent?.getIntExtra(BatteryManager.EXTRA_LEVEL, -1) ?: -1
         val scale = batteryIntent?.getIntExtra(BatteryManager.EXTRA_SCALE, -1) ?: -1
         val battery = if (level >= 0 && scale > 0) level * 100 / scale else 100
-        val tip = engine.readTipVisibility()
+        val tip = engine.headerFooterVisibility()
         _uiState.update {
             it.copy(
                 headerVisible = tip.headerVisible,
@@ -639,14 +639,14 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application),
 
     // ==================== 引擎回调（ReaderEngineCallback） ====================
 
-    override fun onUpMenuView() {
+    override fun onRequestShowMenu() {
         val book = engine.sessionBook ?: return
         _uiState.update {
             it.copy(
                 bookName = book.name,
                 bookAuthor = book.author,
                 bookUrl = book.bookUrl,
-                chapterIndex = engine.durChapterIndex,
+                chapterIndex = engine.currentChapterIndex,
                 chapterSize = engine.chapterSize,
             )
         }
@@ -664,10 +664,10 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application),
     }
 
     fun upContent() {
-        onUpContent(0, false, null)
+        onContentUpdated(0, false, null)
     }
 
-    override fun onUpContent(
+    override fun onContentUpdated(
         relativePosition: Int,
         resetPageOffset: Boolean,
         success: (() -> Unit)?
@@ -686,7 +686,7 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application),
             success?.invoke()
             return
         }
-        val pageIndex = engine.durPageIndex
+        val pageIndex = engine.currentPageIndex
         if (pageIndex < 0) {
             // 流式排版尚未到达阅读位置：保持现状（加载中/旧页），
             // 等待包含 durChapterPos 的页面排出，禁止回退第 0 页（章节首页闪现）
@@ -702,7 +702,7 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application),
                     chapterTitle = page.title,
                     pageIndex = pageIndex,
                     pageCount = engine.currentChapterPageSize,
-                    chapterIndex = engine.durChapterIndex,
+                    chapterIndex = engine.currentChapterIndex,
                     chapterSize = engine.chapterSize,
                     readProgress = page.readProgress,
                     isLoading = false,
@@ -745,7 +745,7 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application),
         stopAutoPlay()
         if (engine.isRegistered(this)) {
             // 落库阅读进度（更新 durChapterTime，书架按最后阅读排序据此置顶）
-            engine.saveRead()
+            engine.saveReadingProgress()
             engine.unregister(this)
         }
     }

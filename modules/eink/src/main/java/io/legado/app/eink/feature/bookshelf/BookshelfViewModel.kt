@@ -128,7 +128,7 @@ class BookshelfViewModel(application: Application) : AndroidViewModel(applicatio
         //（notShelf）的隐藏行。详情页/搜索/阅读页的预取可能写入 notShelf 行，
         // 统一在此清理，后续查询与刷新无需再逐个过滤。
         viewModelScope.launch(Dispatchers.IO) {
-            engine.deleteNotShelfBooks()
+            engine.deleteBooksNotInBookshelf()
         }
         // 与 View 版 MainActivity 自动刷新一致：仅在设置开启时，
         // 进入首页延迟 1 秒自动刷新一次；ViewModel 常驻，
@@ -165,7 +165,7 @@ class BookshelfViewModel(application: Application) : AndroidViewModel(applicatio
             _isRefreshing.value = true
             _updatingUrls.value = emptySet()
             try {
-                val books = engine.updatableShelfBooks()
+                val books = engine.updatableBooks()
                 val concurrency = min(settings.threadCount, MAX_REFRESH_CONCURRENCY)
                 Log.i(
                     TAG,
@@ -201,7 +201,7 @@ class BookshelfViewModel(application: Application) : AndroidViewModel(applicatio
      * 服务不会并行运行。
      */
     private fun startCacheBook() {
-        if (settings.preDownloadNum == 0) return
+        if (settings.preDownloadChapterCount == 0) return
         if (cacheBookJob?.isActive == true) return
         cacheBookJob = viewModelScope.launch(Dispatchers.IO) {
             launch {

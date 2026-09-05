@@ -167,7 +167,7 @@ class ChangeSourceViewModel(application: Application) : AndroidViewModel(applica
     private fun onSearchSuccess(searchBook: ChangeSourceResultUiModel) {
         _uiState.update { state ->
             // 去重：同一书源同一书籍只保留一条
-            if (state.results.any { it.primary == searchBook.primary }) {
+            if (state.results.any { it.deduplicationKey == searchBook.deduplicationKey }) {
                 state
             } else {
                 state.copy(results = state.results + searchBook)

@@ -30,8 +30,8 @@ data class TocUiState(
 ) {
 
     /** 当前阅读章节索引 */
-    val durChapterIndex: Int
-        get() = book?.durChapterIndex ?: 0
+    val currentChapterIndex: Int
+        get() = book?.currentChapterIndex ?: 0
 
     /** 过滤后的章节（搜索时按标题过滤） */
     val displayChapters: List<ChapterUiModel>
@@ -70,7 +70,7 @@ class TocViewModel(application: Application) : AndroidViewModel(application) {
             // 书架记录优先；未加书架的搜索书由宿主转 notShelf 隐藏行入库
             //（不显示于书架，与 View 版"未加书架直接阅读"行为一致），
             // 使进度与目录缓存可写
-            val book = engine.resolveTocBook(bookUrl)
+            val book = engine.resolveBook(bookUrl)
             if (book == null) {
                 _uiState.update { it.copy(isLoading = false, error = "书籍不存在") }
                 return@launch
@@ -140,7 +140,7 @@ class TocViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch(Dispatchers.IO) {
             val chapter = _uiState.value.chapters.getOrNull(index) ?: return@launch
             engine.saveReadingProgress(bookUrl, index, chapter.title)
-            _uiState.update { it.copy(book = it.book?.copy(durChapterIndex = index)) }
+            _uiState.update { it.copy(book = it.book?.copy(currentChapterIndex = index)) }
             onSaved?.invoke()
         }
     }
