@@ -255,7 +255,7 @@ jobs:
 
       # 1. 下载 build 任务上传的所有 APK
       - name: 下载所有 APK Artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           pattern: '*-apk-release'
           path: artifacts
@@ -263,7 +263,7 @@ jobs:
 
       # 2. 下载 mapping 文件
       - name: 下载 Mapping Artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           pattern: 'legado.app.release.mapping*'
           path: artifacts
