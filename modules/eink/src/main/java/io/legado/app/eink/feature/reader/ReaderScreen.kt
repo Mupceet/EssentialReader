@@ -5,6 +5,9 @@ import android.view.KeyEvent
 import android.view.WindowManager
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -12,27 +15,36 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.safeDrawingPadding
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -49,7 +61,9 @@ import io.legado.app.eink.designsystem.theme.EInkTheme
  * 阅读 Route — ViewModel 感知层。
  *
  * 全屏说明：窗口在 Activity 层始终 Edge-to-Edge（进出阅读无布局跳动）；
- * 阅读时不收起系统状态栏，正常显示原生内容。
+ * 状态栏默认显示，「其它设置 → 隐藏状态栏」开启时收起（转发完整模式
+ * 同键设置），页眉接管 时间/电量；菜单展开期恢复状态栏显示（对齐
+ * 完整模式 toolBarHide 语义），顶栏/面板避让到其下方。
  *
  * 职责：
  * - 按设置保持屏幕常亮；
@@ -96,6 +110,31 @@ fun ReaderRoute(
             window?.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         }
         onDispose { window?.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON) }
+    }
+
+    // 隐藏状态栏（转发完整模式同键设置），对齐 View 版语义：沉浸条件为
+    // 「开关开启 && 操作条收起」（ReadBookController 的 toolBarHide &&
+    // hideStatusBar）——菜单展开期恢复状态栏显示，收起后回到沉浸阅读。
+    // 顶部避让由 readerSystemBarInsets 显式置零且只跟随开关本身，正文
+    // 排版区域尺寸不随菜单开合变化（规范 §15）；菜单层（顶栏/面板）以
+    // 高度快照固定避让（不跟随回归动画，一步落位），顶栏 surface 自
+    // 屏幕上缘铺起垫在状态栏图标后方。旧平台（API < 30）legacy 布局
+    // 标记 LAYOUT_STABLE 下系统栏插图冻结在「栏可见」尺寸、不随
+    // hide() 归零，不能依赖 safeDrawing 自动收缩；滑动可临时浮现
+    // （TRANSIENT 浮层）。离开阅读页（含去目录/换源）时恢复显示，其余
+    // 界面不受影响。
+    val immersiveReading = uiState.hideStatusBar && !uiState.controlsVisible
+    DisposableEffect(immersiveReading) {
+        val controller = (view.context as? Activity)?.window
+            ?.let { WindowCompat.getInsetsController(it, view) }
+        if (immersiveReading) {
+            controller?.systemBarsBehavior =
+                WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+            controller?.hide(WindowInsetsCompat.Type.statusBars())
+        } else {
+            controller?.show(WindowInsetsCompat.Type.statusBars())
+        }
+        onDispose { controller?.show(WindowInsetsCompat.Type.statusBars()) }
     }
 
     // 音量键翻页（对齐 View 版 ReadBookController.volumeKeyPage）：
@@ -166,6 +205,12 @@ fun ReaderRoute(
         }
     }
 
+    // 菜单层顶部避让（固定值，不跟随状态栏回归动画）：开关开启时菜单
+    // 展开期状态栏恢复显示，避让取进入阅读期捕获的高度快照；开关关闭
+    // 时外层 readerSystemBarInsets（safeDrawing）已承担顶部避让，取 0
+    val statusBarTop = rememberStatusBarTop()
+    val menuTopInset = if (uiState.hideStatusBar) statusBarTop else 0.dp
+
     // 操作条返回图标：关闭设置面板 → 退出阅读。
     // 边距弹框期间操作条整体隐藏（保证边距实时可见），其首级返回
     // 由系统返回键/点击弹框外区域承担，关闭后回到排版展开态
@@ -176,6 +221,7 @@ fun ReaderRoute(
     Box(modifier = Modifier.fillMaxSize()) {
         ReaderScreen(
             state = uiState,
+            statusBarTopInset = menuTopInset,
             // 顶栏在设置面板打开期间隐藏（保持页眉等顶部调参预览不被遮挡）；
             // 底部操作条常驻可见，承载面板期间的返回与选中态；
             // 边距调整弹框例外：操作条隐藏，保证正文四周边距实时可见
@@ -233,12 +279,17 @@ fun ReaderRoute(
         // 边距弹框期间面板隐藏（panel 状态保留），关闭弹框后回到展开态
         panel?.takeIf { !showMarginDialog }?.let { current ->
             val onClose = { panel = null }
-            // 面板与阅读内容对齐（Edge-to-Edge 下避免被系统栏遮挡），
+            // 面板与阅读内容对齐（Edge-to-Edge 下避免被系统栏遮挡，
+            // 顶部避让与正文同规则——状态栏收起时同样上移），
             // 底部避开常驻操作条，保持其可见可点
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .safeDrawingPadding()
+                    .readerSystemBarInsets(uiState.hideStatusBar)
+                    // 菜单展开期状态栏恢复显示（开关开启时上一行顶部已置零）：
+                    // 面板同样避让到状态栏下方，固定快照一步落位；开关关闭时
+                    // 顶部插图已被上一行消费，此处取 0 不重复避让
+                    .padding(top = menuTopInset)
                     .padding(bottom = ReaderBottomBarInset)
             ) {
                 when (current) {
@@ -282,6 +333,7 @@ fun ReaderRoute(
                         ReaderOtherPanel(
                             state = uiState,
                             onToggleKeepScreenOn = viewModel::toggleKeepScreenOn,
+                            onToggleHideStatusBar = viewModel::toggleHideStatusBar,
                             onToggleTextBold = viewModel::toggleTextBold,
                         )
                     }
@@ -354,9 +406,12 @@ fun ReaderRoute(
  * 操作条可见性：设置面板打开期间底部操作条保持可见（承载分层返回
  * [onBarBack] 与面板选中态 [selectedPanel]），顶栏隐藏以保持顶部调参预览。
  *
- * 系统栏避让由本界面自管（[safeDrawingPadding]）：窗口 Edge-to-Edge、
- * 状态栏阅读时保持可见，页眉紧贴状态栏下方；后续若支持收起状态栏，
- * 状态栏区域转为页眉区域（页眉上移占位），正文始终从页眉之下开始排版。
+ * 系统栏避让由本界面自管（readerSystemBarInsets）：窗口 Edge-to-Edge、
+ * 状态栏默认可见，页眉紧贴状态栏下方；「隐藏状态栏」开启时状态栏
+ * 收起，状态栏区域转为页眉区域（页眉上移占位），正文始终从页眉之下
+ * 开始排版。菜单展开期状态栏恢复显示，正文不移位不重排；顶栏以
+ * surface 实底自屏幕上缘铺起（垫在透明状态栏后方），内容按高度快照
+ * 固定避让、一步落位。
  *
  * 手势（规范 §16）：
  * - 操作条可见时：点/滑动正文任意处收起操作条；
@@ -368,6 +423,7 @@ fun ReaderRoute(
 @Composable
 internal fun ReaderScreen(
     state: ReaderUiState,
+    statusBarTopInset: Dp,
     topBarVisible: Boolean,
     bottomBarVisible: Boolean,
     onPrevPage: () -> Unit,
@@ -393,11 +449,17 @@ internal fun ReaderScreen(
         modifier = Modifier
             .fillMaxSize()
             .background(EInkTheme.colorScheme.background)
-            .safeDrawingPadding()
+            .readerSystemBarInsets(state.hideStatusBar)
     ) {
         Column(modifier = Modifier.fillMaxSize()) {
             if (state.headerVisible) {
-                ReaderHeader(state = state)
+                // 菜单展开期状态栏恢复显示，会覆盖页眉条带（正文排版区域
+                // 尺寸恒定不重排，页眉不移位）：文字转透明让出条带，
+                // 收起菜单后状态栏再隐藏、时间/电量复现
+                ReaderHeader(
+                    state = state,
+                    contentVisible = !(state.hideStatusBar && state.controlsVisible),
+                )
             }
             Box(
                 modifier = Modifier
@@ -488,6 +550,13 @@ internal fun ReaderScreen(
                 modifier = Modifier
                     .align(Alignment.TopCenter)
                     .fillMaxWidth()
+                    // surface 从屏幕上缘铺起：垫在（Edge-to-Edge 下透明的）
+                    // 状态栏图标后方形成实底条带，同时盖住下方的页眉条带
+                    // （状态栏与页眉不再重叠透出）
+                    .background(EInkTheme.colorScheme.surface)
+                    // 内容让位状态栏：固定快照一步落位（开关关闭时取 0，
+                    // 顶部避让由外层 readerSystemBarInsets 承担）
+                    .padding(top = statusBarTopInset)
             ) {
                 ReaderTopBar(
                     state = state,
@@ -518,9 +587,54 @@ internal fun ReaderScreen(
     }
 }
 
-/** 页眉：时间（左）+ 电量%（右）。可见性与内容按 View 版 ReadTipConfig 默认规则，不开放设置。 */
+/**
+ * 阅读界面系统栏避让：左右/底部沿用 safeDrawing；顶部按「隐藏状态栏」
+ * 开关显式置零——旧平台（API < 30）legacy 布局标记 LAYOUT_STABLE 下，
+ * 系统栏插图冻结在「栏可见」尺寸、不随 insetsController.hide() 归零，
+ * safeDrawing 自动收缩不可依赖，置零后状态栏区域转为页眉区域。
+ * 对齐完整模式 LAYOUT_FULLSCREEN：隐藏时不避让刘海（墨水屏设备无刘海）。
+ */
 @Composable
-private fun ReaderHeader(state: ReaderUiState) {
+private fun Modifier.readerSystemBarInsets(hideStatusBar: Boolean): Modifier {
+    val top = if (hideStatusBar) {
+        WindowInsets(0, 0, 0, 0)
+    } else {
+        WindowInsets.safeDrawing.only(WindowInsetsSides.Top)
+    }
+    return windowInsetsPadding(
+        WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal + WindowInsetsSides.Bottom)
+    ).windowInsetsPadding(top)
+}
+
+/**
+ * 状态栏高度快照：菜单层固定避让用——状态栏恢复显示的 show()/hide()
+ * 动画期间系统栏插图从 0 插值到终值，菜单层若跟随实时插图会被逐步
+ * 顶下来，改用快照一步落位。
+ *
+ * 捕获时机：进入阅读首帧状态栏尚未收起（上一界面必为显示态），
+ * 插图即真实高度；此后只增不减，收起/展开不冲掉缓存。旋转后
+ * remember 重建、若彼时状态栏已收起，首次展开菜单会随动画补捕一次。
+ */
+@Composable
+private fun rememberStatusBarTop(): Dp {
+    val liveTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
+    var captured by remember { mutableStateOf(0.dp) }
+    SideEffect {
+        if (liveTop > captured) captured = liveTop
+    }
+    return captured
+}
+
+/**
+ * 页眉：时间（左）+ 电量%（右）。可见性与内容按 View 版 ReadTipConfig 默认规则。
+ *
+ * [contentVisible] 为 false 时文字转透明（尺寸不变）：菜单展开期状态栏
+ * 恢复显示覆盖页眉条带，让位但保持布局，避免正文重排。
+ */
+@Composable
+private fun ReaderHeader(state: ReaderUiState, contentVisible: Boolean) {
+    val textColor =
+        if (contentVisible) EInkTheme.colorScheme.onSurfaceVariant else Color.Transparent
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -536,13 +650,13 @@ private fun ReaderHeader(state: ReaderUiState) {
             EInkText(
                 text = state.headerTime,
                 modifier = Modifier.weight(1f),
-                color = EInkTheme.colorScheme.onSurfaceVariant,
+                color = textColor,
                 maxLines = 1,
             )
         }
         EInkText(
             text = "${state.batteryPercent}%",
-            color = EInkTheme.colorScheme.onSurfaceVariant,
+            color = textColor,
             maxLines = 1,
         )
     }

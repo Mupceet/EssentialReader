@@ -64,8 +64,10 @@ internal val einkSettingsWriteScope =
  * 设置项全部经设置网关读写：threadCount/preDownloadNum 经
  * DownloadCacheSettingsGateway（与旧 AppConfig 门面同键同默认值的
  * 快照）；autoRefreshBook/defaultToRead（「我的」页可写）经
- * OtherSettingsGateway、volumeKeyPage 经 ReadSettingsGateway、
- * changeSourceCheckAuthor 经 ChangeSourceSettingsGateway；
+ * OtherSettingsGateway、volumeKeyPage 与 hideStatusBar（阅读菜单
+ * 开关，后者与完整模式「隐藏状态栏」同键共享存储）经
+ * ReadSettingsGateway、changeSourceCheckAuthor 经
+ * ChangeSourceSettingsGateway；
  * useDefaultCover（「我的」页可写）为本对象持有的 Compose 快照状态 +
  * CoverSettingsGateway 异步落盘——组合内读取订阅变化，切换后开关行与
  * 书架/详情可见封面立即重组；keepScreenOn（阅读菜单开关，E-Ink 自有
@@ -148,6 +150,14 @@ private object GlobalSettingsImpl : GlobalSettings, KoinComponent {
         set(value) {
             einkSettingsWriteScope.launch {
                 readSettingsGateway.update { it.copy(volumeKeyPage = value) }
+            }
+        }
+
+    override var hideStatusBar: Boolean
+        get() = readSettingsGateway.currentSettings.hideStatusBar
+        set(value) {
+            einkSettingsWriteScope.launch {
+                readSettingsGateway.update { it.copy(hideStatusBar = value) }
             }
         }
 

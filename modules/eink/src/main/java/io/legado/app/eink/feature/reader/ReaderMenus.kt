@@ -606,10 +606,12 @@ private fun PanelTabRow(labels: List<String>, selected: Int, onSelect: (Int) -> 
 internal fun ReaderOtherPanel(
     state: ReaderUiState,
     onToggleKeepScreenOn: () -> Unit,
+    onToggleHideStatusBar: () -> Unit,
     onToggleTextBold: () -> Unit,
 ) {
     ToggleRow(label = "保持屏幕常亮", checked = state.keepScreenOn, onToggle = onToggleKeepScreenOn)
     ToggleRow(label = "正文加粗", checked = state.textBold, onToggle = onToggleTextBold)
+    ToggleRow(label = "隐藏状态栏", checked = state.hideStatusBar, onToggle = onToggleHideStatusBar)
 }
 
 // ====================================================================

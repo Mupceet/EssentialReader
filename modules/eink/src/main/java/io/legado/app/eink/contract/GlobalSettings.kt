@@ -12,7 +12,7 @@ package io.legado.app.eink.contract
  *        │ 读（VM init / 按键时 / 入口 attach 期 / 组合内快照）
  *        ▼
  * 模块消费方（预缓存泵门槛、音量键判定、入口 Context 包装、
- *            图片画笔抗锯齿、书架自动刷新触发…）
+ *            图片画笔抗锯齿、书架自动刷新触发、阅读页状态栏收起…）
  * ```
  *
  * 收录 E-Ink VM 编排与「我的」页/阅读菜单真正读写的键——含转发宿主
@@ -75,6 +75,21 @@ interface GlobalSettings {
      * 默认 prefs 文件（存量设置无损继承）。
      */
     var keepScreenOn: Boolean
+
+    /**
+     * 阅读页隐藏系统状态栏（转发宿主阅读设置，与完整模式「隐藏状态栏」
+     * 同键共享存储）。
+     *
+     * 语义对齐完整模式：开启后阅读页收起状态栏，页眉（时间/电量）接管
+     * 顶部信息——headerMode 默认档的页眉可见性即跟随本开关（见
+     * ReaderEngine.headerFooterVisibility 的默认分支）。
+     *
+     * 可写（阅读菜单开关）：fire-and-forget 写入；实时生效——切换后
+     * 模块立即重算页眉可见性并收起/恢复状态栏。若宿主写入为纯异步
+     * 可见（写后读 getter 拿到旧值），页眉最迟随下一次翻页的
+     * 内容刷新对齐。
+     */
+    var hideStatusBar: Boolean
 
     /**
      * 图片绘制抗锯齿（仅阅读页图片画笔消费；文字画笔恒抗锯齿不受

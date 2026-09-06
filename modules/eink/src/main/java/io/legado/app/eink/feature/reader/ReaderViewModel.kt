@@ -61,6 +61,8 @@ data class ReaderUiState(
     val isLocalBook: Boolean = false,
     val inBookshelf: Boolean = false,
     val keepScreenOn: Boolean = false,
+    /** 隐藏状态栏（转发完整模式同键阅读设置；开启后页眉接管 时间/电量）。 */
+    val hideStatusBar: Boolean = false,
     val textBold: Boolean = false,
     val style: ReaderTextStyle = ReaderTextStyle(),
     // 水平滑动翻页触发距离（px，0 = 系统 touch slop）
@@ -105,6 +107,7 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application),
     private val _uiState = MutableStateFlow(
         ReaderUiState(
             keepScreenOn = EInkEngineRegistry.globalSettings.keepScreenOn,
+            hideStatusBar = EInkEngineRegistry.globalSettings.hideStatusBar,
             // 与完整模式共用宿主 autoReadSpeed 配置（默认 10）
             autoPlayIntervalSec = engine.autoReadIntervalSec
                 .coerceIn(MIN_AUTO_INTERVAL_SEC, MAX_AUTO_INTERVAL_SEC),
@@ -266,8 +269,9 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application),
 
     /**
      * 刷新页眉/页脚信息（复刻 View 版 PageView.upTipStyle 的可见性与默认
-     * 内容，可见性规则经端口计算，不开放设置）：
-     * - 页眉：headerMode 1 强制显示 / 2 强制隐藏 / 默认状态栏显示时隐藏，
+     * 内容，可见性规则经端口计算）：
+     * - 页眉：headerMode 1 强制显示 / 2 强制隐藏 / 默认档跟随「隐藏
+     *   状态栏」开关（状态栏可见时隐藏，收起后接管 时间/电量），
      *   内容为 时间（左）+ 电量%（右）
      * - 页脚：默认显示（footerMode 1 隐藏），内容为 章节标题（左）+ 页数及进度（右）
      *
@@ -585,6 +589,18 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application),
             EInkEngineRegistry.globalSettings.keepScreenOn = !it.keepScreenOn
             it.copy(keepScreenOn = !it.keepScreenOn)
         }
+    }
+
+    /**
+     * 隐藏状态栏（转发完整模式同键设置）：写入 + 乐观更新开关态，
+     * 再经端口重算页眉可见性——headerMode 默认档下开启后页眉出现
+     * （时间/电量接管状态栏职责）。
+     */
+    fun toggleHideStatusBar() {
+        val newValue = !EInkEngineRegistry.globalSettings.hideStatusBar
+        EInkEngineRegistry.globalSettings.hideStatusBar = newValue
+        _uiState.update { it.copy(hideStatusBar = newValue) }
+        updateTipInfo()
     }
 
     /**
