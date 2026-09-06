@@ -22,7 +22,7 @@ object AppUpdateGitHub : AppUpdate.AppUpdateInterface {
 
     private val otherSettingsGateway get() = org.koin.core.context.GlobalContext.get().get<io.legado.app.domain.gateway.OtherSettingsGateway>()
 
-    private const val repoPath = "HapeLee/legado-with-MD3"
+    private const val repoPath = "Mupceet/EssentialReader"
     private const val githubApiBaseUrl = "https://api.github.com/repos/$repoPath/releases"
     private const val updateManifestBaseUrl =
         "https://raw.githubusercontent.com/$repoPath/update-manifests"

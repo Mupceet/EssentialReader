@@ -148,13 +148,13 @@ private fun MaterialAboutScreen(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.Center
             ) {
-                FilledTonalIconButton(onClick = { onIntent(AboutIntent.OpenUrl("https://github.com/HapeLee/legado-with-MD3")) }) {
+                FilledTonalIconButton(onClick = { onIntent(AboutIntent.OpenUrl("https://github.com/Mupceet/EssentialReader")) }) {
                     Icon(
                         painter = painterResource(R.drawable.ic_web_outline),
                         contentDescription = stringResource(R.string.about_open_project_homepage)
                     )
                 }
-                FilledTonalIconButton(onClick = { onIntent(AboutIntent.OpenUrl("https://github.com/HapeLee/legado-with-MD3")) }) {
+                FilledTonalIconButton(onClick = { onIntent(AboutIntent.OpenUrl("https://github.com/Mupceet/EssentialReader")) }) {
                     Icon(
                         painter = painterResource(R.drawable.ic_github),
                         contentDescription = stringResource(R.string.about_open_github)
@@ -175,7 +175,7 @@ private fun MaterialAboutScreen(
                 SettingItemWithDivider {
                     SettingItem(
                         title = stringResource(R.string.contributors),
-                        onClick = { onIntent(AboutIntent.OpenUrl("https://github.com/HapeLee/legado-with-MD3")) }
+                        onClick = { onIntent(AboutIntent.OpenUrl("https://github.com/Mupceet/EssentialReader")) }
                     )
                 }
                 SettingItemWithDivider {
