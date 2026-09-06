@@ -69,7 +69,8 @@ private val HomeTabIcons = listOf(
  *    （行为对齐 View 版下拉刷新），"我的" Tab 无动作；
  *  - 中间内容区：书架 / 我的 两个 Tab；
  *  - 底部通用操作栏（[EInkOperationBar]）：左侧 Tab 切换，
- *    右侧上/下箭头对书架整页翻页，不可翻页时置灰。
+ *    右侧上/下箭头按当前 Tab 整页翻页（书架条目 /「我的」条目，
+ *    零动画整页跳转），不可翻页时置灰。
  *
  * 书架布局默认网格、由 [BookshelfUiState.isGridLayout] 驱动，列表与网格
  * 各持一套固定页分页状态（[rememberEInkListPagerState] /
@@ -97,6 +98,8 @@ fun HomeRoute(
     val listPager = rememberEInkListPagerState()
     val gridPager = rememberEInkGridPagerState()
     val pager: EInkPageController = if (uiState.isGridLayout) gridPager else listPager
+    // 「我的」页独立分页状态（条目整页翻页，对齐书架约定）
+    val minePager = rememberEInkListPagerState()
     val scope = rememberCoroutineScope()
     val totalBooks = uiState.books.size
 
@@ -114,6 +117,22 @@ fun HomeRoute(
     val pageDown: () -> Unit = remember(pager, totalBooks, refresh, scope) {
         {
             scope.launch { pager.pageDown(totalBooks) }
+            refresh.requestRefresh(EInkRefreshIntent.PageTurn)
+        }
+    }
+    // 「我的」页翻页动作（与书架同款零动画整页跳转；条目总数由列表
+    // 布局信息提供，箭头槽内读取）
+    val minePageUp: () -> Unit = remember(minePager, refresh, scope) {
+        {
+            scope.launch { minePager.pageUp() }
+            refresh.requestRefresh(EInkRefreshIntent.PageTurn)
+        }
+    }
+    val minePageDown: () -> Unit = remember(minePager, refresh, scope) {
+        {
+            scope.launch {
+                minePager.pageDown(minePager.listState.layoutInfo.totalItemsCount)
+            }
             refresh.requestRefresh(EInkRefreshIntent.PageTurn)
         }
     }
@@ -160,14 +179,19 @@ fun HomeRoute(
 
     // 翻页箭头槽：canPageUp/canPageDown 读取分页状态（pageStart 为
     // mutableStateOf），在 Route 作用域读取会让整个首页随每次翻页重组；
-    // 收敛到本槽内读取，翻页只重组箭头两个图标。Tab 非书架时箭头置灰
+    // 收敛到本槽内读取，翻页只重组箭头两个图标。按当前 Tab 分派：
+    // 书架 Tab 驱动书架分页（不可翻页时置灰），「我的」Tab 驱动其条目
+    // 分页（条目未满一页时两箭头同样置灰）
     val pageArrows: @Composable () -> Unit = {
         val isBookshelfTab = selectedTab == HomeTabs.BOOKSHELF
+        val activePager: EInkPageController = if (isBookshelfTab) pager else minePager
+        val activeTotal = if (isBookshelfTab) totalBooks
+        else minePager.listState.layoutInfo.totalItemsCount
         EInkPageArrows(
-            pageUpEnabled = isBookshelfTab && pager.canPageUp(),
-            pageDownEnabled = isBookshelfTab && pager.canPageDown(totalBooks),
-            onPageUp = pageUp,
-            onPageDown = pageDown
+            pageUpEnabled = activePager.canPageUp(),
+            pageDownEnabled = activePager.canPageDown(activeTotal),
+            onPageUp = { if (isBookshelfTab) pageUp() else minePageUp() },
+            onPageDown = { if (isBookshelfTab) pageDown() else minePageDown() }
         )
     }
 
@@ -193,6 +217,9 @@ fun HomeRoute(
         },
         mine = {
             MineScreen(
+                pager = minePager,
+                onPageUp = minePageUp,
+                onPageDown = minePageDown,
                 onOpenFontScale = onOpenFontScale,
                 onOpenFullMode = onOpenFullMode,
                 onOpenThemeDebug = onOpenThemeDebug,

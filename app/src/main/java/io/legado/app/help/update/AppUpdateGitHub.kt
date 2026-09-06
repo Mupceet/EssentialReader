@@ -209,7 +209,7 @@ object AppUpdateGitHub : AppUpdate.AppUpdateInterface {
                 )
             }
 
-            throw NoStackTraceException("已是最新版本")
+            throw UpToDateException()
         }.timeout(10000)
     }
 
