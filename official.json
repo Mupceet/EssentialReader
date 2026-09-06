@@ -1,0 +1,49 @@
+{
+  "tag_name": "3.26.16",
+  "name": "Release 3.26.16",
+  "body": "# 更新日志\n\n墨本阅读——开源阅读 legado 的墨水屏增强发行版：同一本书，两种读法。\n\n## 3.26.16（首个版本）\n\n基于 legado 开源项目与 MD3 界面移植构建，加入墨水屏专属阅读模式：\n\n* **墨水屏模式**：轻量单界面（书架 / 搜索 / 阅读），黑白主题跟随系统深浅色，音量键翻页，页眉页脚信息条\n* **完整模式**：MD3 风格全功能界面，导入导出、书源管理、Web 服务等管理能力均在此完成\n* 排版设置两种模式共享——任一模式调字号、行距，另一模式同样生效\n* 墨水屏模式入口在「我的 → 实验室」，可设为启动直达\n\n### 温馨提醒\n\n* 本应用只是转码工具，不提供内容；书源需要自行导入，可使用 legado 生态的书源资源\n* 更新前建议先做好备份，以免数据丢失\n\n### 已知限制\n\n* 墨水屏模式功能持续完善中，遇到问题可随时切换回完整模式\n\n### 致谢\n\n* [legado 开源阅读](https://github.com/gedoor/legado)\n* [legado-with-MD3](https://github.com/HapeLee/legado-with-MD3)",
+  "prerelease": false,
+  "created_at": "2026-09-06T14:07:46Z",
+  "assets": [
+    {
+      "browser_download_url": "https://github.com/Mupceet/EssentialReader/releases/download/3.26.16/legado-3.26.16-arm64-v8a.apk",
+      "content_type": "application/vnd.android.package-archive",
+      "created_at": "2026-09-06T14:33:27Z",
+      "download_count": 0,
+      "id": 547293297,
+      "name": "legado-3.26.16-arm64-v8a.apk",
+      "state": "uploaded",
+      "url": "https://api.github.com/repos/Mupceet/EssentialReader/releases/assets/547293297"
+    },
+    {
+      "browser_download_url": "https://github.com/Mupceet/EssentialReader/releases/download/3.26.16/legado-3.26.16-armeabi-v7a.apk",
+      "content_type": "application/vnd.android.package-archive",
+      "created_at": "2026-09-06T14:33:27Z",
+      "download_count": 0,
+      "id": 547293299,
+      "name": "legado-3.26.16-armeabi-v7a.apk",
+      "state": "uploaded",
+      "url": "https://api.github.com/repos/Mupceet/EssentialReader/releases/assets/547293299"
+    },
+    {
+      "browser_download_url": "https://github.com/Mupceet/EssentialReader/releases/download/3.26.16/legado-3.26.16.apk",
+      "content_type": "application/vnd.android.package-archive",
+      "created_at": "2026-09-06T14:33:27Z",
+      "download_count": 0,
+      "id": 547293300,
+      "name": "legado-3.26.16.apk",
+      "state": "uploaded",
+      "url": "https://api.github.com/repos/Mupceet/EssentialReader/releases/assets/547293300"
+    },
+    {
+      "browser_download_url": "https://github.com/Mupceet/EssentialReader/releases/download/3.26.16/mapping.txt",
+      "content_type": "text/plain",
+      "created_at": "2026-09-06T14:33:27Z",
+      "download_count": 0,
+      "id": 547293298,
+      "name": "mapping.txt",
+      "state": "uploaded",
+      "url": "https://api.github.com/repos/Mupceet/EssentialReader/releases/assets/547293298"
+    }
+  ]
+}
