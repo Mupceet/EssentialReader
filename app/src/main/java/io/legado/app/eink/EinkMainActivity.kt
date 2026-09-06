@@ -7,9 +7,8 @@ import io.legado.app.domain.gateway.AppUiConfigurationGateway
 import io.legado.app.eink.bridge.EInkBridge
 import io.legado.app.eink.contract.EInkHostActivity
 import io.legado.app.help.config.AppConfigStore
-import io.legado.app.ui.main.MainActivity
+import io.legado.app.ui.main.MainIntent
 import io.legado.app.utils.isNightMode
-import io.legado.app.utils.startActivity
 import org.koin.core.context.GlobalContext
 
 /**
@@ -40,9 +39,12 @@ class EInkMainActivity : EInkHostActivity() {
         // 完整模式（View UI）——导入导出等管理功能在完整模式中完成，
         // 再次启用需在 实验室 → 墨水屏显示 重新打开
         AppConfigStore.putBoolean(PreferKey.labEInkDisplay, false)
-        context.startActivity<MainActivity> {
-            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            addFlags(Intent.FLAG_ACTIVITY_CLEAR_TASK)
-        }
+        // 不能显式指向 MainActivity：切换图标后该组件被禁用，
+        // 须解析当前启用的 launcher 组件（主类或 Launcher 别名）
+        context.startActivity(
+            MainIntent.createLauncherIntent(context)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TASK)
+        )
     }
 }
