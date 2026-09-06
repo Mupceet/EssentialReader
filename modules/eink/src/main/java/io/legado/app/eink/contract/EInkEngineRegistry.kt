@@ -15,7 +15,7 @@ import io.legado.app.eink.contract.EInkEngineRegistry.keyEventHub
  * ```text
  * 宿主入口 attachBaseContext
  *    └─ onInstallEngines() ──► 宿主 bridge（如 EInkBridge.install()）
- *                                └─ install(8 个端口实现)
+ *                                └─ install(8 个必填端口实现 + 可选 appUpdateEngine)
  *                                      └─ 静态注册表整体替换（last-wins）
  *                                             │ keyEventHub 一并重建
  *                                             ▼
@@ -51,6 +51,7 @@ object EInkEngineRegistry {
     private var _changeSourceEngine: ChangeSourceEngine? = null
     private var _coverEngine: CoverEngine? = null
     private var _readerEngine: ReaderEngine? = null
+    private var _appUpdateEngine: AppUpdateEngine? = null
 
     /** 模块自有的按键枢纽（非宿主端口）：每次 install 重置，丢弃陈旧 handler。 */
     private var _keyEventHub = EInkKeyEventHub()
@@ -87,6 +88,14 @@ object EInkEngineRegistry {
     val readerEngine: ReaderEngine
         get() = require(_readerEngine, "ReaderEngine")
 
+    /**
+     * 应用更新端口——唯一**可选**端口：未注册 = 宿主无 app 级更新能力
+     * （companion 宿主的合法状态），「我的」页检查更新入口随之不渲染，
+     * 不参与 install 必填校验。
+     */
+    val appUpdateEngine: AppUpdateEngine?
+        get() = _appUpdateEngine
+
     /** 模块自有按键枢纽（入口基类分发、阅读页注册处理器；恒可用）。 */
     val keyEventHub: EInkKeyEventHub
         get() = _keyEventHub
@@ -104,6 +113,8 @@ object EInkEngineRegistry {
      * @param changeSourceEngine 换源端口实现。
      * @param coverEngine 封面端口实现。
      * @param readerEngine 阅读端口实现。
+     * @param appUpdateEngine 应用更新端口实现（可选，默认 null：
+     *   宿主无更新能力时不传，「我的」页入口不渲染）。
      */
     fun install(
         globalSettings: GlobalSettings,
@@ -114,6 +125,7 @@ object EInkEngineRegistry {
         changeSourceEngine: ChangeSourceEngine,
         coverEngine: CoverEngine,
         readerEngine: ReaderEngine,
+        appUpdateEngine: AppUpdateEngine? = null,
     ) {
         _globalSettings = globalSettings
         _bookshelfEngine = bookshelfEngine
@@ -123,6 +135,7 @@ object EInkEngineRegistry {
         _changeSourceEngine = changeSourceEngine
         _coverEngine = coverEngine
         _readerEngine = readerEngine
+        _appUpdateEngine = appUpdateEngine
         _keyEventHub = EInkKeyEventHub()
     }
 

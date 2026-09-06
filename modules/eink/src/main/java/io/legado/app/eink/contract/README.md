@@ -75,6 +75,7 @@
 | `ChangeSourceEngine` | 跨源搜索 + 换源迁移        | 成功后重载会话并发射 `bookChanged`；进度迁移完整                    |
 | `CoverEngine`        | 封面请求策略（防盗链/请求头/尺寸） | 宿主图片栈知识唯一出口；`ImageRequest.Builder` 配置块             |
 | `ReaderEngine`       | 阅读会话状态机 + 排版引擎转发面  | 最重的端口：回调注册时序、排版快照读写、页快照映射，逐方法见 KDoc                |
+| `AppUpdateEngine`    | 应用更新检查与下载启动（**唯一可选**） | `null` = 已是最新（正常结果）；未注册 = 「我的」页入口不渲染；下载走宿主自有管线 |
 
 ## 4. 跨界数据类型（宿主构造/映射）
 
@@ -98,7 +99,9 @@
   → onCreate：启动清理（IO 协程）→ 直达阅读解析（主线程同步）→
   setContent 组合。任何端口读取都晚于装配。
 - **失败模式**：端口未注册即被访问时，registry 抛出的
-  IllegalStateException 会指名缺失的端口与修复入口。
+  IllegalStateException 会指名缺失的端口与修复入口。唯一例外是
+  `AppUpdateEngine`（可选端口）：以 null 表达宿主无 app 级更新能力，
+  模块据此不渲染更新入口——缺席以入口消失明示，不用空实现伪造。
 - **线程约定**：suspend 方法在调用方协程上下文执行；回调线程不限定
   （模块自行切主线程）；标注「主线程同步」的少数方法（如
   `lastReadBookUrl`）在宿主实现中保持单查询轻量。
