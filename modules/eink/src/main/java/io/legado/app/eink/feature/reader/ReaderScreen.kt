@@ -385,7 +385,24 @@ fun ReaderRoute(
             )
 
             ReaderStyleDialog.Fonts -> Unit          // Task 12 接入
-            ReaderStyleDialog.Info -> Unit           // Task 11 接入
+            ReaderStyleDialog.Info -> ReaderInfoConfigDialog(
+                catalog = viewModel.styleCatalog,
+                style = uiState.style,
+                headerVisible = uiState.headerVisible,
+                footerVisible = uiState.footerVisible,
+                onSetTitleMode = viewModel::setTitleMode,
+                onSetTitleSize = viewModel::setTitleSize,
+                onSetTitleTopSpacing = viewModel::setTitleTopSpacing,
+                onSetTitleBottomSpacing = viewModel::setTitleBottomSpacing,
+                onSetTitleLineSpacing = viewModel::setTitleLineSpacing,
+                onSetHeaderVisible = viewModel::setHeaderVisible,
+                onSetHeaderSize = viewModel::setHeaderSize,
+                onSetHeaderDivider = viewModel::setHeaderDivider,
+                onSetFooterVisible = viewModel::setFooterVisible,
+                onSetFooterDivider = viewModel::setFooterDivider,
+                onClose = { styleDialog = null },
+                onBackdropClick = dismissToCleanReading,
+            )
             null -> Unit
         }
 

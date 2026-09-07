@@ -527,10 +527,15 @@ internal fun ReaderMarginDialog(
         )
         when (selectedTab) {
             0 -> MarginRows(
+                catalog = catalog,
                 topDp = style.paddingTop,
                 bottomDp = style.paddingBottom,
                 leftDp = style.paddingLeft,
                 rightDp = style.paddingRight,
+                idTop = Ids.BODY_PADDING_TOP,
+                idBottom = Ids.BODY_PADDING_BOTTOM,
+                idLeft = Ids.BODY_PADDING_LEFT,
+                idRight = Ids.BODY_PADDING_RIGHT,
                 maxVertical = catalog.intRange(Ids.BODY_PADDING_TOP).last,
                 maxHorizontal = catalog.intRange(Ids.BODY_PADDING_LEFT).last,
                 onSetTop = onSetPaddingTop,
@@ -540,10 +545,15 @@ internal fun ReaderMarginDialog(
             )
 
             1 -> MarginRows(
+                catalog = catalog,
                 topDp = style.headerPaddingTop,
                 bottomDp = style.headerPaddingBottom,
                 leftDp = style.headerPaddingLeft,
                 rightDp = style.headerPaddingRight,
+                idTop = Ids.HEADER_PADDING_TOP,
+                idBottom = Ids.HEADER_PADDING_BOTTOM,
+                idLeft = Ids.HEADER_PADDING_LEFT,
+                idRight = Ids.HEADER_PADDING_RIGHT,
                 maxVertical = catalog.intRange(Ids.HEADER_PADDING_TOP).last,
                 maxHorizontal = catalog.intRange(Ids.HEADER_PADDING_LEFT).last,
                 onSetTop = onSetHeaderPaddingTop,
@@ -553,10 +563,15 @@ internal fun ReaderMarginDialog(
             )
 
             else -> MarginRows(
+                catalog = catalog,
                 topDp = style.footerPaddingTop,
                 bottomDp = style.footerPaddingBottom,
                 leftDp = style.footerPaddingLeft,
                 rightDp = style.footerPaddingRight,
+                idTop = Ids.FOOTER_PADDING_TOP,
+                idBottom = Ids.FOOTER_PADDING_BOTTOM,
+                idLeft = Ids.FOOTER_PADDING_LEFT,
+                idRight = Ids.FOOTER_PADDING_RIGHT,
                 maxVertical = catalog.intRange(Ids.FOOTER_PADDING_TOP).last,
                 maxHorizontal = catalog.intRange(Ids.FOOTER_PADDING_LEFT).last,
                 onSetTop = onSetFooterPaddingTop,
@@ -571,10 +586,15 @@ internal fun ReaderMarginDialog(
 /** 单个区域的边距 4 行档位滑条：上边距、下边距、左边距、右边距。 */
 @Composable
 private fun MarginRows(
+    catalog: ReaderStyleCatalog,
     topDp: Int,
     bottomDp: Int,
     leftDp: Int,
     rightDp: Int,
+    idTop: String,
+    idBottom: String,
+    idLeft: String,
+    idRight: String,
     maxVertical: Int,
     maxHorizontal: Int,
     onSetTop: (Int) -> Unit,
@@ -589,6 +609,7 @@ private fun MarginRows(
         thumbLabel = { "${it}dp" },
         tickStep = MarginTickStep,
         onSetValue = onSetTop,
+        markerStep = catalog.defaultStep(idTop),
     )
     SliderRow(
         label = "下边距",
@@ -597,6 +618,7 @@ private fun MarginRows(
         thumbLabel = { "${it}dp" },
         tickStep = MarginTickStep,
         onSetValue = onSetBottom,
+        markerStep = catalog.defaultStep(idBottom),
     )
     SliderRow(
         label = "左边距",
@@ -605,6 +627,7 @@ private fun MarginRows(
         thumbLabel = { "${it}dp" },
         tickStep = MarginTickStep,
         onSetValue = onSetLeft,
+        markerStep = catalog.defaultStep(idLeft),
     )
     SliderRow(
         label = "右边距",
@@ -613,6 +636,7 @@ private fun MarginRows(
         thumbLabel = { "${it}dp" },
         tickStep = MarginTickStep,
         onSetValue = onSetRight,
+        markerStep = catalog.defaultStep(idRight),
     )
 }
 
