@@ -37,15 +37,31 @@ class ReaderStyleCatalogTest {
 
     @Test
     fun `页眉页脚左右边距不影响分页其余全部影响`() {
-        fun affects(id: String) = catalog.find(id)!!.affectsLayout
-        assertFalse(affects(ReaderStyleParamIds.HEADER_PADDING_LEFT))
-        assertFalse(affects(ReaderStyleParamIds.HEADER_PADDING_RIGHT))
-        assertFalse(affects(ReaderStyleParamIds.FOOTER_PADDING_LEFT))
-        assertFalse(affects(ReaderStyleParamIds.FOOTER_PADDING_RIGHT))
-        assertTrue(affects(ReaderStyleParamIds.HEADER_PADDING_TOP))
-        assertTrue(affects(ReaderStyleParamIds.HEADER_PADDING_BOTTOM))
-        assertTrue(affects(ReaderStyleParamIds.FOOTER_PADDING_TOP))
-        assertTrue(affects(ReaderStyleParamIds.BODY_SIZE))
+        val paintOnly = setOf(
+            ReaderStyleParamIds.HEADER_PADDING_LEFT,
+            ReaderStyleParamIds.HEADER_PADDING_RIGHT,
+            ReaderStyleParamIds.FOOTER_PADDING_LEFT,
+            ReaderStyleParamIds.FOOTER_PADDING_RIGHT,
+        )
+        catalog.params.forEach { param ->
+            if (param.id in paintOnly) {
+                assertFalse("${param.id} 应为纯绘制（不影响分页）", param.affectsLayout)
+            } else {
+                assertTrue("${param.id} 应影响分页", param.affectsLayout)
+            }
+        }
+    }
+
+    @Test
+    fun `全部Stepped参数默认值落在值域内`() {
+        val stepped = catalog.params.filterIsInstance<ReaderStyleParam.Stepped>()
+        assertEquals(catalog.params.size, stepped.size)
+        stepped.forEach { param ->
+            assertTrue(
+                "${param.id} default=${param.default} 不在 ${param.min}..${param.max} 内",
+                param.default >= param.min && param.default <= param.max,
+            )
+        }
     }
 
     @Test

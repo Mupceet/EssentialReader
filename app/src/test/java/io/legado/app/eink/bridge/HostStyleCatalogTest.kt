@@ -50,4 +50,23 @@ class HostStyleCatalogTest {
         assertEquals(listOf(0, 1, 2), choice.options.map { it.value })
         assertEquals(0, choice.default)
     }
+
+    @Test
+    fun `目录id成员恰为ReaderStyleParamIds全部常量`() {
+        val declaredIds = Ids::class.java.fields
+            .filter { it.type == String::class.java } // 排除 object 的 INSTANCE 字段
+            .map { it.get(null) as String }
+        assertEquals(32, declaredIds.size)
+        assertEquals(declaredIds.toSet(), catalog.params.map { it.id }.toSet())
+    }
+
+    @Test
+    fun `全部Stepped参数默认值落在值域内`() {
+        catalog.params.filterIsInstance<ReaderStyleParam.Stepped>().forEach { param ->
+            assertTrue(
+                "${param.id} default=${param.default} 不在 ${param.min}..${param.max} 内",
+                param.default >= param.min && param.default <= param.max,
+            )
+        }
+    }
 }

@@ -244,3 +244,4 @@ sealed interface ReaderFontSelection {
 ## 修订记录
 
 - 2026-09-07 初版：四题澄清（协商形态/页眉页脚/覆盖/UI 形态）+ 两轮修订（字重纳入、字体默认跟随正文、三入口行替代四入口）。
+- 2026-09-07 实施修订：§3 目录代码块中 ChoiceParam 的 Option(value: String)/default: String 落地为 Option(value: Int)/default: Int（标题位置与宿主 titleMode 同构，避免字符串往返）；§5.2 裂缝修复实施时追加「分页缓存键直接钉住派生 extent 值（同完整模式键）」作为参数片段之外的结构性闭合（覆盖 hideStatusBar 等非 Config 输入）；§5.4 页眉渲染的门控判据落地为「按构造放得下」（宿主 extent 即按同字号度量预留），兜底仅 null/非正字号。

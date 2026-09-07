@@ -87,7 +87,16 @@
   `SearchResultHandle`：引擎实体的不透明句柄。宿主 bridge 包装真实实体，
   模块只持有回传，不解读；实体被替换时的句柄语义见各端口方法 KDoc。
 - **`ReaderTextStyle.kt`** — 排版参数快照：设置面板编辑 →
-  `ReaderEngine.applyStyle` 整体写入；字段单位与编辑区间见文件头 KDoc。
+  `ReaderEngine.applyStyle` 整体写入；另含 15 个可空协商扩展字段
+  （null = 不跨桥写，保持宿主值）。字段单位与编辑区间见文件头 KDoc。
+- **`ReaderStyleCatalog.kt`** — 排版参数协商目录（`ReaderStyleParam`
+  描述符 + 稳定 id 集 `ReaderStyleParamIds` + 旧宿主回落基线
+  `FallbackReaderStyleCatalog`）；伴生 `ReaderFontSelection.kt` 为字体
+  取值与选项类型。`ReaderEngine` 三个关联端口成员（默认实现 =
+  能力降级）：
+  - `styleCatalog(): ReaderStyleCatalog?` — 排版参数协商目录（null = 旧宿主，模块回落内置基线 FallbackReaderStyleCatalog）
+  - `availableFonts(): List<ReaderFontOption>` — 字体文件夹枚举（suspend，阻塞式，调用方 IO 上下文）
+  - `setFontFolder(uri: String)` — 持久化字体文件夹（suspend）
 - **`ReaderPageSnapshot.kt`** — 排版产物页快照：宿主把引擎排版结果映射
   而来（渲染侧唯一职责），模块自持画布绘制。坐标原样拷贝、构建后
   不可变、画笔规格只含测量耦合参数。
