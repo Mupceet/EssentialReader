@@ -310,7 +310,7 @@ interface ReaderEngine {
     fun updateViewSize(width: Int, height: Int)
 
     /**
-     * 整体写入排版参数：映射到宿主排版配置各字段、持久化并刷新排版
+     * 写入排版参数快照：映射到宿主排版配置各字段、持久化并刷新排版
      * 画笔。可空扩展字段为 null 时宿主不写对应键（部分写入语义）；
      * FollowBody 字体选择由宿主展开为正文当前有效字体。
      */
@@ -324,7 +324,8 @@ interface ReaderEngine {
 
     /**
      * 可枚举的字体文件列表（来自宿主配置的字体文件夹；无文件夹时宿主
-     * 可回落其默认字体目录）。IO 操作，调用方自行调度。
+     * 可回落其默认字体目录）。阻塞式文件夹枚举，宿主不保证内部切换
+     * IO 调度器，调用方应在 IO 上下文调用。
      */
     suspend fun availableFonts(): List<ReaderFontOption> = emptyList()
 
