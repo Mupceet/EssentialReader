@@ -7,6 +7,7 @@ import io.legado.app.feature.reader.core.navigation.ReaderChapterPaginationSnaps
 import io.legado.app.feature.reader.core.navigation.ReaderPageNavigator
 import io.legado.app.feature.reader.legacy.LegacyReaderChapterPaginator
 import io.legado.app.feature.reader.legacy.LegacyReaderChapterPaginationResult
+import io.legado.app.feature.reader.legacy.LegacyReaderPageDecorationFactory
 import io.legado.app.feature.reader.legacy.LegacyReaderPaginationStyleFactory
 import io.legado.app.feature.reader.legacy.paginateLegacyReaderChapterSafely
 import io.legado.app.feature.reader.platform.ReaderAndroidPaginationStyle
@@ -281,6 +282,40 @@ internal class ReaderChapterPager(
             append(style.titleTopSpacingPx).append('|')
             append(style.titleBottomSpacingPx).append('|')
             append(style.paragraphSpacing).append('|')
+            append(decorationCacheKeyFragment(ReadBookConfig.config)).append('|')
+            // 直接钉住派生 extent 值（同完整模式键）：任何现在/未来的 extent 输入
+            // （含 headerMode=0 档的 hideStatusBar 门控）变化都反映到这两个值，
+            // 结构性闭合装饰参数错位
+            append(LegacyReaderPageDecorationFactory.headerExtentPx()).append(',')
+                .append(LegacyReaderPageDecorationFactory.footerExtentPx()).append('|')
             append(ReadBookConfig.durConfig.highlightRules.hashCode())
         }
+}
+
+/**
+ * 页眉/页脚装饰的缓存键片段：这些参数经 extent（按字号/字体度量/
+ * 上下边距/分割线推导分页预留高度）影响正文分页，任一变化必须触发
+ * 重排。修复缺陷：改页眉上下边距/字号后条带高度变化但缓存键不含
+ * 这些键，旧页坐标继续使用导致错位。
+ *
+ * 采样 share-aware 的 [ReadBookConfig.config]，与 extent 工厂同源
+ * （shareLayout 开启时 durConfig 不反映有效值）。
+ *
+ * 键中另行钉住派生 extent 值；本片段保留是为显式声明意图与可读性。
+ */
+internal fun decorationCacheKeyFragment(config: ReadBookConfig.Config): String = buildString {
+    append(config.headerFontSize).append(',')
+    append(config.footerFontSize).append(',')
+    append(config.headerFont).append(',')
+    append(config.footerFont).append(',')
+    append(config.applyHeaderStyle).append(',')
+    append(config.headerMode).append(',')
+    append(config.footerMode).append(',')
+    append(config.showHeaderLine).append(',')
+    append(config.showFooterLine).append(',')
+    append(config.headerPaddingTop).append(',').append(config.headerPaddingBottom)
+        .append(',').append(config.headerPaddingLeft).append(',').append(config.headerPaddingRight)
+        .append(',')
+    append(config.footerPaddingTop).append(',').append(config.footerPaddingBottom)
+        .append(',').append(config.footerPaddingLeft).append(',').append(config.footerPaddingRight)
 }
