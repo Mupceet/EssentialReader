@@ -28,6 +28,8 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import io.legado.app.eink.R
+import io.legado.app.eink.contract.ReaderStyleCatalog
+import io.legado.app.eink.contract.ReaderStyleParamIds as Ids
 import io.legado.app.eink.contract.ReaderTextStyle
 import io.legado.app.eink.designsystem.content.EInkHorizontalDivider
 import io.legado.app.eink.designsystem.content.EInkText
@@ -58,7 +60,7 @@ internal val ReaderBottomBarInset = BarHeight + 1.dp
 private val StepTouchTarget = 44.dp
 
 /** 档位滑条行标签列宽（容纳"上边距"三字并对齐各行滑条起点）。 */
-private val SliderLabelWidth = 64.dp
+internal val SliderLabelWidth = 64.dp
 
 /** 边距滑条刻度间隔（dp）。 */
 private const val MarginTickStep = 8
@@ -376,68 +378,105 @@ internal fun ReaderPanelContainer(
 }
 
 // ====================================================================
-// 排版参数面板（6 行：字号/字距/缩进/行距/段距/边距调整入口）
+// 排版参数面板（5 行档位滑条 + 三入口行）
 // ====================================================================
 
+/** 三入口行：一行多枚等宽文本按钮（字体配置/信息配置/边距调整）。 */
+@Composable
+private fun StyleEntryRow(entries: List<Pair<String, () -> Unit>>) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = EInkSpacing.s),
+        horizontalArrangement = Arrangement.spacedBy(EInkSpacing.s),
+    ) {
+        entries.forEach { (label, onClick) ->
+            EInkButton(
+                text = label,
+                onClick = onClick,
+                modifier = Modifier.weight(1f),
+                height = 44.dp,
+                role = Role.Button,
+            )
+        }
+    }
+}
+
 /**
- * 排版面板。
- *
- * 6 行：字号、字距、缩进、行距、段距为档位滑条行（拖动选值 + ±1 逐级精调），
- * 以及"边距调整"入口。边距调整在独立的居中弹框（[ReaderMarginDialog]）中进行：
- * 底部面板会遮挡页眉/页脚，居中弹框四周透明，调整时实时可见效果。
+ * 排版面板：5 行档位滑条（字号/字距/缩进/行距/段距，值域与「默认」
+ * 标识来自协商目录）+ 一行入口按钮（字体配置/信息配置/边距调整，
+ * 按目录可用性显隐）。三个弹层均为居中透明卡片，实时预览不被遮挡。
  */
 @Composable
 internal fun ReaderLayoutPanel(
+    catalog: ReaderStyleCatalog,
     style: ReaderTextStyle,
     onSetTextSize: (Int) -> Unit,
     onSetLetterSpacing: (Int) -> Unit,
     onSetIndent: (Int) -> Unit,
     onSetLineSpacing: (Int) -> Unit,
     onSetParagraphSpacing: (Int) -> Unit,
+    onOpenFonts: () -> Unit,
+    onOpenInfo: () -> Unit,
     onOpenMargins: () -> Unit,
 ) {
     SliderRow(
         label = "字号",
         value = style.textSize,
-        valueRange = MIN_TEXT_SIZE..MAX_TEXT_SIZE,
+        valueRange = catalog.intRange(Ids.BODY_SIZE),
         thumbLabel = { "${it}sp" },
         tickStep = 4,
         onSetValue = onSetTextSize,
+        markerStep = catalog.defaultStep(Ids.BODY_SIZE),
     )
+    val lsRange = catalog.floatStepIndexRange(Ids.BODY_LETTER_SPACING, LETTER_SPACING_STEP)
     SliderRow(
         label = "字距",
         value = (style.letterSpacing / LETTER_SPACING_STEP).roundToInt()
-            .coerceIn(0, LETTER_SPACING_STEPS),
-        valueRange = 0..LETTER_SPACING_STEPS,
+            .coerceIn(lsRange.first, lsRange.last),
+        valueRange = lsRange,
         thumbLabel = { "%.2f".format(it * LETTER_SPACING_STEP) },
         tickStep = 2,
         onSetValue = onSetLetterSpacing,
+        markerStep = catalog.floatDefaultStep(Ids.BODY_LETTER_SPACING, LETTER_SPACING_STEP),
     )
     SliderRow(
         label = "缩进",
         value = style.indentChars,
-        valueRange = MIN_INDENT_CHARS..MAX_INDENT_CHARS,
+        valueRange = catalog.intRange(Ids.BODY_INDENT),
         thumbLabel = { "${it}字" },
         tickStep = 1,
         onSetValue = onSetIndent,
+        markerStep = catalog.defaultStep(Ids.BODY_INDENT),
     )
     SliderRow(
         label = "行距",
         value = style.lineSpacing,
-        valueRange = 0..MAX_LINE_SPACING,
+        valueRange = catalog.intRange(Ids.BODY_LINE_SPACING),
         thumbLabel = { "%.1f倍".format(it / 10f) },
-        tickStep = 5,
+        tickStep = 2,
         onSetValue = onSetLineSpacing,
+        markerStep = catalog.defaultStep(Ids.BODY_LINE_SPACING),
     )
     SliderRow(
         label = "段距",
         value = style.paragraphSpacing,
-        valueRange = 0..MAX_PARAGRAPH_SPACING,
+        valueRange = catalog.intRange(Ids.BODY_PARAGRAPH_SPACING),
         thumbLabel = { "%.1f行".format(it / 10f) },
         tickStep = 2,
         onSetValue = onSetParagraphSpacing,
+        markerStep = catalog.defaultStep(Ids.BODY_PARAGRAPH_SPACING),
     )
-    OptionRow(label = "边距调整") { onOpenMargins() }
+    val entries = buildList {
+        val fontReady = catalog.available(Ids.BODY_FONT) || catalog.available(Ids.TITLE_FONT) ||
+            catalog.available(Ids.HEADER_FONT)
+        val infoReady = catalog.available(Ids.TITLE_MODE) || catalog.available(Ids.HEADER_SIZE) ||
+            catalog.available(Ids.HEADER_VISIBILITY)
+        if (fontReady) add("字体配置" to onOpenFonts)
+        if (infoReady) add("信息配置" to onOpenInfo)
+        add("边距调整" to onOpenMargins)
+    }
+    StyleEntryRow(entries)
 }
 
 // ====================================================================
@@ -456,6 +495,7 @@ internal fun ReaderLayoutPanel(
  */
 @Composable
 internal fun ReaderMarginDialog(
+    catalog: ReaderStyleCatalog,
     style: ReaderTextStyle,
     onSetPaddingTop: (Int) -> Unit,
     onSetPaddingBottom: (Int) -> Unit,
@@ -491,8 +531,8 @@ internal fun ReaderMarginDialog(
                 bottomDp = style.paddingBottom,
                 leftDp = style.paddingLeft,
                 rightDp = style.paddingRight,
-                maxVertical = MAX_PADDING_VERTICAL,
-                maxHorizontal = MAX_PADDING_HORIZONTAL,
+                maxVertical = catalog.intRange(Ids.BODY_PADDING_TOP).last,
+                maxHorizontal = catalog.intRange(Ids.BODY_PADDING_LEFT).last,
                 onSetTop = onSetPaddingTop,
                 onSetBottom = onSetPaddingBottom,
                 onSetLeft = onSetPaddingLeft,
@@ -504,8 +544,8 @@ internal fun ReaderMarginDialog(
                 bottomDp = style.headerPaddingBottom,
                 leftDp = style.headerPaddingLeft,
                 rightDp = style.headerPaddingRight,
-                maxVertical = MAX_PADDING_VERTICAL,
-                maxHorizontal = MAX_PADDING_VERTICAL,
+                maxVertical = catalog.intRange(Ids.HEADER_PADDING_TOP).last,
+                maxHorizontal = catalog.intRange(Ids.HEADER_PADDING_LEFT).last,
                 onSetTop = onSetHeaderPaddingTop,
                 onSetBottom = onSetHeaderPaddingBottom,
                 onSetLeft = onSetHeaderPaddingLeft,
@@ -517,8 +557,8 @@ internal fun ReaderMarginDialog(
                 bottomDp = style.footerPaddingBottom,
                 leftDp = style.footerPaddingLeft,
                 rightDp = style.footerPaddingRight,
-                maxVertical = MAX_PADDING_VERTICAL,
-                maxHorizontal = MAX_PADDING_VERTICAL,
+                maxVertical = catalog.intRange(Ids.FOOTER_PADDING_TOP).last,
+                maxHorizontal = catalog.intRange(Ids.FOOTER_PADDING_LEFT).last,
                 onSetTop = onSetFooterPaddingTop,
                 onSetBottom = onSetFooterPaddingBottom,
                 onSetLeft = onSetFooterPaddingLeft,
@@ -578,7 +618,7 @@ private fun MarginRows(
 
 /** 面板 Tab 行：选中项反白，按压瞬时反色，零动画直接切换。 */
 @Composable
-private fun PanelTabRow(labels: List<String>, selected: Int, onSelect: (Int) -> Unit) {
+internal fun PanelTabRow(labels: List<String>, selected: Int, onSelect: (Int) -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -635,13 +675,14 @@ internal fun ReaderCachePanel(onCache: (Int) -> Unit) {
  * 滑条支持拖动选值与点按轨道跳档，[−]/[+] 为逐档精调（行内按值域钳制）。
  */
 @Composable
-private fun SliderRow(
+internal fun SliderRow(
     label: String?,
     value: Int,
     valueRange: IntRange,
     thumbLabel: (Int) -> String,
     tickStep: Int,
     onSetValue: (Int) -> Unit,
+    markerStep: Int? = null,
 ) {
     Row(
         modifier = Modifier
@@ -673,6 +714,8 @@ private fun SliderRow(
             modifier = Modifier.weight(1f),
             thumbLabel = thumbLabel,
             tickStep = tickStep,
+            markerStep = markerStep,
+            markerLabel = markerStep?.let { "默认" },
         )
         EInkButton(
             text = "＋",
@@ -688,7 +731,7 @@ private fun SliderRow(
 
 /** 开关行：标签在左（纯展示），开/关块在右（EInkButton，开启实心）。 */
 @Composable
-private fun ToggleRow(label: String, checked: Boolean, onToggle: () -> Unit) {
+internal fun ToggleRow(label: String, checked: Boolean, onToggle: () -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()

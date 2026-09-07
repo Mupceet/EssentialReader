@@ -99,8 +99,8 @@ data class ReaderUiState(
  * 到 Compose StateFlow：
  * - 复用 View 版渲染引擎（宿主 ChapterProvider 排版产物经映射器转为
  *   ReaderPageSnapshot 快照进入状态，绘制由模块画布完成）；
- * - 排版参数以 ReaderTextStyle 快照整体经端口写回（与 View 版共用一套
- *   阅读配置）；
+ * - 排版参数以 ReaderTextStyle 快照经端口写回（可空扩展字段为 null 时
+ *   跳过；与 View 版共用一套阅读配置）；
  * - 通过实现 [ReaderEngineCallback] 接收引擎状态推送。
  */
 class ReaderViewModel(application: Application) : AndroidViewModel(application),
@@ -857,10 +857,6 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application),
 /** 缓存全部剩余章节的标记值。 */
 const val CACHE_ALL = -1
 
-/** 缩进字符数可调区间。 */
-internal const val MIN_INDENT_CHARS = 0
-internal const val MAX_INDENT_CHARS = 4
-
 /** 等待阅读区尺寸就绪的超时（毫秒）。 */
 internal const val VIEW_SIZE_TIMEOUT_MS = 2000L
 
@@ -872,19 +868,5 @@ internal const val DEFAULT_AUTO_INTERVAL_SEC = 10
 internal const val MIN_AUTO_INTERVAL_SEC = 1
 internal const val MAX_AUTO_INTERVAL_SEC = 120
 
-/** 字号可调区间（sp）。 */
-internal const val MIN_TEXT_SIZE = 8
-internal const val MAX_TEXT_SIZE = 40
-
-/** 字距档位滑条的步进索引上界（实际字距 = 步进 × [LETTER_SPACING_STEP]，范围 0..0.5）。 */
-internal const val LETTER_SPACING_STEPS = 10
+/** 字距档位滑条的实际步进（实际字距 = 步进索引 × [LETTER_SPACING_STEP]）。 */
 internal const val LETTER_SPACING_STEP = 0.05f
-private const val MAX_LETTER_SPACING = 0.5f
-
-/** 行距/段距内部值上界（显示值 = 内部值 / 10）。 */
-internal const val MAX_LINE_SPACING = 30
-internal const val MAX_PARAGRAPH_SPACING = 10
-
-/** 正文边距上界：左右 64dp / 上下 48dp；页眉/页脚边距全部 48dp。 */
-internal const val MAX_PADDING_HORIZONTAL = 64
-internal const val MAX_PADDING_VERTICAL = 48

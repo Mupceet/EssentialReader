@@ -60,6 +60,9 @@ import io.legado.app.eink.designsystem.control.EInkDialog
 import io.legado.app.eink.designsystem.interaction.einkClickable
 import io.legado.app.eink.designsystem.theme.EInkTheme
 
+/** 排版设置的居中弹层形态。 */
+private enum class ReaderStyleDialog { Fonts, Info, Margin }
+
 /**
  * 阅读 Route — ViewModel 感知层。
  *
@@ -90,7 +93,9 @@ fun ReaderRoute(
     // 按键转发枢纽：宿主入口 Activity onKeyDown/onKeyUp 经注册表下发
     val keyEventHub = EInkEngineRegistry.keyEventHub
     var panel by remember { mutableStateOf<ReaderPanel?>(null) }
-    var showMarginDialog by remember { mutableStateOf(false) }
+    // 排版设置弹层（字体配置/信息配置/边距调整）：居中透明卡片，
+    // 打开期间面板与操作条隐藏；返回键逐级回退到排版展开态
+    var styleDialog by remember { mutableStateOf<ReaderStyleDialog?>(null) }
     // 移出书架二次确认（顶栏切换钮在架态点击只打开确认框）
     var showRemoveConfirm by remember { mutableStateOf(false) }
 
@@ -197,11 +202,11 @@ fun ReaderRoute(
         }
     }
 
-    // 返回键逐级回退：边距弹框 → 设置面板 → 收起操作条 → 退出阅读
-    // （边距弹框期间排版面板保留，返回即回到排版展开态）
+    // 返回键逐级回退：排版弹层 → 设置面板 → 收起操作条 → 退出阅读
+    // （弹层期间排版面板保留，返回即回到排版展开态）
     BackHandler {
         when {
-            showMarginDialog -> showMarginDialog = false
+            styleDialog != null -> styleDialog = null
             panel != null -> panel = null
             uiState.controlsVisible -> viewModel.hideControls()
             else -> onBack()
@@ -215,7 +220,7 @@ fun ReaderRoute(
     val menuTopInset = if (uiState.hideStatusBar) statusBarTop else 0.dp
 
     // 操作条返回图标：关闭设置面板 → 退出阅读。
-    // 边距弹框期间操作条整体隐藏（保证边距实时可见），其首级返回
+    // 排版弹层期间操作条整体隐藏（保证调参实时可见），其首级返回
     // 由系统返回键/点击弹框外区域承担，关闭后回到排版展开态
     val onBarBack = {
         if (panel != null) panel = null else onBack()
@@ -227,9 +232,9 @@ fun ReaderRoute(
             statusBarTopInset = menuTopInset,
             // 顶栏在设置面板打开期间隐藏（保持页眉等顶部调参预览不被遮挡）；
             // 底部操作条常驻可见，承载面板期间的返回与选中态；
-            // 边距调整弹框例外：操作条隐藏，保证正文四周边距实时可见
+            // 排版弹层例外：操作条隐藏，保证排版调参实时可见
             topBarVisible = uiState.controlsVisible && panel == null,
-            bottomBarVisible = uiState.controlsVisible && !showMarginDialog,
+            bottomBarVisible = uiState.controlsVisible && styleDialog == null,
             onPrevPage = viewModel::prevPage,
             onNextPage = viewModel::nextPage,
             onCenterTap = {
@@ -262,9 +267,9 @@ fun ReaderRoute(
             selectedPanel = panel,
             onOpenPanel = { target ->
                 // 再次点击已打开的面板按钮 = 关闭（取消选中）；
-                // 边距弹框打开时点击则先收回弹框、回到面板
-                val toggleOff = panel == target && !showMarginDialog
-                showMarginDialog = false
+                // 排版弹层打开时点击则先收回弹层、回到面板
+                val toggleOff = panel == target && styleDialog == null
+                styleDialog = null
                 panel = if (toggleOff) null else target
             },
             onRetry = { viewModel.attach(bookUrl) },
@@ -274,13 +279,13 @@ fun ReaderRoute(
         // （× 与系统返回、操作条返回仍为逐级回退）
         val dismissToCleanReading = {
             panel = null
-            showMarginDialog = false
+            styleDialog = null
             viewModel.hideControls()
         }
         // 设置面板与阅读内容对齐（Edge-to-Edge 下避免被系统栏遮挡），
         // 底部避开常驻操作条，保持其可见可点；
-        // 边距弹框期间面板隐藏（panel 状态保留），关闭弹框后回到展开态
-        panel?.takeIf { !showMarginDialog }?.let { current ->
+        // 排版弹层期间面板隐藏（panel 状态保留），关闭弹层后回到展开态
+        panel?.takeIf { styleDialog == null }?.let { current ->
             val onClose = { panel = null }
             // 面板与阅读内容对齐（Edge-to-Edge 下避免被系统栏遮挡，
             // 顶部避让与正文同规则——状态栏收起时同样上移），
@@ -302,14 +307,16 @@ fun ReaderRoute(
                         onBackdropClick = dismissToCleanReading,
                     ) {
                         ReaderLayoutPanel(
+                            catalog = viewModel.styleCatalog,
                             style = uiState.style,
                             onSetTextSize = viewModel::setTextSize,
                             onSetLetterSpacing = viewModel::setLetterSpacing,
                             onSetIndent = viewModel::setIndent,
                             onSetLineSpacing = viewModel::setLineSpacing,
                             onSetParagraphSpacing = viewModel::setParagraphSpacing,
-                            // 排版面板保留（不置空 panel），返回键回到排版展开态
-                            onOpenMargins = { showMarginDialog = true },
+                            onOpenFonts = { styleDialog = ReaderStyleDialog.Fonts },
+                            onOpenInfo = { styleDialog = ReaderStyleDialog.Info },
+                            onOpenMargins = { styleDialog = ReaderStyleDialog.Margin },
                         )
                     }
 
@@ -356,11 +363,10 @@ fun ReaderRoute(
             }
         }
 
-        // 边距调整弹框：屏幕居中、四周透明，内含 正文/页眉/页脚 三 Tab，
-        // 调整时页眉/页脚/正文边距实时可见。弹框期间操作条隐藏；
-        // 关闭后回到排版展开态（面板保留），操作条恢复显示
-        if (showMarginDialog) {
-            ReaderMarginDialog(
+        // 排版弹层：居中透明卡片（面板保留不销毁），关闭后回到排版展开态
+        when (styleDialog) {
+            ReaderStyleDialog.Margin -> ReaderMarginDialog(
+                catalog = viewModel.styleCatalog,
                 style = uiState.style,
                 onSetPaddingTop = viewModel::setPaddingTop,
                 onSetPaddingBottom = viewModel::setPaddingBottom,
@@ -374,9 +380,13 @@ fun ReaderRoute(
                 onSetFooterPaddingBottom = viewModel::setFooterPaddingBottom,
                 onSetFooterPaddingLeft = viewModel::setFooterPaddingLeft,
                 onSetFooterPaddingRight = viewModel::setFooterPaddingRight,
-                onClose = { showMarginDialog = false },
+                onClose = { styleDialog = null },
                 onBackdropClick = dismissToCleanReading,
             )
+
+            ReaderStyleDialog.Fonts -> Unit          // Task 12 接入
+            ReaderStyleDialog.Info -> Unit           // Task 11 接入
+            null -> Unit
         }
 
         // 移出书架二次确认：确认后执行移出（后果与详情页一致——下次进
