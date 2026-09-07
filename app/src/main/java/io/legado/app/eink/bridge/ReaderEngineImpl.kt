@@ -119,7 +119,8 @@ internal object ReaderEngineImpl : ReaderEngine, KoinComponent {
         val adapter = adapterFor(callback)
         ReadBook.unregisterRender(adapter)
         ReadBook.unregister(adapter)
-        chapterPager.clear()
+        // 不清分页缓存：目录等界面离开阅读页会销毁 ViewModel 触发 unregister，
+        // 返回时要靠热缓存即时恢复渲染（清了就会出现「加载中」再重排）
     }
 
     override fun isRegistered(callback: ReaderEngineCallback): Boolean {
@@ -164,13 +165,21 @@ internal object ReaderEngineImpl : ReaderEngine, KoinComponent {
     // ---- 会话控制 ----
 
     override fun loadBook(book: BookHandle) {
-        chapterPager.clear()
-        ReadBook.upData((book as BookHandleImpl).book)
+        val b = (book as BookHandleImpl).book
+        // 模块从目录/换源返回时对同一本书也会重走 loadBook：同书不清分页
+        // 缓存，返回阅读页直接用热缓存渲染；换书必须清，防止旧书页残留
+        if (ReadBook.book?.bookUrl != b.bookUrl) {
+            chapterPager.clear()
+        }
+        ReadBook.upData(b)
     }
 
     override fun reloadBook(book: BookHandle) {
-        chapterPager.clear()
-        ReadBook.resetData((book as BookHandleImpl).book)
+        val b = (book as BookHandleImpl).book
+        if (ReadBook.book?.bookUrl != b.bookUrl) {
+            chapterPager.clear()
+        }
+        ReadBook.resetData(b)
     }
 
     override fun setInBookshelf(value: Boolean) {
@@ -424,7 +433,10 @@ internal object ReaderEngineImpl : ReaderEngine, KoinComponent {
     override fun currentStyle(): ReaderTextStyle = ReadBookConfig.snapshotStyle()
 
     override fun relayout() {
-        chapterPager.clear()
+        // 不清分页缓存：重排是否发生由缓存键决定（内容 hash/排版样式/视口任一
+        // 变化才会重排）。模块在重入阅读页和尺寸回调处都会调 relayout，清了
+        // 缓存就会把无变化的重排变成「清屏→全量重排」的抖动；样式变更已由
+        // applyStyle/setTextBold 的 onStyleChanged 走键失效，无需在此强清
         ReadBook.clearTextChapter()
         val index = ReadBook.durChapterIndex
         ReadBook.removeLoading(index - 1)

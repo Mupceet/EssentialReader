@@ -82,7 +82,8 @@ internal class ReaderChapterPager(
         requestPagination()
     }
 
-    /** 会话切换/重排/注销：丢弃缓存并停止在途分页。 */
+    /** 换书/换会话：丢弃缓存并停止在途分页。重排与注销不清缓存——
+     *  重排是否需要由缓存键判定，注销后返回阅读页要靠热缓存即时恢复。 */
     fun clear() {
         paginateJob?.cancel()
         paginateJob = null
