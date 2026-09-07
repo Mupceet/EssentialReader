@@ -52,6 +52,7 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -709,6 +710,7 @@ private fun rememberStatusBarTop(): Dp {
 
 /**
  * 页眉：时间（左）+ 电量%（右）。可见性与内容按 View 版 ReadTipConfig 默认规则。
+ * 字号优先取协商目录的页眉字号配置（[headerTipTextStyle]），推导仅兜底。
  *
  * [contentVisible] 为 false 时文字转透明（尺寸不变）：菜单展开期状态栏
  * 恢复显示覆盖页眉条带，让位但保持布局，避免正文重排。
@@ -721,10 +723,11 @@ private fun ReaderHeader(
 ) {
     val textColor =
         if (contentVisible) EInkTheme.colorScheme.onSurfaceVariant else Color.Transparent
-    val tipStyle = tipTextStyle(
+    val tipStyle = headerTipTextStyle(
         availablePx = extentPx -
             state.style.headerPaddingTop.dpPx() -
             state.style.headerPaddingBottom.dpPx(),
+        configuredSizeSp = state.style.headerSize,
     )
     // fillMaxSize：容器已按宿主页眉预留高度定高，行撑满预留区、文字
     // 纵向居中，与完整模式装饰的几何一致
@@ -818,6 +821,28 @@ private fun tipTextStyle(availablePx: Float): TextStyle {
         fontSize = with(density) { (linePx * 14f / 20f).toDp().toSp() },
         lineHeight = with(density) { linePx.toDp().toSp() },
     )
+}
+
+/**
+ * 页眉文字样式：宿主字号可见（协商目录 header.size）后按配置字号渲染
+ * （像素锚定，不随应用内字体缩放），行高锚定条带可用高度、行内垂直
+ * 居中。宿主 extent 本就按同字号的字体度量预留（padding+fontLine+
+ * divider），配置字号按构造放得下；模块渲染字体与宿主页眉字体度量不
+ * 同时可能轻微越界，但 lineHeight 不裁字形、居中对称，观感安全。
+ * 字号缺失或非正（旧宿主桥/极端配置）时回落 [tipTextStyle] 推导。
+ */
+@Composable
+private fun headerTipTextStyle(availablePx: Float, configuredSizeSp: Int?): TextStyle {
+    val density = LocalDensity.current
+    if (configuredSizeSp != null && configuredSizeSp > 0) {
+        val linePx = availablePx.takeIf { it > 0f } ?: with(density) { 23.dp.toPx() }
+        val sizePx = with(density) { configuredSizeSp.sp.toPx() }
+        return EInkTheme.typography.bodyMedium.copy(
+            fontSize = with(density) { sizePx.toDp().toSp() },
+            lineHeight = with(density) { linePx.toDp().toSp() },
+        )
+    }
+    return tipTextStyle(availablePx)
 }
 
 /**
