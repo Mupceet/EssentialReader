@@ -15,4 +15,4 @@ sealed interface ReaderFontSelection {
 }
 
 /** 可选字体文件（宿主字体文件夹枚举项；path 为文件 uri/路径字符串）。 */
-class ReaderFontOption(val name: String, val path: String)
+data class ReaderFontOption(val name: String, val path: String)

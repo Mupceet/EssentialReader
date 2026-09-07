@@ -311,10 +311,25 @@ interface ReaderEngine {
 
     /**
      * 整体写入排版参数：映射到宿主排版配置各字段、持久化并刷新排版
-     * 画笔。标题字号无独立字段——宿主实现应把标题字号一并写入同值
-     * （模块语义：标题跟随正文字号）。
+     * 画笔。可空扩展字段为 null 时宿主不写对应键（部分写入语义）；
+     * FollowBody 字体选择由宿主展开为正文当前有效字体。
      */
     fun applyStyle(style: ReaderTextStyle)
+
+    /**
+     * 排版参数协商目录：宿主逐参数声明可用性/值域/默认值/是否影响分页。
+     * 返回 null = 宿主不支持协商（旧宿主），模块回落内置基线目录。
+     */
+    fun styleCatalog(): ReaderStyleCatalog? = null
+
+    /**
+     * 可枚举的字体文件列表（来自宿主配置的字体文件夹；无文件夹时宿主
+     * 可回落其默认字体目录）。IO 操作，调用方自行调度。
+     */
+    suspend fun availableFonts(): List<ReaderFontOption> = emptyList()
+
+    /** 设置字体文件夹（SAF tree uri 字符串）并持久化。 */
+    suspend fun setFontFolder(uri: String) {}
 
     /** 写入正文加粗开关（可变字重路径）；[textBold] 读回当前值。 */
     fun setTextBold(enabled: Boolean)
