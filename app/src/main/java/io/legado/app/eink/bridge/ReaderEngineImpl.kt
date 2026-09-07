@@ -50,9 +50,6 @@ internal class ReaderBookSnapshotImpl(override val handle: BookHandle) : ReaderB
     override val isInBookshelf: Boolean get() = !book.isType(BookType.notShelf)
 }
 
-/** 段落缩进字符（全角空格，旧 ChapterProvider.indentChar 语义）。 */
-private const val INDENT_CHAR = "　"
-
 /**
  * 阅读器端口实现：ReadBook 全局状态机 + 排版引擎的
  * 纯转发（含宿主双轨回调 → 模块回调的适配与样式快照映射）。
