@@ -6,9 +6,10 @@ plugins {
 
 android {
     namespace = "io.legado.app.eink"
-    // 库取兼容下限：37 宿主向上消费无碍，36 宿主（AGP8.x）也可直接依赖
-    //（compileSdk 37 构建的 AAR 元数据 minCompileSdk=37 会被 AGP 拒绝）
-    compileSdk = 36
+    // 跟随宿主 compileSdk 37。曾刻意压 36 作兼容下限，2026-09 随宿主
+    // 依赖集升级（Compose UI 1.12 / Coil 3.6.2 的 AAR 元数据要求
+    // minCompileSdk=37）下限被打穿，回到与宿主同轨。
+    compileSdk = 37
 
     defaultConfig {
         // minSdk 21：可被低 minSdk 宿主直接依赖，库 minSdk 高于宿主会导致 manifest merge 失败
@@ -56,11 +57,10 @@ dependencies {
 
     // ViewModel + 协程（模块承载全部 E-Ink ViewModel）
     implementation(libs.bundles.coroutines)
-    // lifecycle 钉 2.9.4：2.11 的 AAR 元数据 minCompileSdk=37，会把模块
-    // 的兼容下限抬到 37（AGP8/compileSdk36 宿主被拒）。宿主 app 自身
-    // 用更高版本时 Gradle 解析取高，二进制兼容
-    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.9.4")
-    implementation("androidx.lifecycle:lifecycle-runtime-compose:2.9.4")
+    // 与宿主同轨（catalog 2.11.0）。曾钉 2.9.4 以保 compileSdk 36 兼容
+    // 下限，下限回到 37 后钉版失去意义
+    implementation(libs.androidx.lifecycle.viewmodel.compose)
+    implementation(libs.androidx.lifecycle.runtime.compose)
     implementation(libs.activity.compose)
 
     // 图片加载（EInkAsyncImage / EInkBookCover 封面）— api 传递：

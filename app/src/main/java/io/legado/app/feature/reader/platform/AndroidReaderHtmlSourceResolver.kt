@@ -77,7 +77,9 @@ class AndroidReaderHtmlSourceResolver(
                         ))
                         is BulletSpan -> add(ReaderParagraphDecoration(
                             ReaderParagraphDecorationKind.BULLET,
-                            span.color.takeUnless { it == 0 },
+                            // getColor 与 stripeWidth/bulletRadius 同为 API 28+；低版本
+                            // 无取色入口，回退 null（走默认装饰色）
+                            if (Build.VERSION.SDK_INT >= 28) span.color.takeUnless { it == 0 } else null,
                             if (Build.VERSION.SDK_INT >= 28) span.bulletRadius.toFloat() else 4f,
                             leadingOffset,
                         ))
