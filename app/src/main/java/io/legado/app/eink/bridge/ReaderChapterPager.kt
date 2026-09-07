@@ -298,6 +298,9 @@ internal class ReaderChapterPager(
  * 重排。修复缺陷：改页眉上下边距/字号后条带高度变化但缓存键不含
  * 这些键，旧页坐标继续使用导致错位。
  *
+ * 左右边距（headerPaddingLeft/Right、footerPaddingLeft/Right）仅
+ * 条带内部绘制、不影响 extent，不入键——即时生效不重排。
+ *
  * 采样 share-aware 的 [ReadBookConfig.config]，与 extent 工厂同源
  * （shareLayout 开启时 durConfig 不反映有效值）。
  *
@@ -313,9 +316,6 @@ internal fun decorationCacheKeyFragment(config: ReadBookConfig.Config): String =
     append(config.footerMode).append(',')
     append(config.showHeaderLine).append(',')
     append(config.showFooterLine).append(',')
-    append(config.headerPaddingTop).append(',').append(config.headerPaddingBottom)
-        .append(',').append(config.headerPaddingLeft).append(',').append(config.headerPaddingRight)
-        .append(',')
+    append(config.headerPaddingTop).append(',').append(config.headerPaddingBottom).append(',')
     append(config.footerPaddingTop).append(',').append(config.footerPaddingBottom)
-        .append(',').append(config.footerPaddingLeft).append(',').append(config.footerPaddingRight)
 }

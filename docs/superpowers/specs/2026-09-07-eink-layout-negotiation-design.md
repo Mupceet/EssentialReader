@@ -216,7 +216,7 @@ sealed interface ReaderFontSelection {
 
 - 旧宿主：`styleCatalog()` 默认 null → FallbackCatalog = 今天的完整行为；字体/字重/标题/页眉页脚行全部隐藏。
 - eink 与完整模式共享同一份 ReadBookConfig（eink 改字体/字号在完整模式同样生效，既有共享语义，不改）。
-- 存量迁移：titleSize 钉平值无缝衔接；textBold 读取时按宿主 `resolveWeight` 口径归一化（1→900、2→300、0/其他→500），写入一律 100..900；「正文加粗」开关移除后其效果由字重滑条承接。
+- 存量迁移：titleSize 钉平值无缝衔接；textBold 读取时按宿主 `resolveWeight` 口径归一化（1→900、2→300、0/其他→400），写入一律 100..900；「正文加粗」开关移除后其效果由字重滑条承接。
 
 ## 8. 测试
 
@@ -245,3 +245,4 @@ sealed interface ReaderFontSelection {
 
 - 2026-09-07 初版：四题澄清（协商形态/页眉页脚/覆盖/UI 形态）+ 两轮修订（字重纳入、字体默认跟随正文、三入口行替代四入口）。
 - 2026-09-07 实施修订：§3 目录代码块中 ChoiceParam 的 Option(value: String)/default: String 落地为 Option(value: Int)/default: Int（标题位置与宿主 titleMode 同构，避免字符串往返）；§5.2 裂缝修复实施时追加「分页缓存键直接钉住派生 extent 值（同完整模式键）」作为参数片段之外的结构性闭合（覆盖 hideStatusBar 等非 Config 输入）；§5.4 页眉渲染的门控判据落地为「按构造放得下」（宿主 extent 即按同字号度量预留），兜底仅 null/非正字号。
+- 2026-09-07 终审修订：标题/页眉字体选项移除系统预设行（宿主 titleFont/headerFont 键仅收文件路径，空串回落正文/系统默认，预设不可表达且选中不粘）；§5.2 实施对齐：页眉/页脚左右边距为纯绘制参数，移出分页缓存键（避免无谓整章重排）。

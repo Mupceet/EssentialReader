@@ -27,10 +27,13 @@ import io.legado.app.eink.designsystem.control.EInkDialog
 import io.legado.app.eink.designsystem.theme.EInkSpacing
 
 /**
- * 字体配置弹层（tabs 正文｜标题｜页眉）：字体列表（系统预设 + 字体
- * 文件，标题/页眉多一项「跟随正文」）与字重滑条（正文/标题；宿主无
- * 页眉字重键）。字体文件来自宿主字体文件夹，经 [onPickFolder] 发起
- * SAF 选择后刷新列表。
+ * 字体配置弹层（tabs 正文｜标题｜页眉）：字体列表与字重滑条（正文/
+ * 标题；宿主无页眉字重键）。字体文件来自宿主字体文件夹，经
+ * [onPickFolder] 发起 SAF 选择后刷新列表。
+ *
+ * 选项构成：正文 = 系统预设 + 字体文件；标题/页眉 = 跟随正文 +
+ * 字体文件（宿主 titleFont/headerFont 键仅收文件路径，空串回落
+ * 正文/系统默认，系统预设不可表达）。
  */
 @Composable
 internal fun ReaderFontConfigDialog(
@@ -97,15 +100,6 @@ internal fun ReaderFontConfigDialog(
                     FontRow("跟随正文", style.titleFont == ReaderFontSelection.FollowBody) {
                         onSetTitleFont(ReaderFontSelection.FollowBody)
                     }
-                    FontRow("系统无衬线", style.titleFont == ReaderFontSelection.Sans) {
-                        onSetTitleFont(ReaderFontSelection.Sans)
-                    }
-                    FontRow("系统衬线", style.titleFont == ReaderFontSelection.Serif) {
-                        onSetTitleFont(ReaderFontSelection.Serif)
-                    }
-                    FontRow("系统等宽", style.titleFont == ReaderFontSelection.Mono) {
-                        onSetTitleFont(ReaderFontSelection.Mono)
-                    }
                     fontOptions.forEach { option ->
                         FontRow(option.name, style.titleFont == ReaderFontSelection.File(option.path)) {
                             onSetTitleFont(ReaderFontSelection.File(option.path))
@@ -126,15 +120,6 @@ internal fun ReaderFontConfigDialog(
                 else -> {
                     FontRow("跟随正文", style.headerFont == ReaderFontSelection.FollowBody) {
                         onSetHeaderFont(ReaderFontSelection.FollowBody)
-                    }
-                    FontRow("系统无衬线", style.headerFont == ReaderFontSelection.Sans) {
-                        onSetHeaderFont(ReaderFontSelection.Sans)
-                    }
-                    FontRow("系统衬线", style.headerFont == ReaderFontSelection.Serif) {
-                        onSetHeaderFont(ReaderFontSelection.Serif)
-                    }
-                    FontRow("系统等宽", style.headerFont == ReaderFontSelection.Mono) {
-                        onSetHeaderFont(ReaderFontSelection.Mono)
                     }
                     fontOptions.forEach { option ->
                         FontRow(option.name, style.headerFont == ReaderFontSelection.File(option.path)) {

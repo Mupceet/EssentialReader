@@ -42,10 +42,14 @@ class DecorationCacheKeyFragmentTest {
     }
 
     @Test
-    fun `左右边距同样进键但值独立`() {
-        assertNotEquals(
+    fun `左右边距不入键`() {
+        assertEquals(
             decorationCacheKeyFragment(base),
             decorationCacheKeyFragment(base.copy(headerPaddingLeft = 20)),
+        )
+        assertEquals(
+            decorationCacheKeyFragment(base),
+            decorationCacheKeyFragment(base.copy(footerPaddingLeft = 20)),
         )
     }
 
@@ -85,15 +89,7 @@ class DecorationCacheKeyFragmentTest {
         )
         assertNotEquals(
             decorationCacheKeyFragment(base),
-            decorationCacheKeyFragment(base.copy(headerPaddingRight = 20)),
-        )
-        assertNotEquals(
-            decorationCacheKeyFragment(base),
             decorationCacheKeyFragment(base.copy(footerPaddingTop = 2)),
-        )
-        assertNotEquals(
-            decorationCacheKeyFragment(base),
-            decorationCacheKeyFragment(base.copy(footerPaddingLeft = 20)),
         )
     }
 
