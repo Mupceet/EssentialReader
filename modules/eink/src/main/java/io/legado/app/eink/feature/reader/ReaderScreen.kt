@@ -11,6 +11,7 @@ import androidx.core.view.WindowInsetsControllerCompat
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.text.BasicText
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -44,6 +45,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -659,6 +661,7 @@ private fun rememberStatusBarTop(): Dp {
 private fun ReaderHeader(state: ReaderUiState, contentVisible: Boolean) {
     val textColor =
         if (contentVisible) EInkTheme.colorScheme.onSurfaceVariant else Color.Transparent
+    val tipStyle = tipTextStyle()
     // fillMaxSize：容器已按宿主页眉预留高度定高，行撑满预留区、文字
     // 纵向居中，与完整模式装饰的几何一致
     Row(
@@ -672,18 +675,15 @@ private fun ReaderHeader(state: ReaderUiState, contentVisible: Boolean) {
             ),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        // 时间/电量文字始终占位（空文本仍占一行高）：headerTime 首帧后由
-        // updateTipInfo 填充，若条件组合会让页眉高度变化、正文画布随之
-        // 漂移数像素，触发一次全量重排（墨水屏上即一次肉眼可见的抖动）
-        EInkText(
+        BasicText(
             text = state.headerTime,
             modifier = Modifier.weight(1f),
-            color = textColor,
+            style = tipStyle.copy(color = textColor),
             maxLines = 1,
         )
-        EInkText(
+        BasicText(
             text = "${state.batteryPercent}%",
-            color = textColor,
+            style = tipStyle.copy(color = textColor),
             maxLines = 1,
         )
     }
@@ -692,6 +692,7 @@ private fun ReaderHeader(state: ReaderUiState, contentVisible: Boolean) {
 /** 页脚：顶部自动翻页进度条 + 章节标题（左）/ 页数及进度（右，View 版 pageAndTotal 格式）。 */
 @Composable
 private fun ReaderFooter(state: ReaderUiState) {
+    val tipStyle = tipTextStyle()
     // fillMaxSize：容器已按宿主页脚预留高度定高（进度条 2dp 挤占其内
     // 顶部），文字行占满剩余并在其中纵向居中
     Column(modifier = Modifier.fillMaxSize()) {
@@ -708,22 +709,37 @@ private fun ReaderFooter(state: ReaderUiState) {
                 ),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            EInkText(
+            BasicText(
                 text = state.chapterTitle,
                 modifier = Modifier.weight(1f),
-                color = EInkTheme.colorScheme.onSurfaceVariant,
+                style = tipStyle.copy(color = EInkTheme.colorScheme.onSurfaceVariant),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
-            // pageAndTotal 与页眉时间同理始终占位：避免首帧后填充文字时
-            // 页脚高度变化引起正文区域漂移重排
-            EInkText(
+            BasicText(
                 text = state.pageAndTotal,
-                color = EInkTheme.colorScheme.onSurfaceVariant,
+                style = tipStyle.copy(color = EInkTheme.colorScheme.onSurfaceVariant),
                 maxLines = 1,
             )
         }
     }
+}
+
+/**
+ * 页眉/页脚文字样式：排版装饰语义——字号/行高锚定像素（取默认系统缩放
+ * 1.15 下 14sp/20sp 的实际像素），**不随应用内字体缩放放大**。容器高度
+ * 来自宿主预留（px，不随缩放变），sp 字号被字体缩放放大会超出预留高度，
+ * 表现为页眉/页脚文字显示不完整；正文同理不随字体缩放（排版坐标为引擎
+ * 测量像素）。刻意不走 EInkText：其 14sp 下限按 sp 语义钳制，与像素
+ * 锚定冲突。
+ */
+@Composable
+private fun tipTextStyle(): TextStyle {
+    val density = LocalDensity.current
+    return EInkTheme.typography.bodyMedium.copy(
+        fontSize = with(density) { 16.dp.toSp() },
+        lineHeight = with(density) { 23.dp.toSp() },
+    )
 }
 
 /**
