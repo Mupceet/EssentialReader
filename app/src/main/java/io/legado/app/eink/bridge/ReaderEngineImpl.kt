@@ -31,7 +31,6 @@ import io.legado.app.model.cache.CacheDownloadRequest
 import io.legado.app.model.cache.ChapterSelection
 import io.legado.app.model.localBook.LocalBook
 import io.legado.app.model.webBook.WebBook
-import io.legado.app.ui.book.read.page.provider.ChapterProvider
 import io.legado.app.ui.config.readConfig.ReadConfig
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
@@ -50,17 +49,23 @@ internal class ReaderBookSnapshotImpl(override val handle: BookHandle) : ReaderB
     override val isInBookshelf: Boolean get() = !book.isType(BookType.notShelf)
 }
 
+/** 段落缩进字符（全角空格，旧 ChapterProvider.indentChar 语义）。 */
+private const val INDENT_CHAR = "　"
+
 /**
- * 阅读器端口实现：ReadBook 全局状态机 + ChapterProvider 排版引擎的
+ * 阅读器端口实现：ReadBook 全局状态机 + 排版引擎的
  * 纯转发（含宿主双轨回调 → 模块回调的适配与样式快照映射）。
- * 排版产物经 [ReaderPageSnapshotMapper] 映射为模块快照。
+ * 排版产物由 [ReaderChapterPager] 消费章节输入排出，经
+ * [ReaderPageSnapshotMapper] 映射为模块快照。
  *
  * 本上游差异：
  *  - ReadBook.CallBack 只剩 4 个业务方法，渲染回调拆在
- *    ReadBook.ReaderRenderCallback（含 LayoutProgressListener）——
- *    适配器同时实现两个接口，注册/注销两轨都走；
- *  - durPageIndex 是由 durChapterPos 派生的只读值（无独立 setter，
- *    本端口本就只读）；
+ *    ReadBook.ReaderRenderCallback——适配器同时实现两个接口，
+ *    注册/注销两轨都走；排版异常不再走 LayoutProgressListener，
+ *    改由分页方经 onPagesError 上报；
+ *  - durPageIndex 由分页快照派生（pager 分页后回填快照，本端口只读）；
+ *  - 排版产物（ReaderPage）随上游重写移入渲染层，E-Ink 不宿主
+ *    Compose 渲染层，分页由 ReaderChapterPager 承担；
  *  - 翻页走 moveToNextPage/moveToPrevPage；
  *  - ReadBookConfig 全面只读化，本仓架构护栏（:verifyConfigArchitecture）
  *    禁止直写 —— 写路径统一为 ReadStyleGateway.updateCurrentStyle
@@ -71,6 +76,25 @@ internal object ReaderEngineImpl : ReaderEngine, KoinComponent {
 
     private val readStyleGateway: ReadStyleGateway by inject()
     private val readSettingsRepository: ReadSettingsRepository by inject()
+
+    private val chapterPager = ReaderChapterPager(
+        onPagesReady = ::notifyPagesReady,
+        onPagesError = ::notifyPagesError,
+    )
+
+    private fun notifyPagesReady() {
+        // 与 ReadBook 的 upContent 同型：页面对象可能未换（同页重排），靠
+        // pageVersion 强制模块画布重绘
+        cachedAdapter?.callback?.onContentUpdated(
+            relativePosition = 0,
+            resetPageOffset = false,
+            success = null,
+        )
+    }
+
+    private fun notifyPagesError(error: Throwable) {
+        cachedAdapter?.callback?.onLayoutException(error)
+    }
 
     private fun Book.snapshot() = ReaderBookSnapshotImpl(BookHandleImpl(this))
 
@@ -95,6 +119,7 @@ internal object ReaderEngineImpl : ReaderEngine, KoinComponent {
         val adapter = adapterFor(callback)
         ReadBook.unregisterRender(adapter)
         ReadBook.unregister(adapter)
+        chapterPager.clear()
     }
 
     override fun isRegistered(callback: ReaderEngineCallback): Boolean {
@@ -127,23 +152,24 @@ internal object ReaderEngineImpl : ReaderEngine, KoinComponent {
         get() = ReadBook.msg
 
     override val hasLaidOutPages: Boolean
-        get() = ReadBook.curTextChapter?.pages?.isNotEmpty() == true
+        get() = chapterPager.hasPages
 
     override val currentChapterPageSize: Int
-        get() = ReadBook.curTextChapter?.pageSize ?: 0
+        get() = chapterPager.currentChapterPageSize
 
     override fun currentPage(): ReaderPageSnapshot? {
-        val chapter = ReadBook.curTextChapter ?: return null
-        return chapter.getPage(ReadBook.durPageIndex)?.let(ReaderPageSnapshotMapper::map)
+        return chapterPager.currentPageSnapshot()
     }
 
     // ---- 会话控制 ----
 
     override fun loadBook(book: BookHandle) {
+        chapterPager.clear()
         ReadBook.upData((book as BookHandleImpl).book)
     }
 
     override fun reloadBook(book: BookHandle) {
+        chapterPager.clear()
         ReadBook.resetData((book as BookHandleImpl).book)
     }
 
@@ -333,7 +359,7 @@ internal object ReaderEngineImpl : ReaderEngine, KoinComponent {
     // ---- 排版 ----
 
     override fun updateViewSize(width: Int, height: Int) {
-        ChapterProvider.upViewSize(width, height)
+        chapterPager.updateViewport(width, height)
     }
 
     override fun applyStyle(style: ReaderTextStyle) {
@@ -344,14 +370,14 @@ internal object ReaderEngineImpl : ReaderEngine, KoinComponent {
             // 排版时覆盖完整模式残留的绝对值，保证调整字号后标题同步
             ReadStyleMutation.IntValue(ReadStyleIntKey.TitleSize, style.textSize),
             ReadStyleMutation.FloatValue(ReadStyleFloatKey.LetterSpacing, style.letterSpacing),
-            ReadStyleMutation.StringValue(
-                ReadStyleStringKey.ParagraphIndent,
-                if (style.indentChars <= 0) {
-                    ""
-                } else {
-                    ChapterProvider.indentChar.repeat(style.indentChars)
-                },
-            ),
+                ReadStyleMutation.StringValue(
+                    ReadStyleStringKey.ParagraphIndent,
+                    if (style.indentChars <= 0) {
+                        ""
+                    } else {
+                        INDENT_CHAR.repeat(style.indentChars)
+                    },
+                ),
             ReadStyleMutation.IntValue(ReadStyleIntKey.LineSpacing, style.lineSpacing),
             ReadStyleMutation.IntValue(ReadStyleIntKey.ParagraphSpacing, style.paragraphSpacing),
             ReadStyleMutation.IntValue(ReadStyleIntKey.PaddingLeft, style.paddingLeft),
@@ -381,7 +407,7 @@ internal object ReaderEngineImpl : ReaderEngine, KoinComponent {
         )
         mutations.forEach(readStyleGateway::updateCurrentStyle)
         readStyleGateway.save()
-        ChapterProvider.upStyle()
+        chapterPager.onStyleChanged()
     }
 
     override fun setTextBold(enabled: Boolean) {
@@ -389,7 +415,7 @@ internal object ReaderEngineImpl : ReaderEngine, KoinComponent {
             ReadStyleMutation.IntValue(ReadStyleIntKey.TextBold, if (enabled) 1 else 0)
         )
         readStyleGateway.save()
-        ChapterProvider.upStyle()
+        chapterPager.onStyleChanged()
     }
 
     override val textBold: Boolean
@@ -398,6 +424,7 @@ internal object ReaderEngineImpl : ReaderEngine, KoinComponent {
     override fun currentStyle(): ReaderTextStyle = ReadBookConfig.snapshotStyle()
 
     override fun relayout() {
+        chapterPager.clear()
         ReadBook.clearTextChapter()
         val index = ReadBook.durChapterIndex
         ReadBook.removeLoading(index - 1)
@@ -468,9 +495,11 @@ internal object ReaderEngineImpl : ReaderEngine, KoinComponent {
 
         override fun cancelSelect() {}
 
-        // ---- LayoutProgressListener ----
+        // ---- 章节输入就绪（分页协调器的排版时机） ----
 
-        override fun onLayoutException(e: Throwable) = callback.onLayoutException(e)
+        override fun readerChapterInputChanged() {
+            chapterPager.onChapterInputChanged()
+        }
     }
 }
 
@@ -478,7 +507,7 @@ internal object ReaderEngineImpl : ReaderEngine, KoinComponent {
 private fun ReadBookConfig.snapshotStyle(): ReaderTextStyle = ReaderTextStyle(
     textSize = textSize,
     letterSpacing = letterSpacing,
-    indentChars = paragraphIndent.count { it == ChapterProvider.indentChar[0] },
+    indentChars = paragraphIndent.count { it == INDENT_CHAR[0] },
     lineSpacing = lineSpacingExtra,
     paragraphSpacing = paragraphSpacing,
     paddingLeft = paddingLeft,
