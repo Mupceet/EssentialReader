@@ -182,6 +182,9 @@ internal class ReaderChapterPager(
                     viewportHeightPx = viewportHeight,
                     paginationStyle = style,
                     highlightRules = highlightRules,
+                    // E-Ink 的页眉/页脚由模块画在排版画布之外（Column 布局），
+                    // 画布视口已随之缩小；再预留装饰空间会双重扣减，每页少一行
+                    reservesDecorationExtent = false,
                 )
             }
             withContext(Dispatchers.Main) {

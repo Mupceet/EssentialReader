@@ -114,6 +114,13 @@ object LegacyReaderChapterPaginator {
         contentPaddingBottomPx: Int = 0,
         paginationStyle: ReaderAndroidPaginationStyle,
         highlightRules: List<HighlightRule>,
+        /**
+         * 是否在视口内预留页眉/页脚装饰空间。Canvas 直排渲染（完整模式）
+         * 的视口覆盖整个阅读区、装饰自绘，需要预留；页眉页脚画在排版区
+         * 之外的宿主（E-Ink 模块画布）必须传 false，否则装饰空间被扣除
+         * 两次（视口已缩小 + 再预留），每页少排约一行。
+         */
+        reservesDecorationExtent: Boolean = true,
     ): LegacyReaderChapterPaginationResult {
         if (viewportWidthPx <= 0 || viewportHeightPx <= 0) {
             return LegacyReaderChapterPaginationResult.Unsupported("viewport")
@@ -204,10 +211,14 @@ object LegacyReaderChapterPaginator {
                 viewportHeightPx = viewportHeightPx,
                 paddingLeftPx = (paginationStyle.paddingLeftPx + contentPaddingLeftPx).toFloat(),
                 paddingTopPx = (paginationStyle.paddingTopPx + contentPaddingTopPx).toFloat() +
-                    LegacyReaderPageDecorationFactory.headerExtentPx(),
+                    if (reservesDecorationExtent) {
+                        LegacyReaderPageDecorationFactory.headerExtentPx()
+                    } else 0f,
                 paddingRightPx = (paginationStyle.paddingRightPx + contentPaddingRightPx).toFloat(),
                 paddingBottomPx = (paginationStyle.paddingBottomPx + contentPaddingBottomPx).toFloat() +
-                    LegacyReaderPageDecorationFactory.footerExtentPx(),
+                    if (reservesDecorationExtent) {
+                        LegacyReaderPageDecorationFactory.footerExtentPx()
+                    } else 0f,
                 lineHeightPx = paginationStyle.bodyTextHeightPx,
                 baselineOffsetPx = paginationStyle.bodyBaselineOffsetPx,
                 lineSpacingMultiplier = paginationStyle.lineSpacingExtra,
