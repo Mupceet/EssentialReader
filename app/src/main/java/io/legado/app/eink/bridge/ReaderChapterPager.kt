@@ -28,6 +28,19 @@ private const val VIEWPORT_EPSILON_PX = 24
  * E-Ink 章节分页协调器：宿主 Compose 渲染层（ReadBookController 直排页）
  * 的 E-Ink 等价物。
  *
+ * **与完整模式的对齐关系**：本类与 ReadBookController（完整模式渲染控制器）
+ * 调用同一个 LegacyReaderChapterPaginator——它不是旧排版引擎（旧
+ * ChapterProvider 体系已整体删除），而是新核心 ReaderPaginator 的设置
+ * 适配层，完整模式自己的分页也走它（ReadBookController#directReaderLayoutJob）。
+ * 章节输入、样式工厂、高亮规则、revision 公式均与完整模式同源同参；
+ * 仅两处刻意差异，均源于「页眉页脚/系统栏画在画布内还是画布外」：
+ *  - contentPadding：完整模式画布全屏，经 ReaderContentAvoidancePolicy
+ *    向分页器避让系统栏；E-Ink 模块 Box 已在布局层避让，画布不含系统栏
+ *    区域，传 0；
+ *  - reservesDecorationExtent：完整模式页眉页脚是画布内自绘装饰，需在
+ *    视口内预留；E-Ink 页眉页脚是模块画布外的组合项，画布已随之缩小，
+ *    传 false（传 true 会双重扣减，每页少排一行）。
+ *
  * 上游排版核心重写后，带元素的页对象（ReaderPage）不再存于 ReadBook 全局
  * 状态：ReadBook 只保留章节输入窗口（处理完的正文/标题/解析结果）与字符
  * 偏移分页快照，页对象由渲染层消费章节输入、经 LegacyReaderChapterPaginator
