@@ -646,14 +646,15 @@ private fun ReaderHeader(state: ReaderUiState, contentVisible: Boolean) {
             ),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        if (state.headerTime.isNotEmpty()) {
-            EInkText(
-                text = state.headerTime,
-                modifier = Modifier.weight(1f),
-                color = textColor,
-                maxLines = 1,
-            )
-        }
+        // 时间/电量文字始终占位（空文本仍占一行高）：headerTime 首帧后由
+        // updateTipInfo 填充，若条件组合会让页眉高度变化、正文画布随之
+        // 漂移数像素，触发一次全量重排（墨水屏上即一次肉眼可见的抖动）
+        EInkText(
+            text = state.headerTime,
+            modifier = Modifier.weight(1f),
+            color = textColor,
+            maxLines = 1,
+        )
         EInkText(
             text = "${state.batteryPercent}%",
             color = textColor,
@@ -685,13 +686,13 @@ private fun ReaderFooter(state: ReaderUiState) {
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
-            if (state.pageAndTotal.isNotEmpty()) {
-                EInkText(
-                    text = state.pageAndTotal,
-                    color = EInkTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                )
-            }
+            // pageAndTotal 与页眉时间同理始终占位：避免首帧后填充文字时
+            // 页脚高度变化引起正文区域漂移重排
+            EInkText(
+                text = state.pageAndTotal,
+                color = EInkTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+            )
         }
     }
 }
