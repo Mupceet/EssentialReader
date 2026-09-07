@@ -6,7 +6,7 @@ package io.legado.app.eink.contract
  * 调参数据流：
  * ```text
  * 阅读页排版面板（滑条编辑；模块内已钳制区间）
- *        │ applyStyle(style)     整体快照写入
+ *        │ applyStyle(style)     快照写入（可空扩展字段 null 时跳过对应键）
  *        ▼
  * 宿主排版配置（映射各字段 + 持久化 + 刷新画笔）
  *        │ relayout()            调参防抖合并后触发

@@ -7,8 +7,6 @@ import io.legado.app.data.appDb
 import io.legado.app.data.entities.Book
 import io.legado.app.data.repository.ReadSettingsRepository
 import io.legado.app.domain.gateway.ReadStyleGateway
-import io.legado.app.domain.gateway.ReadStyleIntKey
-import io.legado.app.domain.gateway.ReadStyleMutation
 import io.legado.app.eink.contract.BookHandle
 import io.legado.app.eink.contract.ReaderBookSnapshot
 import io.legado.app.eink.contract.ReaderEngine
@@ -400,17 +398,6 @@ internal object ReaderEngineImpl : ReaderEngine, KoinComponent {
         chapterPager.onStyleChanged()
     }
 
-    override fun setTextBold(enabled: Boolean) {
-        readStyleGateway.updateCurrentStyle(
-            ReadStyleMutation.IntValue(ReadStyleIntKey.TextBold, if (enabled) 1 else 0)
-        )
-        readStyleGateway.save()
-        chapterPager.onStyleChanged()
-    }
-
-    override val textBold: Boolean
-        get() = ReadBookConfig.textBold.let { it == 1 }
-
     override fun currentStyle(): ReaderTextStyle = ReadBookConfig.snapshotStyle()
 
     /** 从阅读配置读取排版参数快照。header 显隐读宿主默认档（随状态栏）
@@ -482,7 +469,7 @@ internal object ReaderEngineImpl : ReaderEngine, KoinComponent {
         // 不清分页缓存：重排是否发生由缓存键决定（内容 hash/排版样式/视口任一
         // 变化才会重排）。模块在重入阅读页和尺寸回调处都会调 relayout，清了
         // 缓存就会把无变化的重排变成「清屏→全量重排」的抖动；样式变更已由
-        // applyStyle/setTextBold 的 onStyleChanged 走键失效，无需在此强清
+        // applyStyle 的 onStyleChanged 走键失效，无需在此强清
         ReadBook.clearTextChapter()
         val index = ReadBook.durChapterIndex
         ReadBook.removeLoading(index - 1)

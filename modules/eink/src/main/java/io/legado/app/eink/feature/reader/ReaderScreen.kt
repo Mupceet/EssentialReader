@@ -337,7 +337,6 @@ fun ReaderRoute(
                             state = uiState,
                             onToggleKeepScreenOn = viewModel::toggleKeepScreenOn,
                             onToggleHideStatusBar = viewModel::toggleHideStatusBar,
-                            onToggleTextBold = viewModel::toggleTextBold,
                         )
                     }
 

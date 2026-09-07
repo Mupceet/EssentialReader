@@ -89,8 +89,9 @@ afterEvaluate {
                 groupId = "io.legado.app.eink"
                 artifactId = "eink"
                 // 0.1.0 = 旧栈（AGP8.13/K2.3）构建、develop 宿主在用；
-                // 0.2.0 = 本仓主栈（AGP9/K2.4/Java21）构建，跨栈消费核对 §0
-                version = "0.2.0"
+                // 0.2.0 = 本仓主栈（AGP9/K2.4/Java21）构建，跨栈消费核对 §0；
+                // 0.3.0 = 契约破坏性变更（移除 setTextBold/textBold 端口）
+                version = "0.3.0"
             }
         }
     }

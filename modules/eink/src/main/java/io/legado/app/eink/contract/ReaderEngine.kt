@@ -144,7 +144,8 @@ interface ReaderEngineCallback {
  *
  * 实现纪律：
  *  - 排版参数经 [applyStyle]/[currentStyle] 以 [ReaderTextStyle] 快照
- *    整体读写，宿主把它映射为自己的排版配置并持久化；
+ *    读写（可空扩展字段为 null 时宿主不写对应键），宿主把它映射为
+ *    自己的排版配置并持久化；
  *  - 排版产物（页内容）经宿主映射为 [ReaderPageSnapshot] 供
  *    [currentPage] 返回——坐标是宿主排版引擎的测量结果，模块画布按
  *    同值绘制；
@@ -331,12 +332,6 @@ interface ReaderEngine {
 
     /** 设置字体文件夹（SAF tree uri 字符串）并持久化。 */
     suspend fun setFontFolder(uri: String) {}
-
-    /** 写入正文加粗开关（可变字重路径）；[textBold] 读回当前值。 */
-    fun setTextBold(enabled: Boolean)
-
-    /** 正文加粗开关当前值。 */
-    val textBold: Boolean
 
     /** 从宿主排版配置读回当前参数快照。 */
     fun currentStyle(): ReaderTextStyle

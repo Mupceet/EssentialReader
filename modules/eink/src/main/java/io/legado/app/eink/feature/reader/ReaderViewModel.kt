@@ -9,10 +9,15 @@ import androidx.lifecycle.viewModelScope
 import io.legado.app.eink.R
 import io.legado.app.eink.arch.UserMessage
 import io.legado.app.eink.contract.EInkEngineRegistry
+import io.legado.app.eink.contract.FallbackReaderStyleCatalog
 import io.legado.app.eink.contract.ReaderBookSnapshot
 import io.legado.app.eink.contract.ReaderEngineCallback
+import io.legado.app.eink.contract.ReaderFontOption
+import io.legado.app.eink.contract.ReaderFontSelection
 import io.legado.app.eink.contract.ReaderPageSnapshot
 import io.legado.app.eink.contract.ReaderPrepareResult
+import io.legado.app.eink.contract.ReaderStyleCatalog
+import io.legado.app.eink.contract.ReaderStyleParamIds as Ids
 import io.legado.app.eink.contract.ReaderTextStyle
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
@@ -63,7 +68,6 @@ data class ReaderUiState(
     val keepScreenOn: Boolean = false,
     /** 隐藏状态栏（转发完整模式同键阅读设置；开启后页眉接管 时间/电量）。 */
     val hideStatusBar: Boolean = false,
-    val textBold: Boolean = false,
     val style: ReaderTextStyle = ReaderTextStyle(),
     // 水平滑动翻页触发距离（px，0 = 系统 touch slop）
     val pageTouchSlop: Int = 0,
@@ -104,6 +108,11 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application),
 
     private val engine get() = EInkEngineRegistry.readerEngine
 
+    /** 排版参数目录（宿主协商；旧宿主回落内置基线）。 */
+    val styleCatalog: ReaderStyleCatalog by lazy {
+        engine.styleCatalog() ?: FallbackReaderStyleCatalog.create()
+    }
+
     private val _uiState = MutableStateFlow(
         ReaderUiState(
             keepScreenOn = EInkEngineRegistry.globalSettings.keepScreenOn,
@@ -111,7 +120,6 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application),
             // 与完整模式共用宿主 autoReadSpeed 配置（默认 10）
             autoPlayIntervalSec = engine.autoReadIntervalSec
                 .coerceIn(MIN_AUTO_INTERVAL_SEC, MAX_AUTO_INTERVAL_SEC),
-            textBold = engine.textBold,
             style = engine.currentStyle(),
             pageTouchSlop = engine.pageTouchSlop,
         )
@@ -504,84 +512,168 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application),
 
     // ==================== 排版参数 ====================
     // 均为绝对值 setter：档位滑条（含 ±1 按钮）直接设置目标档位，
-    // 钳制在本地完成后以快照整体经端口写回，由 applyLayoutStyle /
-    // applyStyleOnly 持久化。
+    // 按目录钳制后写回快照；是否重排由目录 diff 路由（applyStyleChange）。
 
-    fun setTextSize(value: Int) =
-        applyLayoutStyle { it.copy(textSize = value.coerceIn(MIN_TEXT_SIZE, MAX_TEXT_SIZE)) }
-
-    /** 字距按 0.05 步进索引设置（0..[LETTER_SPACING_STEPS]），避免浮点累加漂移。 */
-    fun setLetterSpacing(step: Int) = applyLayoutStyle {
-        it.copy(letterSpacing = (step * LETTER_SPACING_STEP).coerceIn(0f, MAX_LETTER_SPACING))
+    fun setTextSize(value: Int) = applyStyleChange {
+        it.copy(textSize = styleCatalog.clampInt(Ids.BODY_SIZE, value))
     }
 
-    fun setLineSpacing(value: Int) = applyLayoutStyle {
-        it.copy(lineSpacing = value.coerceIn(0, MAX_LINE_SPACING))
+    /** 字距按 0.05 步进索引设置（目录值域映射，避免浮点累加漂移）。 */
+    fun setLetterSpacing(step: Int) = applyStyleChange {
+        val range = styleCatalog.floatStepIndexRange(Ids.BODY_LETTER_SPACING, LETTER_SPACING_STEP)
+        val safe = step.coerceIn(range.first, range.last)
+        it.copy(letterSpacing = safe * LETTER_SPACING_STEP)
     }
 
-    fun setParagraphSpacing(value: Int) = applyLayoutStyle {
-        it.copy(paragraphSpacing = value.coerceIn(0, MAX_PARAGRAPH_SPACING))
+    fun setLineSpacing(value: Int) = applyStyleChange {
+        it.copy(lineSpacing = styleCatalog.clampInt(Ids.BODY_LINE_SPACING, value))
     }
 
-    fun setIndent(value: Int) = applyLayoutStyle {
-        it.copy(indentChars = value.coerceIn(MIN_INDENT_CHARS, MAX_INDENT_CHARS))
+    fun setParagraphSpacing(value: Int) = applyStyleChange {
+        it.copy(paragraphSpacing = styleCatalog.clampInt(Ids.BODY_PARAGRAPH_SPACING, value))
     }
 
-    fun setPaddingLeft(value: Int) = applyLayoutStyle {
-        it.copy(paddingLeft = value.coerceIn(0, MAX_PADDING_HORIZONTAL))
+    fun setIndent(value: Int) = applyStyleChange {
+        it.copy(indentChars = styleCatalog.clampInt(Ids.BODY_INDENT, value))
     }
 
-    fun setPaddingTop(value: Int) = applyLayoutStyle {
-        it.copy(paddingTop = value.coerceIn(0, MAX_PADDING_VERTICAL))
+    fun setPaddingLeft(value: Int) = applyStyleChange {
+        it.copy(paddingLeft = styleCatalog.clampInt(Ids.BODY_PADDING_LEFT, value))
     }
 
-    fun setPaddingRight(value: Int) = applyLayoutStyle {
-        it.copy(paddingRight = value.coerceIn(0, MAX_PADDING_HORIZONTAL))
+    fun setPaddingTop(value: Int) = applyStyleChange {
+        it.copy(paddingTop = styleCatalog.clampInt(Ids.BODY_PADDING_TOP, value))
     }
 
-    fun setPaddingBottom(value: Int) = applyLayoutStyle {
-        it.copy(paddingBottom = value.coerceIn(0, MAX_PADDING_VERTICAL))
+    fun setPaddingRight(value: Int) = applyStyleChange {
+        it.copy(paddingRight = styleCatalog.clampInt(Ids.BODY_PADDING_RIGHT, value))
     }
 
-    // ---- 页眉 / 页脚边距：不影响引擎分页，仅刷新快照即时生效。
-    // 页眉/页脚字号与 View 版对齐，不做单独设置。 ----
-
-    fun setHeaderPaddingLeft(value: Int) = applyStyleOnly {
-        it.copy(headerPaddingLeft = value.coerceIn(0, MAX_PADDING_VERTICAL))
+    fun setPaddingBottom(value: Int) = applyStyleChange {
+        it.copy(paddingBottom = styleCatalog.clampInt(Ids.BODY_PADDING_BOTTOM, value))
     }
 
-    fun setHeaderPaddingTop(value: Int) = applyStyleOnly {
-        it.copy(headerPaddingTop = value.coerceIn(0, MAX_PADDING_VERTICAL))
+    // ---- 页眉/页脚边距：上下边距经 extent 影响分页（diff 路由自动判定
+    // 走重排），左右边距仅条带内部即时生效。 ----
+
+    fun setHeaderPaddingLeft(value: Int) = applyStyleChange {
+        it.copy(headerPaddingLeft = styleCatalog.clampInt(Ids.HEADER_PADDING_LEFT, value))
     }
 
-    fun setHeaderPaddingRight(value: Int) = applyStyleOnly {
-        it.copy(headerPaddingRight = value.coerceIn(0, MAX_PADDING_VERTICAL))
+    fun setHeaderPaddingTop(value: Int) = applyStyleChange {
+        it.copy(headerPaddingTop = styleCatalog.clampInt(Ids.HEADER_PADDING_TOP, value))
     }
 
-    fun setHeaderPaddingBottom(value: Int) = applyStyleOnly {
-        it.copy(headerPaddingBottom = value.coerceIn(0, MAX_PADDING_VERTICAL))
+    fun setHeaderPaddingRight(value: Int) = applyStyleChange {
+        it.copy(headerPaddingRight = styleCatalog.clampInt(Ids.HEADER_PADDING_RIGHT, value))
     }
 
-    fun setFooterPaddingLeft(value: Int) = applyStyleOnly {
-        it.copy(footerPaddingLeft = value.coerceIn(0, MAX_PADDING_VERTICAL))
+    fun setHeaderPaddingBottom(value: Int) = applyStyleChange {
+        it.copy(headerPaddingBottom = styleCatalog.clampInt(Ids.HEADER_PADDING_BOTTOM, value))
     }
 
-    fun setFooterPaddingTop(value: Int) = applyStyleOnly {
-        it.copy(footerPaddingTop = value.coerceIn(0, MAX_PADDING_VERTICAL))
+    fun setFooterPaddingLeft(value: Int) = applyStyleChange {
+        it.copy(footerPaddingLeft = styleCatalog.clampInt(Ids.FOOTER_PADDING_LEFT, value))
     }
 
-    fun setFooterPaddingRight(value: Int) = applyStyleOnly {
-        it.copy(footerPaddingRight = value.coerceIn(0, MAX_PADDING_VERTICAL))
+    fun setFooterPaddingTop(value: Int) = applyStyleChange {
+        it.copy(footerPaddingTop = styleCatalog.clampInt(Ids.FOOTER_PADDING_TOP, value))
     }
 
-    fun setFooterPaddingBottom(value: Int) = applyStyleOnly {
-        it.copy(footerPaddingBottom = value.coerceIn(0, MAX_PADDING_VERTICAL))
+    fun setFooterPaddingRight(value: Int) = applyStyleChange {
+        it.copy(footerPaddingRight = styleCatalog.clampInt(Ids.FOOTER_PADDING_RIGHT, value))
     }
 
-    fun toggleTextBold() {
-        engine.setTextBold(!engine.textBold)
-        _uiState.update { it.copy(textBold = engine.textBold) }
-        scheduleRelayout()
+    fun setFooterPaddingBottom(value: Int) = applyStyleChange {
+        it.copy(footerPaddingBottom = styleCatalog.clampInt(Ids.FOOTER_PADDING_BOTTOM, value))
+    }
+
+    // ---- 协商扩展参数（目录可用性由 UI 入口判定，VM 只管写） ----
+
+    fun setBodyFont(selection: ReaderFontSelection) = applyStyleChange {
+        it.copy(bodyFont = selection)
+    }
+
+    fun setBodyWeight(value: Int) = applyStyleChange {
+        it.copy(bodyWeight = styleCatalog.clampInt(Ids.BODY_WEIGHT, value))
+    }
+
+    fun setTitleFont(selection: ReaderFontSelection) = applyStyleChange {
+        it.copy(titleFont = selection)
+    }
+
+    fun setTitleWeight(value: Int) = applyStyleChange {
+        it.copy(titleWeight = styleCatalog.clampInt(Ids.TITLE_WEIGHT, value))
+    }
+
+    fun setTitleMode(value: Int) = applyStyleChange {
+        it.copy(titleMode = value.coerceIn(0, 2))
+    }
+
+    fun setTitleSize(value: Int) = applyStyleChange {
+        it.copy(titleSize = styleCatalog.clampInt(Ids.TITLE_SIZE, value))
+    }
+
+    fun setTitleTopSpacing(value: Int) = applyStyleChange {
+        it.copy(titleTopSpacing = styleCatalog.clampInt(Ids.TITLE_TOP_SPACING, value))
+    }
+
+    fun setTitleBottomSpacing(value: Int) = applyStyleChange {
+        it.copy(titleBottomSpacing = styleCatalog.clampInt(Ids.TITLE_BOTTOM_SPACING, value))
+    }
+
+    fun setTitleLineSpacing(value: Int) = applyStyleChange {
+        it.copy(titleLineSpacing = styleCatalog.clampInt(Ids.TITLE_LINE_SPACING, value))
+    }
+
+    fun setHeaderFont(selection: ReaderFontSelection) = applyStyleChange {
+        it.copy(headerFont = selection)
+    }
+
+    fun setHeaderSize(value: Int) = applyStyleChange {
+        it.copy(headerSize = styleCatalog.clampInt(Ids.HEADER_SIZE, value))
+    }
+
+    fun setHeaderDivider(value: Boolean) = applyStyleChange {
+        it.copy(headerDivider = value)
+    }
+
+    fun setFooterDivider(value: Boolean) = applyStyleChange {
+        it.copy(footerDivider = value)
+    }
+
+    /** 页眉显隐：写宿主 HeaderMode 1/2；随后重算条带可见性即时生效。 */
+    fun setHeaderVisible(value: Boolean) {
+        applyStyleChange { it.copy(headerVisible = value) }
+        updateTipInfo()
+    }
+
+    /** 页脚显隐：写宿主 FooterMode 0/1；随后重算条带可见性即时生效。 */
+    fun setFooterVisible(value: Boolean) {
+        applyStyleChange { it.copy(footerVisible = value) }
+        updateTipInfo()
+    }
+
+    // ---- 字体列表（字体配置弹层数据源） ----
+
+    private val _fontOptions = MutableStateFlow<List<ReaderFontOption>>(emptyList())
+
+    /** 可选字体文件（宿主字体文件夹枚举）。 */
+    val fontOptions = _fontOptions.asStateFlow()
+
+    /** 拉取字体文件列表（打开字体配置弹层时调用）。 */
+    fun loadFontOptions() {
+        viewModelScope.launch(Dispatchers.IO) {
+            _fontOptions.value = engine.availableFonts()
+        }
+    }
+
+    /** 设置字体文件夹（SAF tree uri）并刷新字体列表。 */
+    fun setFontFolder(uri: String) {
+        viewModelScope.launch(Dispatchers.IO) {
+            engine.setFontFolder(uri)
+            _fontOptions.value = engine.availableFonts()
+        }
     }
 
     fun toggleKeepScreenOn() {
@@ -601,16 +693,24 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application),
         EInkEngineRegistry.globalSettings.hideStatusBar = newValue
         _uiState.update { it.copy(hideStatusBar = newValue) }
         updateTipInfo()
+        // extent 随页眉显隐翻转，确定性触发重排（视口变化路径为常规触发，
+        // 此处兜底状态栏高度小于分页器漂移阈值的设备）
+        scheduleRelayout()
     }
 
     /**
-     * 应用影响排版的参数：写回配置 → 更新画笔 → 防抖合并后重新排版
-     * （保留 durChapterPos，重新排版后定位到包含该位置的页面；
-     * 面板打开期间正文保持旧页渲染，新页面就绪后直接替换，实时预览）。
+     * 应用排版参数变更：写回配置并读回快照，按目录 diff 判定是否需要
+     * 重新分页（affectsLayout 参数变更 → 200ms 防抖重排；仅纯绘制参数
+     * 变更即时生效不重排）。
      */
-    private fun applyLayoutStyle(change: (ReaderTextStyle) -> ReaderTextStyle) {
-        applyStyleOnly(change)
-        scheduleRelayout()
+    private fun applyStyleChange(change: (ReaderTextStyle) -> ReaderTextStyle) {
+        val old = _uiState.value.style
+        val new = change(old)
+        engine.applyStyle(new)
+        _uiState.update { it.copy(style = engine.currentStyle()) }
+        if (styleChangeNeedsRelayout(styleCatalog, old, new)) {
+            scheduleRelayout()
+        }
     }
 
     /**
@@ -638,19 +738,6 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application),
     private suspend fun relayoutEngine() {
         if (loadedBookUrl == null) return
         engine.relayout()
-    }
-
-    /** 应用不影响分页的参数：仅经端口写配置、刷新画笔与快照。
-     *  画笔字色由模块画布每次绘制前按主题钉死。 */
-    private fun applyStyleOnly(change: (ReaderTextStyle) -> ReaderTextStyle) {
-        val newStyle = change(_uiState.value.style)
-        engine.applyStyle(newStyle)
-        _uiState.update {
-            it.copy(
-                style = engine.currentStyle(),
-                textBold = engine.textBold,
-            )
-        }
     }
 
     // ==================== 引擎回调（ReaderEngineCallback） ====================

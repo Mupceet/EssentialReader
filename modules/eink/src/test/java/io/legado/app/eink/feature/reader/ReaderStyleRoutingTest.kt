@@ -2,7 +2,6 @@ package io.legado.app.eink.feature.reader
 
 import io.legado.app.eink.contract.FallbackReaderStyleCatalog
 import io.legado.app.eink.contract.ReaderFontSelection
-import io.legado.app.eink.contract.ReaderStyleParamIds as Ids
 import io.legado.app.eink.contract.ReaderTextStyle
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
