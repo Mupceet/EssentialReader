@@ -537,15 +537,12 @@ internal fun ReaderScreen(
             }
             }
         if (state.headerVisible) {
+            val extentPx = EInkEngineRegistry.readerEngine.headerDecorationExtentPx
             Box(
                 modifier = Modifier
                     .align(Alignment.TopCenter)
                     .fillMaxWidth()
-                    .height(
-                        with(density) {
-                            EInkEngineRegistry.readerEngine.headerDecorationExtentPx.toDp()
-                        }
-                    )
+                    .height(with(density) { extentPx.toDp() })
             ) {
                 // 菜单展开期状态栏恢复显示，会覆盖页眉条带（正文排版区域
                 // 尺寸恒定不重排，页眉不移位）：文字转透明让出条带，
@@ -553,21 +550,19 @@ internal fun ReaderScreen(
                 ReaderHeader(
                     state = state,
                     contentVisible = !(state.hideStatusBar && state.controlsVisible),
+                    extentPx = extentPx,
                 )
             }
         }
         if (state.footerVisible) {
+            val extentPx = EInkEngineRegistry.readerEngine.footerDecorationExtentPx
             Box(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
                     .fillMaxWidth()
-                    .height(
-                        with(density) {
-                            EInkEngineRegistry.readerEngine.footerDecorationExtentPx.toDp()
-                        }
-                    )
+                    .height(with(density) { extentPx.toDp() })
             ) {
-                ReaderFooter(state = state)
+                ReaderFooter(state = state, extentPx = extentPx)
             }
         }
 
@@ -658,10 +653,18 @@ private fun rememberStatusBarTop(): Dp {
  * 恢复显示覆盖页眉条带，让位但保持布局，避免正文重排。
  */
 @Composable
-private fun ReaderHeader(state: ReaderUiState, contentVisible: Boolean) {
+private fun ReaderHeader(
+    state: ReaderUiState,
+    contentVisible: Boolean,
+    extentPx: Float,
+) {
     val textColor =
         if (contentVisible) EInkTheme.colorScheme.onSurfaceVariant else Color.Transparent
-    val tipStyle = tipTextStyle()
+    val tipStyle = tipTextStyle(
+        availablePx = extentPx -
+            state.style.headerPaddingTop.dpPx() -
+            state.style.headerPaddingBottom.dpPx(),
+    )
     // fillMaxSize：容器已按宿主页眉预留高度定高，行撑满预留区、文字
     // 纵向居中，与完整模式装饰的几何一致
     Row(
@@ -691,10 +694,15 @@ private fun ReaderHeader(state: ReaderUiState, contentVisible: Boolean) {
 
 /** 页脚：顶部自动翻页进度条 + 章节标题（左）/ 页数及进度（右，View 版 pageAndTotal 格式）。 */
 @Composable
-private fun ReaderFooter(state: ReaderUiState) {
-    val tipStyle = tipTextStyle()
-    // fillMaxSize：容器已按宿主页脚预留高度定高（进度条 2dp 挤占其内
-    // 顶部），文字行占满剩余并在其中纵向居中
+private fun ReaderFooter(state: ReaderUiState, extentPx: Float) {
+    // 进度条 2dp 是模块自有装饰，不在宿主预留预算内，需先扣减
+    val tipStyle = tipTextStyle(
+        availablePx = extentPx - 2.dpPx() -
+            state.style.footerPaddingTop.dpPx() -
+            state.style.footerPaddingBottom.dpPx(),
+    )
+    // fillMaxSize：容器已按宿主页脚预留高度定高，文字行在剩余空间内
+    // 纵向居中
     Column(modifier = Modifier.fillMaxSize()) {
         AutoPlayProgressBar(active = state.autoPlay, progress = state.autoPlayProgress)
         Row(
@@ -725,20 +733,29 @@ private fun ReaderFooter(state: ReaderUiState) {
     }
 }
 
+/** dp 转像素（字体缩放不参与——排版装饰几何锚定像素）。 */
+@Composable
+private fun Int.dpPx(): Float = with(LocalDensity.current) { dp.toPx() }
+
 /**
- * 页眉/页脚文字样式：排版装饰语义——字号/行高锚定像素（取默认系统缩放
- * 1.15 下 14sp/20sp 的实际像素），**不随应用内字体缩放放大**。容器高度
- * 来自宿主预留（px，不随缩放变），sp 字号被字体缩放放大会超出预留高度，
- * 表现为页眉/页脚文字显示不完整；正文同理不随字体缩放（排版坐标为引擎
- * 测量像素）。刻意不走 EInkText：其 14sp 下限按 sp 语义钳制，与像素
- * 锚定冲突。
+ * 页眉/页脚文字样式：排版装饰语义——**行高从容器可用高度推导**（宿主
+ * 预留 − 配置边距 − 模块进度条），字号按 14/20 的字面/行高比缩放。
+ * 两个不变量：
+ *  - 恰好放得下：宿主预留的文字预算是按宿主字体度量算的，与本模块
+ *    字体无关；行高锚定可用高度保证任何配置（页脚字号/边距/字体缩放）
+ *    下都不超出，文字底部不再被裁；
+ *  - 像素锚定不随字体缩放：用 Dp.toSp() 换算，应用内字体缩放不放大
+ *    页眉/页脚（同正文；正文排版坐标是引擎测量像素）。宿主预留随其
+ *    页眉/页脚字号设置变化时，模块文字同步伸缩。
+ * 刻意不走 EInkText：其 14sp 下限按 sp 语义钳制，与像素锚定冲突。
  */
 @Composable
-private fun tipTextStyle(): TextStyle {
+private fun tipTextStyle(availablePx: Float): TextStyle {
     val density = LocalDensity.current
+    val linePx = availablePx.takeIf { it > 0f } ?: with(density) { 23.dp.toPx() }
     return EInkTheme.typography.bodyMedium.copy(
-        fontSize = with(density) { 16.dp.toSp() },
-        lineHeight = with(density) { 23.dp.toSp() },
+        fontSize = with(density) { (linePx * 14f / 20f).toDp().toSp() },
+        lineHeight = with(density) { linePx.toDp().toSp() },
     )
 }
 
