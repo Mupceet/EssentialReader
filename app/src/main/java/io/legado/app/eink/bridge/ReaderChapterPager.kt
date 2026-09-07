@@ -19,6 +19,10 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlin.math.abs
+
+/** 小于该值的视口高度漂移不触发重排（页眉/页脚内容后填导致的首帧漂移）。 */
+private const val VIEWPORT_EPSILON_PX = 24
 
 /**
  * E-Ink 章节分页协调器：宿主 Compose 渲染层（ReadBookController 直排页）
@@ -66,6 +70,12 @@ internal class ReaderChapterPager(
     /** E-Ink 画布视口就绪/变化（等价旧 ChapterProvider.upViewSize）。 */
     fun updateViewport(width: Int, height: Int) {
         if (width <= 0 || height <= 0) return
+        // 页眉/页脚内容（时间/电量文本）在首次渲染后才填充，会让画布高度
+        // 漂移几个像素。小于一行正文的视口漂移直接忽略（存储值也不更新，
+        // 否则下一次任何触发都会带着新视口全量重排）：快照自顶部绘制，
+        // 几像素差异只是页脚方向多留空白，而一次重排+换页在墨水屏上就是
+        // 一次肉眼可见的抖动
+        if (width == viewportWidth && abs(height - viewportHeight) < VIEWPORT_EPSILON_PX) return
         if (width == viewportWidth && height == viewportHeight) return
         viewportWidth = width
         viewportHeight = height
