@@ -19,6 +19,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import io.legado.app.eink.contract.ReaderStyleCatalog
+import io.legado.app.eink.contract.ReaderStyleParam
 import io.legado.app.eink.contract.ReaderStyleParamIds as Ids
 import io.legado.app.eink.contract.ReaderTextStyle
 import io.legado.app.eink.designsystem.content.EInkText
@@ -75,7 +76,9 @@ internal fun ReaderInfoConfigDialog(
                     ChoiceRow(
                         label = "标题位置",
                         options = listOf("居左", "居中", "隐藏"),
-                        selected = style.titleMode ?: catalog.defaultInt(Ids.TITLE_MODE),
+                        selected = style.titleMode
+                            ?: (catalog.find(Ids.TITLE_MODE) as? ReaderStyleParam.Choice)?.default
+                            ?: 0,
                         onSelect = onSetTitleMode,
                     )
                     SliderRow(

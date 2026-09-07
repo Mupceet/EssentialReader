@@ -1,10 +1,13 @@
 package io.legado.app.eink.feature.reader
 
 import android.app.Activity
+import android.content.Intent
 import android.view.KeyEvent
 import android.view.WindowManager
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
@@ -98,6 +101,26 @@ fun ReaderRoute(
     var styleDialog by remember { mutableStateOf<ReaderStyleDialog?>(null) }
     // 移出书架二次确认（顶栏切换钮在架态点击只打开确认框）
     var showRemoveConfirm by remember { mutableStateOf(false) }
+
+    // 字体文件夹选择（SAF）：持久化读权限后交 VM 落库并刷新字体列表
+    val fontFolderLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocumentTree()
+    ) { uri ->
+        uri?.let {
+            runCatching {
+                context.contentResolver.takePersistableUriPermission(
+                    it, Intent.FLAG_GRANT_READ_URI_PERMISSION
+                )
+            }
+            viewModel.setFontFolder(it.toString())
+        }
+    }
+
+    // 字体文件列表：字体弹层打开时拉取（SAF 换文件夹后由 VM 刷新）
+    val fontOptions by viewModel.fontOptions.collectAsStateWithLifecycle()
+    LaunchedEffect(styleDialog) {
+        if (styleDialog == ReaderStyleDialog.Fonts) viewModel.loadFontOptions()
+    }
 
     LaunchedEffect(bookUrl) {
         viewModel.attach(bookUrl)
@@ -384,7 +407,19 @@ fun ReaderRoute(
                 onBackdropClick = dismissToCleanReading,
             )
 
-            ReaderStyleDialog.Fonts -> Unit          // Task 12 接入
+            ReaderStyleDialog.Fonts -> ReaderFontConfigDialog(
+                catalog = viewModel.styleCatalog,
+                style = uiState.style,
+                fontOptions = fontOptions,
+                onSetBodyFont = viewModel::setBodyFont,
+                onSetBodyWeight = viewModel::setBodyWeight,
+                onSetTitleFont = viewModel::setTitleFont,
+                onSetTitleWeight = viewModel::setTitleWeight,
+                onSetHeaderFont = viewModel::setHeaderFont,
+                onPickFolder = { fontFolderLauncher.launch(null) },
+                onClose = { styleDialog = null },
+                onBackdropClick = dismissToCleanReading,
+            )
             ReaderStyleDialog.Info -> ReaderInfoConfigDialog(
                 catalog = viewModel.styleCatalog,
                 style = uiState.style,
