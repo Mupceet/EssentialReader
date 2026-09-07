@@ -34,6 +34,7 @@ sealed interface ReaderStyleParam {
         override val available: Boolean,
         override val affectsLayout: Boolean,
         val options: List<Option>,
+        /** 默认值；为选项 [Choice.Option.value]（非下标）。 */
         val default: Int,
     ) : ReaderStyleParam {
         data class Option(val value: Int, val label: String)

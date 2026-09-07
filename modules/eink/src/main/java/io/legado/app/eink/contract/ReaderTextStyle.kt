@@ -22,8 +22,8 @@ package io.legado.app.eink.contract
  *
  * 字段单位与模块内编辑区间（设置面板滑条的边界，常量在模块
  * feature/reader 包内）：
- *  - [textSize] sp，8..40。标题字号无独立字段——模块语义为标题跟随
- *    正文，宿主实现把标题字号一并写入同值；
+ *  - [textSize] sp，8..40。标题字号为独立可空字段（[titleSize]），null
+ *    时不跨桥写；宿主实现不再钉平；
  *  - [letterSpacing] em（引擎侧乘以字号换算 px），0..0.5，面板按
  *    0.05 步进设置（避免浮点累加漂移）；
  *  - [indentChars] 段首缩进字符数，0..4（<=0 即无缩进）；宿主把它
@@ -40,7 +40,7 @@ package io.legado.app.eink.contract
  * 宿主实现按自身引擎容忍度原值透传即可。
  */
 data class ReaderTextStyle(
-    /** 正文字号（sp），默认 20；标题字号随正文，无独立字段。 */
+    /** 正文字号（sp），默认 20。 */
     val textSize: Int = 20,
 
     /** 字距（em），默认 0.1；宿主引擎按 [textSize] 换算像素。 */
@@ -54,6 +54,55 @@ data class ReaderTextStyle(
 
     /** 段距增量（0.1 倍行高），默认 2。 */
     val paragraphSpacing: Int = 2,
+
+    // ---- 协商扩展参数：null = 不跨桥写（保持宿主值）。宿主目录标记
+    // 不可用或旧宿主回落目录中不存在时，UI 隐藏对应设置项。 ----
+
+    /** 正文字体；null = 不管理。 */
+    val bodyFont: ReaderFontSelection? = null,
+
+    /** 正文字重（100..900 可变字重）；null = 不管理。 */
+    val bodyWeight: Int? = null,
+
+    /** 标题字体；null = 不管理，[ReaderFontSelection.FollowBody] = 跟随正文。 */
+    val titleFont: ReaderFontSelection? = null,
+
+    /** 标题字重（100..900）；null = 不管理。 */
+    val titleWeight: Int? = null,
+
+    /** 标题位置（0 左 / 1 中 / 2 隐藏，宿主语义）；null = 不管理。 */
+    val titleMode: Int? = null,
+
+    /** 标题字号（sp）；null = 不管理（宿主值独立保留，不再钉平跟随正文）。 */
+    val titleSize: Int? = null,
+
+    /** 标题上留白（dp）；null = 不管理。 */
+    val titleTopSpacing: Int? = null,
+
+    /** 标题下留白（dp）；null = 不管理。 */
+    val titleBottomSpacing: Int? = null,
+
+    /** 标题行距（0.1 倍档，12 = 1.2 倍）；null = 不管理。 */
+    val titleLineSpacing: Int? = null,
+
+    /** 页眉字体；null = 不管理，FollowBody = 跟随正文。 */
+    val headerFont: ReaderFontSelection? = null,
+
+    /** 页眉显隐（写宿主 HeaderMode 1/2）；null = 不管理（宿主默认档
+     *  「随状态栏」保留原语义）。 */
+    val headerVisible: Boolean? = null,
+
+    /** 页眉字号（sp，经 extent 影响正文分页预留）；null = 不管理。 */
+    val headerSize: Int? = null,
+
+    /** 页眉分割线；null = 不管理。 */
+    val headerDivider: Boolean? = null,
+
+    /** 页脚显隐（写宿主 FooterMode 0/1）；null = 不管理。 */
+    val footerVisible: Boolean? = null,
+
+    /** 页脚分割线；null = 不管理。 */
+    val footerDivider: Boolean? = null,
 
     /** 正文左边距（dp）。 */
     val paddingLeft: Int = 16,
