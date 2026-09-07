@@ -41,6 +41,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextOverflow
@@ -451,24 +452,17 @@ internal fun ReaderScreen(
             .background(EInkTheme.colorScheme.background)
             .readerSystemBarInsets(state.hideStatusBar)
     ) {
-        Column(modifier = Modifier.fillMaxSize()) {
-            if (state.headerVisible) {
-                // 菜单展开期状态栏恢复显示，会覆盖页眉条带（正文排版区域
-                // 尺寸恒定不重排，页眉不移位）：文字转透明让出条带，
-                // 收起菜单后状态栏再隐藏、时间/电量复现
-                ReaderHeader(
-                    state = state,
-                    contentVisible = !(state.hideStatusBar && state.controlsVisible),
-                )
-            }
-            Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxWidth()
-                    .onSizeChanged { size ->
-                        onContentSized(size.width, size.height)
-                    }
-                    .pointerInput(state.controlsVisible) {
+        val density = LocalDensity.current
+        // 排版画布铺满整个阅读区（页眉/页脚装饰空间含在内，由宿主分页器
+        // 预留——与完整模式「画布全屏 + 装饰画在预留区」同构）。页眉/页脚
+        // 以宿主预留高度定高叠加在画布上，落在正文避让出的预留区内
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .onSizeChanged { size ->
+                    onContentSized(size.width, size.height)
+                }
+                .pointerInput(state.controlsVisible) {
                         detectTapGestures { offset ->
                             if (state.controlsVisible) {
                                 onCenterTap() // 收起操作条
@@ -520,27 +514,57 @@ internal fun ReaderScreen(
                         }
                     }
             ) {
-                ReaderPageSnapshotCanvas(
-                    page = state.page,
-                    pageVersion = state.pageVersion,
+            ReaderPageSnapshotCanvas(
+                page = state.page,
+                pageVersion = state.pageVersion,
+                modifier = Modifier.fillMaxSize(),
+            )
+            if (state.isLoading && state.page == null) {
+                Box(
                     modifier = Modifier.fillMaxSize(),
-                )
-                if (state.isLoading && state.page == null) {
-                    Box(
-                        modifier = Modifier.fillMaxSize(),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        EInkText(
-                            text = "加载中…",
-                            color = EInkTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                }
-                if (state.error != null) {
-                    ErrorView(message = state.error, onRetry = onRetry, onBack = onBack)
+                    contentAlignment = Alignment.Center,
+                ) {
+                    EInkText(
+                        text = "加载中…",
+                        color = EInkTheme.colorScheme.onSurfaceVariant,
+                    )
                 }
             }
-            if (state.footerVisible) {
+            if (state.error != null) {
+                ErrorView(message = state.error, onRetry = onRetry, onBack = onBack)
+            }
+            }
+        if (state.headerVisible) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .fillMaxWidth()
+                    .height(
+                        with(density) {
+                            EInkEngineRegistry.readerEngine.headerDecorationExtentPx.toDp()
+                        }
+                    )
+            ) {
+                // 菜单展开期状态栏恢复显示，会覆盖页眉条带（正文排版区域
+                // 尺寸恒定不重排，页眉不移位）：文字转透明让出条带，
+                // 收起菜单后状态栏再隐藏、时间/电量复现
+                ReaderHeader(
+                    state = state,
+                    contentVisible = !(state.hideStatusBar && state.controlsVisible),
+                )
+            }
+        }
+        if (state.footerVisible) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth()
+                    .height(
+                        with(density) {
+                            EInkEngineRegistry.readerEngine.footerDecorationExtentPx.toDp()
+                        }
+                    )
+            ) {
                 ReaderFooter(state = state)
             }
         }
@@ -635,9 +659,11 @@ private fun rememberStatusBarTop(): Dp {
 private fun ReaderHeader(state: ReaderUiState, contentVisible: Boolean) {
     val textColor =
         if (contentVisible) EInkTheme.colorScheme.onSurfaceVariant else Color.Transparent
+    // fillMaxSize：容器已按宿主页眉预留高度定高，行撑满预留区、文字
+    // 纵向居中，与完整模式装饰的几何一致
     Row(
         modifier = Modifier
-            .fillMaxWidth()
+            .fillMaxSize()
             .padding(
                 start = state.style.headerPaddingLeft.dp,
                 top = state.style.headerPaddingTop.dp,
@@ -666,10 +692,13 @@ private fun ReaderHeader(state: ReaderUiState, contentVisible: Boolean) {
 /** 页脚：顶部自动翻页进度条 + 章节标题（左）/ 页数及进度（右，View 版 pageAndTotal 格式）。 */
 @Composable
 private fun ReaderFooter(state: ReaderUiState) {
-    Column(modifier = Modifier.fillMaxWidth()) {
+    // fillMaxSize：容器已按宿主页脚预留高度定高（进度条 2dp 挤占其内
+    // 顶部），文字行占满剩余并在其中纵向居中
+    Column(modifier = Modifier.fillMaxSize()) {
         AutoPlayProgressBar(active = state.autoPlay, progress = state.autoPlayProgress)
         Row(
             modifier = Modifier
+                .weight(1f)
                 .fillMaxWidth()
                 .padding(
                     start = state.style.footerPaddingLeft.dp,

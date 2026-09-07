@@ -340,6 +340,17 @@ interface ReaderEngine {
     /** 页眉/页脚可见性判定（规则为宿主阅读界面语义，模块不开放设置）。 */
     fun headerFooterVisibility(): ReaderHeaderFooterVisibility
 
+    /**
+     * 宿主排版在页顶/页底为页眉/页脚装饰预留的高度（px，排版坐标系）。
+     * 模块页眉/页脚叠加绘制在排版画布之上时，应以同高度定高对齐宿主
+     * 预留区——正文的排版基线从预留区之下开始，页眉页脚落在预留区内，
+     * 与宿主完整模式的装饰几何一致。不可用时为 0（页眉页脚自由高度）。
+     */
+    val headerDecorationExtentPx: Float get() = 0f
+
+    /** 同 [headerDecorationExtentPx]，页脚侧。 */
+    val footerDecorationExtentPx: Float get() = 0f
+
     /** 当前时间文本（按宿主的用户可见时间格式格式化，页眉时钟用）。 */
     fun formatTimeNow(): String
 }

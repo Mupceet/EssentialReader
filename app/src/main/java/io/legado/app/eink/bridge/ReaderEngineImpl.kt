@@ -31,6 +31,7 @@ import io.legado.app.model.cache.CacheDownloadRequest
 import io.legado.app.model.cache.ChapterSelection
 import io.legado.app.model.localBook.LocalBook
 import io.legado.app.model.webBook.WebBook
+import io.legado.app.feature.reader.legacy.LegacyReaderPageDecorationFactory
 import io.legado.app.ui.config.readConfig.ReadConfig
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
@@ -461,6 +462,12 @@ internal object ReaderEngineImpl : ReaderEngine, KoinComponent {
             },
             footerVisible = ReadBookConfig.footerMode != 1,
         )
+
+    override val headerDecorationExtentPx: Float
+        get() = LegacyReaderPageDecorationFactory.headerExtentPx()
+
+    override val footerDecorationExtentPx: Float
+        get() = LegacyReaderPageDecorationFactory.footerExtentPx()
 
     override fun formatTimeNow(): String =
         AppConst.timeFormat.format(Date()).toString()
