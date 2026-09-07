@@ -55,11 +55,21 @@ internal class ReaderChapterPager(
     private var cachedPages: List<ReaderPage> = emptyList()
     private var cachedStyle: ReaderAndroidPaginationStyle? = null
 
-    /** 当前章节是否已有分页产物（等价旧 curTextChapter.pages 非空）。 */
-    val hasPages: Boolean get() = cachedPages.isNotEmpty()
+    /** 缓存分页产物所属章节；与 ReadBook.durChapterIndex 不一致视为无产物。 */
+    private var cachedChapterIndex: Int = -1
+
+    /**
+     * 当前章节是否已有分页产物。必须校验章节一致：目录跳章（DB 写新进度后
+     * 重进 attach）与跨章翻页（durChapterIndex 已 ++ 而新章尚未分页）的
+     * 窗口期内，模块靠本值区分「直接刷新旧页」与「清空显示加载中」——
+     * 旧章缓存页绝不可作为新章渲染。
+     */
+    val hasPages: Boolean
+        get() = cachedPages.isNotEmpty() && cachedChapterIndex == ReadBook.durChapterIndex
 
     /** 当前章节页数（分页产物只含当前章节）。 */
-    val currentChapterPageSize: Int get() = cachedPages.size
+    val currentChapterPageSize: Int
+        get() = if (cachedChapterIndex == ReadBook.durChapterIndex) cachedPages.size else 0
 
     /**
      * 分页同源样式。快照画笔规格必须与排版测量同值，映射时从这里取
@@ -87,6 +97,23 @@ internal class ReaderChapterPager(
         requestPagination()
     }
 
+    /**
+     * 渲染回调到达时的窗口对账：跨章翻页只平移输入窗口
+     * （moveReaderChapterInputNext/Previous）不触发任何回调，分页机会
+     * 藏在下一次 ±1 预载完成的 input-changed 里——慢网/预载失败时新章
+     * 永远排不上。每次 upContent/pageChanged 先对账一次（键未变时是
+     * 空操作），窗口平移后立即补分页。
+     */
+    fun syncWithWindow() {
+        requestPagination()
+    }
+
+    /** 取消在途分页（注销时防迟到 commit 通知已销毁回调）；缓存保留。 */
+    fun cancelPending() {
+        paginateJob?.cancel()
+        paginateJob = null
+    }
+
     /** 排版样式变更（等价旧 ChapterProvider.upStyle 失效重排）。 */
     fun onStyleChanged() {
         requestPagination()
@@ -100,6 +127,7 @@ internal class ReaderChapterPager(
         cacheKey = null
         cachedPages = emptyList()
         cachedStyle = null
+        cachedChapterIndex = -1
     }
 
     /** 当前阅读位置所在页映射为快照；未分页或无阅读位置返回 null。 */
@@ -107,6 +135,9 @@ internal class ReaderChapterPager(
         val style = cachedStyle ?: return null
         val pages = cachedPages
         if (pages.isEmpty()) return null
+        // 章节守卫：章节切换到新章分页落地之间返回 null（模块保持旧页或
+        // 显示加载中），旧章页绝不可作为新章渲染
+        if (cachedChapterIndex != ReadBook.durChapterIndex) return null
         val book = ReadBook.book ?: return null
         val index = ReaderPageNavigator.locate(
             pages,
@@ -178,6 +209,7 @@ internal class ReaderChapterPager(
         cacheKey = key
         cachedPages = pages
         cachedStyle = style
+        cachedChapterIndex = input.chapter.index
         val chapterIndex = input.chapter.index
         ReaderPageNavigator.pageContext(pages, pages.lastIndex)?.endPosition?.let { contentEnd ->
             ReadBook.publishReaderPagination(

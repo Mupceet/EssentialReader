@@ -120,7 +120,9 @@ internal object ReaderEngineImpl : ReaderEngine, KoinComponent {
         ReadBook.unregisterRender(adapter)
         ReadBook.unregister(adapter)
         // 不清分页缓存：目录等界面离开阅读页会销毁 ViewModel 触发 unregister，
-        // 返回时要靠热缓存即时恢复渲染（清了就会出现「加载中」再重排）
+        // 返回时要靠热缓存即时恢复渲染（清了就会出现「加载中」再重排）；
+        // 只取消在途分页，防止迟到的 commit 通知已销毁的回调
+        chapterPager.cancelPending()
     }
 
     override fun isRegistered(callback: ReaderEngineCallback): Boolean {
@@ -491,17 +493,31 @@ internal object ReaderEngineImpl : ReaderEngine, KoinComponent {
             relativePosition: Int,
             resetPageOffset: Boolean,
             success: (() -> Unit)?,
-        ) = callback.onContentUpdated(relativePosition, resetPageOffset, success)
+        ) {
+            // 跨章翻页只平移输入窗口不触发回调：每次渲染前先对账，
+            // 新章输入已在窗口时立即补分页（键未变时为空操作）
+            chapterPager.syncWithWindow()
+            callback.onContentUpdated(relativePosition, resetPageOffset, success)
+        }
 
         override suspend fun upContentAwait(
             relativePosition: Int,
             resetPageOffset: Boolean,
             success: (() -> Unit)?,
-        ) = callback.onContentUpdated(relativePosition, resetPageOffset, success)
+        ) {
+            chapterPager.syncWithWindow()
+            callback.onContentUpdated(relativePosition, resetPageOffset, success)
+        }
 
-        override fun pageChanged() = callback.onPageChanged()
+        override fun pageChanged() {
+            chapterPager.syncWithWindow()
+            callback.onPageChanged()
+        }
 
-        override fun contentLoadFinish() = callback.onContentLoadFinish()
+        override fun contentLoadFinish() {
+            chapterPager.syncWithWindow()
+            callback.onContentLoadFinish()
+        }
 
         override fun upPageAnim(upRecorder: Boolean) {}
 
