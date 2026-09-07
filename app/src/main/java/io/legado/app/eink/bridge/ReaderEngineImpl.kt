@@ -1,22 +1,24 @@
 package io.legado.app.eink.bridge
 
+import androidx.core.net.toUri
 import io.legado.app.constant.AppConst
 import io.legado.app.constant.BookType
 import io.legado.app.data.appDb
 import io.legado.app.data.entities.Book
 import io.legado.app.data.repository.ReadSettingsRepository
-import io.legado.app.domain.gateway.ReadStyleFloatKey
 import io.legado.app.domain.gateway.ReadStyleGateway
 import io.legado.app.domain.gateway.ReadStyleIntKey
 import io.legado.app.domain.gateway.ReadStyleMutation
-import io.legado.app.domain.gateway.ReadStyleStringKey
 import io.legado.app.eink.contract.BookHandle
 import io.legado.app.eink.contract.ReaderBookSnapshot
 import io.legado.app.eink.contract.ReaderEngine
 import io.legado.app.eink.contract.ReaderEngineCallback
+import io.legado.app.eink.contract.ReaderFontOption
+import io.legado.app.eink.contract.ReaderFontSelection
 import io.legado.app.eink.contract.ReaderHeaderFooterVisibility
 import io.legado.app.eink.contract.ReaderPageSnapshot
 import io.legado.app.eink.contract.ReaderPrepareResult
+import io.legado.app.eink.contract.ReaderStyleCatalog
 import io.legado.app.eink.contract.ReaderTextStyle
 import io.legado.app.help.book.BookHelp
 import io.legado.app.help.book.addType
@@ -25,6 +27,7 @@ import io.legado.app.help.book.isLocalModified
 import io.legado.app.help.book.isType
 import io.legado.app.help.book.removeType
 import io.legado.app.help.config.ReadBookConfig
+import io.legado.app.help.loadFontFiles
 import io.legado.app.model.CacheBook
 import io.legado.app.model.ReadBook
 import io.legado.app.model.cache.CacheDownloadRequest
@@ -39,6 +42,11 @@ import splitties.init.appCtx
 import java.util.Date
 import kotlin.coroutines.cancellation.CancellationException
 import kotlin.math.min
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 
 /** Book 快照实现。 */
 internal class ReaderBookSnapshotImpl(override val handle: BookHandle) : ReaderBookSnapshot {
@@ -372,49 +380,22 @@ internal object ReaderEngineImpl : ReaderEngine, KoinComponent {
     }
 
     override fun applyStyle(style: ReaderTextStyle) {
-        val mutations = listOf(
-            ReadStyleMutation.IntValue(ReadStyleIntKey.TextSize, style.textSize),
-            // 标题跟随正文字号：本仓 titleSize 为绝对字号（完整模式排版设置，
-            // 默认 20sp），develop/E-Ink 语义是标题与正文一致——E-Ink 应用
-            // 排版时覆盖完整模式残留的绝对值，保证调整字号后标题同步
-            ReadStyleMutation.IntValue(ReadStyleIntKey.TitleSize, style.textSize),
-            ReadStyleMutation.FloatValue(ReadStyleFloatKey.LetterSpacing, style.letterSpacing),
-                ReadStyleMutation.StringValue(
-                    ReadStyleStringKey.ParagraphIndent,
-                    if (style.indentChars <= 0) {
-                        ""
-                    } else {
-                        INDENT_CHAR.repeat(style.indentChars)
-                    },
-                ),
-            ReadStyleMutation.IntValue(ReadStyleIntKey.LineSpacing, style.lineSpacing),
-            ReadStyleMutation.IntValue(ReadStyleIntKey.ParagraphSpacing, style.paragraphSpacing),
-            ReadStyleMutation.IntValue(ReadStyleIntKey.PaddingLeft, style.paddingLeft),
-            ReadStyleMutation.IntValue(ReadStyleIntKey.PaddingTop, style.paddingTop),
-            ReadStyleMutation.IntValue(ReadStyleIntKey.PaddingRight, style.paddingRight),
-            ReadStyleMutation.IntValue(ReadStyleIntKey.PaddingBottom, style.paddingBottom),
-            ReadStyleMutation.IntValue(ReadStyleIntKey.HeaderPaddingLeft, style.headerPaddingLeft),
-            ReadStyleMutation.IntValue(ReadStyleIntKey.HeaderPaddingTop, style.headerPaddingTop),
-            ReadStyleMutation.IntValue(
-                ReadStyleIntKey.HeaderPaddingRight,
-                style.headerPaddingRight
-            ),
-            ReadStyleMutation.IntValue(
-                ReadStyleIntKey.HeaderPaddingBottom,
-                style.headerPaddingBottom
-            ),
-            ReadStyleMutation.IntValue(ReadStyleIntKey.FooterPaddingLeft, style.footerPaddingLeft),
-            ReadStyleMutation.IntValue(ReadStyleIntKey.FooterPaddingTop, style.footerPaddingTop),
-            ReadStyleMutation.IntValue(
-                ReadStyleIntKey.FooterPaddingRight,
-                style.footerPaddingRight
-            ),
-            ReadStyleMutation.IntValue(
-                ReadStyleIntKey.FooterPaddingBottom,
-                style.footerPaddingBottom
-            ),
+        val mutations = buildStyleMutations(
+            style = style,
+            currentBodyFontPath = ReadBookConfig.durConfig.textFont,
         )
         mutations.forEach(readStyleGateway::updateCurrentStyle)
+        // 正文系统预设写入全局 systemTypefaces（ReadSettings，非样式键）；
+        // 同值重复写无害，DataStore 异步落盘。必须 UNDISPATCHED（与
+        // ReadStyleDelegate.selectSystemTypeface 同款）：onStyleChanged 的
+        // 分页工厂同步读 systemTypefaces，内存值须在其前就位
+        // （setSystemTypefaces 的 putInt 内存层同步生效，磁盘异步不受影响）
+        when (style.bodyFont) {
+            ReaderFontSelection.Sans -> styleScope.launch(start = CoroutineStart.UNDISPATCHED) { readSettingsRepository.setSystemTypefaces(0) }
+            ReaderFontSelection.Serif -> styleScope.launch(start = CoroutineStart.UNDISPATCHED) { readSettingsRepository.setSystemTypefaces(1) }
+            ReaderFontSelection.Mono -> styleScope.launch(start = CoroutineStart.UNDISPATCHED) { readSettingsRepository.setSystemTypefaces(2) }
+            else -> Unit
+        }
         readStyleGateway.save()
         chapterPager.onStyleChanged()
     }
@@ -431,6 +412,71 @@ internal object ReaderEngineImpl : ReaderEngine, KoinComponent {
         get() = ReadBookConfig.textBold.let { it == 1 }
 
     override fun currentStyle(): ReaderTextStyle = ReadBookConfig.snapshotStyle()
+
+    /** 从阅读配置读取排版参数快照。header 显隐读宿主默认档（随状态栏）
+     *  时保持 null（不管理）；footer 仅显/隐两态，0 档读回 true。 */
+    private fun ReadBookConfig.snapshotStyle(): ReaderTextStyle = ReaderTextStyle(
+        textSize = textSize,
+        letterSpacing = letterSpacing,
+        indentChars = paragraphIndent.count { it == INDENT_CHAR[0] },
+        lineSpacing = lineSpacingExtra,
+        paragraphSpacing = paragraphSpacing,
+        paddingLeft = paddingLeft,
+        paddingTop = paddingTop,
+        paddingRight = paddingRight,
+        paddingBottom = paddingBottom,
+        headerPaddingLeft = durConfig.headerPaddingLeft,
+        headerPaddingTop = durConfig.headerPaddingTop,
+        headerPaddingRight = durConfig.headerPaddingRight,
+        headerPaddingBottom = durConfig.headerPaddingBottom,
+        footerPaddingLeft = durConfig.footerPaddingLeft,
+        footerPaddingTop = durConfig.footerPaddingTop,
+        footerPaddingRight = durConfig.footerPaddingRight,
+        footerPaddingBottom = durConfig.footerPaddingBottom,
+        bodyWeight = normalizeHostWeight(durConfig.textBold),
+        titleWeight = normalizeHostWeight(durConfig.titleBold),
+        titleMode = titleMode,
+        titleSize = durConfig.titleSize,
+        titleTopSpacing = durConfig.titleTopSpacing,
+        titleBottomSpacing = durConfig.titleBottomSpacing,
+        titleLineSpacing = durConfig.titleLineSpacingExtra,
+        bodyFont = bodyFontSelection(durConfig.textFont),
+        titleFont = followBodyIfSame(durConfig.titleFont, durConfig.textFont),
+        headerFont = followBodyIfSame(durConfig.headerFont, durConfig.textFont),
+        headerSize = durConfig.headerFontSize,
+        headerDivider = durConfig.showHeaderLine,
+        footerDivider = durConfig.showFooterLine,
+        headerVisible = when (durConfig.headerMode) {
+            1 -> true
+            2 -> false
+            else -> null
+        },
+        footerVisible = when (durConfig.footerMode) {
+            1 -> false
+            else -> true
+        },
+    )
+
+    /** 正文正文字体取值：有文件用文件，否则按全局 systemTypefaces 映射系统预设。 */
+    private fun bodyFontSelection(path: String): ReaderFontSelection = if (path.isNotBlank()) {
+        ReaderFontSelection.File(path)
+    } else {
+        when (readSettingsRepository.currentSettings.systemTypefaces) {
+            1 -> ReaderFontSelection.Serif
+            2 -> ReaderFontSelection.Mono
+            else -> ReaderFontSelection.Sans
+        }
+    }
+
+    /** 与正文路径相同（含同为空）读回 FollowBody：跟随语义不被首次往返
+     * 展开成的显式路径打散；完整模式单独设的相同字体文件同样收拢为
+     * 跟随（字体一致，无行为差异）。 */
+    private fun followBodyIfSame(path: String, bodyPath: String): ReaderFontSelection =
+        if (path.isBlank() || path == bodyPath) {
+            ReaderFontSelection.FollowBody
+        } else {
+            ReaderFontSelection.File(path)
+        }
 
     override fun relayout() {
         // 不清分页缓存：重排是否发生由缓存键决定（内容 hash/排版样式/视口任一
@@ -466,8 +512,24 @@ internal object ReaderEngineImpl : ReaderEngine, KoinComponent {
     override val footerDecorationExtentPx: Float
         get() = LegacyReaderPageDecorationFactory.footerExtentPx()
 
+    override fun styleCatalog(): ReaderStyleCatalog = HostStyleCatalog.create()
+
+    override suspend fun availableFonts(): List<ReaderFontOption> {
+        val folder = readSettingsRepository.currentSettings.fontFolder
+            .takeIf { it.isNotEmpty() }
+            ?.toUri()
+        return loadFontFiles(appCtx, folder).map { ReaderFontOption(name = it.name, path = it.uri.toString()) }
+    }
+
+    override suspend fun setFontFolder(uri: String) {
+        readSettingsRepository.setFontFolder(uri)
+    }
+
     override fun formatTimeNow(): String =
         AppConst.timeFormat.format(Date()).toString()
+
+    /** 排版副作用作用域：applyStyle 内的异步全局设置写入（systemTypefaces）。 */
+    private val styleScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     /**
      * 宿主双轨回调适配（每回调实例缓存一份，恒等比较安全）：
@@ -534,24 +596,3 @@ internal object ReaderEngineImpl : ReaderEngine, KoinComponent {
         }
     }
 }
-
-/** 从阅读配置读取排版参数快照。 */
-private fun ReadBookConfig.snapshotStyle(): ReaderTextStyle = ReaderTextStyle(
-    textSize = textSize,
-    letterSpacing = letterSpacing,
-    indentChars = paragraphIndent.count { it == INDENT_CHAR[0] },
-    lineSpacing = lineSpacingExtra,
-    paragraphSpacing = paragraphSpacing,
-    paddingLeft = paddingLeft,
-    paddingTop = paddingTop,
-    paddingRight = paddingRight,
-    paddingBottom = paddingBottom,
-    headerPaddingLeft = durConfig.headerPaddingLeft,
-    headerPaddingTop = durConfig.headerPaddingTop,
-    headerPaddingRight = durConfig.headerPaddingRight,
-    headerPaddingBottom = durConfig.headerPaddingBottom,
-    footerPaddingLeft = durConfig.footerPaddingLeft,
-    footerPaddingTop = durConfig.footerPaddingTop,
-    footerPaddingRight = durConfig.footerPaddingRight,
-    footerPaddingBottom = durConfig.footerPaddingBottom,
-)
