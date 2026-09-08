@@ -31,17 +31,19 @@ enum class BookshelfTocRefreshResult {
  *  │                            ├─ OK/NO_BOOK/NO_SOURCE/ERROR ─► VM 刷新统计
  *  │                            └─ 成功即预缓存入队（宿主内部）
  *  └─ preDownloadChapterCount > 0
- *       └─ startCacheProcessJob()    预缓存泵循环
- *            └─ 刷新期间 setCacheWorkingState(true) 暂停，结束恢复
+ *       └─ startCacheProcessJob()    预缓存泵循环（模块进程级作用域承载，
+ *                                    不随书架 VM 销毁取消）
+ *            └─ 刷新期间 setCacheWorkingState(false) 暂停，结束恢复 true
  *
  * 入口模板 onCreate ─► deleteBooksNotInBookshelf()   隐藏行清理（IO）
  * defaultToRead 开启 ─► lastReadBookUrl()            直达阅读解析（同步一次）
  * ```
  *
  * 职责边界：模块书架页 VM 保留界面编排（刷新并发调度、逐条更新中
- * 标记、自动刷新触发、预缓存泵循环）；宿主实现负责单本书的完整
- * 目录刷新管线（详情/预更新脚本 → 拉目录 → 进度同步 → 重定向替换
- * → 入库 → 预缓存入队）与书架数据流。
+ * 标记、自动刷新触发、预缓存泵触发）；泵循环由模块进程级作用域承载
+ * （非 VM 作用域），离开书架页仍继续消费已入队章节。宿主实现负责单
+ * 本书的完整目录刷新管线（详情/预更新脚本 → 拉目录 → 进度同步 → 重
+ * 定向替换 → 入库 → 预缓存入队）与书架数据流。
  */
 interface BookshelfEngine {
 
@@ -80,15 +82,16 @@ interface BookshelfEngine {
     val isCacheRunning: Boolean
 
     /**
-     * 预缓存泵运行开关：目录刷新进行中模块会暂停泵（true = 暂停），
-     * 刷新结束后恢复。
+     * 预缓存泵工作态开关：true = 运行，false = 暂停。目录刷新进行中
+     * 模块传 false 暂停泵（目录优先），刷新结束后恢复 true。
      */
     fun setCacheWorkingState(working: Boolean)
 
     /**
      * 启动预缓存处理循环（挂起至泵结束；模块在书架页按
      * [preDownloadChapterCount][GlobalSettings.preDownloadChapterCount]
-     * 门槛调用）。
+     * 门槛调用，运行在模块进程级作用域，不随书架页 VM 销毁取消——
+     * 已入队章节在离开书架页后仍继续消费）。
      */
     suspend fun startCacheProcessJob()
 }
