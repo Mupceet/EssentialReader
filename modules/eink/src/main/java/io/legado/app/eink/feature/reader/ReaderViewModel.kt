@@ -657,8 +657,13 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application),
         }
     }
 
-    fun setHeaderSize(value: Int) = applyStyleChange {
-        it.copy(headerSize = styleCatalog.clampInt(Ids.HEADER_SIZE, value))
+    /** 页眉/页脚字号统一调节：同时写两侧（宿主 applyHeaderStyle 任一
+     *  状态下两端字号一致；页脚经 extent 推导行高）。 */
+    fun setTipSize(value: Int) = applyStyleChange {
+        it.copy(
+            headerSize = styleCatalog.clampInt(Ids.HEADER_SIZE, value),
+            footerSize = styleCatalog.clampInt(Ids.FOOTER_SIZE, value),
+        )
     }
 
     /** 页眉模式：0 随状态栏 / 1 显示 / 2 隐藏（宿主 HeaderMode 同构）；

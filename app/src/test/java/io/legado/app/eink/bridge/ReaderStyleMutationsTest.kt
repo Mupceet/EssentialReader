@@ -99,6 +99,15 @@ class ReaderStyleMutationsTest {
     }
 
     @Test
+    fun `页脚字号独立写入`() {
+        val mutations = buildStyleMutations(
+            ReaderTextStyle(footerSize = 14),
+            currentBodyFontPath = "",
+        )
+        assertEquals(14, ints(mutations).first { it.key == ReadStyleIntKey.FooterFontSize }.value)
+    }
+
+    @Test
     fun `页眉模式null时不跨桥写HeaderMode`() {
         val mutations = buildStyleMutations(
             ReaderTextStyle(footerVisible = true),

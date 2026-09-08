@@ -55,6 +55,7 @@ internal object HostStyleCatalog {
                 default = 0,
             ),
             stepped(Ids.HEADER_SIZE, 0f, 100f, 12f),
+            stepped(Ids.FOOTER_SIZE, 0f, 100f, 12f),
             toggle(Ids.HEADER_DIVIDER, default = false),
             toggle(Ids.FOOTER_VISIBILITY, default = true),
             toggle(Ids.FOOTER_DIVIDER, default = true),

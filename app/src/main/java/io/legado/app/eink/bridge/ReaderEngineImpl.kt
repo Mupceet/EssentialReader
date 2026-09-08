@@ -433,6 +433,7 @@ internal object ReaderEngineImpl : ReaderEngine, KoinComponent {
         titleFont = followBodyIfSame(durConfig.titleFont, durConfig.textFont),
         headerFont = followBodyIfSame(durConfig.headerFont, durConfig.textFont),
         headerSize = durConfig.headerFontSize,
+        footerSize = durConfig.footerFontSize,
         headerDivider = durConfig.showHeaderLine,
         footerDivider = durConfig.showFooterLine,
         headerMode = when (durConfig.headerMode) {

@@ -83,6 +83,7 @@ object ReaderStyleParamIds {
     const val HEADER_FONT = "header.font"
     const val HEADER_VISIBILITY = "header.visibility"
     const val HEADER_SIZE = "header.size"
+    const val FOOTER_SIZE = "footer.size"
     const val HEADER_DIVIDER = "header.divider"
     const val HEADER_PADDING_TOP = "header.padding-top"
     const val HEADER_PADDING_BOTTOM = "header.padding-bottom"

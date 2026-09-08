@@ -87,7 +87,7 @@
   `SearchResultHandle`：引擎实体的不透明句柄。宿主 bridge 包装真实实体，
   模块只持有回传，不解读；实体被替换时的句柄语义见各端口方法 KDoc。
 - **`ReaderTextStyle.kt`** — 排版参数快照：设置面板编辑 →
-  `ReaderEngine.applyStyle` 整体写入；另含 15 个可空协商扩展字段
+  `ReaderEngine.applyStyle` 整体写入；另含 16 个可空协商扩展字段
   （null = 不跨桥写，保持宿主值）。字段单位与编辑区间见文件头 KDoc。
 - **`ReaderStyleCatalog.kt`** — 排版参数协商目录（`ReaderStyleParam`
   描述符 + 稳定 id 集 `ReaderStyleParamIds` + 旧宿主回落基线

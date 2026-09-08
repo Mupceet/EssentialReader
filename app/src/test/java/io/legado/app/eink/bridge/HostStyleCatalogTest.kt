@@ -12,9 +12,9 @@ class HostStyleCatalogTest {
     private val catalog = HostStyleCatalog.create()
 
     @Test
-    fun `完整目录覆盖全部32个参数且全部可用`() {
-        assertEquals(32, catalog.params.size)
-        assertEquals(32, catalog.params.map { it.id }.toSet().size)
+    fun `完整目录覆盖全部33个参数且全部可用`() {
+        assertEquals(33, catalog.params.size)
+        assertEquals(33, catalog.params.map { it.id }.toSet().size)
         assertTrue(catalog.params.all { it.available })
     }
 
@@ -60,7 +60,7 @@ class HostStyleCatalogTest {
         val declaredIds = Ids::class.java.fields
             .filter { it.type == String::class.java } // 排除 object 的 INSTANCE 字段
             .map { it.get(null) as String }
-        assertEquals(32, declaredIds.size)
+        assertEquals(33, declaredIds.size)
         assertEquals(declaredIds.toSet(), catalog.params.map { it.id }.toSet())
     }
 

@@ -428,8 +428,8 @@ fun ReaderRoute(
                 onSetTitleSizeFollowBody = viewModel::setTitleSizeFollowBody,
                 onSetTitleSize = viewModel::setTitleSize,
                 onSetHeaderMode = viewModel::setHeaderMode,
-                onSetHeaderSize = viewModel::setHeaderSize,
                 onSetFooterVisible = viewModel::setFooterVisible,
+                onSetTipSize = viewModel::setTipSize,
                 onClose = { styleDialog = null },
                 onBackdropClick = dismissToCleanReading,
             )

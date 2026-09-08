@@ -21,6 +21,7 @@ class ReaderTextStyleDefaultsTest {
         assertNull(style.headerFont)
         assertNull(style.headerMode)
         assertNull(style.headerSize)
+        assertNull(style.footerSize)
         assertNull(style.headerDivider)
         assertNull(style.footerVisible)
         assertNull(style.footerDivider)

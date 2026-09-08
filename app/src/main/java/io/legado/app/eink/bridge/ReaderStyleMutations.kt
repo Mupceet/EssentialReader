@@ -66,6 +66,7 @@ internal fun buildStyleMutations(
     style.headerFont?.let { str(ReadStyleStringKey.HeaderFont, fontPathForHost(it, effectiveBodyPath)) }
 
     style.headerSize?.let { int(ReadStyleIntKey.HeaderFontSize, it) }
+    style.footerSize?.let { int(ReadStyleIntKey.FooterFontSize, it) }
     style.headerDivider?.let {
         add(ReadStyleMutation.BooleanValue(ReadStyleBooleanKey.ShowHeaderLine, it))
     }

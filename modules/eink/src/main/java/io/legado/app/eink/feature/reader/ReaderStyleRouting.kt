@@ -36,6 +36,7 @@ internal fun styleChangeNeedsRelayout(
         Ids.HEADER_FONT to (old.headerFont != new.headerFont),
         Ids.HEADER_VISIBILITY to (old.headerMode != new.headerMode),
         Ids.HEADER_SIZE to (old.headerSize != new.headerSize),
+        Ids.FOOTER_SIZE to (old.footerSize != new.footerSize),
         Ids.HEADER_DIVIDER to (old.headerDivider != new.headerDivider),
         Ids.HEADER_PADDING_TOP to (old.headerPaddingTop != new.headerPaddingTop),
         Ids.HEADER_PADDING_BOTTOM to (old.headerPaddingBottom != new.headerPaddingBottom),

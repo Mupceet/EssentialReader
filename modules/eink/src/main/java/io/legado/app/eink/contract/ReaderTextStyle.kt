@@ -100,6 +100,10 @@ data class ReaderTextStyle(
     /** 页眉字号（sp，经 extent 影响正文分页预留）；null = 不管理。 */
     val headerSize: Int? = null,
 
+    /** 页脚字号（sp，与 [headerSize] 由同一拖动条统一写入；经 extent
+     *  影响正文分页预留）；null = 不管理。 */
+    val footerSize: Int? = null,
+
     /** 页眉分割线；null = 不管理。 */
     val headerDivider: Boolean? = null,
 
