@@ -590,16 +590,19 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application),
 
     // ---- 协商扩展参数（目录可用性由 UI 入口判定，VM 只管写） ----
 
-    fun setBodyFont(selection: ReaderFontSelection) = applyStyleChange {
-        it.copy(bodyFont = selection)
+    /** 统一字体：正文/标题/页眉（页脚经 applyHeaderStyle 跟随页眉）完全
+     *  一致——选字体时正文直写、标题/页眉归位「跟随正文」，由桥展开为
+     *  同一路径；正文选系统预设时跟随者回落空串（宿主语义）。 */
+    fun setReaderFont(selection: ReaderFontSelection) = applyStyleChange {
+        it.copy(
+            bodyFont = selection,
+            titleFont = ReaderFontSelection.FollowBody,
+            headerFont = ReaderFontSelection.FollowBody,
+        )
     }
 
     fun setBodyWeight(value: Int) = applyStyleChange {
         it.copy(bodyWeight = styleCatalog.clampInt(Ids.BODY_WEIGHT, value))
-    }
-
-    fun setTitleFont(selection: ReaderFontSelection) = applyStyleChange {
-        it.copy(titleFont = selection)
     }
 
     fun setTitleWeight(value: Int) = applyStyleChange {
@@ -624,10 +627,6 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application),
 
     fun setTitleLineSpacing(value: Int) = applyStyleChange {
         it.copy(titleLineSpacing = styleCatalog.clampInt(Ids.TITLE_LINE_SPACING, value))
-    }
-
-    fun setHeaderFont(selection: ReaderFontSelection) = applyStyleChange {
-        it.copy(headerFont = selection)
     }
 
     fun setHeaderSize(value: Int) = applyStyleChange {

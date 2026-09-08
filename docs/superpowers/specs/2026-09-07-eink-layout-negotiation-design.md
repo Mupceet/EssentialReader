@@ -107,7 +107,7 @@ sealed interface ReaderFontSelection {
 | body.line-spacing 行距 | 滑条 | 0..2.0倍（1.2） | lineSpacingExtra | 是 |
 | body.paragraph-spacing 段距 | 滑条 | 0..2.0行（0.2） | paragraphSpacing | 是 |
 
-### 4.2 字体配置弹层（tabs 正文｜标题｜页眉）
+### 4.2 字体配置弹层（单列表统一字体）
 
 | eink id / 名称 | 控件 | 选项/值域（默认） | 宿主落点 | affectsLayout |
 |---|---|---|---|---|
@@ -118,6 +118,8 @@ sealed interface ReaderFontSelection {
 | header.font 页眉字体 | 列表选择 | +「跟随正文」（跟随正文） | headerFont | 是 |
 
 页眉无字重键（宿主未提供），故无滑条；页脚不暴露字体（经宿主 `applyHeaderStyle` 默认开传递性跟随页眉）。
+
+title.font/header.font 参数仍在协商目录中，但 eink UI 不再独立暴露（统一字体原则下恒为「跟随正文」）。
 
 ### 4.3 信息配置弹层（tabs 标题｜页眉｜页脚）
 
@@ -202,7 +204,7 @@ sealed interface ReaderFontSelection {
 
 ### 6.2 三个弹层（居中透明 + 隐藏操作条，边距弹框既有模式）
 
-- **字体配置**：tabs 正文｜标题｜页眉。每 tab = 字体列表（可滚动，含「跟随正文」项）+（正文/标题）字重滑条。
+- **字体配置**：单列表统一选字体（系统预设 + 字体文件 + 文件夹入口）+ 正文/标题字重滑条——统一字体原则，正文/标题/页眉/页脚字体完全一致，无页签。
 - **信息配置**：tabs 标题｜页眉｜页脚，内容见 4.3。
 - **边距调整**：现状三 tab 四边滑条，零改动。
 
@@ -250,3 +252,4 @@ sealed interface ReaderFontSelection {
 - 2026-09-07 终审修订：标题/页眉字体选项移除系统预设行（宿主 titleFont/headerFont 键仅收文件路径，空串回落正文/系统默认，预设不可表达且选中不粘）；§5.2 实施对齐：页眉/页脚左右边距为纯绘制参数，移出分页缓存键（避免无谓整章重排）。
 - 2026-09-08 修订：页眉显隐升级为三态（随状态栏/显示/隐藏，宿主 HeaderMode 同构）——解除「一经显式设置回不到随状态栏」的单向棘轮，隐藏状态栏开关恢复自动驱动页眉显隐；契约字段 headerVisible:Boolean? 更名 headerMode:Int?。
 - 2026-09-08 修订：页眉/页脚字体在 eink 端按「设置→跟随正文→系统默认」链渲染（新端口 headerFooterTypefaces，宿主解析并加载 Typeface）——解除此前"字形仅在完整模式生效"的限制。
+- 2026-09-08 修订：字体配置弹层去页签——统一字体原则（正文/标题/页眉/页脚字体完全一致），单列表选字体 + 正文/标题两个字重；VM setReaderFont 一次性写三目标（标题/页眉归位跟随正文），独立 per-target 字体 setter 移除。
