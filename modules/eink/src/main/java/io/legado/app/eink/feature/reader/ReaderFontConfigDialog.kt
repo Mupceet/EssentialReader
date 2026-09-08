@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
@@ -79,33 +80,40 @@ internal fun ReaderFontConfigDialog(
                     )
                 }
             }
-            // 网格顶部加呼吸边距，与标题区拉开层次；行间保持既有节奏
-            Column(
+            // 标签在左（与字重行共用 64dp 标签列，左缘对齐），网格居右；
+            // 顶部加呼吸边距与标题区拉开层次，行间保持既有节奏
+            Row(
                 modifier = Modifier.padding(top = EInkSpacing.s),
-                verticalArrangement = Arrangement.spacedBy(EInkSpacing.xs),
+                horizontalArrangement = Arrangement.spacedBy(EInkSpacing.xs),
+                verticalAlignment = Alignment.Top,
             ) {
-                // 与字重行标签同款样式（labelLarge），区头语义
                 EInkText(
                     text = "字体选择",
                     style = EInkTheme.typography.labelLarge,
+                    modifier = Modifier.width(SliderLabelWidth),
                     maxLines = 1,
                 )
-                entries.chunked(3).forEach { rowEntries ->
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(EInkSpacing.xs),
-                    ) {
-                        rowEntries.forEach { entry ->
-                            EInkButton(
-                                text = entry.label,
-                                onClick = entry.onClick,
-                                modifier = Modifier.weight(1f),
-                                selected = entry.selected,
-                                height = 44.dp,
-                                role = Role.Button,
-                            )
+                Column(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(EInkSpacing.xs),
+                ) {
+                    entries.chunked(3).forEach { rowEntries ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(EInkSpacing.xs),
+                        ) {
+                            rowEntries.forEach { entry ->
+                                EInkButton(
+                                    text = entry.label,
+                                    onClick = entry.onClick,
+                                    modifier = Modifier.weight(1f),
+                                    selected = entry.selected,
+                                    height = 44.dp,
+                                    role = Role.Button,
+                                )
+                            }
+                            repeat(3 - rowEntries.size) { Spacer(modifier = Modifier.weight(1f)) }
                         }
-                        repeat(3 - rowEntries.size) { Spacer(modifier = Modifier.weight(1f)) }
                     }
                 }
             }
