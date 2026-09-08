@@ -182,7 +182,7 @@ Java 17 / minSdk 21（按 §0 升 23）/ 无 Compose 无 Coil（图片栈 Glide�
   ImageLoader 拦截器（本仓形态）；Glide 等其它栈宿主默认无防盗链
   （相关封面回退占位），恢复路径为模块的 Coil 实例注册带书源解析的
   网络拦截器。
-- **排版协商与字体端口（0.3.0 起）**：`ReaderEngine` 新增四个带默认
+- **排版协商与字体端口（0.3.0 起）**：`ReaderEngine` 新增五个带默认
   实现的成员，旧宿主零改动即降级——`styleCatalog()` 不实现即返回
   null，模块回落内置 17 参数基线（`FallbackReaderStyleCatalog`），
   字体/字重/标题/页眉页脚设置行全部隐藏（= 0.2.x 行为）。要启用这些
@@ -190,7 +190,9 @@ Java 17 / minSdk 21（按 §0 升 23）/ 无 Compose 无 Coil（图片栈 Glide�
   本仓 `HostStyleCatalog`，逐参数声明可用性/值域/默认值/affectsLayout，
   值域与宿主排版设置 UI 同源）+ 实现 `availableFonts()` /
   `setFontFolder(uri)`（字体文件夹枚举与 SAF 持久化授权，均 suspend、
-  阻塞式，模块在 IO 上下文调用）。同版本起 `setTextBold` / `textBold`
+  阻塞式，模块在 IO 上下文调用）；`fontFolderUri()` 返回当前持久化的
+  字体文件夹（不实现返回 null，模块按钮恒显示「选择字体文件夹」）。
+  同版本起 `setTextBold` / `textBold`
   已移除，加粗能力由字重参数（body.weight / title.weight 100..900）
   取代。另 `headerFooterTypefaces()` 返回页眉/页脚的有效字体（按
   「设置→跟随正文→系统默认」链解析，宿主负责 Typeface 加载与缓存），

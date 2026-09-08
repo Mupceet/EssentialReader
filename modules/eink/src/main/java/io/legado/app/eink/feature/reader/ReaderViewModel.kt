@@ -601,12 +601,18 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application),
         )
     }
 
+    /** 字重域：0 常规 / 1 粗体 / 2 细体 / 100..900 自定义（宿主同构）。 */
+    private fun coerceWeight(value: Int): Int = when (value) {
+        in 0..2 -> value
+        else -> value.coerceIn(100, 900)
+    }
+
     fun setBodyWeight(value: Int) = applyStyleChange {
-        it.copy(bodyWeight = styleCatalog.clampInt(Ids.BODY_WEIGHT, value))
+        it.copy(bodyWeight = coerceWeight(value))
     }
 
     fun setTitleWeight(value: Int) = applyStyleChange {
-        it.copy(titleWeight = styleCatalog.clampInt(Ids.TITLE_WEIGHT, value))
+        it.copy(titleWeight = coerceWeight(value))
     }
 
     fun setTitleMode(value: Int) = applyStyleChange {
@@ -661,10 +667,16 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application),
     /** 可选字体文件（宿主字体文件夹枚举）。 */
     val fontOptions = _fontOptions.asStateFlow()
 
+    private val _fontFolderSet = MutableStateFlow(false)
+
+    /** 是否已选择字体文件夹（底部按钮文案依据）。 */
+    val fontFolderSet = _fontFolderSet.asStateFlow()
+
     /** 拉取字体文件列表（打开字体配置弹层时调用）。 */
     fun loadFontOptions() {
         viewModelScope.launch(Dispatchers.IO) {
             _fontOptions.value = engine.availableFonts()
+            _fontFolderSet.value = engine.fontFolderUri() != null
         }
     }
 
@@ -673,6 +685,7 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application),
         viewModelScope.launch(Dispatchers.IO) {
             engine.setFontFolder(uri)
             _fontOptions.value = engine.availableFonts()
+            _fontFolderSet.value = engine.fontFolderUri() != null
         }
     }
 

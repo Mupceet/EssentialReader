@@ -118,21 +118,20 @@ class ReaderStyleMutationsTest {
     }
 
     @Test
-    fun `字重写入钳制到100到900`() {
+    fun `字重预设档直传其余钳到自定义区间`() {
         val mutations = buildStyleMutations(
+            ReaderTextStyle(bodyWeight = 0, titleWeight = 2),
+            currentBodyFontPath = "",
+        )
+        assertEquals(0, ints(mutations).first { it.key == ReadStyleIntKey.TextBold }.value)
+        assertEquals(2, ints(mutations).first { it.key == ReadStyleIntKey.TitleBold }.value)
+
+        val clamped = buildStyleMutations(
             ReaderTextStyle(bodyWeight = 50, titleWeight = 950),
             currentBodyFontPath = "",
         )
-        assertEquals(100, ints(mutations).first { it.key == ReadStyleIntKey.TextBold }.value)
-        assertEquals(900, ints(mutations).first { it.key == ReadStyleIntKey.TitleBold }.value)
-    }
-
-    @Test
-    fun `宿主遗留字重值归一化`() {
-        assertEquals(900, normalizeHostWeight(1))
-        assertEquals(300, normalizeHostWeight(2))
-        assertEquals(500, normalizeHostWeight(500))
-        assertEquals(400, normalizeHostWeight(0))
+        assertEquals(100, ints(clamped).first { it.key == ReadStyleIntKey.TextBold }.value)
+        assertEquals(900, ints(clamped).first { it.key == ReadStyleIntKey.TitleBold }.value)
     }
 
     @Test

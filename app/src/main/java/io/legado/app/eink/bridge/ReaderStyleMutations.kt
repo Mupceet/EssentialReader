@@ -53,8 +53,8 @@ internal fun buildStyleMutations(
     style.titleTopSpacing?.let { int(ReadStyleIntKey.TitleTopSpacing, it) }
     style.titleBottomSpacing?.let { int(ReadStyleIntKey.TitleBottomSpacing, it) }
     style.titleLineSpacing?.let { int(ReadStyleIntKey.TitleLineSpacingExtra, it) }
-    style.bodyWeight?.let { int(ReadStyleIntKey.TextBold, it.coerceIn(100, 900)) }
-    style.titleWeight?.let { int(ReadStyleIntKey.TitleBold, it.coerceIn(100, 900)) }
+    style.bodyWeight?.let { int(ReadStyleIntKey.TextBold, weightForHost(it)) }
+    style.titleWeight?.let { int(ReadStyleIntKey.TitleBold, weightForHost(it)) }
 
     val effectiveBodyPath = when (val body = style.bodyFont) {
         null -> currentBodyFontPath
@@ -86,10 +86,8 @@ private fun fontPathForHost(
     ReaderFontSelection.Sans, ReaderFontSelection.Serif, ReaderFontSelection.Mono -> ""
 }
 
-/** 宿主遗留字重值（0 正常 / 1 粗 / 2 细 / 100..900）归一化为 100..900，与引擎 resolveWeight 同口径。 */
-internal fun normalizeHostWeight(value: Int): Int = when (value) {
-    1 -> 900
-    2 -> 300
-    in 100..900 -> value
-    else -> 400
+/** 字重域收口：0/1/2 预设直传（宿主下拉语义），其余钳到自定义区间 100..900。 */
+internal fun weightForHost(value: Int): Int = when (value) {
+    in 0..2 -> value
+    else -> value.coerceIn(100, 900)
 }

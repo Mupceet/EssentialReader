@@ -422,8 +422,8 @@ internal object ReaderEngineImpl : ReaderEngine, KoinComponent {
         footerPaddingTop = durConfig.footerPaddingTop,
         footerPaddingRight = durConfig.footerPaddingRight,
         footerPaddingBottom = durConfig.footerPaddingBottom,
-        bodyWeight = normalizeHostWeight(durConfig.textBold),
-        titleWeight = normalizeHostWeight(durConfig.titleBold),
+        bodyWeight = durConfig.textBold,
+        titleWeight = durConfig.titleBold,
         titleMode = titleMode,
         titleSize = durConfig.titleSize,
         titleTopSpacing = durConfig.titleTopSpacing,
@@ -532,6 +532,9 @@ internal object ReaderEngineImpl : ReaderEngine, KoinComponent {
     override suspend fun setFontFolder(uri: String) {
         readSettingsRepository.setFontFolder(uri)
     }
+
+    override fun fontFolderUri(): String? =
+        readSettingsRepository.currentSettings.fontFolder.takeIf { it.isNotEmpty() }
 
     override fun formatTimeNow(): String =
         AppConst.timeFormat.format(Date()).toString()

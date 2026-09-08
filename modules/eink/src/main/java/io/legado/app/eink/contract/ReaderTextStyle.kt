@@ -61,13 +61,15 @@ data class ReaderTextStyle(
     /** 正文字体；null = 不管理。 */
     val bodyFont: ReaderFontSelection? = null,
 
-    /** 正文字重（100..900 可变字重）；null = 不管理。 */
+    /** 正文字重：0 常规 / 1 粗体 / 2 细体 / 100..900 自定义可变字重
+     *  （宿主 textBold 同构，预设档直传保留宿主下拉语义）；null = 不管理。 */
     val bodyWeight: Int? = null,
 
     /** 标题字体；null = 不管理，[ReaderFontSelection.FollowBody] = 跟随正文。 */
     val titleFont: ReaderFontSelection? = null,
 
-    /** 标题字重（100..900）；null = 不管理。 */
+    /** 标题字重：0 常规 / 1 粗体 / 2 细体 / 100..900 自定义可变字重
+     *  （宿主 titleBold 同构，预设档直传保留宿主下拉语义）；null = 不管理。 */
     val titleWeight: Int? = null,
 
     /** 标题位置（0 左 / 1 中 / 2 隐藏，宿主语义）；null = 不管理。 */
