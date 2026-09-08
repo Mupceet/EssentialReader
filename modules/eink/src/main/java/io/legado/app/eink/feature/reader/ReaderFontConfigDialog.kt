@@ -84,6 +84,12 @@ internal fun ReaderFontConfigDialog(
                 modifier = Modifier.padding(top = EInkSpacing.s),
                 verticalArrangement = Arrangement.spacedBy(EInkSpacing.xs),
             ) {
+                // 与字重行标签同款样式（labelLarge），区头语义
+                EInkText(
+                    text = "字体选择",
+                    style = EInkTheme.typography.labelLarge,
+                    maxLines = 1,
+                )
                 entries.chunked(3).forEach { rowEntries ->
                     Row(
                         modifier = Modifier.fillMaxWidth(),
