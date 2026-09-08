@@ -134,7 +134,7 @@ title.font/header.font 参数仍在协商目录中，但 eink UI 不再独立暴
 | header.size 页眉字号 | 滑条 | 0..100sp（12） | headerFontSize | 是 |
 | header.divider 页眉分割线 | （不暴露） | （关） | showHeaderLine | 是 |
 | footer.visibility 页脚显隐 | 二选 | 显示/隐藏（开） | footerMode | 是 |
-| footer.size 页脚字号 | 拖动条（与 header.size 统一写入） | 0..100sp（12） | footerFontSize | 是 |
+| footer.size 页眉页脚字号 | 拖动条（与 header.size 统一写入） | 0..100sp（12） | footerFontSize | 是 |
 | footer.divider 页脚分割线 | （不暴露） | （开） | showFooterLine | 是 |
 
 ### 4.4 边距调整弹层（现状三 tab，零改动）
@@ -223,7 +223,7 @@ title.font/header.font 参数仍在协商目录中，但 eink UI 不再独立暴
     该边界下随正文态标题短暂为 8sp）；
   - 页眉显示：三选按钮行「显示/隐藏/随状态栏」；
   - 页脚显示：两按钮「显示/隐藏」——第三槽 Spacer 占位，与页眉行同列对齐；
-  - 页脚字号：统一拖动条（常驻）——一次调整同时写 headerFontSize 与
+  - 页眉页脚字号：统一拖动条（常驻）——一次调整同时写 headerFontSize 与
     footerFontSize（宿主 applyHeaderStyle 任一状态下两端字号一致；页脚
     渲染按 extent 推导行高，无需其它改动）；
   - 上/下留白、标题行距、页眉页脚分割线不暴露（eink 不绘制分割线，
@@ -279,3 +279,4 @@ title.font/header.font 参数仍在协商目录中，但 eink UI 不再独立暴
 - 2026-09-08 修订：字体弹层打磨——字重行标签与四选按钮同排单行、文字样式统一；进入自定义按当前档位映射等效值（不写死 500）；字体网格加顶部呼吸边距；文件夹按钮统一「选择字体文件夹」（fontFolderUri 端口随之移除）。
 - 2026-09-08 修订：信息配置精简——标题字号改「随正文一致/自定义」二选（随正文由 VM 保持 titleSize==textSize，进自定义初值=正文字号）；删除上/下留白、标题行距、页眉页脚分割线设置（分割线 eink 不绘制）；页眉合并为模式三选+字号拖动条；页脚两按钮按三槽空间与页眉行对齐；标签按需占宽保完整。
 - 2026-09-08 修订：信息配置合并单页去页签；「页眉显示」「页脚显示」按钮序改为 显示/隐藏/随状态栏（页脚第三槽占位对齐）；页眉页脚字号统一为「页脚字号」单拖动条（新增 footer.size 契约字段，一次写 HeaderFontSize+FooterFontSize，applyHeaderStyle 任一状态下两端一致）。
+- 2026-09-08 修订：统一字号拖动条标签「页脚字号」更名「页眉页脚字号」——标签与实际语义（页眉/页脚共用同一字号）一致。

@@ -704,7 +704,7 @@ private fun rememberStatusBarTop(): Dp {
 
 /**
  * 页眉：时间（左）+ 电量%（右）。可见性与内容按 View 版 ReadTipConfig 默认规则。
- * 字号优先取协商目录的页眉字号配置（[headerTipTextStyle]），推导仅兜底。
+ * 字号优先取协商目录的页眉字号配置（[configuredTipTextStyle]），推导仅兜底。
  * 字体按「设置→跟随正文→系统默认」链从端口解析
  * （[io.legado.app.eink.contract.ReaderEngine.headerFooterTypefaces]）。
  *
@@ -719,7 +719,7 @@ private fun ReaderHeader(
 ) {
     val textColor =
         if (contentVisible) EInkTheme.colorScheme.onSurfaceVariant else Color.Transparent
-    val tipStyle = headerTipTextStyle(
+    val tipStyle = configuredTipTextStyle(
         availablePx = extentPx -
             state.style.headerPaddingTop.dpPx() -
             state.style.headerPaddingBottom.dpPx(),
@@ -762,11 +762,13 @@ private fun ReaderHeader(
  */
 @Composable
 private fun ReaderFooter(state: ReaderUiState, extentPx: Float) {
-    // 进度条 2dp 是模块自有装饰，不在宿主预留预算内，需先扣减
-    val tipStyle = tipTextStyle(
+    // 进度条 2dp 是模块自有装饰，不在宿主预留预算内，需先扣减；
+    // 字号与页眉统一——按配置字号直接渲染（非 14/20 推导）
+    val tipStyle = configuredTipTextStyle(
         availablePx = extentPx - 2.dpPx() -
             state.style.footerPaddingTop.dpPx() -
             state.style.footerPaddingBottom.dpPx(),
+        configuredSizeSp = state.style.footerSize,
     )
     val tipStyleWithFont = EInkEngineRegistry.readerEngine.headerFooterTypefaces().footer
         ?.let { tipStyle.copy(fontFamily = FontFamily(it)) }
@@ -830,15 +832,17 @@ private fun tipTextStyle(availablePx: Float): TextStyle {
 }
 
 /**
- * 页眉文字样式：宿主字号可见（协商目录 header.size）后按配置字号渲染
- * （像素锚定，不随应用内字体缩放），行高锚定条带可用高度、行内垂直
- * 居中。宿主 extent 本就按同字号的字体度量预留（padding+fontLine+
- * divider），配置字号按构造放得下；模块渲染字体与宿主页眉字体度量不
- * 同时可能轻微越界，但 lineHeight 不裁字形、居中对称，观感安全。
- * 字号缺失或非正（旧宿主桥/极端配置）时回落 [tipTextStyle] 推导。
+ * 页眉/页脚文字样式（配置字号渲染）：协商目录字号可见后按配置字号
+ * 渲染（像素锚定，不随应用内字体缩放），行高锚定条带可用高度、行内
+ * 垂直居中——页眉与页脚用同一配置字号（eink 统一写入两侧），视觉上
+ * 严格同字号。宿主 extent 本就按同字号的字体度量预留（padding+
+ * fontLine+divider），配置字号按构造放得下；模块渲染字体与宿主字体
+ * 度量不同时可能轻微越界，但 lineHeight 不裁字形、居中对称，观感
+ * 安全。字号缺失或非正（旧宿主桥/极端配置）时回落 [tipTextStyle]
+ * 推导。
  */
 @Composable
-private fun headerTipTextStyle(availablePx: Float, configuredSizeSp: Int?): TextStyle {
+private fun configuredTipTextStyle(availablePx: Float, configuredSizeSp: Int?): TextStyle {
     val density = LocalDensity.current
     if (configuredSizeSp != null && configuredSizeSp > 0) {
         val linePx = availablePx.takeIf { it > 0f } ?: with(density) { 23.dp.toPx() }

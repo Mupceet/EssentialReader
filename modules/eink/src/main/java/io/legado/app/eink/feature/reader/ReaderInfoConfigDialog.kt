@@ -30,8 +30,8 @@ import io.legado.app.eink.designsystem.theme.EInkSpacing
  * 信息配置弹层（单页）：标题位置三选；标题字号「随正文一致/自定义」
  * 二选（仅自定义显示拖动条，初值=当前标题字号）；「页眉显示」「页脚
  * 显示」两行按钮依次 显示/隐藏/随状态栏（页脚仅前两枚，第三槽占位
- * 与页眉行同列对齐）；「页脚字号」统一拖动条（页眉/页脚字号一次写
- * 两侧）。标签按需占宽保证完整显示（Box 居中 intrinsic，同字体弹层）。
+ * 与页眉行同列对齐）；「页眉页脚字号」统一拖动条（页眉/页脚共用同一
+ * 字号，一次写两侧）。标签按需占宽保证完整显示（Box 居中 intrinsic，同字体弹层）。
  *  上/下留白、标题行距、页眉页脚分割线不暴露（eink 不支持分割线绘制，
  *  留白/行距不开放调节）。
  */
@@ -146,7 +146,7 @@ internal fun ReaderInfoConfigDialog(
                     Spacer(modifier = Modifier.weight(1f))
                 }
             }
-            LabeledSettingRow(label = "页脚字号") {
+            LabeledSettingRow(label = "页眉页脚字号") {
                 SliderRow(
                     label = null,
                     value = style.footerSize ?: catalog.defaultInt(Ids.FOOTER_SIZE),
