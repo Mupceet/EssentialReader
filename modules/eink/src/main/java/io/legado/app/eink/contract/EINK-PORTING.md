@@ -192,7 +192,9 @@ Java 17 / minSdk 21（按 §0 升 23）/ 无 Compose 无 Coil（图片栈 Glide�
   `setFontFolder(uri)`（字体文件夹枚举与 SAF 持久化授权，均 suspend、
   阻塞式，模块在 IO 上下文调用）。同版本起 `setTextBold` / `textBold`
   已移除，加粗能力由字重参数（body.weight / title.weight 100..900）
-  取代。
+  取代。另 `headerFooterTypefaces()` 返回页眉/页脚的有效字体（按
+  「设置→跟随正文→系统默认」链解析，宿主负责 Typeface 加载与缓存），
+  不实现即返回 null，模块页眉/页脚文字用平台默认字体渲染。
 - **资源合并**：模块资源全部 `eink_` 前缀，与任何宿主零同名。
 - **D8/R8 元数据警告**：AGP 8.x 宿主消费新 Kotlin metadata 的库时 D8
   打 warning（不阻塞 debug；release R8 需真机回归确认）。

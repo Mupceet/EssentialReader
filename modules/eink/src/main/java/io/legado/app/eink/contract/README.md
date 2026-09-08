@@ -92,11 +92,12 @@
 - **`ReaderStyleCatalog.kt`** — 排版参数协商目录（`ReaderStyleParam`
   描述符 + 稳定 id 集 `ReaderStyleParamIds` + 旧宿主回落基线
   `FallbackReaderStyleCatalog`）；伴生 `ReaderFontSelection.kt` 为字体
-  取值与选项类型。`ReaderEngine` 三个关联端口成员（默认实现 =
+  取值与选项类型。`ReaderEngine` 四个关联端口成员（默认实现 =
   能力降级）：
   - `styleCatalog(): ReaderStyleCatalog?` — 排版参数协商目录（null = 旧宿主，模块回落内置基线 FallbackReaderStyleCatalog）
   - `availableFonts(): List<ReaderFontOption>` — 字体文件夹枚举（suspend，阻塞式，调用方 IO 上下文）
   - `setFontFolder(uri: String)` — 持久化字体文件夹（suspend）
+  - `headerFooterTypefaces(): ReaderTipTypefaces` — 页眉/页脚有效字体（设置→跟随正文→系统默认）
 - **`ReaderPageSnapshot.kt`** — 排版产物页快照：宿主把引擎排版结果映射
   而来（渲染侧唯一职责），模块自持画布绘制。坐标原样拷贝、构建后
   不可变、画笔规格只含测量耦合参数。

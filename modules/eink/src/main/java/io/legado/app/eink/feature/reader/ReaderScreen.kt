@@ -49,6 +49,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -710,6 +711,8 @@ private fun rememberStatusBarTop(): Dp {
 /**
  * 页眉：时间（左）+ 电量%（右）。可见性与内容按 View 版 ReadTipConfig 默认规则。
  * 字号优先取协商目录的页眉字号配置（[headerTipTextStyle]），推导仅兜底。
+ * 字体按「设置→跟随正文→系统默认」链从端口解析
+ * （[io.legado.app.eink.contract.ReaderEngine.headerFooterTypefaces]）。
  *
  * [contentVisible] 为 false 时文字转透明（尺寸不变）：菜单展开期状态栏
  * 恢复显示覆盖页眉条带，让位但保持布局，避免正文重排。
@@ -728,6 +731,9 @@ private fun ReaderHeader(
             state.style.headerPaddingBottom.dpPx(),
         configuredSizeSp = state.style.headerSize,
     )
+    val tipStyleWithFont = EInkEngineRegistry.readerEngine.headerFooterTypefaces().header
+        ?.let { tipStyle.copy(fontFamily = FontFamily(it)) }
+        ?: tipStyle
     // fillMaxSize：容器已按宿主页眉预留高度定高，行撑满预留区、文字
     // 纵向居中，与完整模式装饰的几何一致
     Row(
@@ -744,18 +750,22 @@ private fun ReaderHeader(
         BasicText(
             text = state.headerTime,
             modifier = Modifier.weight(1f),
-            style = tipStyle.copy(color = textColor),
+            style = tipStyleWithFont.copy(color = textColor),
             maxLines = 1,
         )
         BasicText(
             text = "${state.batteryPercent}%",
-            style = tipStyle.copy(color = textColor),
+            style = tipStyleWithFont.copy(color = textColor),
             maxLines = 1,
         )
     }
 }
 
-/** 页脚：顶部自动翻页进度条 + 章节标题（左）/ 页数及进度（右，View 版 pageAndTotal 格式）。 */
+/**
+ * 页脚：顶部自动翻页进度条 + 章节标题（左）/ 页数及进度（右，View 版 pageAndTotal 格式）。
+ * 字体按「设置→跟随正文→系统默认」链从端口解析
+ * （[io.legado.app.eink.contract.ReaderEngine.headerFooterTypefaces]）。
+ */
 @Composable
 private fun ReaderFooter(state: ReaderUiState, extentPx: Float) {
     // 进度条 2dp 是模块自有装饰，不在宿主预留预算内，需先扣减
@@ -764,6 +774,9 @@ private fun ReaderFooter(state: ReaderUiState, extentPx: Float) {
             state.style.footerPaddingTop.dpPx() -
             state.style.footerPaddingBottom.dpPx(),
     )
+    val tipStyleWithFont = EInkEngineRegistry.readerEngine.headerFooterTypefaces().footer
+        ?.let { tipStyle.copy(fontFamily = FontFamily(it)) }
+        ?: tipStyle
     // fillMaxSize：容器已按宿主页脚预留高度定高，文字行在剩余空间内
     // 纵向居中
     Column(modifier = Modifier.fillMaxSize()) {
@@ -783,13 +796,13 @@ private fun ReaderFooter(state: ReaderUiState, extentPx: Float) {
             BasicText(
                 text = state.chapterTitle,
                 modifier = Modifier.weight(1f),
-                style = tipStyle.copy(color = EInkTheme.colorScheme.onSurfaceVariant),
+                style = tipStyleWithFont.copy(color = EInkTheme.colorScheme.onSurfaceVariant),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
             BasicText(
                 text = state.pageAndTotal,
-                style = tipStyle.copy(color = EInkTheme.colorScheme.onSurfaceVariant),
+                style = tipStyleWithFont.copy(color = EInkTheme.colorScheme.onSurfaceVariant),
                 maxLines = 1,
             )
         }

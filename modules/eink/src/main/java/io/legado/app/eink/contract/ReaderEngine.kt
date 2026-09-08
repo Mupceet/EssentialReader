@@ -362,6 +362,14 @@ interface ReaderEngine {
     /** 同 [headerDecorationExtentPx]，页脚侧。 */
     val footerDecorationExtentPx: Float get() = 0f
 
+    /**
+     * 页眉/页脚文字的有效字体（模块本地渲染用）。规则：页眉/页脚设置
+     * 了字体文件用之，未设置跟随正文字体，正文也未设置（系统预设）用
+     * 对应系统字体（默认返回 null = 模块平台默认）。宿主负责 Typeface
+     * 加载与缓存；即时反映当前配置，调用方组合期读取。
+     */
+    fun headerFooterTypefaces(): ReaderTipTypefaces = ReaderTipTypefaces()
+
     /** 当前时间文本（按宿主的用户可见时间格式格式化，页眉时钟用）。 */
     fun formatTimeNow(): String
 }

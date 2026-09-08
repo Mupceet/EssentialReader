@@ -1,5 +1,6 @@
 package io.legado.app.eink.bridge
 
+import android.graphics.Typeface
 import androidx.core.net.toUri
 import io.legado.app.constant.AppConst
 import io.legado.app.constant.BookType
@@ -18,6 +19,7 @@ import io.legado.app.eink.contract.ReaderPageSnapshot
 import io.legado.app.eink.contract.ReaderPrepareResult
 import io.legado.app.eink.contract.ReaderStyleCatalog
 import io.legado.app.eink.contract.ReaderTextStyle
+import io.legado.app.eink.contract.ReaderTipTypefaces
 import io.legado.app.help.book.BookHelp
 import io.legado.app.help.book.addType
 import io.legado.app.help.book.isLocal
@@ -498,6 +500,25 @@ internal object ReaderEngineImpl : ReaderEngine, KoinComponent {
 
     override val footerDecorationExtentPx: Float
         get() = LegacyReaderPageDecorationFactory.footerExtentPx()
+
+    override fun headerFooterTypefaces(): ReaderTipTypefaces {
+        val config = ReadBookConfig.config
+        val systemTypefaces = readSettingsRepository.currentSettings.systemTypefaces
+        val header = resolveHeaderTipFont(config.headerFont, config.textFont, systemTypefaces)
+        val footer = resolveFooterTipFont(
+            footerFont = config.footerFont,
+            applyHeaderStyle = config.applyHeaderStyle,
+            headerResolved = header,
+            textFont = config.textFont,
+            systemTypefaces = systemTypefaces,
+        )
+        fun load(font: TipFont?): Typeface? = when (font) {
+            is TipFont.File -> loadTipTypeface(font.path)
+            is TipFont.Preset -> presetTypeface(font.index)
+            null -> null
+        }
+        return ReaderTipTypefaces(header = load(header), footer = load(footer))
+    }
 
     override fun styleCatalog(): ReaderStyleCatalog = HostStyleCatalog.create()
 

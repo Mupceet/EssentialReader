@@ -1,5 +1,7 @@
 package io.legado.app.eink.contract
 
+import android.graphics.Typeface
+
 /**
  * 字体取值：系统预设 / 字体文件 / 跟随正文。
  *
@@ -16,3 +18,9 @@ sealed interface ReaderFontSelection {
 
 /** 可选字体文件（宿主字体文件夹枚举项；path 为文件 uri/路径字符串）。 */
 data class ReaderFontOption(val name: String, val path: String)
+
+/** 页眉/页脚有效字体（模块本地渲染用）；null = 系统/模块默认。 */
+class ReaderTipTypefaces(
+    val header: Typeface? = null,
+    val footer: Typeface? = null,
+)

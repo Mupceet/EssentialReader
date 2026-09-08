@@ -173,6 +173,8 @@ sealed interface ReaderFontSelection {
 - **页眉 = 所见即所得**：按配置字号直接渲染（保留像素锚定 `Dp.toPx().toSp()`，不受应用内字体缩放影响），行高 = extent − 上下边距，垂直居中。现行「14/20 行高比反推」（`f4e0383b8`/`491e4a04d`）是宿主字号不可见时代的近似，**退役为兜底**：配置字号的行高放不进可用条带时回落推导，保证不裁字。
 - **页脚 = 继续按 extent 推导**：行高 = footerExtent − 上下边距 − 2dp 进度条，字号 = 行高 × 14/20。原因：宿主 `applyHeaderStyle` 允许页脚独立配置字体字号（完整模式用户可能设过），页脚真实有效字号 eink 不可知；但 footerExtent 永远按有效字号的度量计算，从 extent 推导在「跟随页眉/独立配置」两种状态下都正确，默认状态下推导结果 ≈ 页眉字号。
 
+**字体**：页眉/页脚文字按「设置→跟随正文→系统默认」链渲染——经 `headerFooterTypefaces()` 端口由宿主解析并加载 Typeface，模块叠加到 tip 样式的 fontFamily（null 保持模块平台默认）。
+
 **时序**（页眉字号 12→14sp）：抬手 → `applyStyle` 写 headerFontSize=14（affectsLayout=是）→ 桥 mutation 落宿主配置 → `onStyleChanged` → cacheKey（已补全）变化 → 重新分页（200ms 防抖合并）→ 新页就绪：extent 变大、正文行数减少、页眉按 14sp 渲染 → 旧页渲染至新页就绪直接替换，保留阅读位置。
 
 ### 5.5 字体跟随语义
@@ -247,3 +249,4 @@ sealed interface ReaderFontSelection {
 - 2026-09-07 实施修订：§3 目录代码块中 ChoiceParam 的 Option(value: String)/default: String 落地为 Option(value: Int)/default: Int（标题位置与宿主 titleMode 同构，避免字符串往返）；§5.2 裂缝修复实施时追加「分页缓存键直接钉住派生 extent 值（同完整模式键）」作为参数片段之外的结构性闭合（覆盖 hideStatusBar 等非 Config 输入）；§5.4 页眉渲染的门控判据落地为「按构造放得下」（宿主 extent 即按同字号度量预留），兜底仅 null/非正字号。
 - 2026-09-07 终审修订：标题/页眉字体选项移除系统预设行（宿主 titleFont/headerFont 键仅收文件路径，空串回落正文/系统默认，预设不可表达且选中不粘）；§5.2 实施对齐：页眉/页脚左右边距为纯绘制参数，移出分页缓存键（避免无谓整章重排）。
 - 2026-09-08 修订：页眉显隐升级为三态（随状态栏/显示/隐藏，宿主 HeaderMode 同构）——解除「一经显式设置回不到随状态栏」的单向棘轮，隐藏状态栏开关恢复自动驱动页眉显隐；契约字段 headerVisible:Boolean? 更名 headerMode:Int?。
+- 2026-09-08 修订：页眉/页脚字体在 eink 端按「设置→跟随正文→系统默认」链渲染（新端口 headerFooterTypefaces，宿主解析并加载 Typeface）——解除此前"字形仅在完整模式生效"的限制。
