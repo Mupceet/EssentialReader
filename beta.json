@@ -1,49 +1,49 @@
 {
-  "tag_name": "3.26.17-beta.1",
-  "name": "Pre-release 3.26.17-beta.1",
-  "body": "**此版本为测试版，会存在不稳定问题。**\n\n# 更新日志\n\n墨本阅读——开源阅读 legado 的墨水屏增强发行版：同一本书，两种读法。\n\n## 3.26.16（首个版本）\n\n基于 legado 开源项目与 MD3 界面移植构建，加入墨水屏专属阅读模式：\n\n* **墨水屏模式**：轻量单界面（书架 / 搜索 / 阅读），黑白主题跟随系统深浅色，音量键翻页，页眉页脚信息条\n* **完整模式**：MD3 风格全功能界面，导入导出、书源管理、Web 服务等管理能力均在此完成\n* 排版设置两种模式共享——任一模式调字号、行距，另一模式同样生效\n* 墨水屏模式入口在「我的 → 实验室」，可设为启动直达\n\n### 温馨提醒\n\n* 本应用只是转码工具，不提供内容；书源需要自行导入，可使用 legado 生态的书源资源\n* 更新前建议先做好备份，以免数据丢失\n\n### 已知限制\n\n* 墨水屏模式功能持续完善中，遇到问题可随时切换回完整模式\n\n### 致谢\n\n* [legado 开源阅读](https://github.com/gedoor/legado)\n* [legado-with-MD3](https://github.com/HapeLee/legado-with-MD3)",
+  "tag_name": "3.26.17-beta.2",
+  "name": "Pre-release 3.26.17-beta.2",
+  "body": "**此版本为测试版，会存在不稳定问题。**\n\n# 更新日志\n\n墨本阅读——开源阅读 legado 的墨水屏增强发行版：同一本书，两种读法。\n\n## 3.26.17（预发布）\n\n本次更新集中完善墨水屏阅读器的排版、字体与阅读性能：\n\n### 新增\n\n* 排版面板新增「字体配置」：可选择系统默认、系统衬线、系统等宽或字体文件夹中的字体；正文与标题字重支持细体、常规、粗体，也可自定义粗细\n* 排版面板新增「信息配置」：可设置标题位置与字号、页眉显示方式（显示 / 隐藏 / 随状态栏）、页脚显隐，以及页眉页脚统一字号\n* 页眉页脚字体与正文、标题统一，字号、边距等调整可在阅读页实时预览\n* 「正文加粗」开关并入字体配置中的字重设置\n\n### 优化\n\n* 提前准备相邻章节，并优先显示当前阅读章节，跨章翻页更快\n* 从书架进入书籍时提前加载内容，减少首次打开阅读页的等待\n* 优化目录打开和返回阅读页的速度，重复进入目录更流畅\n* 从目录返回阅读页时直接恢复原内容，减少“先加载中再恢复”的等待\n* 调整页眉页脚占用空间，使墨水屏模式的每页行数和页数与完整模式保持一致\n* 统一排版面板及字体、信息弹层的文字样式和控件间距，显示更整齐\n\n## 3.26.16（首个版本）\n\n基于 legado 开源项目与 MD3 界面移植构建，加入墨水屏专属阅读模式：\n\n* **墨水屏模式**：轻量单界面（书架 / 搜索 / 阅读），黑白主题跟随系统深浅色，音量键翻页，页眉页脚信息条\n* **完整模式**：MD3 风格全功能界面，导入导出、书源管理、Web 服务等管理能力均在此完成\n* 排版设置两种模式共享——任一模式调字号、行距，另一模式同样生效\n* 墨水屏模式入口在「我的 → 实验室」，可设为启动直达\n\n## 温馨提醒\n\n* 本应用只是转码工具，不提供内容；书源需要自行导入，可使用 legado 生态的书源资源\n* 更新前建议先做好备份，以免数据丢失\n\n## 已知限制\n\n* 墨水屏模式功能持续完善中，遇到问题可随时切换回完整模式\n\n## 致谢\n\n* [legado 开源阅读](https://github.com/gedoor/legado)\n* [legado-with-MD3](https://github.com/HapeLee/legado-with-MD3)",
   "prerelease": true,
-  "created_at": "2026-09-06T15:47:43Z",
+  "created_at": "2026-09-08T10:24:48Z",
   "assets": [
     {
-      "browser_download_url": "https://github.com/Mupceet/EssentialReader/releases/download/3.26.17-beta.1/legado-3.26.17-beta.1-arm64-v8a.apk",
+      "browser_download_url": "https://github.com/Mupceet/EssentialReader/releases/download/3.26.17-beta.2/legado-3.26.17-beta.2-arm64-v8a.apk",
       "content_type": "application/vnd.android.package-archive",
-      "created_at": "2026-09-06T16:02:23Z",
+      "created_at": "2026-09-08T10:43:51Z",
       "download_count": 0,
-      "id": 547385092,
-      "name": "legado-3.26.17-beta.1-arm64-v8a.apk",
+      "id": 550318030,
+      "name": "legado-3.26.17-beta.2-arm64-v8a.apk",
       "state": "uploaded",
-      "url": "https://api.github.com/repos/Mupceet/EssentialReader/releases/assets/547385092"
+      "url": "https://api.github.com/repos/Mupceet/EssentialReader/releases/assets/550318030"
     },
     {
-      "browser_download_url": "https://github.com/Mupceet/EssentialReader/releases/download/3.26.17-beta.1/legado-3.26.17-beta.1-armeabi-v7a.apk",
+      "browser_download_url": "https://github.com/Mupceet/EssentialReader/releases/download/3.26.17-beta.2/legado-3.26.17-beta.2-armeabi-v7a.apk",
       "content_type": "application/vnd.android.package-archive",
-      "created_at": "2026-09-06T16:02:23Z",
+      "created_at": "2026-09-08T10:43:51Z",
       "download_count": 0,
-      "id": 547385094,
-      "name": "legado-3.26.17-beta.1-armeabi-v7a.apk",
+      "id": 550318032,
+      "name": "legado-3.26.17-beta.2-armeabi-v7a.apk",
       "state": "uploaded",
-      "url": "https://api.github.com/repos/Mupceet/EssentialReader/releases/assets/547385094"
+      "url": "https://api.github.com/repos/Mupceet/EssentialReader/releases/assets/550318032"
     },
     {
-      "browser_download_url": "https://github.com/Mupceet/EssentialReader/releases/download/3.26.17-beta.1/legado-3.26.17-beta.1.apk",
+      "browser_download_url": "https://github.com/Mupceet/EssentialReader/releases/download/3.26.17-beta.2/legado-3.26.17-beta.2.apk",
       "content_type": "application/vnd.android.package-archive",
-      "created_at": "2026-09-06T16:02:23Z",
+      "created_at": "2026-09-08T10:43:51Z",
       "download_count": 0,
-      "id": 547385095,
-      "name": "legado-3.26.17-beta.1.apk",
+      "id": 550318029,
+      "name": "legado-3.26.17-beta.2.apk",
       "state": "uploaded",
-      "url": "https://api.github.com/repos/Mupceet/EssentialReader/releases/assets/547385095"
+      "url": "https://api.github.com/repos/Mupceet/EssentialReader/releases/assets/550318029"
     },
     {
-      "browser_download_url": "https://github.com/Mupceet/EssentialReader/releases/download/3.26.17-beta.1/mapping.txt",
+      "browser_download_url": "https://github.com/Mupceet/EssentialReader/releases/download/3.26.17-beta.2/mapping.txt",
       "content_type": "text/plain",
-      "created_at": "2026-09-06T16:02:23Z",
+      "created_at": "2026-09-08T10:43:51Z",
       "download_count": 0,
-      "id": 547385090,
+      "id": 550318031,
       "name": "mapping.txt",
       "state": "uploaded",
-      "url": "https://api.github.com/repos/Mupceet/EssentialReader/releases/assets/547385090"
+      "url": "https://api.github.com/repos/Mupceet/EssentialReader/releases/assets/550318031"
     }
   ]
 }
