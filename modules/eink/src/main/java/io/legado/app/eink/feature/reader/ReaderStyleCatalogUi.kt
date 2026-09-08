@@ -28,22 +28,8 @@ internal fun ReaderStyleCatalog.clampInt(id: String, value: Int): Int {
 internal fun ReaderStyleCatalog.defaultInt(id: String): Int =
     stepped(id)?.default?.roundToInt() ?: 0
 
-/** 「默认」标识档位（在值域内才显示）。 */
-internal fun ReaderStyleCatalog.defaultStep(id: String): Int? {
-    val p = stepped(id) ?: return null
-    val d = p.default.roundToInt()
-    return d.takeIf { it in p.min.roundToInt()..p.max.roundToInt() }
-}
-
 /** 浮点参数按步进映射为整型档位域（如字距 -0.5..0.5、步进 0.05 → -10..10）。 */
 internal fun ReaderStyleCatalog.floatStepIndexRange(id: String, step: Float): IntRange {
     val p = stepped(id) ?: return 0..0
     return (p.min / step).roundToInt()..(p.max / step).roundToInt()
-}
-
-/** 浮点参数默认档位。 */
-internal fun ReaderStyleCatalog.floatDefaultStep(id: String, step: Float): Int? {
-    val p = stepped(id) ?: return null
-    val d = (p.default / step).roundToInt()
-    return d.takeIf { it in floatStepIndexRange(id, step) }
 }

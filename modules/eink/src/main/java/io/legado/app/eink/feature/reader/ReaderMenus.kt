@@ -403,9 +403,9 @@ private fun StyleEntryRow(entries: List<Pair<String, () -> Unit>>) {
 }
 
 /**
- * 排版面板：5 行档位滑条（字号/字距/缩进/行距/段距，值域与「默认」
- * 标识来自协商目录）+ 一行入口按钮（字体配置/信息配置/边距调整，
- * 按目录可用性显隐）。三个弹层均为居中透明卡片，实时预览不被遮挡。
+ * 排版面板：5 行档位滑条（字号/字距/缩进/行距/段距，值域来自协商
+ * 目录）+ 一行入口按钮（字体配置/信息配置/边距调整，按目录可用性
+ * 显隐）。三个弹层均为居中透明卡片，实时预览不被遮挡。
  */
 @Composable
 internal fun ReaderLayoutPanel(
@@ -427,7 +427,6 @@ internal fun ReaderLayoutPanel(
         thumbLabel = { "${it}sp" },
         tickStep = 4,
         onSetValue = onSetTextSize,
-        markerStep = catalog.defaultStep(Ids.BODY_SIZE),
     )
     val lsRange = catalog.floatStepIndexRange(Ids.BODY_LETTER_SPACING, LETTER_SPACING_STEP)
     SliderRow(
@@ -438,7 +437,6 @@ internal fun ReaderLayoutPanel(
         thumbLabel = { "%.2f".format(it * LETTER_SPACING_STEP) },
         tickStep = 2,
         onSetValue = onSetLetterSpacing,
-        markerStep = catalog.floatDefaultStep(Ids.BODY_LETTER_SPACING, LETTER_SPACING_STEP),
     )
     SliderRow(
         label = "缩进",
@@ -447,7 +445,6 @@ internal fun ReaderLayoutPanel(
         thumbLabel = { "${it}字" },
         tickStep = 1,
         onSetValue = onSetIndent,
-        markerStep = catalog.defaultStep(Ids.BODY_INDENT),
     )
     SliderRow(
         label = "行距",
@@ -456,7 +453,6 @@ internal fun ReaderLayoutPanel(
         thumbLabel = { "%.1f倍".format(it / 10f) },
         tickStep = 2,
         onSetValue = onSetLineSpacing,
-        markerStep = catalog.defaultStep(Ids.BODY_LINE_SPACING),
     )
     SliderRow(
         label = "段距",
@@ -465,7 +461,6 @@ internal fun ReaderLayoutPanel(
         thumbLabel = { "%.1f行".format(it / 10f) },
         tickStep = 2,
         onSetValue = onSetParagraphSpacing,
-        markerStep = catalog.defaultStep(Ids.BODY_PARAGRAPH_SPACING),
     )
     val entries = buildList {
         val fontReady = catalog.available(Ids.BODY_FONT) || catalog.available(Ids.TITLE_FONT) ||
@@ -527,15 +522,10 @@ internal fun ReaderMarginDialog(
         )
         when (selectedTab) {
             0 -> MarginRows(
-                catalog = catalog,
                 topDp = style.paddingTop,
                 bottomDp = style.paddingBottom,
                 leftDp = style.paddingLeft,
                 rightDp = style.paddingRight,
-                idTop = Ids.BODY_PADDING_TOP,
-                idBottom = Ids.BODY_PADDING_BOTTOM,
-                idLeft = Ids.BODY_PADDING_LEFT,
-                idRight = Ids.BODY_PADDING_RIGHT,
                 maxVertical = catalog.intRange(Ids.BODY_PADDING_TOP).last,
                 maxHorizontal = catalog.intRange(Ids.BODY_PADDING_LEFT).last,
                 onSetTop = onSetPaddingTop,
@@ -545,15 +535,10 @@ internal fun ReaderMarginDialog(
             )
 
             1 -> MarginRows(
-                catalog = catalog,
                 topDp = style.headerPaddingTop,
                 bottomDp = style.headerPaddingBottom,
                 leftDp = style.headerPaddingLeft,
                 rightDp = style.headerPaddingRight,
-                idTop = Ids.HEADER_PADDING_TOP,
-                idBottom = Ids.HEADER_PADDING_BOTTOM,
-                idLeft = Ids.HEADER_PADDING_LEFT,
-                idRight = Ids.HEADER_PADDING_RIGHT,
                 maxVertical = catalog.intRange(Ids.HEADER_PADDING_TOP).last,
                 maxHorizontal = catalog.intRange(Ids.HEADER_PADDING_LEFT).last,
                 onSetTop = onSetHeaderPaddingTop,
@@ -563,15 +548,10 @@ internal fun ReaderMarginDialog(
             )
 
             else -> MarginRows(
-                catalog = catalog,
                 topDp = style.footerPaddingTop,
                 bottomDp = style.footerPaddingBottom,
                 leftDp = style.footerPaddingLeft,
                 rightDp = style.footerPaddingRight,
-                idTop = Ids.FOOTER_PADDING_TOP,
-                idBottom = Ids.FOOTER_PADDING_BOTTOM,
-                idLeft = Ids.FOOTER_PADDING_LEFT,
-                idRight = Ids.FOOTER_PADDING_RIGHT,
                 maxVertical = catalog.intRange(Ids.FOOTER_PADDING_TOP).last,
                 maxHorizontal = catalog.intRange(Ids.FOOTER_PADDING_LEFT).last,
                 onSetTop = onSetFooterPaddingTop,
@@ -586,15 +566,10 @@ internal fun ReaderMarginDialog(
 /** 单个区域的边距 4 行档位滑条：上边距、下边距、左边距、右边距。 */
 @Composable
 private fun MarginRows(
-    catalog: ReaderStyleCatalog,
     topDp: Int,
     bottomDp: Int,
     leftDp: Int,
     rightDp: Int,
-    idTop: String,
-    idBottom: String,
-    idLeft: String,
-    idRight: String,
     maxVertical: Int,
     maxHorizontal: Int,
     onSetTop: (Int) -> Unit,
@@ -609,7 +584,6 @@ private fun MarginRows(
         thumbLabel = { "${it}dp" },
         tickStep = MarginTickStep,
         onSetValue = onSetTop,
-        markerStep = catalog.defaultStep(idTop),
     )
     SliderRow(
         label = "下边距",
@@ -618,7 +592,6 @@ private fun MarginRows(
         thumbLabel = { "${it}dp" },
         tickStep = MarginTickStep,
         onSetValue = onSetBottom,
-        markerStep = catalog.defaultStep(idBottom),
     )
     SliderRow(
         label = "左边距",
@@ -627,7 +600,6 @@ private fun MarginRows(
         thumbLabel = { "${it}dp" },
         tickStep = MarginTickStep,
         onSetValue = onSetLeft,
-        markerStep = catalog.defaultStep(idLeft),
     )
     SliderRow(
         label = "右边距",
@@ -636,7 +608,6 @@ private fun MarginRows(
         thumbLabel = { "${it}dp" },
         tickStep = MarginTickStep,
         onSetValue = onSetRight,
-        markerStep = catalog.defaultStep(idRight),
     )
 }
 
@@ -706,7 +677,6 @@ internal fun SliderRow(
     thumbLabel: (Int) -> String,
     tickStep: Int,
     onSetValue: (Int) -> Unit,
-    markerStep: Int? = null,
 ) {
     Row(
         modifier = Modifier
@@ -738,8 +708,6 @@ internal fun SliderRow(
             modifier = Modifier.weight(1f),
             thumbLabel = thumbLabel,
             tickStep = tickStep,
-            markerStep = markerStep,
-            markerLabel = markerStep?.let { "默认" },
         )
         EInkButton(
             text = "＋",

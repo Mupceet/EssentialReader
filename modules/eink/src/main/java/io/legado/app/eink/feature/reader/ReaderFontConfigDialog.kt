@@ -127,14 +127,12 @@ internal fun ReaderFontConfigDialog(
                 label = "正文字重",
                 value = style.bodyWeight ?: catalog.defaultInt(Ids.BODY_WEIGHT),
                 valueRange = catalog.intRange(Ids.BODY_WEIGHT),
-                markerStep = catalog.defaultStep(Ids.BODY_WEIGHT),
                 onSetWeight = onSetBodyWeight,
             )
             WeightSettingRow(
                 label = "标题字重",
                 value = style.titleWeight ?: catalog.defaultInt(Ids.TITLE_WEIGHT),
                 valueRange = catalog.intRange(Ids.TITLE_WEIGHT),
-                markerStep = catalog.defaultStep(Ids.TITLE_WEIGHT),
                 onSetWeight = onSetTitleWeight,
             )
             EInkButton(
@@ -167,7 +165,6 @@ private fun WeightSettingRow(
     label: String,
     value: Int,
     valueRange: IntRange,
-    markerStep: Int?,
     onSetWeight: (Int) -> Unit,
 ) {
     val isCustom = value !in 0..2
@@ -233,7 +230,6 @@ private fun WeightSettingRow(
                     thumbLabel = { it.toString() },
                     tickStep = 100,
                     onSetValue = onSetWeight,
-                    markerStep = markerStep,
                 )
             }
         }

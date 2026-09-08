@@ -103,7 +103,6 @@ internal fun ReaderInfoConfigDialog(
                         thumbLabel = { "${it}sp" },
                         tickStep = 6,
                         onSetValue = onSetTitleSize,
-                        markerStep = catalog.defaultStep(Ids.TITLE_SIZE),
                     )
                 }
             }
@@ -151,7 +150,6 @@ internal fun ReaderInfoConfigDialog(
                     thumbLabel = { "${it}sp" },
                     tickStep = 6,
                     onSetValue = onSetTipSize,
-                    markerStep = catalog.defaultStep(Ids.FOOTER_SIZE),
                 )
             }
         }
