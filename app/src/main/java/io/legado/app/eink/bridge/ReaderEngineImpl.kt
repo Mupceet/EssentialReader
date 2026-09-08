@@ -180,6 +180,9 @@ internal object ReaderEngineImpl : ReaderEngine, KoinComponent {
             chapterPager.clear()
         }
         ReadBook.upData(b)
+        // upData 跳章分支会 clearTextChapter 连带清空 ReadBook 分页快照：
+        // 章节输入窗口为空时对账一次，预排过的热缓存补发布，页内导航不断链
+        chapterPager.syncWithWindow()
     }
 
     override fun reloadBook(book: BookHandle) {

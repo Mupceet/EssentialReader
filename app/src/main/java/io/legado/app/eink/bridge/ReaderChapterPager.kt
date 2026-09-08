@@ -18,6 +18,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlin.math.abs
@@ -49,8 +50,15 @@ private const val VIEWPORT_EPSILON_PX = 24
  *     skipToPage 等页面导航全部从快照派生，不回填则页导航停摆；
  *  3. 通知引擎页面就绪，由引擎触发阅读页重读快照。
  *
- * 分页产物按「章节身份 + 视口 + 排版样式标量」为键缓存；样式与视口变更
- * 走失效重排，旧页保留到新页落地（避免 E-Ink 空屏闪烁）。
+ * 分页产物按「章节身份 + 视口 + 排版样式标量」为键缓存，并维护
+ * 当前章 ±1 的三章窗口（对齐完整模式 directReaderPages 的内存档位）：
+ *  - 当前章分页落地后，后台预排相邻章（下一章优先）——正常节奏阅读时
+ *    翻到章边界直接命中热页，翻章不再同步等待全章分页（完整模式
+ *    「相邻章热页复用」的对齐项）；
+ *  - 样式与视口变更走键失效重排，旧页保留到新页落地（避免 E-Ink
+ *    空屏闪烁）；
+ *  - 同键在途去重：一次装载的多个章节输入先后到达会重复触发分页请求，
+ *    取消重启会作废在途进度从头重排，同键在途时直接复用。
  */
 internal class ReaderChapterPager(
     private val onPagesReady: () -> Unit,
@@ -58,36 +66,43 @@ internal class ReaderChapterPager(
 ) {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
+    /** 当前章分页（交互路径，新请求到来时取消重启）。 */
     private var paginateJob: Job? = null
+
+    /** 相邻章预排（后台路径，交互分页到来时让路）。 */
+    private var adjacentJob: Job? = null
+
+    /** 交互分页在途键（同键请求去重，防取消重启浪费）。 */
+    private var inFlightKey: String? = null
 
     private var viewportWidth = 0
     private var viewportHeight = 0
 
-    private var cacheKey: String? = null
-    private var cachedPages: List<ReaderPage> = emptyList()
-    private var cachedStyle: ReaderAndroidPaginationStyle? = null
+    /**
+     * 三章窗口缓存（键 = 章节下标）。copy-on-write：主线程写、任意线程读
+     * （快照映射可能在 VM 的 IO 协程中被读），引用替换保证可见性。
+     */
+    @Volatile
+    private var chapters: Map<Int, ChapterPages> = emptyMap()
 
-    /** 缓存分页产物所属章节；与 ReadBook.durChapterIndex 不一致视为无产物。 */
-    private var cachedChapterIndex: Int = -1
+    /** E-Ink 画布视口是否已就绪（就绪后重进阅读页可免首帧尺寸等待）。 */
+    val hasViewport: Boolean
+        get() = viewportWidth > 0 && viewportHeight > 0
 
     /**
-     * 当前章节是否已有分页产物。必须校验章节一致：目录跳章（DB 写新进度后
-     * 重进 attach）与跨章翻页（durChapterIndex 已 ++ 而新章尚未分页）的
-     * 窗口期内，模块靠本值区分「直接刷新旧页」与「清空显示加载中」——
-     * 旧章缓存页绝不可作为新章渲染。
+     * 当前章节是否已有分页产物。产物按章节下标索引，天然只对
+     * [ReadBook.durChapterIndex] 命中：目录跳章（DB 写新进度后重进 attach）
+     * 与跨章翻页（durChapterIndex 已 ++ 而新章尚未分页）的窗口期内，
+     * 模块靠本值区分「直接刷新旧页」与「清空显示加载中」——其他章节的
+     * 缓存页绝不可作为当前章渲染。
      */
     val hasPages: Boolean
-        get() = cachedPages.isNotEmpty() && cachedChapterIndex == ReadBook.durChapterIndex
+        get() = chapters[ReadBook.durChapterIndex]?.pages?.isNotEmpty() == true
 
     /** 当前章节页数（分页产物只含当前章节）。 */
     val currentChapterPageSize: Int
-        get() = if (cachedChapterIndex == ReadBook.durChapterIndex) cachedPages.size else 0
-
-    /**
-     * 分页同源样式。快照画笔规格必须与排版测量同值，映射时从这里取
-     * title/body 画笔，而不是重新 create()（期间设置可能已变）。
-     */
-    val paginationStyle: ReaderAndroidPaginationStyle? get() = cachedStyle
+        get() = chapters[ReadBook.durChapterIndex]?.pages?.size ?: 0
 
     /** E-Ink 画布视口就绪/变化（等价旧 ChapterProvider.upViewSize）。 */
     fun updateViewport(width: Int, height: Int) {
@@ -124,6 +139,8 @@ internal class ReaderChapterPager(
     fun cancelPending() {
         paginateJob?.cancel()
         paginateJob = null
+        adjacentJob?.cancel()
+        adjacentJob = null
     }
 
     /** 排版样式变更（等价旧 ChapterProvider.upStyle 失效重排）。 */
@@ -134,22 +151,18 @@ internal class ReaderChapterPager(
     /** 换书/换会话：丢弃缓存并停止在途分页。重排与注销不清缓存——
      *  重排是否需要由缓存键判定，注销后返回阅读页要靠热缓存即时恢复。 */
     fun clear() {
-        paginateJob?.cancel()
-        paginateJob = null
-        cacheKey = null
-        cachedPages = emptyList()
-        cachedStyle = null
-        cachedChapterIndex = -1
+        cancelPending()
+        inFlightKey = null
+        chapters = emptyMap()
     }
 
     /** 当前阅读位置所在页映射为快照；未分页或无阅读位置返回 null。 */
     fun currentPageSnapshot(): ReaderPageSnapshot? {
-        val style = cachedStyle ?: return null
-        val pages = cachedPages
+        // 章节守卫：按当前章下标索引缓存，新章分页落地之间返回 null
+        // （模块保持旧页或显示加载中），其他章节页绝不可作为当前章渲染
+        val entry = chapters[ReadBook.durChapterIndex] ?: return null
+        val pages = entry.pages
         if (pages.isEmpty()) return null
-        // 章节守卫：章节切换到新章分页落地之间返回 null（模块保持旧页或
-        // 显示加载中），旧章页绝不可作为新章渲染
-        if (cachedChapterIndex != ReadBook.durChapterIndex) return null
         val book = ReadBook.book ?: return null
         val index = ReaderPageNavigator.locate(
             pages,
@@ -159,7 +172,7 @@ internal class ReaderChapterPager(
         val page = pages.getOrNull(index) ?: return null
         return ReaderPageSnapshotMapper.map(
             page = page,
-            paginationStyle = style,
+            paginationStyle = entry.style,
             sessionBook = book,
             readProgress = ReaderPageSnapshotMapper.readProgress(
                 chapterIndex = page.id.chapterIndex,
@@ -172,12 +185,31 @@ internal class ReaderChapterPager(
 
     private fun requestPagination() {
         if (viewportWidth <= 0 || viewportHeight <= 0) return
-        val input = ReadBook.readerChapterInputWindow.current ?: return
+        val input = ReadBook.readerChapterInputWindow.current
+        if (input == null) {
+            // 跳章清窗（upData→clearTextChapter）会连带清空 ReadBook 分页快照，
+            // 而本缓存可能仍有可用产物（如跳到预排过的相邻章）：补发布一次，
+            // 保证页内导航（nextPageStart 等）不断链
+            republishCachedSnapshots()
+            return
+        }
         val style = LegacyReaderPaginationStyleFactory.create()
         val key = cacheKey(input, style)
-        if (key == cacheKey && cachedPages.isNotEmpty()) return
+        val entry = chapters[input.chapter.index]
+        if (entry != null && entry.key == key && entry.pages.isNotEmpty()) {
+            // 命中也要补发布：ReadBook 侧快照可能被外部清空（清窗/重置）；
+            // 相邻章输入晚于当前章到达时，这里也是预排的补触发点
+            republishCachedSnapshots()
+            scheduleAdjacentPagination(style)
+            return
+        }
+        // 同键在途去重：一次装载的三个章节输入先后到达会重复触发本方法，
+        // 无去重时每次都取消在途分页从头重排（同一章被排至多 3 次）
+        if (key == inFlightKey && paginateJob?.isActive == true) return
+        adjacentJob?.cancel()
         paginateJob?.cancel()
         val generation = ReadBook.readerPaginationGeneration
+        inFlightKey = key
         paginateJob = scope.launch {
             val highlightRules = HighlightRuleRepository()
                 .loadEnabled(ReadBookConfig.durConfig.name)
@@ -197,11 +229,13 @@ internal class ReaderChapterPager(
                 )
             }
             withContext(Dispatchers.Main) {
+                inFlightKey = null
                 when (result) {
                     is LegacyReaderChapterPaginationResult.Success -> {
                         // 分页期间可能已换书：旧章节产物不得落进新会话
                         if (ReadBook.book?.bookUrl != input.book.bookUrl) return@withContext
-                        commit(input, style, result.pages, key, generation)
+                        commit(input, style, result.pages, key, generation, notify = true)
+                        scheduleAdjacentPagination(style)
                     }
 
                     is LegacyReaderChapterPaginationResult.Unsupported ->
@@ -211,31 +245,128 @@ internal class ReaderChapterPager(
         }
     }
 
+    /**
+     * 后台预排相邻章（下一章优先，对齐完整模式「当前章先行发布、邻章
+     * 后台补排」的节奏）。仅排当前样式/视口下缺失的章；交互分页请求
+     * 到来时整体让路。产物同样发布分页快照（页内导航需要），但不通知
+     * 模块重绘——模块只消费当前章页面，多余通知在墨水屏上就是一次闪屏。
+     */
+    private fun scheduleAdjacentPagination(style: ReaderAndroidPaginationStyle) {
+        if (adjacentJob?.isActive == true) return
+        val bookUrl = ReadBook.book?.bookUrl ?: return
+        val window = ReadBook.readerChapterInputWindow
+        val candidates = listOfNotNull(window.next, window.previous).filter { input ->
+            val entry = chapters[input.chapter.index]
+            if (entry == null || entry.pages.isEmpty()) return@filter true
+            entry.key != cacheKey(input, style)
+        }
+        if (candidates.isEmpty()) return
+        val generation = ReadBook.readerPaginationGeneration
+        adjacentJob = scope.launch {
+            val highlightRules = HighlightRuleRepository()
+                .loadEnabled(ReadBookConfig.durConfig.name)
+            for (input in candidates) {
+                ensureActive()
+                val key = cacheKey(input, style)
+                val entry = chapters[input.chapter.index]
+                if (entry != null && entry.key == key && entry.pages.isNotEmpty()) continue
+                val result = paginateLegacyReaderChapterSafely {
+                    LegacyReaderChapterPaginator.paginate(
+                        book = input.book,
+                        bookSource = input.bookSource,
+                        chapter = input.chapter,
+                        displayTitle = input.displayTitle,
+                        content = input.content,
+                        source = input.source,
+                        revision = 31L * key.hashCode() + input.chapter.index,
+                        viewportWidthPx = viewportWidth,
+                        viewportHeightPx = viewportHeight,
+                        paginationStyle = style,
+                        highlightRules = highlightRules,
+                    )
+                }
+                if (result !is LegacyReaderChapterPaginationResult.Success) continue
+                // 预排期间可能已换书：旧章节产物不得落进新会话
+                if (ReadBook.book?.bookUrl != bookUrl) return@launch
+                withContext(Dispatchers.Main) {
+                    if (ReadBook.book?.bookUrl == bookUrl) {
+                        commit(input, style, result.pages, key, generation, notify = false)
+                    }
+                }
+            }
+        }
+    }
+
+    /** 分页产物落缓存（仅主线程调用）：窗口淘汰 + 发布分页快照。 */
     private fun commit(
         input: ReaderChapterInput,
         style: ReaderAndroidPaginationStyle,
         pages: List<ReaderPage>,
         key: String,
         generation: Long,
+        notify: Boolean,
     ) {
-        cacheKey = key
-        cachedPages = pages
-        cachedStyle = style
-        cachedChapterIndex = input.chapter.index
-        val chapterIndex = input.chapter.index
-        ReaderPageNavigator.pageContext(pages, pages.lastIndex)?.endPosition?.let { contentEnd ->
-            ReadBook.publishReaderPagination(
-                listOf(
-                    ReaderChapterPaginationSnapshot(
-                        chapterIndex = chapterIndex,
-                        pageStarts = pages.map(ReaderPageNavigator::pageStart),
-                        contentEnd = contentEnd,
-                        generation = generation,
-                    )
-                )
+        val index = input.chapter.index
+        val next = buildMap {
+            putAll(chapters)
+            put(
+                index,
+                ChapterPages(
+                    key = key,
+                    pages = pages,
+                    pageStarts = pages.map(ReaderPageNavigator::pageStart),
+                    contentEnd = ReaderPageNavigator.pageContext(pages, pages.lastIndex)?.endPosition,
+                    style = style,
+                    chapterIndex = index,
+                    generation = generation,
+                ),
             )
         }
-        onPagesReady()
+        // 窗口淘汰：仅保留当前章 ±1，内存档位与完整模式三章窗口一致
+        val window = ReadBook.durChapterIndex - 1..ReadBook.durChapterIndex + 1
+        chapters = next.filterKeys { it in window }
+        publishCachedSnapshots()
+        // 页面对象可能未换（同页重排），靠 pageVersion 强制模块画布重绘
+        if (notify) onPagesReady()
+    }
+
+    /** 把窗口内全部缓存章的分页快照发布给 ReadBook（页内导航的数据源）。 */
+    private fun publishCachedSnapshots() {
+        val snapshots = chapters.values
+            .sortedBy { it.chapterIndex }
+            .mapNotNull { entry ->
+                entry.contentEnd?.let { contentEnd ->
+                    ReaderChapterPaginationSnapshot(
+                        chapterIndex = entry.chapterIndex,
+                        pageStarts = entry.pageStarts,
+                        contentEnd = contentEnd,
+                        generation = entry.generation,
+                    )
+                }
+            }
+        if (snapshots.isNotEmpty()) {
+            ReadBook.publishReaderPagination(snapshots)
+        }
+    }
+
+    /**
+     * ReadBook 侧分页快照被外部清空（跳章清窗/会话重置）而本缓存仍持有时
+     * 补发布。逐章比对已发布内容，无缺失时不做任何事（翻页热路径零开销）。
+     */
+    private fun republishCachedSnapshots() {
+        val snapshot = chapters
+        if (snapshot.isEmpty()) return
+        val upToDate = snapshot.values.all { entry ->
+            val published = ReadBook.readerPagination(entry.chapterIndex)
+            published != null &&
+                    published.pageStarts == entry.pageStarts &&
+                    published.contentEnd == entry.contentEnd
+        }
+        if (upToDate) return
+        scope.launch(Dispatchers.Main) {
+            // 期间可能已换书清缓存：引用变化即放弃（publish 会读最新缓存）
+            if (chapters === snapshot) publishCachedSnapshots()
+        }
     }
 
     /** 缓存键：章节身份 + 视口 + 影响排版的全部样式标量（对照直排层 key）。 */
@@ -290,6 +421,17 @@ internal class ReaderChapterPager(
                 .append(LegacyReaderPageDecorationFactory.footerExtentPx()).append('|')
             append(ReadBookConfig.durConfig.highlightRules.hashCode())
         }
+
+    /** 单章分页产物缓存项。 */
+    private class ChapterPages(
+        val key: String,
+        val pages: List<ReaderPage>,
+        val pageStarts: List<Int>,
+        val contentEnd: Int?,
+        val style: ReaderAndroidPaginationStyle,
+        val chapterIndex: Int,
+        val generation: Long,
+    )
 }
 
 /**
