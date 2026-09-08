@@ -10,7 +10,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
@@ -81,19 +80,24 @@ internal fun ReaderFontConfigDialog(
                     )
                 }
             }
-            // 标签在左（与字重行共用 64dp 标签列，左缘对齐），网格居右；
-            // 顶部加呼吸边距与标题区拉开层次，行间保持既有节奏
+            // 标签在左（按需占宽保证完整显示，同字重行；垂直居中对齐
+            // 首行网格按钮），网格居右；顶部加呼吸边距与标题区拉开层次
             Row(
                 modifier = Modifier.padding(top = EInkSpacing.s),
                 horizontalArrangement = Arrangement.spacedBy(EInkSpacing.xs),
                 verticalAlignment = Alignment.Top,
             ) {
-                EInkText(
-                    text = "字体选择",
-                    style = EInkTheme.typography.labelLarge,
-                    modifier = Modifier.width(SliderLabelWidth),
-                    maxLines = 1,
-                )
+                Box(
+                    modifier = Modifier.height(44.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    EInkText(
+                        text = "字体选择",
+                        style = EInkTheme.typography.labelLarge,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
                 Column(
                     modifier = Modifier.weight(1f),
                     verticalArrangement = Arrangement.spacedBy(EInkSpacing.xs),
