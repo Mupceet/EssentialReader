@@ -642,9 +642,10 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application),
         it.copy(footerDivider = value)
     }
 
-    /** 页眉显隐：写宿主 HeaderMode 1/2；随后重算条带可见性即时生效。 */
-    fun setHeaderVisible(value: Boolean) {
-        applyStyleChange { it.copy(headerVisible = value) }
+    /** 页眉模式：0 随状态栏 / 1 显示 / 2 隐藏（宿主 HeaderMode 同构）；
+     *  选「随状态栏」后由「隐藏状态栏」开关自动驱动页眉显隐。 */
+    fun setHeaderMode(value: Int) {
+        applyStyleChange { it.copy(headerMode = value.coerceIn(0, 2)) }
         updateTipInfo()
     }
 

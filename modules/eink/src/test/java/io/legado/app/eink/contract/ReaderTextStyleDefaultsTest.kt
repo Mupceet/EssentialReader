@@ -19,7 +19,7 @@ class ReaderTextStyleDefaultsTest {
         assertNull(style.titleBottomSpacing)
         assertNull(style.titleLineSpacing)
         assertNull(style.headerFont)
-        assertNull(style.headerVisible)
+        assertNull(style.headerMode)
         assertNull(style.headerSize)
         assertNull(style.headerDivider)
         assertNull(style.footerVisible)

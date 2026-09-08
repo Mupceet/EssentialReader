@@ -128,7 +128,7 @@ sealed interface ReaderFontSelection {
 | title.top-spacing 标题上留白 | 滑条 | 0..200dp（0） | titleTopSpacing | 是 |
 | title.bottom-spacing 标题下留白 | 滑条 | 0..200dp（0） | titleBottomSpacing | 是 |
 | title.line-spacing 标题行距 | 滑条 | 0..2.0倍（1.2） | titleLineSpacingExtra | 是 |
-| header.visibility 页眉显隐 | 开关 | （初值按现行端口可见性；写 1/2） | headerMode | 是 |
+| header.visibility 页眉模式 | 三选 | 随状态栏/显示/隐藏（随状态栏） | headerMode | 是 |
 | header.size 页眉字号 | 滑条 | 0..100sp（12） | headerFontSize | 是 |
 | header.divider 页眉分割线 | 开关 | （关） | showHeaderLine | 是 |
 | footer.visibility 页脚显隐 | 开关 | （开） | footerMode | 是 |
@@ -246,3 +246,4 @@ sealed interface ReaderFontSelection {
 - 2026-09-07 初版：四题澄清（协商形态/页眉页脚/覆盖/UI 形态）+ 两轮修订（字重纳入、字体默认跟随正文、三入口行替代四入口）。
 - 2026-09-07 实施修订：§3 目录代码块中 ChoiceParam 的 Option(value: String)/default: String 落地为 Option(value: Int)/default: Int（标题位置与宿主 titleMode 同构，避免字符串往返）；§5.2 裂缝修复实施时追加「分页缓存键直接钉住派生 extent 值（同完整模式键）」作为参数片段之外的结构性闭合（覆盖 hideStatusBar 等非 Config 输入）；§5.4 页眉渲染的门控判据落地为「按构造放得下」（宿主 extent 即按同字号度量预留），兜底仅 null/非正字号。
 - 2026-09-07 终审修订：标题/页眉字体选项移除系统预设行（宿主 titleFont/headerFont 键仅收文件路径，空串回落正文/系统默认，预设不可表达且选中不粘）；§5.2 实施对齐：页眉/页脚左右边距为纯绘制参数，移出分页缓存键（避免无谓整章重排）。
+- 2026-09-08 修订：页眉显隐升级为三态（随状态栏/显示/隐藏，宿主 HeaderMode 同构）——解除「一经显式设置回不到随状态栏」的单向棘轮，隐藏状态栏开关恢复自动驱动页眉显隐；契约字段 headerVisible:Boolean? 更名 headerMode:Int?。

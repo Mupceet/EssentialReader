@@ -76,22 +76,35 @@ class ReaderStyleMutationsTest {
     }
 
     @Test
-    fun `显隐开关映射宿主模式值`() {
+    fun `页眉模式三态与页脚开关映射宿主模式值`() {
         val mutations = buildStyleMutations(
-            ReaderTextStyle(headerVisible = false, footerVisible = false),
+            ReaderTextStyle(headerMode = 2, footerVisible = false),
             currentBodyFontPath = "",
         )
         assertEquals(2, ints(mutations).first { it.key == ReadStyleIntKey.HeaderMode }.value)
         assertEquals(1, ints(mutations).first { it.key == ReadStyleIntKey.FooterMode }.value)
+
+        val show = buildStyleMutations(
+            ReaderTextStyle(headerMode = 1, footerVisible = true),
+            currentBodyFontPath = "",
+        )
+        assertEquals(1, ints(show).first { it.key == ReadStyleIntKey.HeaderMode }.value)
+        assertEquals(0, ints(show).first { it.key == ReadStyleIntKey.FooterMode }.value)
+
+        val follow = buildStyleMutations(
+            ReaderTextStyle(headerMode = 0),
+            currentBodyFontPath = "",
+        )
+        assertEquals(0, ints(follow).first { it.key == ReadStyleIntKey.HeaderMode }.value)
     }
 
     @Test
-    fun `显隐开关显示方向映射宿主模式值`() {
+    fun `页眉模式null时不跨桥写HeaderMode`() {
         val mutations = buildStyleMutations(
-            ReaderTextStyle(headerVisible = true, footerVisible = true),
+            ReaderTextStyle(footerVisible = true),
             currentBodyFontPath = "",
         )
-        assertEquals(1, ints(mutations).first { it.key == ReadStyleIntKey.HeaderMode }.value)
+        assertTrue(ints(mutations).none { it.key == ReadStyleIntKey.HeaderMode })
         assertEquals(0, ints(mutations).first { it.key == ReadStyleIntKey.FooterMode }.value)
     }
 

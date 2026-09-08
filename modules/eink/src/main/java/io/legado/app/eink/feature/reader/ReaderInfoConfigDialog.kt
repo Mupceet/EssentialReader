@@ -30,7 +30,8 @@ import io.legado.app.eink.designsystem.theme.EInkSpacing
 
 /**
  * 信息配置弹层（tabs 标题｜页眉｜页脚）：标题的版面信息（位置/字号/
- * 留白/行距）与页眉页脚几何（显隐/字号/分割线）。居中透明卡片，
+ * 留白/行距）与页眉页脚几何（页眉模式三态：随状态栏/显示/隐藏；
+ * 页脚显隐两态；字号/分割线）。居中透明卡片，
  * 页面上下边缘不被遮挡，实时预览。参数可用性由排版面板入口守卫，
  * 本弹层内不再逐项判。
  */
@@ -38,14 +39,13 @@ import io.legado.app.eink.designsystem.theme.EInkSpacing
 internal fun ReaderInfoConfigDialog(
     catalog: ReaderStyleCatalog,
     style: ReaderTextStyle,
-    headerVisible: Boolean,
     footerVisible: Boolean,
     onSetTitleMode: (Int) -> Unit,
     onSetTitleSize: (Int) -> Unit,
     onSetTitleTopSpacing: (Int) -> Unit,
     onSetTitleBottomSpacing: (Int) -> Unit,
     onSetTitleLineSpacing: (Int) -> Unit,
-    onSetHeaderVisible: (Boolean) -> Unit,
+    onSetHeaderMode: (Int) -> Unit,
     onSetHeaderSize: (Int) -> Unit,
     onSetHeaderDivider: (Boolean) -> Unit,
     onSetFooterVisible: (Boolean) -> Unit,
@@ -120,10 +120,11 @@ internal fun ReaderInfoConfigDialog(
                 }
 
                 1 -> {
-                    ToggleRow(
-                        label = "显示页眉",
-                        checked = headerVisible,
-                        onToggle = { onSetHeaderVisible(!headerVisible) },
+                    ChoiceRow(
+                        label = "页眉",
+                        options = listOf("随状态栏", "显示", "隐藏"),
+                        selected = style.headerMode ?: 0,
+                        onSelect = onSetHeaderMode,
                     )
                     SliderRow(
                         label = "页眉字号",

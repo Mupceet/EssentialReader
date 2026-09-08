@@ -49,6 +49,10 @@ class HostStyleCatalogTest {
         val choice = catalog.find(Ids.TITLE_MODE) as ReaderStyleParam.Choice
         assertEquals(listOf(0, 1, 2), choice.options.map { it.value })
         assertEquals(0, choice.default)
+
+        val headerVisibility = catalog.find(Ids.HEADER_VISIBILITY) as ReaderStyleParam.Choice
+        assertEquals(listOf(0, 1, 2), headerVisibility.options.map { it.value })
+        assertEquals(0, headerVisibility.default)
     }
 
     @Test

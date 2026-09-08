@@ -400,8 +400,8 @@ internal object ReaderEngineImpl : ReaderEngine, KoinComponent {
 
     override fun currentStyle(): ReaderTextStyle = ReadBookConfig.snapshotStyle()
 
-    /** 从阅读配置读取排版参数快照。header 显隐读宿主默认档（随状态栏）
-     *  时保持 null（不管理）；footer 仅显/隐两态，0 档读回 true。 */
+    /** 从阅读配置读取排版参数快照。页眉模式读宿主 0 档（随状态栏）时
+     *  保持 null（不管理）；footer 仅显/隐两态，0 档读回 true。 */
     private fun ReadBookConfig.snapshotStyle(): ReaderTextStyle = ReaderTextStyle(
         textSize = textSize,
         letterSpacing = letterSpacing,
@@ -433,9 +433,9 @@ internal object ReaderEngineImpl : ReaderEngine, KoinComponent {
         headerSize = durConfig.headerFontSize,
         headerDivider = durConfig.showHeaderLine,
         footerDivider = durConfig.showFooterLine,
-        headerVisible = when (durConfig.headerMode) {
-            1 -> true
-            2 -> false
+        headerMode = when (durConfig.headerMode) {
+            1 -> 1
+            2 -> 2
             else -> null
         },
         footerVisible = when (durConfig.footerMode) {

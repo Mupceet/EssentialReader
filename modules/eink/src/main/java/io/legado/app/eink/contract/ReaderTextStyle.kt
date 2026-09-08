@@ -88,9 +88,10 @@ data class ReaderTextStyle(
     /** 页眉字体；null = 不管理，FollowBody = 跟随正文。 */
     val headerFont: ReaderFontSelection? = null,
 
-    /** 页眉显隐（写宿主 HeaderMode 1/2）；null = 不管理（宿主默认档
-     *  「随状态栏」保留原语义）。 */
-    val headerVisible: Boolean? = null,
+    /** 页眉模式（0 随状态栏 / 1 显示 / 2 隐藏，宿主 HeaderMode 同构）；
+     *  null = 不跨桥写——读回时宿主 0 档保持 null（不管理），用户显式
+     *  选「随状态栏」时写 0。 */
+    val headerMode: Int? = null,
 
     /** 页眉字号（sp，经 extent 影响正文分页预留）；null = 不管理。 */
     val headerSize: Int? = null,

@@ -41,7 +41,17 @@ internal object HostStyleCatalog {
             stepped(Ids.TITLE_BOTTOM_SPACING, 0f, 200f, 0f),
             stepped(Ids.TITLE_LINE_SPACING, 0f, 20f, 12f),
             ReaderStyleParam.Font(Ids.HEADER_FONT, available = true, affectsLayout = true),
-            toggle(Ids.HEADER_VISIBILITY, default = true),
+            ReaderStyleParam.Choice(
+                id = Ids.HEADER_VISIBILITY,
+                available = true,
+                affectsLayout = true,
+                options = listOf(
+                    ReaderStyleParam.Choice.Option(0, "随状态栏"),
+                    ReaderStyleParam.Choice.Option(1, "显示"),
+                    ReaderStyleParam.Choice.Option(2, "隐藏"),
+                ),
+                default = 0,
+            ),
             stepped(Ids.HEADER_SIZE, 0f, 100f, 12f),
             toggle(Ids.HEADER_DIVIDER, default = false),
             toggle(Ids.FOOTER_VISIBILITY, default = true),

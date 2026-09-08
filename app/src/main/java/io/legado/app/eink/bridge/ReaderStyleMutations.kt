@@ -72,7 +72,7 @@ internal fun buildStyleMutations(
     style.footerDivider?.let {
         add(ReadStyleMutation.BooleanValue(ReadStyleBooleanKey.ShowFooterLine, it))
     }
-    style.headerVisible?.let { int(ReadStyleIntKey.HeaderMode, if (it) 1 else 2) }
+    style.headerMode?.let { int(ReadStyleIntKey.HeaderMode, it.coerceIn(0, 2)) }
     style.footerVisible?.let { int(ReadStyleIntKey.FooterMode, if (it) 0 else 1) }
 }
 
