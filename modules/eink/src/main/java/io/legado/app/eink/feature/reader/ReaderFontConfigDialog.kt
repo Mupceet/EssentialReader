@@ -1,6 +1,7 @@
 package io.legado.app.eink.feature.reader
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -150,8 +151,9 @@ private data class FontEntry(
 )
 
 /**
- * 字重设置行：标签与「细体/常规/粗体/自定义」四选同排一行（文字样式
- * 一致、按钮紧凑内边距保证单行）；仅自定义选中时在其下显示拖动条。
+ * 字重设置行：标签在左（按需占宽、垂直对齐按钮行），右侧纵列为
+ * 「细体/常规/粗体/自定义」四选与（仅自定义时）其下的拖动条——拖动条
+ * 只占按钮区域宽度，不延伸到标签下方。文字样式统一（labelLarge）。
  * 进入自定义时按当前档位映射等效值（0→400/1→900/2→300，与宿主
  * resolveWeight 同口径），不写死默认。
  */
@@ -167,54 +169,69 @@ private fun WeightSettingRow(
     // 与 EInkButton 默认文案样式同款（labelLarge），标签不比按钮细
     val buttonStyle = EInkTheme.typography.labelLarge
     Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(48.dp),
-        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(EInkSpacing.xs),
+        verticalAlignment = Alignment.Top,
     ) {
-        EInkText(
-            text = label,
-            style = buttonStyle,
-            // 按需占宽不设上限：标签（正文字重/标题字重）保证完整显示，
-            // 空间压力由右侧四枚等宽按钮吸收（极端字号下按钮省略兜底）
-            modifier = Modifier,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
-        listOf(2 to "细体", 0 to "常规", 1 to "粗体").forEach { (preset, text) ->
-            EInkButton(
-                text = text,
-                onClick = { onSetWeight(preset) },
-                modifier = Modifier.weight(1f),
-                selected = !isCustom && value == preset,
-                height = 40.dp,
+        Box(
+            modifier = Modifier.height(48.dp),
+            contentAlignment = Alignment.Center,
+        ) {
+            EInkText(
+                text = label,
                 style = buttonStyle,
-                contentPadding = PaddingValues(horizontal = 2.dp),
-                role = Role.Tab,
+                // 按需占宽不设上限：标签（正文字重/标题字重）保证完整显示，
+                // 空间压力由右侧四枚等宽按钮吸收（极端字号下按钮省略兜底）
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
             )
         }
-        EInkButton(
-            text = "自定义",
-            onClick = { if (!isCustom) onSetWeight(presetToCustom(value)) },
+        Column(
             modifier = Modifier.weight(1f),
-            selected = isCustom,
-            height = 40.dp,
-            style = buttonStyle,
-            contentPadding = PaddingValues(horizontal = 2.dp),
-            role = Role.Tab,
-        )
-    }
-    if (isCustom) {
-        SliderRow(
-            label = null,
-            value = value.coerceIn(valueRange.first, valueRange.last),
-            valueRange = valueRange,
-            thumbLabel = { it.toString() },
-            tickStep = 100,
-            onSetValue = onSetWeight,
-            markerStep = markerStep,
-        )
+            verticalArrangement = Arrangement.spacedBy(EInkSpacing.xs),
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(48.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(EInkSpacing.xs),
+            ) {
+                listOf(2 to "细体", 0 to "常规", 1 to "粗体").forEach { (preset, text) ->
+                    EInkButton(
+                        text = text,
+                        onClick = { onSetWeight(preset) },
+                        modifier = Modifier.weight(1f),
+                        selected = !isCustom && value == preset,
+                        height = 40.dp,
+                        style = buttonStyle,
+                        contentPadding = PaddingValues(horizontal = 2.dp),
+                        role = Role.Tab,
+                    )
+                }
+                EInkButton(
+                    text = "自定义",
+                    onClick = { if (!isCustom) onSetWeight(presetToCustom(value)) },
+                    modifier = Modifier.weight(1f),
+                    selected = isCustom,
+                    height = 40.dp,
+                    style = buttonStyle,
+                    contentPadding = PaddingValues(horizontal = 2.dp),
+                    role = Role.Tab,
+                )
+            }
+            if (isCustom) {
+                SliderRow(
+                    label = null,
+                    value = value.coerceIn(valueRange.first, valueRange.last),
+                    valueRange = valueRange,
+                    thumbLabel = { it.toString() },
+                    tickStep = 100,
+                    onSetValue = onSetWeight,
+                    markerStep = markerStep,
+                )
+            }
+        }
     }
 }
 
