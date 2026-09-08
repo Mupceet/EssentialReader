@@ -9,7 +9,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
@@ -163,7 +162,9 @@ private fun WeightSettingRow(
         EInkText(
             text = label,
             style = buttonStyle,
-            modifier = Modifier.widthIn(max = SliderLabelWidth),
+            // 按需占宽不设上限：标签（正文字重/标题字重）保证完整显示，
+            // 空间压力由右侧四枚等宽按钮吸收（极端字号下按钮省略兜底）
+            modifier = Modifier,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
