@@ -74,7 +74,8 @@ internal fun ReaderFontConfigDialog(
                 fontOptions.forEach { option ->
                     add(
                         FontEntry(
-                            label = option.name,
+                            // 显示名去除扩展名（.ttf/.otf），选中身份仍按 path 比对
+                            label = option.name.substringBeforeLast("."),
                             selected = style.bodyFont == ReaderFontSelection.File(option.path),
                         ) { onSetFont(ReaderFontSelection.File(option.path)) }
                     )
