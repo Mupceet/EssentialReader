@@ -522,11 +522,12 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application),
     // 均为绝对值 setter：档位滑条（含 ±1 按钮）直接设置目标档位，
     // 按目录钳制后写回快照；是否重排由目录 diff 路由（applyStyleChange）。
 
-    /** 正文字号：随正文态（titleSize==textSize）下标题字号同步跟随，
-     *  自定义态只动正文、标题保持独立。 */
+    /** 正文字号：随正文态下标题字号同步跟随（按 [ReaderUiState.titleSizeFollowBody]
+     *  标志判定而非样式相等——5..7sp 正文被 TITLE_SIZE 下限钳制后两者短暂
+     *  不等，标志判据保证下次调字号即恢复跟随；自定义态只动正文、标题保持独立）。 */
     fun setTextSize(value: Int) = applyStyleChange {
         val size = styleCatalog.clampInt(Ids.BODY_SIZE, value)
-        if (it.titleSize == it.textSize) {
+        if (_uiState.value.titleSizeFollowBody) {
             it.copy(
                 textSize = size,
                 titleSize = styleCatalog.clampInt(Ids.TITLE_SIZE, size),
