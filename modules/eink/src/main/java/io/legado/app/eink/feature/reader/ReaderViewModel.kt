@@ -69,6 +69,9 @@ data class ReaderUiState(
     /** 隐藏状态栏（转发完整模式同键阅读设置；开启后页眉接管 时间/电量）。 */
     val hideStatusBar: Boolean = false,
     val style: ReaderTextStyle = ReaderTextStyle(),
+    /** 标题字号模式：true=随正文一致（titleSize==textSize 由 VM 保持），
+     *  false=自定义；会话内显式切换，装载时按相等关系推导。 */
+    val titleSizeFollowBody: Boolean = true,
     // 水平滑动翻页触发距离（px，0 = 系统 touch slop）
     val pageTouchSlop: Int = 0,
     // 页眉/页脚信息（按 View 版 ReadTipConfig 规则渲染，不开放设置）
@@ -114,15 +117,20 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application),
     }
 
     private val _uiState = MutableStateFlow(
-        ReaderUiState(
-            keepScreenOn = EInkEngineRegistry.globalSettings.keepScreenOn,
-            hideStatusBar = EInkEngineRegistry.globalSettings.hideStatusBar,
-            // 与完整模式共用宿主 autoReadSpeed 配置（默认 10）
-            autoPlayIntervalSec = engine.autoReadIntervalSec
-                .coerceIn(MIN_AUTO_INTERVAL_SEC, MAX_AUTO_INTERVAL_SEC),
-            style = engine.currentStyle(),
-            pageTouchSlop = engine.pageTouchSlop,
-        )
+        run {
+            val style = engine.currentStyle()
+            ReaderUiState(
+                keepScreenOn = EInkEngineRegistry.globalSettings.keepScreenOn,
+                hideStatusBar = EInkEngineRegistry.globalSettings.hideStatusBar,
+                // 与完整模式共用宿主 autoReadSpeed 配置（默认 10）
+                autoPlayIntervalSec = engine.autoReadIntervalSec
+                    .coerceIn(MIN_AUTO_INTERVAL_SEC, MAX_AUTO_INTERVAL_SEC),
+                style = style,
+                // 装载推导：标题字号与正文相等即「随正文一致」初始态
+                titleSizeFollowBody = style.titleSize == style.textSize,
+                pageTouchSlop = engine.pageTouchSlop,
+            )
+        }
     )
     val uiState: StateFlow<ReaderUiState> = _uiState.asStateFlow()
 
@@ -514,8 +522,18 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application),
     // 均为绝对值 setter：档位滑条（含 ±1 按钮）直接设置目标档位，
     // 按目录钳制后写回快照；是否重排由目录 diff 路由（applyStyleChange）。
 
+    /** 正文字号：随正文态（titleSize==textSize）下标题字号同步跟随，
+     *  自定义态只动正文、标题保持独立。 */
     fun setTextSize(value: Int) = applyStyleChange {
-        it.copy(textSize = styleCatalog.clampInt(Ids.BODY_SIZE, value))
+        val size = styleCatalog.clampInt(Ids.BODY_SIZE, value)
+        if (it.titleSize == it.textSize) {
+            it.copy(
+                textSize = size,
+                titleSize = styleCatalog.clampInt(Ids.TITLE_SIZE, size),
+            )
+        } else {
+            it.copy(textSize = size)
+        }
     }
 
     /** 字距按 0.05 步进索引设置（目录值域映射，避免浮点累加漂移）。 */
@@ -619,32 +637,27 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application),
         it.copy(titleMode = value.coerceIn(0, 2))
     }
 
-    fun setTitleSize(value: Int) = applyStyleChange {
-        it.copy(titleSize = styleCatalog.clampInt(Ids.TITLE_SIZE, value))
+    /** 标题字号模式：随正文一致时立即对齐正文字号；自定义不改动当前值
+     *  （初值=当前标题字号，随正文态下即正文字号）。 */
+    fun setTitleSizeFollowBody(follow: Boolean) {
+        _uiState.update { it.copy(titleSizeFollowBody = follow) }
+        if (follow) {
+            applyStyleChange {
+                it.copy(titleSize = styleCatalog.clampInt(Ids.TITLE_SIZE, it.textSize))
+            }
+        }
     }
 
-    fun setTitleTopSpacing(value: Int) = applyStyleChange {
-        it.copy(titleTopSpacing = styleCatalog.clampInt(Ids.TITLE_TOP_SPACING, value))
-    }
-
-    fun setTitleBottomSpacing(value: Int) = applyStyleChange {
-        it.copy(titleBottomSpacing = styleCatalog.clampInt(Ids.TITLE_BOTTOM_SPACING, value))
-    }
-
-    fun setTitleLineSpacing(value: Int) = applyStyleChange {
-        it.copy(titleLineSpacing = styleCatalog.clampInt(Ids.TITLE_LINE_SPACING, value))
+    /** 标题字号（进入自定义语义）：显式调节即脱离随正文态。 */
+    fun setTitleSize(value: Int) {
+        _uiState.update { it.copy(titleSizeFollowBody = false) }
+        applyStyleChange {
+            it.copy(titleSize = styleCatalog.clampInt(Ids.TITLE_SIZE, value))
+        }
     }
 
     fun setHeaderSize(value: Int) = applyStyleChange {
         it.copy(headerSize = styleCatalog.clampInt(Ids.HEADER_SIZE, value))
-    }
-
-    fun setHeaderDivider(value: Boolean) = applyStyleChange {
-        it.copy(headerDivider = value)
-    }
-
-    fun setFooterDivider(value: Boolean) = applyStyleChange {
-        it.copy(footerDivider = value)
     }
 
     /** 页眉模式：0 随状态栏 / 1 显示 / 2 隐藏（宿主 HeaderMode 同构）；

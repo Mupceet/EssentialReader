@@ -75,7 +75,9 @@ data class ReaderTextStyle(
     /** 标题位置（0 左 / 1 中 / 2 隐藏，宿主语义）；null = 不管理。 */
     val titleMode: Int? = null,
 
-    /** 标题字号（sp）；null = 不管理（宿主值独立保留，不再钉平跟随正文）。 */
+    /** 标题字号（sp）；null = 不管理（宿主值独立保留，不再钉平跟随正文）。
+     *  eink 侧「随正文一致」模式由 VM 保持与 [textSize] 相等（相等即随正文），
+     *  自定义时独立调节。 */
     val titleSize: Int? = null,
 
     /** 标题上留白（dp）；null = 不管理。 */

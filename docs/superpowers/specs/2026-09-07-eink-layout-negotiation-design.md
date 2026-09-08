@@ -126,15 +126,15 @@ title.font/header.font 参数仍在协商目录中，但 eink UI 不再独立暴
 | eink id / 名称 | 控件 | 值域/选项（默认） | 宿主落点 | affectsLayout |
 |---|---|---|---|---|
 | title.mode 标题位置 | 三选 | 左/中/隐藏（左） | titleMode | 是 |
-| title.size 标题字号 | 滑条 | 8..60sp（20） | titleSize | 是 |
-| title.top-spacing 标题上留白 | 滑条 | 0..200dp（0） | titleTopSpacing | 是 |
-| title.bottom-spacing 标题下留白 | 滑条 | 0..200dp（0） | titleBottomSpacing | 是 |
-| title.line-spacing 标题行距 | 滑条 | 0..2.0倍（1.2） | titleLineSpacingExtra | 是 |
+| title.size 标题字号 | 随正文一致/自定义+拖动条 | 8..60sp（20） | titleSize | 是 |
+| title.top-spacing 标题上留白 | （不暴露） | 0..200dp（0） | titleTopSpacing | 是 |
+| title.bottom-spacing 标题下留白 | （不暴露） | 0..200dp（0） | titleBottomSpacing | 是 |
+| title.line-spacing 标题行距 | （不暴露） | 0..2.0倍（1.2） | titleLineSpacingExtra | 是 |
 | header.visibility 页眉模式 | 三选 | 随状态栏/显示/隐藏（随状态栏） | headerMode | 是 |
 | header.size 页眉字号 | 滑条 | 0..100sp（12） | headerFontSize | 是 |
-| header.divider 页眉分割线 | 开关 | （关） | showHeaderLine | 是 |
-| footer.visibility 页脚显隐 | 开关 | （开） | footerMode | 是 |
-| footer.divider 页脚分割线 | 开关 | （开） | showFooterLine | 是 |
+| header.divider 页眉分割线 | （不暴露） | （关） | showHeaderLine | 是 |
+| footer.visibility 页脚显隐 | 二选 | 显示/隐藏（开） | footerMode | 是 |
+| footer.divider 页脚分割线 | （不暴露） | （开） | showFooterLine | 是 |
 
 ### 4.4 边距调整弹层（现状三 tab，零改动）
 
@@ -211,7 +211,17 @@ title.font/header.font 参数仍在协商目录中，但 eink UI 不再独立暴
   100..900 滑条；底部全宽字体文件夹按钮（恒为「选择字体文件夹」，选择
   后字体进入上方网格）——统一字体原则，正文/标题/页眉/页脚字体完全
   一致，无页签。
-- **信息配置**：tabs 标题｜页眉｜页脚，内容见 4.3。
+- **信息配置**：tabs 标题｜页眉｜页脚；标签在左按需占宽保证完整显示
+  （Box 居中 intrinsic，空间压力由右侧元素吸收，同字体弹层），内容居右：
+  - 标题：位置三选；字号「随正文一致/自定义」二选——随正文由 VM 保持
+    titleSize==textSize（相等即随正文，读写两侧无需协议变更），仅自定义
+    显示拖动条，进入自定义初值=当前标题字号（随正文态下与正文字号相等）；
+  - 页眉：合并控件——「随状态栏/显示/隐藏」三选按钮行 + 页眉字号拖动条
+    （常驻，占按钮区宽）；
+  - 页脚：「显示/隐藏」两按钮按三槽空间申请——首槽 Spacer 占位，使
+    显示/隐藏与页眉行的显示/隐藏列对齐；
+  - 上/下留白、标题行距、页眉页脚分割线不暴露（eink 不绘制分割线，
+    留白/行距不开放调节；契约字段与协商目录条目保留，同 title.font 先例）。
 - **边距调整**：现状三 tab 四边滑条，零改动。
 
 弹层期间顶部/底部被调对象（标题在页面顶部、页眉页脚在上下边缘）不被遮挡，实时预览；返回键逐级回退（弹层 → 面板 → 操作条 → 退出）。
@@ -261,3 +271,4 @@ title.font/header.font 参数仍在协商目录中，但 eink UI 不再独立暴
 - 2026-09-08 修订：字体配置弹层去页签——统一字体原则（正文/标题/页眉/页脚字体完全一致），单列表选字体 + 正文/标题两个字重；VM setReaderFont 一次性写三目标（标题/页眉归位跟随正文），独立 per-target 字体 setter 移除。
 - 2026-09-08 修订：字重协议扩为 0/1/2 预设 + 100..900 自定义（宿主同构，读回保留原始档位不再归一化——完整模式下拉语义一致）；字体弹层改三列网格 + 底部全宽文件夹按钮（选择/更新双态）+ 字重四选按钮（细体/常规/粗体/自定义，仅自定义显示滑条）；「系统无衬线」更名「系统默认」、「字重」更名「正文字重」；新端口 fontFolderUri。
 - 2026-09-08 修订：字体弹层打磨——字重行标签与四选按钮同排单行、文字样式统一；进入自定义按当前档位映射等效值（不写死 500）；字体网格加顶部呼吸边距；文件夹按钮统一「选择字体文件夹」（fontFolderUri 端口随之移除）。
+- 2026-09-08 修订：信息配置精简——标题字号改「随正文一致/自定义」二选（随正文由 VM 保持 titleSize==textSize，进自定义初值=正文字号）；删除上/下留白、标题行距、页眉页脚分割线设置（分割线 eink 不绘制）；页眉合并为模式三选+字号拖动条；页脚两按钮按三槽空间与页眉行对齐；标签按需占宽保完整。
