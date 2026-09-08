@@ -226,7 +226,11 @@ interface ReaderEngine {
     /** 清除 [engineMessage]。 */
     fun clearEngineMessage()
 
-    /** 装载当前章节内容（进度/目录缓存就绪后的首次正文加载）。 */
+    /**
+     * 装载当前章节内容（进度/目录缓存就绪后的首次正文加载）。
+     * 宿主实现应优先装载当前章、完成后再装载相邻章——阅读页首屏只等
+     * 当前章，弱设备上三章并发装载会互相抢占拖慢首屏。
+     */
     fun loadContent(resetPageOffset: Boolean)
 
     /** 跳转并装载指定章节。 */

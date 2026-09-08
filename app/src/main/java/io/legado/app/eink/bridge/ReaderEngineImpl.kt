@@ -202,7 +202,10 @@ internal object ReaderEngineImpl : ReaderEngine, KoinComponent {
     }
 
     override fun loadContent(resetPageOffset: Boolean) {
-        ReadBook.loadContent(resetPageOffset = resetPageOffset)
+        // 当前章优先装载（完整模式 loadInitialContent 同款）：相邻章等当前章
+        // 装载完成后才开始，避免弱 SoC 上三章内容处理并发抢占、拖慢用户
+        // 正在等待的当前章分页。同键在途去重由 ReaderChapterPager 承担
+        ReadBook.loadInitialContent(resetPageOffset = resetPageOffset)
     }
 
     override fun loadContent(chapterIndex: Int, resetPageOffset: Boolean) {
