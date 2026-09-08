@@ -22,6 +22,8 @@ internal object HostStyleCatalog {
             stepped(Ids.BODY_LINE_SPACING, 0f, 20f, 12f),
             stepped(Ids.BODY_PARAGRAPH_SPACING, 0f, 20f, 2f),
             ReaderStyleParam.Font(Ids.BODY_FONT, available = true, affectsLayout = true),
+            // 字重协议域另含 0 常规/1 粗/2 细预设（模块 UI 按钮直写，宿主
+            // 同构）；此处目录声明自定义滑条区间与默认值
             stepped(Ids.BODY_WEIGHT, 100f, 900f, 500f),
             ReaderStyleParam.Font(Ids.TITLE_FONT, available = true, affectsLayout = true),
             stepped(Ids.TITLE_WEIGHT, 100f, 900f, 500f),

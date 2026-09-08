@@ -193,8 +193,8 @@ Java 17 / minSdk 21（按 §0 升 23）/ 无 Compose 无 Coil（图片栈 Glide�
   阻塞式，模块在 IO 上下文调用）；`fontFolderUri()` 返回当前持久化的
   字体文件夹（不实现返回 null，模块按钮恒显示「选择字体文件夹」）。
   同版本起 `setTextBold` / `textBold`
-  已移除，加粗能力由字重参数（body.weight / title.weight 100..900）
-  取代。另 `headerFooterTypefaces()` 返回页眉/页脚的有效字体（按
+  已移除，加粗能力由字重参数（body.weight / title.weight，0/1/2 预设
+  + 100..900 自定义）取代。另 `headerFooterTypefaces()` 返回页眉/页脚的有效字体（按
   「设置→跟随正文→系统默认」链解析，宿主负责 Typeface 加载与缓存），
   不实现即返回 null，模块页眉/页脚文字用平台默认字体渲染。
 - **资源合并**：模块资源全部 `eink_` 前缀，与任何宿主零同名。
