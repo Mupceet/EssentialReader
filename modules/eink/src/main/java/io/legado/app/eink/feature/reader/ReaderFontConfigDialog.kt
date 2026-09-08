@@ -92,9 +92,9 @@ internal fun ReaderFontConfigDialog(
                     modifier = Modifier.height(44.dp),
                     contentAlignment = Alignment.Center,
                 ) {
-                    EInkText(
-                        text = "字体选择",
-                        style = EInkTheme.typography.labelLarge,
+                EInkText(
+                    text = "字体选择",
+                    style = EInkTheme.typography.bodyMedium,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
@@ -115,6 +115,7 @@ internal fun ReaderFontConfigDialog(
                                     modifier = Modifier.weight(1f),
                                     selected = entry.selected,
                                     height = 44.dp,
+                                    style = EInkTheme.typography.bodyMedium,
                                     role = Role.Button,
                                 )
                             }
@@ -140,6 +141,7 @@ internal fun ReaderFontConfigDialog(
                 onClick = onPickFolder,
                 modifier = Modifier.fillMaxWidth(),
                 height = 44.dp,
+                style = EInkTheme.typography.bodyMedium,
                 role = Role.Button,
             )
         }
@@ -156,7 +158,8 @@ private data class FontEntry(
 /**
  * 字重设置行：标签在左（按需占宽、垂直对齐按钮行），右侧纵列为
  * 「细体/常规/粗体/自定义」四选与（仅自定义时）其下的拖动条——拖动条
- * 只占按钮区域宽度，不延伸到标签下方。文字样式统一（labelLarge）。
+ * 只占按钮区域宽度，不延伸到标签下方。文字样式统一（bodyMedium，
+ * 与排版面板滑条标签同风格）。
  * 进入自定义时按当前档位映射等效值（0→400/1→900/2→300，与宿主
  * resolveWeight 同口径），不写死默认。
  */
@@ -168,8 +171,8 @@ private fun WeightSettingRow(
     onSetWeight: (Int) -> Unit,
 ) {
     val isCustom = value !in 0..2
-    // 与 EInkButton 默认文案样式同款（labelLarge），标签不比按钮细
-    val buttonStyle = EInkTheme.typography.labelLarge
+    // 标签与按钮统一 bodyMedium（与滑条标签同风格，轻一级）
+    val buttonStyle = EInkTheme.typography.bodyMedium
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(EInkSpacing.xs),

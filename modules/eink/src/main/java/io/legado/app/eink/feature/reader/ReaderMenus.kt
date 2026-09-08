@@ -396,6 +396,7 @@ private fun StyleEntryRow(entries: List<Pair<String, () -> Unit>>) {
                 onClick = onClick,
                 modifier = Modifier.weight(1f),
                 height = 44.dp,
+                style = EInkTheme.typography.bodyMedium,
                 role = Role.Button,
             )
         }
@@ -627,6 +628,7 @@ internal fun PanelTabRow(labels: List<String>, selected: Int, onSelect: (Int) ->
                 modifier = Modifier.weight(1f),
                 selected = index == selected,
                 height = 40.dp,
+                style = EInkTheme.typography.bodyMedium,
                 role = Role.Tab,
             )
         }

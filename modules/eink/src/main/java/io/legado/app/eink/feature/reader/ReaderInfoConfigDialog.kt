@@ -84,6 +84,7 @@ internal fun ReaderInfoConfigDialog(
                         modifier = Modifier.weight(1f),
                         selected = titleSizeFollowBody,
                         height = 40.dp,
+                        style = EInkTheme.typography.bodyMedium,
                         role = Role.Tab,
                     )
                     EInkButton(
@@ -92,6 +93,7 @@ internal fun ReaderInfoConfigDialog(
                         modifier = Modifier.weight(1f),
                         selected = !titleSizeFollowBody,
                         height = 40.dp,
+                        style = EInkTheme.typography.bodyMedium,
                         role = Role.Tab,
                     )
                 }
@@ -129,6 +131,7 @@ internal fun ReaderInfoConfigDialog(
                         modifier = Modifier.weight(1f),
                         selected = style.footerVisible ?: true,
                         height = 40.dp,
+                        style = EInkTheme.typography.bodyMedium,
                         role = Role.Tab,
                     )
                     EInkButton(
@@ -137,6 +140,7 @@ internal fun ReaderInfoConfigDialog(
                         modifier = Modifier.weight(1f),
                         selected = !(style.footerVisible ?: true),
                         height = 40.dp,
+                        style = EInkTheme.typography.bodyMedium,
                         role = Role.Tab,
                     )
                     Spacer(modifier = Modifier.weight(1f))
@@ -170,7 +174,7 @@ private fun LabeledSettingRow(label: String, content: @Composable ColumnScope.()
         ) {
             EInkText(
                 text = label,
-                style = EInkTheme.typography.labelLarge,
+                style = EInkTheme.typography.bodyMedium,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
@@ -205,6 +209,7 @@ private fun ChoiceButtons(
                 modifier = Modifier.weight(1f),
                 selected = values[index] == selected,
                 height = 40.dp,
+                style = EInkTheme.typography.bodyMedium,
                 role = Role.Tab,
             )
         }
