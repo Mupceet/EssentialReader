@@ -333,9 +333,6 @@ interface ReaderEngine {
     /** 设置字体文件夹（SAF tree uri 字符串）并持久化。 */
     suspend fun setFontFolder(uri: String) {}
 
-    /** 当前持久化的字体文件夹（SAF tree uri 字符串；null = 未选择过）。 */
-    fun fontFolderUri(): String? = null
-
     /** 从宿主排版配置读回当前参数快照。 */
     fun currentStyle(): ReaderTextStyle
 

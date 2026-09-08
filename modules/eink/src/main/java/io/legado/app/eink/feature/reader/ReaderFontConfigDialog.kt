@@ -2,18 +2,21 @@ package io.legado.app.eink.feature.reader
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import io.legado.app.eink.contract.ReaderFontOption
 import io.legado.app.eink.contract.ReaderFontSelection
@@ -30,15 +33,14 @@ import io.legado.app.eink.designsystem.theme.EInkSpacing
  * 字体配置弹层：统一字体原则——正文/标题/页眉（页脚经 applyHeaderStyle
  * 跟随页眉）字体完全一致。三列字体网格（系统默认/衬线/等宽 + 字体
  * 文件）；正文字重与标题字重各为「细体/常规/粗体/自定义」四选，仅
- * 自定义显示拖动条（100..900）；底部全宽字体文件夹按钮（未选=选择、
- * 已选=更新），选择后字体进入上方网格。
+ * 自定义显示拖动条（100..900）；底部全宽字体文件夹按钮（恒为
+ * 「选择字体文件夹」，重复选择即换文件夹），选择后字体进入上方网格。
  */
 @Composable
 internal fun ReaderFontConfigDialog(
     catalog: ReaderStyleCatalog,
     style: ReaderTextStyle,
     fontOptions: List<ReaderFontOption>,
-    hasFontFolder: Boolean,
     onSetFont: (ReaderFontSelection) -> Unit,
     onSetBodyWeight: (Int) -> Unit,
     onSetTitleWeight: (Int) -> Unit,
@@ -78,28 +80,30 @@ internal fun ReaderFontConfigDialog(
                     )
                 }
             }
-            entries.chunked(3).forEach { rowEntries ->
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(EInkSpacing.xs),
-                ) {
-                    rowEntries.forEach { entry ->
-                        EInkButton(
-                            text = entry.label,
-                            onClick = entry.onClick,
-                            modifier = Modifier.weight(1f),
-                            selected = entry.selected,
-                            height = 44.dp,
-                            role = Role.Button,
-                        )
+            // 网格顶部加呼吸边距，与标题区拉开层次
+            Column(modifier = Modifier.padding(top = EInkSpacing.s)) {
+                entries.chunked(3).forEach { rowEntries ->
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(EInkSpacing.xs),
+                    ) {
+                        rowEntries.forEach { entry ->
+                            EInkButton(
+                                text = entry.label,
+                                onClick = entry.onClick,
+                                modifier = Modifier.weight(1f),
+                                selected = entry.selected,
+                                height = 44.dp,
+                                role = Role.Button,
+                            )
+                        }
+                        repeat(3 - rowEntries.size) { Spacer(modifier = Modifier.weight(1f)) }
                     }
-                    repeat(3 - rowEntries.size) { Spacer(modifier = Modifier.weight(1f)) }
                 }
             }
             WeightSettingRow(
                 label = "正文字重",
                 value = style.bodyWeight ?: catalog.defaultInt(Ids.BODY_WEIGHT),
-                customDefault = catalog.defaultInt(Ids.BODY_WEIGHT),
                 valueRange = catalog.intRange(Ids.BODY_WEIGHT),
                 markerStep = catalog.defaultStep(Ids.BODY_WEIGHT),
                 onSetWeight = onSetBodyWeight,
@@ -107,13 +111,12 @@ internal fun ReaderFontConfigDialog(
             WeightSettingRow(
                 label = "标题字重",
                 value = style.titleWeight ?: catalog.defaultInt(Ids.TITLE_WEIGHT),
-                customDefault = catalog.defaultInt(Ids.TITLE_WEIGHT),
                 valueRange = catalog.intRange(Ids.TITLE_WEIGHT),
                 markerStep = catalog.defaultStep(Ids.TITLE_WEIGHT),
                 onSetWeight = onSetTitleWeight,
             )
             EInkButton(
-                text = if (hasFontFolder) "更新字体文件夹" else "选择字体文件夹",
+                text = "选择字体文件夹",
                 onClick = onPickFolder,
                 modifier = Modifier.fillMaxWidth(),
                 height = 44.dp,
@@ -131,62 +134,75 @@ private data class FontEntry(
 )
 
 /**
- * 字重设置行：右侧「细体/常规/粗体/自定义」四选（0/2/1 预设档直写，
- * 宿主下拉同构）；仅自定义选中时在其下显示拖动条（进入自定义时写
- * 目录默认值）。
+ * 字重设置行：标签与「细体/常规/粗体/自定义」四选同排一行（文字样式
+ * 一致、按钮紧凑内边距保证单行）；仅自定义选中时在其下显示拖动条。
+ * 进入自定义时按当前档位映射等效值（0→400/1→900/2→300，与宿主
+ * resolveWeight 同口径），不写死默认。
  */
 @Composable
 private fun WeightSettingRow(
     label: String,
     value: Int,
-    customDefault: Int,
     valueRange: IntRange,
     markerStep: Int?,
     onSetWeight: (Int) -> Unit,
 ) {
     val isCustom = value !in 0..2
-    Column {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(48.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(EInkSpacing.xs),
-        ) {
-            EInkText(
-                text = label,
-                modifier = Modifier.width(SliderLabelWidth),
-                style = EInkTheme.typography.bodyMedium,
-            )
-            listOf(2 to "细体", 0 to "常规", 1 to "粗体").forEach { (preset, text) ->
-                EInkButton(
-                    text = text,
-                    onClick = { onSetWeight(preset) },
-                    modifier = Modifier.weight(1f),
-                    selected = !isCustom && value == preset,
-                    height = 40.dp,
-                    role = Role.Tab,
-                )
-            }
+    // 与 EInkButton 默认文案样式同款（labelLarge），标签不比按钮细
+    val buttonStyle = EInkTheme.typography.labelLarge
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(48.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(EInkSpacing.xs),
+    ) {
+        EInkText(
+            text = label,
+            style = buttonStyle,
+            modifier = Modifier.widthIn(max = SliderLabelWidth),
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+        listOf(2 to "细体", 0 to "常规", 1 to "粗体").forEach { (preset, text) ->
             EInkButton(
-                text = "自定义",
-                onClick = { if (!isCustom) onSetWeight(customDefault) },
+                text = text,
+                onClick = { onSetWeight(preset) },
                 modifier = Modifier.weight(1f),
-                selected = isCustom,
+                selected = !isCustom && value == preset,
                 height = 40.dp,
+                style = buttonStyle,
+                contentPadding = PaddingValues(horizontal = 4.dp),
                 role = Role.Tab,
             )
         }
-        if (isCustom) {
-            SliderRow(
-                label = null,
-                value = value.coerceIn(valueRange.first, valueRange.last),
-                valueRange = valueRange,
-                thumbLabel = { it.toString() },
-                tickStep = 100,
-                onSetValue = onSetWeight,
-                markerStep = markerStep,
-            )
-        }
+        EInkButton(
+            text = "自定义",
+            onClick = { if (!isCustom) onSetWeight(presetToCustom(value)) },
+            modifier = Modifier.weight(1f),
+            selected = isCustom,
+            height = 40.dp,
+            style = buttonStyle,
+            contentPadding = PaddingValues(horizontal = 4.dp),
+            role = Role.Tab,
+        )
     }
+    if (isCustom) {
+        SliderRow(
+            label = null,
+            value = value.coerceIn(valueRange.first, valueRange.last),
+            valueRange = valueRange,
+            thumbLabel = { it.toString() },
+            tickStep = 100,
+            onSetValue = onSetWeight,
+            markerStep = markerStep,
+        )
+    }
+}
+
+/** 预设档 → 自定义等效值（与宿主 resolveWeight 同口径：1→900/2→300/其余→400）。 */
+private fun presetToCustom(value: Int): Int = when (value) {
+    1 -> 900
+    2 -> 300
+    else -> 400
 }

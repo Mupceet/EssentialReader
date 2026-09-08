@@ -118,10 +118,8 @@ fun ReaderRoute(
         }
     }
 
-    // 字体文件列表：字体弹层打开时拉取（SAF 换文件夹后由 VM 刷新）；
-    // 文件夹已选状态决定底部按钮「选择/更新」文案
+    // 字体文件列表：字体弹层打开时拉取（SAF 换文件夹后由 VM 刷新）
     val fontOptions by viewModel.fontOptions.collectAsStateWithLifecycle()
-    val fontFolderSet by viewModel.fontFolderSet.collectAsStateWithLifecycle()
     LaunchedEffect(styleDialog) {
         if (styleDialog == ReaderStyleDialog.Fonts) viewModel.loadFontOptions()
     }
@@ -415,7 +413,6 @@ fun ReaderRoute(
                 catalog = viewModel.styleCatalog,
                 style = uiState.style,
                 fontOptions = fontOptions,
-                hasFontFolder = fontFolderSet,
                 onSetFont = viewModel::setReaderFont,
                 onSetBodyWeight = viewModel::setBodyWeight,
                 onSetTitleWeight = viewModel::setTitleWeight,

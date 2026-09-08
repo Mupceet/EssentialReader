@@ -533,9 +533,6 @@ internal object ReaderEngineImpl : ReaderEngine, KoinComponent {
         readSettingsRepository.setFontFolder(uri)
     }
 
-    override fun fontFolderUri(): String? =
-        readSettingsRepository.currentSettings.fontFolder.takeIf { it.isNotEmpty() }
-
     override fun formatTimeNow(): String =
         AppConst.timeFormat.format(Date()).toString()
 
