@@ -22,7 +22,13 @@ import kotlinx.coroutines.launch
  */
 internal object CacheBookPump {
 
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val defaultScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
+    // 单元测试注入点：虚拟时间作用域替换进程级 IO 作用域，其余逻辑不变
+    internal var scopeOverride: CoroutineScope? = null
+
+    private val scope: CoroutineScope
+        get() = scopeOverride ?: defaultScope
 
     private var job: Job? = null
 

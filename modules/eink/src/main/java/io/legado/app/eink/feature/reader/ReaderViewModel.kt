@@ -623,12 +623,6 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application),
         )
     }
 
-    /** 字重域：0 常规 / 1 粗体 / 2 细体 / 100..900 自定义（宿主同构）。 */
-    private fun coerceWeight(value: Int): Int = when (value) {
-        in 0..2 -> value
-        else -> value.coerceIn(100, 900)
-    }
-
     fun setBodyWeight(value: Int) = applyStyleChange {
         it.copy(bodyWeight = coerceWeight(value))
     }
@@ -884,6 +878,15 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application),
 
 /** 缓存全部剩余章节的标记值。 */
 const val CACHE_ALL = -1
+
+/**
+ * 字重域：0 常规 / 1 粗体 / 2 细体 / 100..900 自定义（宿主同构）。
+ * 顶层纯函数便于单测（VM 为 AndroidViewModel，JVM 测试不实例化）。
+ */
+internal fun coerceWeight(value: Int): Int = when (value) {
+    in 0..2 -> value
+    else -> value.coerceIn(100, 900)
+}
 
 /** 等待阅读区尺寸就绪的超时（毫秒）。 */
 internal const val VIEW_SIZE_TIMEOUT_MS = 2000L

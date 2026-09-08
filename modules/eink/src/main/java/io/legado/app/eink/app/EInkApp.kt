@@ -222,7 +222,7 @@ fun EInkApp(
 }
 
 /** 冷启动初始栈：默认仅书架；[自动跳转最近阅读]时书架之上叠阅读页。 */
-private fun initialStack(initialReaderBookUrl: String?): List<EInkScreen> =
+internal fun initialStack(initialReaderBookUrl: String?): List<EInkScreen> =
     if (initialReaderBookUrl == null) {
         listOf(EInkScreen.Home)
     } else {

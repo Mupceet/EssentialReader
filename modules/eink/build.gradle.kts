@@ -78,6 +78,8 @@ dependencies {
 
     // Unit tests（纯函数 JVM 测试，无需 Robolectric）
     testImplementation(libs.junit)
+    // 并发单元测试（onEachParallel / CacheBookPump 的虚拟时间验证）
+    testImplementation(libs.kotlinx.coroutines.test)
 }
 
 
