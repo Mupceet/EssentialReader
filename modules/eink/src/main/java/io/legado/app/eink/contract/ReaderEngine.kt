@@ -256,6 +256,14 @@ interface ReaderEngine {
      */
     suspend fun prepareBookData(book: BookHandle): ReaderPrepareResult
 
+    /**
+     * 进书预取（书架点击 → 阅读页导航切换期间提前装载）：宿主在无活跃
+     * 阅读回调时后台装载书籍会话与当前章内容，与导航并行；条件不满足
+     * 时静默无操作，由阅读页常规装载兜底。默认无实现（宿主不支持时
+     * 仅失去并行收益，行为不变）。
+     */
+    fun prefetchOpen(bookUrl: String) {}
+
     // ---- 翻页 ----
 
     /** 下一页（章尾自动进入下一章），无更多页返回 false。 */
@@ -313,6 +321,13 @@ interface ReaderEngine {
      * 首帧布局与旋转变化时调用；宿主引擎在拿到真实尺寸前无法排版。
      */
     fun updateViewSize(width: Int, height: Int)
+
+    /**
+     * 排版视口是否已就绪。宿主引擎为进程级单例时视口跨会话保留，
+     * 阅读页重进可跳过首帧尺寸等待直接排版；默认 false（视口只随
+     * 界面生命周期存在），由阅读页常规等待兜底。
+     */
+    val isViewportReady: Boolean get() = false
 
     /**
      * 写入排版参数快照：映射到宿主排版配置各字段、持久化并刷新排版

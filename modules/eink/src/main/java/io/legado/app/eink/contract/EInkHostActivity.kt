@@ -120,6 +120,9 @@ abstract class EInkHostActivity : ComponentActivity() {
         } else {
             null
         }
+        // 直达阅读同样预取（书架点击路径见 EInkApp.onBookClick）：内容装载
+        // 与首帧组合并行，阅读页 attach 时直接消费
+        lastReadBookUrl?.let { EInkEngineRegistry.readerEngine.prefetchOpen(it) }
         setContent {
             EInkTheme(darkTheme = isSystemInDarkTheme()) {
                 EInkRoot(

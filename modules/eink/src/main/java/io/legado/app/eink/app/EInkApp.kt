@@ -18,6 +18,7 @@ import androidx.lifecycle.ViewModelStoreOwner
 import androidx.lifecycle.viewmodel.CreationExtras
 import androidx.lifecycle.viewmodel.MutableCreationExtras
 import androidx.lifecycle.viewmodel.compose.LocalViewModelStoreOwner
+import io.legado.app.eink.contract.EInkEngineRegistry
 import io.legado.app.eink.debug.ComponentGalleryRoute
 import io.legado.app.eink.debug.ThemeDebugRoute
 import io.legado.app.eink.feature.bookdetail.BookDetailRoute
@@ -110,6 +111,10 @@ fun EInkApp(
                         is EInkScreen.Home -> {
                             HomeRoute(
                                 onBookClick = { bookUrl ->
+                                    // 点击即预取（对齐完整模式 MainNavigator 的
+                                    // prefetchForOpen 时机）：会话装载与当前章内容
+                                    // 读取和导航切换并行，阅读页进入时直接消费
+                                    EInkEngineRegistry.readerEngine.prefetchOpen(bookUrl)
                                     // 书架点击直接进入阅读
                                     controller.navigate(EInkScreen.Reader(bookUrl))
                                 },

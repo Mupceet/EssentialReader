@@ -212,6 +212,13 @@ internal object ReaderEngineImpl : ReaderEngine, KoinComponent {
         ReadBook.loadContent(chapterIndex, resetPageOffset = resetPageOffset)
     }
 
+    override fun prefetchOpen(bookUrl: String) {
+        // 完整模式 MainNavigator 的进书预取同款：点击即装载（会话 + 当前章
+        // 内容）与导航切换并行；内部自带 callBack 占用/朗读中/数据不全等
+        // 前置守卫，不满足时静默交还阅读页常规装载
+        ReadBook.prefetchForOpen(bookUrl)
+    }
+
     override fun refreshToc() {
         ReadBook.upToc()
     }
@@ -384,6 +391,9 @@ internal object ReaderEngineImpl : ReaderEngine, KoinComponent {
     override fun updateViewSize(width: Int, height: Int) {
         chapterPager.updateViewport(width, height)
     }
+
+    override val isViewportReady: Boolean
+        get() = chapterPager.hasViewport
 
     override fun applyStyle(style: ReaderTextStyle) {
         val mutations = buildStyleMutations(

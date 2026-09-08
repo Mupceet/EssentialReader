@@ -161,8 +161,11 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application),
 
             // 首次排版前必须拿到阅读区真实尺寸：引擎宽高为 0 时
             // visibleWidth 为负数，排版会直接抛异常，导致 upContent
-            // 永远不会回调（界面停留在加载中）
-            withTimeoutOrNull(VIEW_SIZE_TIMEOUT_MS) { viewSizeReady.await() }
+            // 永远不会回调（界面停留在加载中）。引擎为进程级单例、视口
+            // 跨会话保留：已就绪时无需再等首帧，装载与页面组合并行
+            if (!engine.isViewportReady) {
+                withTimeoutOrNull(VIEW_SIZE_TIMEOUT_MS) { viewSizeReady.await() }
+            }
 
             // 换源完成后引擎持有新书（bookUrl 与路由参数不同）：旧记录连同
             // 章节已被删除，按路由参数解析要么为 null、要么从 searchBook
