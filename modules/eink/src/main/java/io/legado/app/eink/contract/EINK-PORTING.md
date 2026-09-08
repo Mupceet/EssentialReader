@@ -182,7 +182,7 @@ Java 17 / minSdk 21（按 §0 升 23）/ 无 Compose 无 Coil（图片栈 Glide�
   ImageLoader 拦截器（本仓形态）；Glide 等其它栈宿主默认无防盗链
   （相关封面回退占位），恢复路径为模块的 Coil 实例注册带书源解析的
   网络拦截器。
-- **排版协商与字体端口（0.3.0 起）**：`ReaderEngine` 新增三个带默认
+- **排版协商与字体端口（0.3.0 起）**：`ReaderEngine` 新增四个带默认
   实现的成员，旧宿主零改动即降级——`styleCatalog()` 不实现即返回
   null，模块回落内置 17 参数基线（`FallbackReaderStyleCatalog`），
   字体/字重/标题/页眉页脚设置行全部隐藏（= 0.2.x 行为）。要启用这些
