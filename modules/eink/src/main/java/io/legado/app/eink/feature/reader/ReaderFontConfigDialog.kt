@@ -80,8 +80,11 @@ internal fun ReaderFontConfigDialog(
                     )
                 }
             }
-            // 网格顶部加呼吸边距，与标题区拉开层次
-            Column(modifier = Modifier.padding(top = EInkSpacing.s)) {
+            // 网格顶部加呼吸边距，与标题区拉开层次；行间保持既有节奏
+            Column(
+                modifier = Modifier.padding(top = EInkSpacing.s),
+                verticalArrangement = Arrangement.spacedBy(EInkSpacing.xs),
+            ) {
                 entries.chunked(3).forEach { rowEntries ->
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -172,7 +175,7 @@ private fun WeightSettingRow(
                 selected = !isCustom && value == preset,
                 height = 40.dp,
                 style = buttonStyle,
-                contentPadding = PaddingValues(horizontal = 4.dp),
+                contentPadding = PaddingValues(horizontal = 2.dp),
                 role = Role.Tab,
             )
         }
@@ -183,7 +186,7 @@ private fun WeightSettingRow(
             selected = isCustom,
             height = 40.dp,
             style = buttonStyle,
-            contentPadding = PaddingValues(horizontal = 4.dp),
+            contentPadding = PaddingValues(horizontal = 2.dp),
             role = Role.Tab,
         )
     }
