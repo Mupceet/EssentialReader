@@ -25,6 +25,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.displayCutout
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -33,6 +34,8 @@ import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.systemBars
+import androidx.compose.foundation.layout.union
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -1008,11 +1011,16 @@ internal fun ReaderScreen(
 }
 
 /**
- * 阅读界面系统栏避让：左右/底部沿用 safeDrawing；顶部按「隐藏状态栏」
+ * 阅读界面系统栏避让：左右/底部取 displayCutout ∪ systemBars；顶部按「隐藏状态栏」
  * 开关显式置零——旧平台（API < 30）legacy 布局标记 LAYOUT_STABLE 下，
  * 系统栏插图冻结在「栏可见」尺寸、不随 insetsController.hide() 归零，
  * safeDrawing 自动收缩不可依赖，置零后状态栏区域转为页眉区域。
  * 对齐完整模式 LAYOUT_FULLSCREEN：隐藏时不避让刘海（墨水屏设备无刘海）。
+ *
+ * 左右/底部不用 safeDrawing：safeDrawing 含 ime，若进避让，输入法弹出会压缩
+ * 阅读视口 → 宿主按新视口全量重排（updateViewport → requestPagination）→
+ * 正文跳页且弹框被页变效应关闭。阅读区与面板均无内嵌输入场景，键盘一律以
+ * 覆盖层出现，输入型弹框的避让由 EInkDialog 的 imePadding 承担。
  */
 @Composable
 private fun Modifier.readerSystemBarInsets(hideStatusBar: Boolean): Modifier {
@@ -1022,7 +1030,9 @@ private fun Modifier.readerSystemBarInsets(hideStatusBar: Boolean): Modifier {
         WindowInsets.safeDrawing.only(WindowInsetsSides.Top)
     }
     return windowInsetsPadding(
-        WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal + WindowInsetsSides.Bottom)
+        WindowInsets.displayCutout
+            .union(WindowInsets.systemBars)
+            .only(WindowInsetsSides.Horizontal + WindowInsetsSides.Bottom)
     ).windowInsetsPadding(top)
 }
 

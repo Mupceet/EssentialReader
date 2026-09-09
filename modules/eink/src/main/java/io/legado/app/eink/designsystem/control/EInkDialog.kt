@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
@@ -46,6 +47,10 @@ import io.legado.app.eink.designsystem.theme.EInkTheme
  * 受限容器——覆盖与点击拦截范围以组合位置为准。内容（表单、输入行、
  * 说明文字）由调用方在 [content] 插槽组合；输入行暂不沉淀 DS（等第二个
  * 消费者），参照 EInkSearchBar 的 BasicTextField decorationBox 写法自行组合。
+ *
+ * IME 避让（DS §20 Dialog / §21 输入）：根 Box 自带 imePadding——弹框自身
+ * 上抬到键盘上方；无输入场景 ime 插图为 0，无行为变化。宿主阅读区不响应
+ * ime 插图（见 readerSystemBarInsets），故输入型弹框打开键盘不会引起正文重排。
  */
 @Composable
 fun EInkDialog(
@@ -65,6 +70,9 @@ fun EInkDialog(
     Box(
         modifier = Modifier
             .fillMaxSize()
+            // 输入型弹框（书签/笔记编辑）键盘弹出时卡片整体抬到键盘上方；
+            // 无输入场景 ime 插图为 0，零行为变化。宿主阅读区不避让 ime。
+            .imePadding()
             // 透明点击层承担模态拦截：点弹框外收起，面板外内容不可交互
             .einkClickable(
                 role = Role.Button,
