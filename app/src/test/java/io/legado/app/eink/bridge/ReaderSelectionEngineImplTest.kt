@@ -39,4 +39,12 @@ class ReaderSelectionEngineImplTest {
         assertEquals("", before)
         assertEquals(48, after.length)
     }
+
+    @Test
+    fun `eink 笔记固定实线样式`() {
+        val style = einkMarkingStyle()
+        assertEquals(1, style.underlineMode)
+        assertEquals(0xFF63C37D.toInt(), style.underlineColor)
+        assertEquals(null, style.bgColor)
+    }
 }

@@ -2,6 +2,8 @@ package io.legado.app.eink.bridge
 
 import io.legado.app.data.entities.Bookmark
 import io.legado.app.data.repository.BookmarkRepository
+import io.legado.app.domain.model.TextProcessStyle
+import io.legado.app.domain.usecase.SaveMarkingUseCase
 import io.legado.app.eink.contract.ReaderSelectionCommit
 import io.legado.app.eink.contract.ReaderSelectionDraft
 import io.legado.app.eink.contract.ReaderSelectionEngine
@@ -12,6 +14,16 @@ import org.koin.core.component.inject
 /** 与 MarkingDelegate 一致的窗口常量。 */
 private const val CONTEXT_CHARS = 48
 private const val CONTEXT_SEARCH_WINDOW = 256
+
+/** eink 笔记固定色：宿主划线渲染的回退默认（灰绿），eink 页面按主题黑绘制。 */
+private val EINK_MARKING_COLOR: Int = 0xFF63C37D.toInt()
+
+/**
+ * eink 创建的笔记固定实线样式（无样式配置——既定产品决策）；颜色为宿主渲染
+ * 回退默认，eink 页面按主题黑绘制。
+ */
+internal fun einkMarkingStyle(): TextProcessStyle =
+    TextProcessStyle(underlineMode = 1, underlineColor = EINK_MARKING_COLOR)
 
 /**
  * 在章节全文中定位选中文本：优先提示位置精确命中，附近 ±[CONTEXT_SEARCH_WINDOW]
@@ -45,6 +57,7 @@ internal fun extractContext(content: String, start: Int, length: Int): Pair<Stri
 internal object ReaderSelectionEngineImpl : ReaderSelectionEngine, KoinComponent {
 
     private val bookmarkRepository: BookmarkRepository by inject()
+    private val saveMarkingUseCase: SaveMarkingUseCase by inject()
 
     /** 当前会话章节的语义正文（章节不匹配返回 null）。 */
     private fun semanticContent(chapterIndex: Int): String? =
@@ -99,7 +112,31 @@ internal object ReaderSelectionEngineImpl : ReaderSelectionEngine, KoinComponent
     }
 
     override suspend fun saveMarking(commit: ReaderSelectionCommit): Boolean {
-        // Task 9 实现：SaveMarkingUseCase + 固定实线样式 + relayout 推送
-        throw NotImplementedError("Task 9")
+        val book = ReadBook.book ?: return false
+        val content = semanticContent(commit.chapterIndex) ?: return false
+        val located = locateInContent(content, commit.start, commit.selectedText)
+        // 选区失效从严：笔记是文本锚点，与书签的宽松回退策略不同
+        if (located < 0) return false
+        val (before, after) = extractContext(content, located, commit.selectedText.length)
+        return try {
+            saveMarkingUseCase.save(
+                bookName = book.name,
+                bookAuthor = book.author,
+                bookUrl = book.bookUrl,
+                chapterIndex = commit.chapterIndex,
+                chapterPosition = located,
+                selectedText = commit.selectedText,
+                style = einkMarkingStyle(),
+                chapterName = displayTitle(),
+                note = commit.note,
+                contextBefore = before,
+                contextAfter = after,
+            )
+            // 新快照经 onContentUpdated 推送（保持页内位置），模块随重绘清选区
+            ReaderEngineImpl.relayout()
+            true
+        } catch (e: Exception) {
+            false
+        }
     }
 }
