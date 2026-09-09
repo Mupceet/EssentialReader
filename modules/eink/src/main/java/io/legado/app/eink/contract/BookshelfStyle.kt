@@ -12,7 +12,7 @@ import io.legado.app.eink.arch.EInkImmutable
  * 映射纪律（宿主构造义务）：
  *  - 字段按模块语义命名，不照搬宿主键名；宿主键到字段的对应关系见各成员
  *    KDoc，宿主实现不得扩大或收窄语义；
- *  - [gridColumns] 的非法值钳制在本层完成，模块收到的值恒可用；
+ *  - [gridCoverWidth] 的非法值钳制在本层完成，模块收到的值恒可用；
  *  - 快照为实时档：宿主设置变化后经 Flow 发射新值，模块组合期订阅，
  *    立即重组（与 [GlobalSettings.useDefaultCover] 的快照状态档同语义）。
  *
@@ -56,11 +56,12 @@ data class BookshelfStyle(
     val isGridLayout: Boolean = true,
 
     /**
-     * 网格列数（宿主 `bookshelfLayoutGridPortrait`，默认 3）。
+     * 网格封面宽（dp）：格宽的最小值语义（宿主 `bookshelfGridCoverWidth`，
+     * 宿主滑杆范围 40..150，默认 120）。
      *
-     * 网格以 Fixed 列数渲染，格宽按可用宽度均分自适应（封面保持 66:90
-     * 比例随格宽伸缩）。宿主映射义务：值 <= 0 时回落 3，不做其他钳制。
-     * 仅 [isGridLayout] = true 时消费。
+     * 网格列数由模块按可用宽推导，使每格不小于该值、富余均摊（列数随
+     * 屏宽/旋转自适应，封面保持 66:90 比例随格宽伸缩）。宿主映射义务：
+     * 值 <= 0 时回落 120，不做其他钳制。仅 [isGridLayout] = true 时消费。
      */
-    val gridColumns: Int = 3,
+    val gridCoverWidth: Int = 120,
 )

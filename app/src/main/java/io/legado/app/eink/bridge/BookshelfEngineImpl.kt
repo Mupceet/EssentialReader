@@ -74,6 +74,10 @@ internal object BookshelfEngineImpl : BookshelfEngine, KoinComponent {
             .map { it.toBookshelfStyle() }
             .distinctUntilChanged()
 
+    override suspend fun setGridLayout(grid: Boolean) {
+        bookshelfSettingsGateway.update { it.withGridLayout(grid) }
+    }
+
     override fun lastReadBookUrl(): String? = appDb.bookDao.lastReadBook?.bookUrl
 
     override suspend fun deleteBooksNotInBookshelf() {

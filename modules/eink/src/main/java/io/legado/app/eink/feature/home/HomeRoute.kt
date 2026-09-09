@@ -19,6 +19,7 @@ import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -38,6 +39,7 @@ import io.legado.app.eink.designsystem.refresh.LocalEInkRefreshController
 import io.legado.app.eink.designsystem.theme.EInkTheme
 import io.legado.app.eink.feature.bookshelf.BookshelfScreen
 import io.legado.app.eink.feature.bookshelf.BookshelfViewModel
+import io.legado.app.eink.feature.bookshelf.adaptiveGridColumns
 import io.legado.app.eink.feature.bookshelf.bookshelfGridCellWidth
 import io.legado.app.eink.feature.common.EInkCoverHeight
 import io.legado.app.eink.feature.common.EInkCoverWidth
@@ -172,7 +174,8 @@ fun HomeRoute(
     // 键逐字节一致（bookshelfGridCellWidth KDoc）。Route 级一次
     // BoxWithConstraints，不做逐项测量
     BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
-        val gridCellWidth = bookshelfGridCellWidth(maxWidth, uiState.style.gridColumns)
+        val gridColumns = adaptiveGridColumns(maxWidth, uiState.style.gridCoverWidth.dp)
+        val gridCellWidth = bookshelfGridCellWidth(maxWidth, gridColumns)
 
         // 封面预取：当前页落定后预热下一页封面进内存缓存。加格宽键：
         // 列数/屏宽变化时按新尺寸重新预热
@@ -218,6 +221,7 @@ fun HomeRoute(
                 BookshelfScreen(
                     state = uiState,
                     gridCellWidth = gridCellWidth,
+                    gridColumns = gridColumns,
                     onBookClick = onBookClick,
                     onBookLongClick = onBookLongClick,
                     listState = listPager.listState,

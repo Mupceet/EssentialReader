@@ -16,5 +16,9 @@ internal fun BookshelfSettings.toBookshelfStyle(): BookshelfStyle = BookshelfSty
     highlightNewChapter = showUnreadNew,
     showLatestChapter = bookshelfShowLatestChapter,
     isGridLayout = bookshelfLayoutModePortrait != 0,
-    gridColumns = if (bookshelfLayoutGridPortrait <= 0) 3 else bookshelfLayoutGridPortrait,
+    gridCoverWidth = if (bookshelfGridCoverWidth <= 0) 120 else bookshelfGridCoverWidth,
 )
+
+/** 布局切换的反向写投影：1 = 网格、0 = 列表（只动竖屏键）。 */
+internal fun BookshelfSettings.withGridLayout(grid: Boolean): BookshelfSettings =
+    copy(bookshelfLayoutModePortrait = if (grid) 1 else 0)

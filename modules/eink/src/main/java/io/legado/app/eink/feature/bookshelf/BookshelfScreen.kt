@@ -50,14 +50,25 @@ import io.legado.app.eink.feature.common.EInkCoverWidth
 
 /**
  * 网格格宽：可用宽扣除左右内容边距（各 [EInkSpacing.m]）与列间距
- * （[EInkSpacing.m] ×（列数 − 1））后均分，列数来自宿主样式快照
- * （BookshelfStyle.gridColumns）。与 LazyVerticalGrid 的
+ * （[EInkSpacing.m] ×（列数 − 1））后均分，列数按封面宽自适应推导
+ * （[adaptiveGridColumns]）。与 LazyVerticalGrid 的
  * GridCells.Fixed 同一约束解（同 contentPadding/Arrangement），显示与
  * 预取必须共用本函数（封面缓存键逐字节一致，见 coverTargetSizePx KDoc）。
  */
 internal fun bookshelfGridCellWidth(availableWidth: Dp, columns: Int): Dp {
     val columns = columns.coerceAtLeast(1)
     return (availableWidth - EInkSpacing.m * 2 - EInkSpacing.m * (columns - 1)) / columns
+}
+
+/**
+ * 网格列数推导（列宽主导，设计 §4）：可用宽扣除左右内容边距
+ * （[EInkSpacing.m] × 2）后，按「格宽不小于 [minCellWidth]」推导列数，
+ * 富余宽度均摊到各格（列距 [EInkSpacing.m]）。列数随屏宽与旋转自适应。
+ */
+internal fun adaptiveGridColumns(availableWidth: Dp, minCellWidth: Dp): Int {
+    val effective = availableWidth - EInkSpacing.m * 2
+    val columns = ((effective + EInkSpacing.m) / (minCellWidth + EInkSpacing.m)).toInt()
+    return columns.coerceAtLeast(1)
 }
 
 /**
@@ -80,7 +91,7 @@ internal fun bookshelfGridCellWidth(availableWidth: Dp, columns: Int): Dp {
  * 布局模式由 [BookshelfUiState.isGridLayout] 驱动（默认网格；切换入口
  * 暂不开放，布局态仅 VM 存续期有效）：
  * 网格模式条目为 封面 + 未读角标 + 书名（对齐 View 版 item_bookshelf_grid），
- * 列数来自样式快照 `state.style.gridColumns`（GridCells.Fixed，格宽
+ * 列数按封面宽自适应推导（adaptiveGridColumns）（GridCells.Fixed，格宽
  * [bookshelfGridCellWidth] 均分）。两种模式同为
  * E-Ink 分页模式（禁自由滚动，整页翻页），[listState]/[gridState]
  * 均由外层提升供首页底部操作栏驱动。
@@ -89,6 +100,7 @@ internal fun bookshelfGridCellWidth(availableWidth: Dp, columns: Int): Dp {
 fun BookshelfScreen(
     state: BookshelfUiState,
     gridCellWidth: Dp,
+    gridColumns: Int,
     onBookClick: (String) -> Unit,
     onBookLongClick: (BookshelfItemUiModel) -> Unit,
     listState: LazyListState = rememberLazyListState(),
@@ -105,6 +117,7 @@ fun BookshelfScreen(
                 updatingBookUrls = state.updatingBookUrls,
                 style = state.style,
                 gridCellWidth = gridCellWidth,
+                gridColumns = gridColumns,
                 onBookClick = onBookClick,
                 onBookLongClick = onBookLongClick,
                 gridState = gridState,
@@ -171,8 +184,8 @@ private fun BookList(
 /**
  * 书架网格（E-Ink 分页模式，同 [BookList] 的翻页约定）。
  *
- * 列数来自样式快照 [BookshelfStyle.gridColumns]（GridCells.Fixed），
- * 格宽由宿主按 [bookshelfGridCellWidth] 单点解析后传入；不用 key 的
+ * 列数按封面宽自适应推导（adaptiveGridColumns）传入（GridCells.Fixed），
+ * 格宽由 [bookshelfGridCellWidth] 单点解析后传入；不用 key 的
  * 理由与 [BookList] 相同。
  */
 @Composable
@@ -181,6 +194,7 @@ private fun BookGrid(
     updatingBookUrls: Set<String>,
     style: BookshelfStyle,
     gridCellWidth: Dp,
+    gridColumns: Int,
     onBookClick: (String) -> Unit,
     onBookLongClick: (BookshelfItemUiModel) -> Unit,
     gridState: LazyGridState,
@@ -188,7 +202,7 @@ private fun BookGrid(
     onPageDown: () -> Unit
 ) {
     LazyVerticalGrid(
-        columns = GridCells.Fixed(style.gridColumns.coerceAtLeast(1)),
+        columns = GridCells.Fixed(gridColumns.coerceAtLeast(1)),
         modifier = Modifier
             .fillMaxSize()
             .EInkPageSwipe(
