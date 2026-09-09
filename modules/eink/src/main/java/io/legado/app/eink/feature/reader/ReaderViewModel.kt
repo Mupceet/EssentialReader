@@ -563,6 +563,26 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application),
         )
     }
 
+    /**
+     * 保存笔记（样式固定实线；备注可空串）。宿主落库 book_marks 后自行触发
+     * 当前章重排并经 onContentUpdated 推送带装饰的新快照（pageVersion 随之
+     * 推进，Route 效应清选区收尾）——模块不请求刷新。false = 落库失败。
+     */
+    suspend fun saveMarking(sel: ReaderSelectionUi, note: String): Boolean {
+        val port = EInkEngineRegistry.selectionEngine ?: return false
+        return port.saveMarking(
+            ReaderSelectionCommit(
+                chapterIndex = engine.currentChapterIndex,
+                start = sel.bodyStart,
+                end = sel.bodyEnd,
+                selectedText = sel.selectedText,
+                bookmarkText = "",
+                bookmarkContent = "",
+                note = note,
+            ),
+        )
+    }
+
     // ==================== 排版参数 ====================
     // 均为绝对值 setter：档位滑条（含 ±1 按钮）直接设置目标档位，
     // 按目录钳制后写回快照；是否重排由目录 diff 路由（applyStyleChange）。

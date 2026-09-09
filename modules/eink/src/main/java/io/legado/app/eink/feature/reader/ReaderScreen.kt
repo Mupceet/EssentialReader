@@ -77,6 +77,7 @@ import io.legado.app.eink.designsystem.control.EInkDialog
 import io.legado.app.eink.designsystem.interaction.einkClickable
 import io.legado.app.eink.designsystem.theme.EInkTheme
 import io.legado.app.eink.feature.reader.selection.ReaderBookmarkEditDialog
+import io.legado.app.eink.feature.reader.selection.ReaderMarkingEditDialog
 import io.legado.app.eink.feature.reader.selection.ReaderSelectionMenu
 import io.legado.app.eink.feature.reader.selection.ReaderSelectionMenuAction
 import io.legado.app.eink.feature.reader.selection.ReaderSelectionOverlay
@@ -107,7 +108,8 @@ private enum class ReaderStyleDialog { Fonts, Info, Margin }
  * - 一次性消息 → Toast；
  * - 页内长按选区状态在此持有：翻页/重排（pageVersion 推进）自动清空，
  *   选择浮条「复制」直接落剪贴板，「书签」经编辑弹层确认后经宿主端口
- *   落库（失败保留弹层可重试）；
+ *   落库（失败保留弹层可重试），「笔记」确认后落库并等宿主重排新快照
+ *   （带装饰）重绘时清选区收尾；
  * - 面板开关为 UI 局部状态（remember），排版数据来自 [ReaderUiState]。
  */
 @Composable
@@ -139,6 +141,9 @@ fun ReaderRoute(
     // 弹层动作的选区，确认提交用）成对置位/清空；弹层期间选区保留——
     // 取消只关弹层，用户可再调整选区，仅保存成功才清选区（设计 §5）
     var bookmarkDraft by remember { mutableStateOf<ReaderSelectionDraft?>(null) }
+    // 笔记编辑弹层状态：与 bookmarkDraft 互斥（pendingSelection 单份，同一
+    // 时刻至多一个弹层打开）；预览文本取 draft.selectedText
+    var markingDraft by remember { mutableStateOf<ReaderSelectionDraft?>(null) }
     var pendingSelection by remember { mutableStateOf<ReaderSelectionUi?>(null) }
     // pageVersion 推进 = 选区所在内容已被替换：选区、待提交选区与弹层
     // 草稿一并清空，弹层随内容变化关闭。只清 selection 会残留幽灵弹层：
@@ -148,12 +153,13 @@ fun ReaderRoute(
         selection = null
         pendingSelection = null
         bookmarkDraft = null
+        markingDraft = null
     }
     val scope = rememberCoroutineScope()
 
-    // 选择浮条动作：复制直接落剪贴板并清选区；书签经端口解析预填后弹层
-    // 编辑、确认落库；笔记弹层与落库在后续切片接入（浮条键显隐由
-    // selectionEngine 端口可用性决定）
+    // 选择浮条动作：复制直接落剪贴板并清选区；书签/笔记经端口解析预填后
+    // 弹层编辑、确认落库（笔记成功后选区保留到新快照重绘再清，见确认路径
+    // 注释；浮条键显隐由 selectionEngine 端口可用性决定）
     val clipboard = LocalClipboard.current
     val clipboardScope = rememberCoroutineScope()
     val onSelectionMenuAction: (ReaderSelectionMenuAction, ReaderSelectionUi) -> Unit =
@@ -178,8 +184,26 @@ fun ReaderRoute(
                     }
                 }
 
-                // 笔记弹层在后续切片接管，先显式 no-op
-                ReaderSelectionMenuAction.MARKING -> Unit
+                // 笔记：解析与失效守卫同书签分支；成功落库后的清区时序不同
+                // （选区保留到新快照重绘），见下方确认路径注释
+                ReaderSelectionMenuAction.MARKING -> {
+                    scope.launch {
+                        val draft = viewModel.resolveSelection(sel)
+                        if (draft == null) {
+                            // 无会话书/选中文本为空：选区失效，清区提示
+                            selection = null
+                            Toast.makeText(context, "选区已失效", Toast.LENGTH_SHORT).show()
+                        } else if (selection != sel) {
+                            // 解析挂起期间选区已被翻页/点按清空或重建（selection
+                            // 现读现判）：解析结果作废，不置弹层状态，清区提示
+                            selection = null
+                            Toast.makeText(context, "选区已失效", Toast.LENGTH_SHORT).show()
+                        } else {
+                            pendingSelection = sel
+                            markingDraft = draft
+                        }
+                    }
+                }
 
                 ReaderSelectionMenuAction.COPY -> {
                     clipboardScope.launch {
@@ -547,13 +571,22 @@ fun ReaderRoute(
             }
         }
 
-        // 书签编辑弹层：确认经端口落库。陈旧/重复触发三重护栏：
-        // - pageVersion 推进（翻页/重排）连同清空 selection/pendingSelection/
-        //   bookmarkDraft，内容变化即关弹层，不残留幽灵弹层；
+        // 书签/笔记编辑弹层：确认经端口落库。陈旧/重复触发三重护栏：
+        // - pageVersion 推进（翻页/重排/批注重绘）连同清空 selection/
+        //   pendingSelection/两个弹层草稿，内容变化即关弹层，不残留幽灵弹层；
         // - 确认时 pendingSelection 现读现判，弹层期间选区被点按清空则落
         //   失效分支；
-        // - saving 防重入：慢速墨水屏确认回显延迟期间的双击只落库一次。
-        // 成功关弹层清选区，失败提示并保留弹层与选区可重试或取消（设计 §5）
+        // - saving 防重入：慢速墨水屏确认回显延迟期间的双击只落库一次
+        //   （书签/笔记共用一枚——pendingSelection 单份，同一时刻至多一个
+        //   弹层打开）。
+        // 书签成功关弹层清选区，失败提示并保留弹层与选区可重试或取消。
+        // 笔记两条路径都关弹层：成功后选区保留——等宿主重排（save → DB →
+        // relayout → onContentUpdated → pageVersion++）推送带装饰的新快照，
+        // 由上面的 pageVersion 效应清区，重排期间选区不闪断（设计 §5 收尾
+        // 时序）；失败（或确认时选区已失效）则选区上下文已不可信，兜底清区
+        // （宿主重排异常另有 onLayoutException 错误态提示）。若宿主重排未
+        // 推进 pageVersion（内容哈希未变的极端情况），选区保留至下次翻页，
+        // 属可接受的 v1 降级
         var saving by remember { mutableStateOf(false) }
         bookmarkDraft?.let { draft ->
             ReaderBookmarkEditDialog(
@@ -575,6 +608,39 @@ fun ReaderRoute(
                                 selection = null
                                 Toast.makeText(context, "已添加书签", Toast.LENGTH_SHORT).show()
                             } else {
+                                Toast.makeText(context, "保存失败", Toast.LENGTH_SHORT).show()
+                            }
+                        } finally {
+                            saving = false
+                        }
+                    }
+                },
+            )
+        }
+        // 笔记编辑弹层：确认落库后成功/失败的清区差异见上方护栏注释
+        markingDraft?.let { draft ->
+            ReaderMarkingEditDialog(
+                draft = draft,
+                onDismiss = {
+                    markingDraft = null
+                    pendingSelection = null
+                },
+                onConfirm = confirm@{ note ->
+                    if (saving) return@confirm
+                    saving = true
+                    scope.launch {
+                        try {
+                            val sel = pendingSelection
+                            val ok = sel != null && viewModel.saveMarking(sel, note)
+                            // 弹层两条路径都关；selection 去留是成功/失败唯一差异
+                            markingDraft = null
+                            pendingSelection = null
+                            if (ok) {
+                                // 不清 selection：保留到新快照重绘，由 pageVersion
+                                // 效应收尾（设计 §5）
+                                Toast.makeText(context, "已添加笔记", Toast.LENGTH_SHORT).show()
+                            } else {
+                                selection = null
                                 Toast.makeText(context, "保存失败", Toast.LENGTH_SHORT).show()
                             }
                         } finally {

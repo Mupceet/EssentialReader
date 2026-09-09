@@ -10,6 +10,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.PathEffect
+import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.toArgb
 import io.legado.app.eink.contract.EInkEngineRegistry
@@ -17,13 +23,16 @@ import io.legado.app.eink.contract.ReaderImageSlot
 import io.legado.app.eink.contract.ReaderPageSnapshot
 import io.legado.app.eink.contract.ReaderPaintSpec
 import io.legado.app.eink.designsystem.theme.EInkTheme
+import io.legado.app.eink.feature.reader.selection.decorationSpanX
 
 /**
  * 阅读页绘制层（模块自持）。
  *
  * 绘制宿主映射来的 [ReaderPageSnapshot]：行 chunk 按预计算 x 坐标画字，
- * 图片槽位按铺满/等比居中画位图。排版本身由引擎（宿主 ChapterProvider）
- * 完成，这里不做二次排版 —— 结果与 View 版 ContentTextView 一致。
+ * 图片槽位按铺满/等比居中画位图。装饰（用户划线/高亮）按三遍绘制：
+ * 高亮带垫在正文之下 → 正文/图片 → 下划线压在正文之上。排版本身由引擎
+ * （宿主 ChapterProvider）完成，这里不做二次排版 —— 结果与 View 版
+ * ContentTextView 一致。
  *
  * 字色随日/夜间主题每次绘制前钉上（首帧即正确，主题切换重组自动重绘）；
  * 画笔渲染规格（字号/字距/字体/可变字重）取自快照规格——这些参数与引擎
@@ -42,9 +51,11 @@ internal fun ReaderPageSnapshotCanvas(
     modifier: Modifier = Modifier,
 ) {
     val themeTextColorArgb = EInkTheme.colorScheme.onBackground.toArgb()
+    val themeHighlightArgb = EInkTheme.colorScheme.secondaryContainer.toArgb()
     val imageAntiAlias = EInkEngineRegistry.globalSettings.useAntiAlias
     val titlePaint = remember { Paint() }
     val contentPaint = remember { Paint() }
+    val highlightPaint = remember { Paint() }
     val imagePaint = remember(imageAntiAlias) { Paint().apply { isAntiAlias = imageAntiAlias } }
     // 引擎可能原地更新同一排版实例，用版本号强制重建绘制块
     key(pageVersion) {
@@ -53,6 +64,25 @@ internal fun ReaderPageSnapshotCanvas(
             val nativeCanvas = drawContext.canvas.nativeCanvas
             titlePaint.applySpec(snapshot.titleSpec, themeTextColorArgb)
             contentPaint.applySpec(snapshot.contentSpec, themeTextColorArgb)
+
+            // 1) 高亮带（正文之下）：secondaryContainer 实灰。与选区高亮带
+            //    同一 token（ReaderSelectionOverlay 先例）——E-Ink 禁 alpha
+            //    混灰（残影），surfaceVariant 在高对比灰阶板下与背景同值
+            //    不可见；secondaryContainer 在灰阶板下为可辨实灰，高分板下
+            //    亦与背景同值（装饰随选区带同一既定取舍：最大对比档不做灰底）。
+            highlightPaint.color = themeHighlightArgb
+            for (line in snapshot.lines) {
+                for (run in line.decorations) {
+                    if (!run.highlight) continue
+                    // 测量闭包与正文绘制同一把尺（contentPaint 已按快照规格钉好）
+                    val span = decorationSpanX(line, run) { contentPaint.measureText(it) } ?: continue
+                    nativeCanvas.drawRect(
+                        span.first, line.top, span.second, line.bottom, highlightPaint,
+                    )
+                }
+            }
+
+            // 2) 文本与图片（既有逻辑不变）
             for (line in snapshot.lines) {
                 val paint = if (line.isTitle) titlePaint else contentPaint
                 for ((index, chunk) in line.chunks.withIndex()) {
@@ -62,8 +92,110 @@ internal fun ReaderPageSnapshotCanvas(
             for (slot in snapshot.images) {
                 drawImageSlot(nativeCanvas, slot, imagePaint)
             }
+
+            // 3) 下划线（正文之上）：主题前景黑，y 在基线下方按行盒高度偏移；
+            //    模式 1 实线 / 2 虚线 / 3 波浪 / 4 双线原生绘制，5（SVG 花色）
+            //    及未知值降级实线（与 contract 透传约定一致）
+            val strokeWidth = 1.5f * density
+            for (line in snapshot.lines) {
+                for (run in line.decorations) {
+                    if (run.underlineMode == 0) continue
+                    val span = decorationSpanX(line, run) { contentPaint.measureText(it) } ?: continue
+                    val y = line.baseY + (line.bottom - line.top) * 0.12f
+                    when (run.underlineMode) {
+                        2 -> drawDashedLine(span.first, span.second, y, strokeWidth, themeTextColorArgb)
+                        3 -> drawWaveLine(span.first, span.second, y, strokeWidth, themeTextColorArgb)
+                        4 -> {
+                            // 双线：副线在主线下方 2.5×线宽（宿主双线间距量级）
+                            drawSolidLine(span.first, span.second, y, strokeWidth, themeTextColorArgb)
+                            drawSolidLine(
+                                span.first, span.second, y + strokeWidth * 2.5f,
+                                strokeWidth, themeTextColorArgb,
+                            )
+                        }
+
+                        else -> drawSolidLine(span.first, span.second, y, strokeWidth, themeTextColorArgb)
+                    }
+                }
+            }
         }
     }
+}
+
+/** 实线（Compose drawLine，方头）。零长区间画不出可见笔迹，安全。 */
+private fun DrawScope.drawSolidLine(
+    left: Float,
+    right: Float,
+    y: Float,
+    strokeWidth: Float,
+    colorArgb: Int,
+) {
+    drawLine(
+        color = Color(colorArgb),
+        start = Offset(left, y),
+        end = Offset(right, y),
+        strokeWidth = strokeWidth,
+    )
+}
+
+/** 虚线：dashPathEffect 8dp 墨 / 5dp 空（宿主 LegacyReaderStyleRangeMapper 默认）。 */
+private fun DrawScope.drawDashedLine(
+    left: Float,
+    right: Float,
+    y: Float,
+    strokeWidth: Float,
+    colorArgb: Int,
+) {
+    val path = Path().apply {
+        moveTo(left, y)
+        lineTo(right, y)
+    }
+    drawPath(
+        path = path,
+        color = Color(colorArgb),
+        style = Stroke(
+            width = strokeWidth,
+            pathEffect = PathEffect.dashPathEffect(
+                floatArrayOf(
+                    (8f * density).coerceAtLeast(0.1f),
+                    (5f * density).coerceAtLeast(0.1f),
+                )
+            ),
+        ),
+    )
+}
+
+/**
+ * 波浪线：整波长 quadTo、控制点在段中点、幅度 ±3dp、波长 12dp——与宿主
+ * ReaderPageDecorationDrawCache.createWavePath 同款几何（视觉周期为 2×波长）。
+ * 零长区间（left==right）不进循环，空路径无绘制。
+ */
+private fun DrawScope.drawWaveLine(
+    left: Float,
+    right: Float,
+    y: Float,
+    strokeWidth: Float,
+    colorArgb: Int,
+) {
+    val wavelength = (12f * density).coerceAtLeast(0.1f)
+    val amplitude = 3f * density
+    val path = Path().apply {
+        moveTo(left, y)
+        var x = left
+        var up = true
+        while (x < right) {
+            val next = (x + wavelength).coerceAtMost(right)
+            val mid = (x + next) / 2f
+            if (up) {
+                quadraticTo(mid, y - amplitude, next, y)
+            } else {
+                quadraticTo(mid, y + amplitude, next, y)
+            }
+            up = !up
+            x = next
+        }
+    }
+    drawPath(path, Color(colorArgb), style = Stroke(width = strokeWidth))
 }
 
 /**
