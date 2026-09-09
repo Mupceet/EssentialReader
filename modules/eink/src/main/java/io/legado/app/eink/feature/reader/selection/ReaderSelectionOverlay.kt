@@ -44,8 +44,8 @@ internal val SelectionHandleTouchRadiusDp = 28.dp
  *   而 surfaceVariant 在高对比灰阶板下与背景同值（纯白/纯黑）完全不可见；
  * - 把手 + 指针独占（zIndex(1f)）：压在正文上方。pointerInput 只在按下
  *   即命中把手时消费指针、独占本次拖拽；否则不消费任何事件直接返回，
- *   下层点按/翻页/长按检测器照常工作（空白处点击 = 清选区由 Screen 承担，
- *   浮条菜单由 ReaderScreen 在本覆盖层之上组合）。
+ *   下层点按/翻页/长按检测器照常工作（空白处点击 = 清选区由 Screen 承担；
+ *   浮条菜单以 zIndex(2f) 组合在本层之上，把手热区不吞菜单键点击）。
  *
  * 拖拽循环内经 rememberUpdatedState 读实时把手位/选区：不以 selection 为
  * pointerInput key——每次端点替换都会触发重组，以之为 key 会在拖拽中途
@@ -188,6 +188,8 @@ internal fun moveEndpoint(
  * 选择浮条：横排动作键，锚在选区上方（放不下取下方），零动画直切。
  * 位置随选区把手锚点重算（把手拖拽期间浮条跟随重排）；x 跟随选区中心
  * 并钳制在画布内。书签/笔记键按批注端口可用性显隐（降级后仅复制）。
+ * 整体置于 zIndex(2f)：盖过把手独占层（zIndex(1f)），下方放置时菜单键
+ * 落在把手 28dp 热区内也不被其 pointerInput 吞掉。
  *
  * @param canvasWidth 画布实测宽（调用方以 onSizeChanged 传入），浮条 x 钳制边界
  */
@@ -218,7 +220,11 @@ internal fun ReaderSelectionMenu(
         (anchorBottom + gapPx).roundToInt()
     }
     Row(
-        modifier = modifier.offset { IntOffset(x.roundToInt(), y) },
+        modifier = modifier
+            // 压过把手独占层（zIndex(1f)）：下方放置（y = anchorBottom + gap）
+            // 时菜单键落在把手热区内，无此层把手 pointerInput 会先于菜单消费点击
+            .zIndex(2f)
+            .offset { IntOffset(x.roundToInt(), y) },
     ) {
         if (showBookmark) {
             EInkButton(

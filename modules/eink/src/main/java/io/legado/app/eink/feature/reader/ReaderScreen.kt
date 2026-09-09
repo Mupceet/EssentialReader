@@ -587,6 +587,12 @@ internal fun ReaderScreen(
         // 会在拖拽中途重启、打断手势（覆盖层同理由，见 ReaderSelectionOverlay）
         val currentPage by rememberUpdatedState(state.page)
         val currentSelection by rememberUpdatedState(selection)
+        // controlsVisible/error 同理：长按检测器不以之为 key——键在手势中途
+        // 翻转（长按选词即收起/展开操作条）会重启检测器，onDragEnd/onDragCancel
+        // 均不执行，selectionMenuVisible 停留 false 而选区仍在（浮条不可达的
+        // 僵死选区）；长按守卫改读 State 实时值
+        val currentControlsVisible by rememberUpdatedState(state.controlsVisible)
+        val currentError by rememberUpdatedState(state.error)
         // 与页画布同规格的测量闭包（applySpec 幂等，重复设置无害）：
         // 长按命中测试与浮条锚点按引擎同款字体度量
         val themeForeground = EInkTheme.colorScheme.onBackground
@@ -680,9 +686,11 @@ internal fun ReaderScreen(
                             if (dragAmount != 0f) lastDelta = dragAmount
                         }
                     }
-                    .pointerInput(state.controlsVisible, state.pageVersion) {
-                        // 长按选词 + 拖拽延伸：键不含 selection——长按选词即改写
-                        // 选区状态，以之为 key 会在拖拽中途重启打断手势，实时值经
+                    .pointerInput(state.pageVersion) {
+                        // 长按选词 + 拖拽延伸：键不含 selection/controlsVisible——
+                        // 长按选词即改写选区状态、控件开合也可发生在手势中途，
+                        // 以之为 key 会在拖拽中途重启打断手势（onDragEnd/
+                        // onDragCancel 不再执行，选区僵死），实时值经
                         // rememberUpdatedState 读取。仅「本次长按新建选区」的拖拽
                         // 延伸末端（startHit 固定）；已有选区时长按不重建，端点
                         // 调整只经把手拖拽
@@ -690,7 +698,7 @@ internal fun ReaderScreen(
                         detectDragGesturesAfterLongPress(
                             onDragStart = { offset ->
                                 dragCreatedSelection = false
-                                if (!state.controlsVisible && state.error == null &&
+                                if (!currentControlsVisible && currentError == null &&
                                     currentSelection == null
                                 ) {
                                     val page = currentPage
@@ -740,7 +748,7 @@ internal fun ReaderScreen(
                 modifier = Modifier.fillMaxSize(),
             )
             // 选区覆盖层：高亮带垫在页画布下方（zIndex 由覆盖层自管），
-            // 把手/指针独占在正文上方；浮条在覆盖层之上组合
+            // 把手/指针独占在正文上方；浮条以 zIndex(2f) 组合在本层之上
             ReaderSelectionOverlay(
                 snapshot = state.page,
                 selection = selection,
