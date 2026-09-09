@@ -48,7 +48,7 @@ class ReaderPageSnapshot(
 
 /**
  * 单文本行：[chunks] 的第 i 段绘制于横坐标 [x][i]，基线纵坐标 [baseY]。
- * [chunks] 与 [x] 等长。
+ * [chunks] 与 [x]、[chapterPositions] 等长。
  */
 @Stable
 class ReaderPageLine(
@@ -63,6 +63,31 @@ class ReaderPageLine(
 
     /** 各文本段起始横坐标（px；与 [chunks] 一一对应）。 */
     val x: FloatArray,
+
+    /**
+     * 各文本段首字符的章内字符位置（UTF-16 索引）。
+     *
+     * 坐标系：正文行 = 语义正文空间（与宿主 TextProcessAnchor.chapterPosition
+     * 同一坐标系，跨行间隙为段落分隔符/占位字符）；标题行 = 标题空间，
+     * 无正文语义——选区含标题行时，章内区间须取选区内首个正文行位置。
+     * 行内各段按段长连续，无需额外段内偏移。
+     *
+     * 宿主实现义务：从排版元素 chapterPosition 原样拷贝，不做换算。
+     */
+    val chapterPositions: IntArray,
+
+    /**
+     * 行盒顶/底边界（px，排版元素 bounds 原样拷贝）。选择命中、高亮带、
+     * 把手与菜单锚定的几何依据；模块不得用字体度量估算行高。
+     */
+    val top: Float,
+    val bottom: Float,
+
+    /**
+     * 本行划线/高亮装饰（缺省空，与选中态无关、常驻）。区间为行内拼接
+     * 文本的 UTF-16 索引；同行相邻同类 run 已在映射侧合并。
+     */
+    val decorations: List<ReaderDecorationRun> = emptyList(),
 )
 
 /**
@@ -116,4 +141,25 @@ class ReaderPaintSpec(
 
     /** 可变字重设置（如 "'wght' 700"）；null = 未设置。加粗影响字形宽度，测量耦合。 */
     val fontVariationSettings: String?,
+)
+
+/**
+ * 行内一段用户划线/高亮装饰。颜色不跨桥：模块按主题自涂
+ * （下划线=主题前景黑，高亮=主题灰底）。
+ */
+@Stable
+class ReaderDecorationRun(
+    /** 行内字符区间 [start, end)，按行内拼接文本的 UTF-16 索引。 */
+    val start: Int,
+    val end: Int,
+
+    /**
+     * 宿主 TextProcessStyle.underlineMode 原样透传
+     * （1 实线 / 2 虚线 / 3 波浪 / 4 双线 / 5 SVG 花色；0 = 无下划线）。
+     * 模块渲染：1/2/3/4 原生绘制，5 及未知值降级为实线（明示不支持花色）。
+     */
+    val underlineMode: Int,
+
+    /** true = 背景高亮带。 */
+    val highlight: Boolean,
 )

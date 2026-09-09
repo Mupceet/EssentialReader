@@ -9,6 +9,7 @@ import io.legado.app.feature.reader.core.model.ReaderPage
 import io.legado.app.feature.reader.core.model.ReaderPageId
 import io.legado.app.feature.reader.core.model.ReaderRect
 import io.legado.app.feature.reader.core.model.ReaderTextStyle
+import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -69,14 +70,16 @@ class ReaderPageSnapshotMapperTest {
         value: String,
         emphasized: Boolean = false,
         baselinePx: Float = top + 40f,
+        chapterPosition: Int = 0,
+        height: Float = 50f,
     ) = ReaderElement.Text(
-        bounds = ReaderRect(x, top, x + 20f, top + 50f),
+        bounds = ReaderRect(x, top, x + 20f, top + height),
         baselinePx = baselinePx,
         value = value,
         style = bodyStyle,
         selected = false,
         emphasized = emphasized,
-        chapterPosition = 0,
+        chapterPosition = chapterPosition,
     )
 
     private fun imageElement(
@@ -158,6 +161,38 @@ class ReaderPageSnapshotMapperTest {
 
         assertTrue(snapshot.lines[0].isTitle)
         assertFalse(snapshot.lines[1].isTitle)
+    }
+
+    @Test
+    fun `行携带元素章内位置与行盒`() {
+        val snapshot = mapElements(
+            textElement(0f, 10f, "第一段第一行", chapterPosition = 0, height = 20f, baselinePx = 28f),
+            textElement(0f, 34f, "第一段第二行", chapterPosition = 7, height = 20f, baselinePx = 52f),
+            sdkInt = 34,
+        )
+
+        val line0 = snapshot.lines[0]
+        assertArrayEquals(intArrayOf(0), line0.chapterPositions)
+        assertEquals(10f, line0.top, 0.001f)
+        assertEquals(30f, line0.bottom, 0.001f)
+        val line1 = snapshot.lines[1]
+        assertArrayEquals(intArrayOf(7), line1.chapterPositions)
+        assertEquals(34f, line1.top, 0.001f)
+        assertEquals(54f, line1.bottom, 0.001f)
+        // 装饰桥本任务只落契约：映射侧恒空，Task 2 接入提取
+        assertTrue(line0.decorations.isEmpty())
+    }
+
+    @Test
+    fun `同行元素行盒底取元素最大值`() {
+        val snapshot = mapElements(
+            textElement(0f, 10f, "上", height = 20f, baselinePx = 28f),
+            textElement(30f, 10f, "下", height = 30f, baselinePx = 28f),
+        )
+
+        assertEquals(1, snapshot.lines.size)
+        assertEquals(10f, snapshot.lines[0].top, 0.001f)
+        assertEquals(40f, snapshot.lines[0].bottom, 0.001f)
     }
 
     @Test

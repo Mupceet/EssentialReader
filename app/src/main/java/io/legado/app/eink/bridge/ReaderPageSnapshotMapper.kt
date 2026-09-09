@@ -78,10 +78,13 @@ internal object ReaderPageSnapshotMapper {
                     if (line == null) {
                         line = LineBuffer().also {
                             it.top = element.bounds.top
+                            it.bottom = element.bounds.bottom
                             it.baseY = element.baselinePx
                             it.isTitle = element.emphasized
                         }
                         buffer = line
+                    } else if (element.bounds.bottom > line.bottom) {
+                        line.bottom = element.bounds.bottom
                     }
                     val spec = if (element.emphasized) titleSpec else contentSpec
                     // API 35+ drawText 会将 letterSpacing 应用在两侧，View 版同样补偿半格
@@ -89,6 +92,7 @@ internal object ReaderPageSnapshotMapper {
                         if (sdkInt >= 35) spec.letterSpacing * spec.textSizePx * 0.5f else 0f
                     line.chunks.add(element.value)
                     line.xs.add(element.bounds.left + halfSpacing)
+                    line.chapterPositions.add(element.chapterPosition)
                 }
 
                 is ReaderElement.Image -> {
@@ -130,7 +134,9 @@ internal object ReaderPageSnapshotMapper {
     private class LineBuffer {
         val chunks = ArrayList<String>()
         val xs = ArrayList<Float>()
+        val chapterPositions = ArrayList<Int>()
         var top = 0f
+        var bottom = 0f
         var baseY = 0f
         var isTitle = false
 
@@ -142,6 +148,10 @@ internal object ReaderPageSnapshotMapper {
                     isTitle = isTitle,
                     chunks = chunks,
                     x = xs.toFloatArray(),
+                    chapterPositions = chapterPositions.toIntArray(),
+                    top = top,
+                    bottom = bottom,
+                    decorations = emptyList(), // Task 2 接入装饰提取
                 )
             )
         }
