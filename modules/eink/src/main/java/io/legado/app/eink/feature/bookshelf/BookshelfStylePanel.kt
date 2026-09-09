@@ -106,7 +106,7 @@ fun BookshelfStylePanel(
                     onStyleChange(style.copy(highlightNewChapter = value))
                 }
                 if (style.isGridLayout) {
-                    // 网格专属：封面宽度 / 书名行数
+                    // 网格专属：封面宽度 / 书名行数（四字标签，标签槽放宽不折行）
                     EInkSliderRow(
                         label = "封面宽度",
                         value = style.gridCoverWidth,
@@ -114,6 +114,7 @@ fun BookshelfStylePanel(
                         thumbLabel = { "${it}dp" },
                         tickStep = 5,
                         onSetValue = { onStyleChange(style.copy(gridCoverWidth = it)) },
+                        labelWidth = 80.dp,
                     )
                     EInkSliderRow(
                         label = "书名行数",
@@ -122,6 +123,7 @@ fun BookshelfStylePanel(
                         thumbLabel = { "${it}行" },
                         tickStep = 1,
                         onSetValue = { onStyleChange(style.copy(titleMaxLines = it)) },
+                        labelWidth = 80.dp,
                     )
                 } else {
                     // 列表专属：最新章节行

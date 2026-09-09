@@ -5,10 +5,11 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import io.legado.app.eink.designsystem.content.EInkText
 import io.legado.app.eink.designsystem.theme.EInkSpacing
@@ -17,7 +18,7 @@ import io.legado.app.eink.designsystem.theme.EInkTheme
 /** 步进器加减按钮触控目标。 */
 private val StepTouchTarget = 44.dp
 
-/** 档位滑条行标签列宽（容纳"上边距"三字并对齐各行滑条起点）。 */
+/** 档位滑条行标签列宽默认值（容纳"上边距"三字并对齐各行滑条起点）。 */
 private val SliderLabelWidth = 64.dp
 
 /**
@@ -25,6 +26,9 @@ private val SliderLabelWidth = 64.dp
  * 当前数值印在滑块上。
  *
  * 滑条支持拖动选值与点按轨道跳档，[−]/[+] 为逐档精调（行内按值域钳制）。
+ *
+ * [labelWidth] 为标签列的最小宽度：短于此的标签按最小宽对齐各行滑条
+ * 起点，更长的标签（四字以上/字体缩放）按实际宽展开、不折行。
  *
  * 自阅读排版面板提升（原 feature.reader 私有 SliderRow，纯移动改名），
  * 书架个性化样式面板复用。
@@ -37,6 +41,7 @@ fun EInkSliderRow(
     thumbLabel: (Int) -> String,
     tickStep: Int,
     onSetValue: (Int) -> Unit,
+    labelWidth: Dp = SliderLabelWidth,
 ) {
     Row(
         modifier = Modifier
@@ -48,7 +53,7 @@ fun EInkSliderRow(
         if (label != null) {
             EInkText(
                 text = label,
-                modifier = Modifier.width(SliderLabelWidth),
+                modifier = Modifier.widthIn(min = labelWidth),
                 style = EInkTheme.typography.bodyMedium,
             )
         }
