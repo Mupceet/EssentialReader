@@ -107,8 +107,9 @@ fun HomeRoute(
     var selectedTab by rememberSaveable { mutableIntStateOf(HomeTabs.BOOKSHELF) }
 
     // 书架个性化配置面板显隐（UI 局部状态）：样式改动经 VM updateStyle
-    // 乐观提交，面板关闭只卸载弹层组合
-    var showStylePanel by rememberSaveable { mutableStateOf(false) }
+    // 乐观提交，面板关闭只卸载弹层组合。不随导航栈保存——面板仅属于
+    // 书架界面在场的这段时间，离开首页即收起，返回不复活
+    var showStylePanel by remember { mutableStateOf(false) }
 
     // 列表封面尺寸单点解析（同网格格宽约定：显示与预取共用同一 Dp 值，
     // 封面缓存键逐字节一致）：行高取基础封面高与字体缩放下文字实需高的
@@ -248,7 +249,12 @@ fun HomeRoute(
 
         HomeScreen(
             selectedTab = selectedTab,
-            onSelectTab = { selectedTab = it },
+            onSelectTab = { target ->
+                // 面板仅属于书架界面：切到「我的」即收起（底部操作条在面板
+                // 点击层之外，Tab 切换是面板打开期间唯一可达的其它界面）
+                if (selectedTab != target) showStylePanel = false
+                selectedTab = target
+            },
             headerTitle = HomeTabLabels[selectedTab],
             showRefresh = selectedTab == HomeTabs.BOOKSHELF,
             isRefreshing = uiState.isRefreshing,
@@ -331,11 +337,11 @@ internal fun HomeScreen(
             actionsFillMax = true,
             actions = {
                 if (showRefresh) {
+                    StyleConfigAction(onShowStylePanel)
                     RefreshAction(
                         isRefreshing = isRefreshing,
                         onClick = onRefresh
                     )
-                    StyleConfigAction(onShowStylePanel)
                 }
             }
         )
@@ -413,13 +419,13 @@ private fun RefreshAction(isRefreshing: Boolean, onClick: () -> Unit) {
 }
 
 /**
- * 书架个性化配置入口：点击打开样式面板（[BookshelfStylePanel]），图标与
- * 阅读页「排版」入口同款语义。面板提交经 VM 乐观层实时预览。
+ * 书架个性化配置入口：点击打开样式面板（[BookshelfStylePanel]）。面板提交
+ * 经 VM 乐观层实时预览。
  */
 @Composable
 private fun StyleConfigAction(onClick: () -> Unit) {
     EInkOperationBarIcon(
-        icon = painterResource(R.drawable.eink_ic_interface_setting),
+        icon = painterResource(R.drawable.eink_ic_style_edit),
         contentDescription = "书架个性化配置",
         onClick = onClick,
     )

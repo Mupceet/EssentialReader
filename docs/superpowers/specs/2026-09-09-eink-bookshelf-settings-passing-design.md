@@ -24,6 +24,17 @@
      与 `bookshelfTitleCenter` 主动忽略——E-Ink 已使用 14sp 最小字号且固定
      居中，支持字体档会放大字体、支持对齐会破坏现有网格观感。maxLines
      钳制 1..5 并参与网格行高与分页重测。
+- 决策补充（2026-09-09 三轮拍板确认：书架个性化配置面板）：
+  7. 顶栏布局切换按钮改为打开**个性化配置面板**——`EInkDialog` 居中
+     卡片、关 scrim 实时预览，样式参考阅读页排版面板（`SliderRow` 档位
+     滑条 + `EInkButton(selected)` 按钮行）；可配置：布局、未读角标、
+     新章高亮、最新章节、封面宽、书名行数六项；
+  8. **写通道收敛**：`setGridLayout` 移除，新增
+     `setStyle(style: BookshelfStyle)`——模块传改后完整快照，宿主一次
+     原子 update 写六个键（镜像 `ReaderEngine.applyStyle` 形态）；
+  9. 分页重测继续走 inputs 键重建并扩展（网格 += 封面宽/书名行数，
+     列表 += 最新章节显隐）；`remeasure()` 无生产调用方，随本轮从
+     `EInkPageController` 接口移除。
 
 ## 1. 文档定位
 
@@ -150,8 +161,8 @@ data class BookshelfStyle(
      * 书架默认布局：true = 网格，false = 列表（宿主 `bookshelfLayoutModePortrait`，
      * 0 = 列表、非 0 = 网格）。
      *
-     * 默认值随宿主（实时档）；E-Ink 首页顶栏可切换，经
-     * [BookshelfEngine.setGridLayout] 反向写宿主竖屏键（横屏变体
+     * 默认值随宿主（实时档）；E-Ink 个性化配置面板可切换，经
+     * [BookshelfEngine.setStyle] 反向写宿主竖屏键（横屏变体
      * 不投影，E-Ink 按竖屏形态设计）。
      */
     val isGridLayout: Boolean,
@@ -183,18 +194,19 @@ data class BookshelfStyle(
 val style: Flow<BookshelfStyle>
 
 /**
- * 切换书架布局并同步宿主（决策修订 5：布局切换入口反向写）。
+ * 提交书架显示样式（个性化配置面板的唯一写通道，决策补充 8）。
  *
- * 写宿主 `bookshelfLayoutModePortrait`（1 = 网格、0 = 列表）——只写竖屏
- * 键，横屏键不动（E-Ink 按竖屏形态设计，横屏键属宿主手机形态）。
- * 宿主实现经设置网关原子 update 落库；写入成功后 [style] 重发新快照。
- * 模块 UI 乐观更新，本方法返回即代表落库完成。
+ * 模块传改后完整快照，宿主经设置网关一次原子 update 写六个键
+ * （showUnread / showUnreadNew / bookshelfShowLatestChapter /
+ * bookshelfLayoutModePortrait 竖屏键 / bookshelfGridCoverWidth /
+ * bookshelfTitleMaxLines；横屏键不动）。返回即落库完成，写入成功后
+ * [style] 重发新快照。模块 UI 乐观更新，不等待本方法返回。
  */
-suspend fun setGridLayout(grid: Boolean)
+suspend fun setStyle(style: BookshelfStyle)
 ```
 
 不新增独立引擎：样式与书架数据同生命周期，挂在 `BookshelfEngine` 是最窄归属。
-`GlobalSettings` 不新增任何键（收录规则不破坏：布局切换是书架面控件而非
+`GlobalSettings` 不新增任何键（收录规则不破坏：个性化面板是书架面控件而非
 设置页条目，读写同归书架端口）。
 
 ## 4. 读取生效组消费语义（8 键）
@@ -212,10 +224,14 @@ suspend fun setGridLayout(grid: Boolean)
 
 实施要点：
 
-1. **布局切换入口**（决策修订 5）：eink 首页顶栏书架 Tab 加切换按钮
-   （历史 `LayoutToggleAction` 形态：静态显示目标布局图标，零动画），
-   点击乐观翻转 + `engine.setGridLayout` 反向落库；写入后快照重发同值，
-   无视觉回跳。默认值仍读快照初始化。
+1. **个性化配置面板**（决策补充 7/8）：eink 首页顶栏书架 Tab 按钮
+   （图标 `eink_ic_interface_setting`，与阅读页「排版」同款语义）点击
+   打开面板——`EInkDialog` 居中卡片、关 scrim 实时预览。面板行：
+   布局（网格/列表双枚 `EInkButton(selected)`）、未读角标 / 新章高亮 /
+   最新章节（三行双枚按钮）、封面宽（`SliderRow` 40..150 步进 5）、
+   书名行数（`SliderRow` 1..5 步进 1）。每档变化即经
+   `engine.setStyle(style.copy(...))` 落库（档位滑条离散步进，非连续
+   拖动）；VM 乐观层 `_styleOverride` 先行，落库完成后清除。
 2. **网格列宽主导渲染**：列数由纯函数按可用宽推导
    `adaptiveGridColumns(availableWidth, minCellWidth)`——扣除左右内容边距
    （16dp×2）后，`floor((有效宽 + 列距) / (minCellWidth + 列距))`、至少
@@ -225,9 +241,12 @@ suspend fun setGridLayout(grid: Boolean)
    2 列、617dp 七英寸墨水屏推导 4 列。
 3. **封面尺寸同源**：显示与预取（HomeRoute 下一页封面预热）必须用同一
    格宽推导公式（缓存键一致性，既有约束）。
-4. **分页几何重测**：`EInkPageController` 新增重测能力——旋转/分屏等
-   改变列数的几何事件后，页项数实测值失效，需重测并把页首拉回第一页
-   （§7.1 的边界自本轮起可达）。
+4. **分页几何重测**：沿用 inputs 键重建机制并扩展（决策补充 9，
+   `remeasure()` 接口随本轮移除）——网格分页状态以
+   （orientation, gridCoverWidth, titleMaxLines）为键、列表分页状态以
+   （orientation, showLatestChapter）为键：任一输入变化即重建分页状态、
+   页首回第一页并按新几何重测（`EInkMainActivity` 旋转不重建，此路径
+   为必经；页首回第一页符合墨水屏整页阅读直觉）。
 5. **网格标题最大行数**：标题固定用 `bodySmall`（14sp/16sp 紧凑档）并
    居中；`titleMaxLines` 经 `bookshelfGridTitleHeight` 计算最小高度并
    限制 `maxLines`，变化时重建网格分页状态。`bookshelfTitleSmallFont` 与
@@ -260,11 +279,10 @@ suspend fun setGridLayout(grid: Boolean)
 
 1. `autoRefreshBook`（GlobalSettings，「我的」页开关，fire-and-forget、
    下次启动生效），维持现状；
-2. **布局切换**（决策修订 5）：eink 首页顶栏切换按钮，乐观更新 +
-   `BookshelfEngine.setGridLayout` 反向写宿主竖屏键
-   `bookshelfLayoutModePortrait`（1 = 网格、0 = 列表）。只写竖屏键：
-   横屏键属宿主手机形态，E-Ink 不消费也不改写。完整模式与 E-Ink 的布局
-   设置由此双向同步（一套配置）。
+2. **个性化配置面板**（决策补充 7/8）：面板六项经
+   `BookshelfEngine.setStyle` 反向写宿主六键（含竖屏布局键）。只写
+   竖屏键：横屏键属宿主手机形态，E-Ink 不消费也不改写。完整模式与
+   E-Ink 的书架显示设置由此双向同步（一套配置）。
 
 **快照演进规则**（后续「宿主新设置要对 eink 生效」类需求的唯一路径）：
 
@@ -282,17 +300,15 @@ suspend fun setGridLayout(grid: Boolean)
 1. **旋转等几何变化需重测分页**：`EInkGridPagerState.pageItemCount` 首次
    布局实测后固定（含 rememberSaveable 恢复）。`EInkMainActivity` 声明了
    `configChanges=orientation|screenSize`，旋转不重建组合——列数（格宽
-   推导输入变化）与行高随之改变，实测页项数失效。处理：分页控制器提供
-   重测能力，HomeRoute 以 orientation 及影响网格高度的标题字体档/最大行数
-   为键触发重建并把页首拉回第一页
-   （跨方向保持页码属过度设计，旋转后回首页符合墨水屏整页阅读直觉）。
+   推导输入变化）与行高随之改变，实测页项数失效。处理：inputs 键重建
+   （决策补充 9；`remeasure()` 接口已随本轮移除），键见 §4 要点 4。
    E-Ink 专用阅读器（竖屏锁定形态）不触发此路径。
 2. **快照实时档的真实变化源**：宿主改设置、E-Ink 内布局切换反向写，均经
    快照流实时反映。
 3. **排序重发与分页状态**：排序变化导致列表重排时，沿用既有
    `realignToPageStart` 数据变化对齐路径；按下标锚定（列表不用 key）的
    现状不变。
-4. **插件宿主义务**：`style` 发射模块默认值静态快照、`setGridLayout`
+4. **插件宿主义务**：`style` 发射模块默认值静态快照、`setStyle`
    写自有 DataStore 或空实现（明示），均属合法实现（§3.3 KDoc 已注明）；
    插件形态的配置分叉见插件计划 §6.4，首次使用默认排版即出厂值，需在
    P4 验收时向用户明示。
@@ -308,12 +324,12 @@ suspend fun setGridLayout(grid: Boolean)
 
 | 层 | 验证 | 方式 |
 |---|---|---|
-| 宿主映射 | `toBookshelfStyle` 全字段映射 + gridCoverWidth/titleMaxLines 钳制；`withGridLayout` 反向写投影 | JVM 纯函数单测 |
+| 宿主映射 | `toBookshelfStyle` 全字段映射 + gridCoverWidth/titleMaxLines 钳制；`withStyleProjection` 六键反向写投影 | JVM 纯函数单测 |
 | 宿主排序 | 六模式 × 升降序与 `sortBooks` 语义对拍；手动排序不依赖 DAO 自然序 | JVM 纯函数单测（比较器镜像） |
 | 模块推导 | `adaptiveGridColumns` 列数推导（含边界：可用宽不足单格、极宽屏）；`bookshelfGridCellWidth` 均分 | JVM 纯函数单测 |
-| 模块消费 | style 并入 UiState；角标组合规则（badge × highlight）；最新章节行显隐；布局切换乐观更新；标题最大行数推导 | 既有 JVM 测试基建 |
-| 分页重测 | 几何变化后 `remeasure` 重置页首并重测页项数 | designsystem 既有纯 JVM 分页测试基建 |
-| 端到端 | 宿主改封面宽/排序 → eink 跟随；eink 切布局 → 完整模式书架布局同步变化；旋转后翻页整行对齐 | 真机手工回归（列入交付说明的未验证风险，若当轮未做） |
+| 模块消费 | style 并入 UiState（含乐观层）；角标组合规则（badge × highlight）；最新章节行显隐；面板六项提交；标题行数推导 `bookshelfGridTitleHeight` | 既有 JVM 测试基建 |
+| 分页重测 | inputs 键（orientation/封面宽/书名行数/最新章节显隐）变化后分页状态重建 | designsystem 既有纯 JVM 分页测试基建 |
+| 端到端 | 宿主改封面宽/排序 → eink 跟随；面板六项改动 → 完整模式书架同步变化；旋转后翻页整行对齐 | 真机手工回归（列入交付说明的未验证风险，若当轮未做） |
 
 文本与门禁：`git diff --check`；契约/bridge 改动跑
 `:app:compileAppDebugKotlin` 与 `testAppDebugUnitTest`；模块侧跑其真实
