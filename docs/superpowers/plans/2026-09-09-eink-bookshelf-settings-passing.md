@@ -2,9 +2,11 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** 宿主书架设置（`BookshelfSettings` 48 键）经策划快照 `BookshelfStyle` 进入 E-Ink 书架：7 键读取生效（排序、未读角标双键、最新章节行、布局模式、网格列数），其余主动忽略或随功能面缺失不投影。
+**Goal:** 宿主书架设置（`BookshelfSettings` 48 键）经策划快照 `BookshelfStyle` 进入 E-Ink 书架：8 键读取生效（排序、未读角标双键、最新章节行、布局模式、网格封面宽、网格标题最大行数），其余主动忽略或随功能面缺失不投影。
 
-**Architecture:** 契约新增 `BookshelfStyle`（5 字段）与 `BookshelfEngine.style: Flow<BookshelfStyle>`；宿主 bridge 把 `BookshelfSettingsGateway.settings` 投影为快照流、并在 `observeShelf` 内消化排序（`combine` 设置流 → 排序 → 映射 UiModel）。模块侧 VM 并入 UiState，书架 Screen 消费角标开关/最新章节行/网格列数；格宽由 Route 级单点解析，显示与预取共用同一 Dp 保证封面缓存键一致。
+**Architecture:** 契约新增 `BookshelfStyle`（6 字段）与 `BookshelfEngine.style: Flow<BookshelfStyle>`；宿主 bridge 把 `BookshelfSettingsGateway.settings` 投影为快照流、并在 `observeShelf` 内消化排序（`combine` 设置流 → 排序 → 映射 UiModel）。模块侧 VM 并入 UiState，书架 Screen 消费角标开关/最新章节行/网格布局/网格标题最大行数；格宽由 Route 级单点解析，显示与预取共用同一 Dp 保证封面缓存键一致。
+
+> 2026-09-09 后续修订：本文早期 Task 片段保留为历史实施记录；标题最大行数补充以文末「修订：网格标题最大行数」为准。
 
 **Tech Stack:** Kotlin、Jetpack Compose、Kotlinx Coroutines Flow、JUnit4、MockK（仅既有桩）、Gradle（`:app`、`:modules:eink`）。
 
@@ -1024,3 +1026,45 @@ Run: 手工（真机）。未执行则列入交付说明「未验证风险」。
 - [ ] **Step 5: 交付说明**
 
 按 AGENTS.md「交付说明」要求输出：修改职责范围、关键设计取舍（排序 bridge 消化、格宽单点解析、96dp 门槛退役）、实际运行的验证与结果、未验证风险（真机清单若未跑）。
+
+---
+
+## 修订：网格标题最大行数（2026-09-09）
+
+**目标：** 宿主 `bookshelfTitleMaxLines` 从主动忽略转为读取生效，作用于
+E-Ink 网格标题；`bookshelfTitleSmallFont`、`bookshelfTitleCenter` 维持主动
+忽略。
+
+**契约与映射：**
+
+- `BookshelfStyle` 新增 `titleMaxLines: Int = 2`。
+- `BookshelfStyleMapper` 逐字段投影；`titleMaxLines` 钳制到宿主滑杆区间
+  `1..5`。
+- `bookshelfTitleSmallFont`、`bookshelfTitleCenter` 不进入契约：E-Ink 已用
+  14sp 最小字号且网格标题固定居中，支持会放大字体或破坏现有网格观感。
+
+**渲染与分页：**
+
+- `BookGridItem` 固定使用 `bodySmall` 并居中，`style.titleMaxLines` 作为
+  `maxLines`。
+- 新增纯函数 `bookshelfGridTitleHeight(density, lineHeight, maxLines)`，
+  以「行高 × 最大行数」作为标题最小高度，保证同行等高。
+- `HomeRoute` 的网格分页键加入 `titleMaxLines`；行数变化时重建分页状态
+  并重测页项数。
+- E-Ink 列表标题保持单行；该属性按原判定只作用于网格。
+
+**测试：**
+
+- `BookshelfStyleTest`：默认值对齐宿主。
+- `BookshelfStyleMapperTest`：逐字段投影 + `titleMaxLines` 越界钳制 +
+  `bookshelfTitleSmallFont`/`bookshelfTitleCenter` 主动忽略。
+- `BookshelfGridTitleHeightTest`：标题高度随行数伸缩且钳制 1..5。
+
+**验证：**
+
+```powershell
+.\gradlew.bat :modules:eink:testDebugUnitTest
+.\gradlew.bat :app:testAppDebugUnitTest --tests "io.legado.app.eink.bridge.BookshelfStyleMapperTest"
+.\gradlew.bat :app:compileAppDebugKotlin
+git diff --check
+```

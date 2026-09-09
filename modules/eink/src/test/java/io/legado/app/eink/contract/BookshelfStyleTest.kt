@@ -7,7 +7,8 @@ import org.junit.Test
 /**
  * 快照默认值必须与宿主 BookshelfSettings 的字段默认值语义一致
  * （showUnread=true、showUnreadNew=true、bookshelfShowLatestChapter=true、
- * bookshelfLayoutModePortrait=1 网格、bookshelfGridCoverWidth=120）。
+ * bookshelfLayoutModePortrait=1 网格、bookshelfGridCoverWidth=120、
+ * bookshelfTitleMaxLines=2）。
  *
  * 注意「默认 120dp 封面宽」在手机竖屏（360dp）推导 2 列、七英寸墨水屏
  * （617dp）推导 4 列，与旧固定 3 列/Adaptive(96dp) 观感不同：列宽主导
@@ -23,5 +24,6 @@ class BookshelfStyleTest {
         assertTrue(style.showLatestChapter)
         assertTrue(style.isGridLayout)
         assertEquals(120, style.gridCoverWidth)
+        assertEquals(2, style.titleMaxLines)
     }
 }

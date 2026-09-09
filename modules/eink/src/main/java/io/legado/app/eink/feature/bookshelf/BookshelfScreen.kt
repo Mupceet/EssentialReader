@@ -76,6 +76,19 @@ internal fun adaptiveGridColumns(availableWidth: Dp, minCellWidth: Dp): Int {
 }
 
 /**
+ * 网格标题最小高度：最大行数 × 标题行高，行数钳制到宿主滑杆区间 1..5。
+ *
+ * 用最小高度而不是 minLines：约束只抬高报告尺寸，不额外触发段落排版。
+ */
+internal fun bookshelfGridTitleHeight(
+    density: Density,
+    lineHeight: TextUnit,
+    maxLines: Int,
+): Dp = with(density) {
+    (lineHeight * maxLines.coerceIn(1, 5)).toDp()
+}
+
+/**
  * 列表行高单点解析（列表模式对应网格的 [bookshelfGridCellWidth]）：
  * 取「基础封面高 [EInkListCoverHeight]」与「worst-case 文字实需高」
  * 的较大值——标题行 + 作者行 + 当前进度行（[showLatestChapter] 时
@@ -291,10 +304,10 @@ private fun BookGrid(
  * 网格条目：封面（未读角标叠加右上角）+ 书名，对齐 View 版
  * item_bookshelf_grid 的组成与比例。
  *
- * 书名固定两行高（两倍行高的最小高度约束 + maxLines = 2），保证同行
- * 各列行高一致、翻页按完整行计；行高为 sp，字体缩放放大（如 1.3）时
- * 高度随之增长但不破坏对齐。不用 minLines：实际行数不足时它会补一次
- * 段落排版，整页组合时在弱 SoC 上被放大。
+ * 书名高度由宿主标题最大行数控制（1..5）。以
+ * 最大行数 × 行高作最小高度约束，保证同行各列等高、翻页按完整行计；
+ * 行高为 sp，字体缩放放大时随之增长但不破坏对齐。不用 minLines：
+ * 实际行数不足时它会补一次段落排版，整页组合时在弱 SoC 上被放大。
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -353,21 +366,25 @@ private fun BookGridItem(
                 )
             }
         }
-        // 最小高度约束替代 minLines：约束只抬高报告尺寸不重排段落，
-        // 行高（sp）经 Density 换算，字体缩放下仍按比例伸缩
-        val twoLineHeight = with(LocalDensity.current) {
-            (EInkTheme.typography.bodySmall.lineHeight * 2).toDp()
-        }
+        // E-Ink 固定使用 14sp/16sp 紧凑标题并居中；titleSmallFont/titleCenter
+        // 按设计主动忽略，避免字体放大或破坏现有网格观感
+        val titleStyle = EInkTheme.typography.bodySmall
+        val titleMaxLines = style.titleMaxLines.coerceIn(1, 5)
+        val titleHeight = bookshelfGridTitleHeight(
+            density = LocalDensity.current,
+            lineHeight = titleStyle.lineHeight,
+            maxLines = titleMaxLines,
+        )
         EInkText(
             text = book.name,
-            style = EInkTheme.typography.bodySmall,
+            style = titleStyle,
             textAlign = TextAlign.Center,
-            maxLines = 2,
+            maxLines = titleMaxLines,
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(top = EInkSpacing.xs)
-                .heightIn(min = twoLineHeight)
+                .heightIn(min = titleHeight)
         )
     }
 }

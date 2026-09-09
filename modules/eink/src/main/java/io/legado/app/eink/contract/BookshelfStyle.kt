@@ -65,4 +65,12 @@ data class BookshelfStyle(
      * 值 <= 0 时回落 120，不做其他钳制。仅 [isGridLayout] = true 时消费。
      */
     val gridCoverWidth: Int = 120,
+
+    /**
+     * 网格标题最大行数（宿主 `bookshelfTitleMaxLines`，宿主滑杆范围 1..5）。
+     *
+     * 模块消费前钳制到 1..5；行数变化会改变网格条目高度，宿主/模块需
+     * 重新测量固定页分页。仅 [isGridLayout] = true 时消费。
+     */
+    val titleMaxLines: Int = 2,
 )

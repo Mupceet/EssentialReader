@@ -2,7 +2,7 @@
 
 - 日期：2026-09-09
 - 分支：`md3/port/eink`
-- 状态：设计定稿（待实施；本文档只定契约与消费语义，不含代码改动）
+- 状态：设计定稿；2026-09-09 第三轮修订（标题最大行数读取生效）
 - 判定基准：E-Ink 书架当前形态——扁平全量书架（无分组/文件夹）、网格/列表双布局
   （E-Ink 分页模式，禁自由滚动）、黑白主题自持、禁动画禁阴影
 - 关联：`modules/eink/docs/eink-host-config-review.md`（阅读界面配置评审，判定框架来源）、
@@ -19,6 +19,11 @@
      `bookshelfLayoutGridPortrait` 回归主动忽略；
   5. 书架布局切换入口回归（默认仍随宿主），切换**反向写**宿主
      `bookshelfLayoutModePortrait`（竖屏键；横屏键不动）——覆盖原决策 3。
+- 决策修订（2026-09-09 三轮拍板）：
+  6. 网格标题最大行数读取生效：`bookshelfTitleMaxLines`；`bookshelfTitleSmallFont`
+     与 `bookshelfTitleCenter` 主动忽略——E-Ink 已使用 14sp 最小字号且固定
+     居中，支持字体档会放大字体、支持对齐会破坏现有网格观感。maxLines
+     钳制 1..5 并参与网格行高与分页重测。
 
 ## 1. 文档定位
 
@@ -37,13 +42,13 @@
 | 分类 | 数量 | 内容 |
 |---|---|---|
 | 已传递（现状固化） | 1 | `autoRefreshBook`（GlobalSettings 读写，「我的」页开关） |
-| 读取生效 | 7 | 排序双键、未读角标双键、最新章节行、布局模式、网格封面宽 |
-| 主动忽略 | 28 | 配色/阴影/尺寸/横屏/信息密度/标题样式等，逐组依据见 §5 |
+| 读取生效 | 8 | 排序双键、未读角标双键、最新章节行、布局模式、网格封面宽、网格标题最大行数 |
+| 主动忽略 | 27 | 配色/阴影/尺寸/横屏/信息密度/标题字体档与对齐/网格样式等，逐组依据见 §5 |
 | 功能面不存在 | 12 | 分组/文件夹体系全部键，eink 无此 UI 面 |
 
 核心决策：
 
-1. **通道 = 策划快照**：契约 `BookshelfStyle`（5 字段），经
+1. **通道 = 策划快照**：契约 `BookshelfStyle`（6 字段），经
    `BookshelfEngine.style: Flow<BookshelfStyle>` 传递；排序在宿主 bridge
    内消化，不进契约（§3）。
 2. **网格列宽主导**（决策修订 4）：封面宽设置是格宽的最小值语义，列数
@@ -160,6 +165,9 @@ data class BookshelfStyle(
      * 值 <= 0 时回落 120，不做其他钳制。仅 [isGridLayout] = true 时消费。
      */
     val gridCoverWidth: Int = 120,
+
+    /** 网格标题最大行数（宿主 `bookshelfTitleMaxLines`，钳制 1..5）。 */
+    val titleMaxLines: Int = 2,
 )
 ```
 
@@ -189,7 +197,7 @@ suspend fun setGridLayout(grid: Boolean)
 `GlobalSettings` 不新增任何键（收录规则不破坏：布局切换是书架面控件而非
 设置页条目，读写同归书架端口）。
 
-## 4. 读取生效组消费语义（7 键）
+## 4. 读取生效组消费语义（8 键）
 
 | 宿主键 | 契约/消化位置 | 模块消费规则 | 生效档 |
 |---|---|---|---|
@@ -200,6 +208,7 @@ suspend fun setGridLayout(grid: Boolean)
 | `bookshelfShowLatestChapter` | `BookshelfStyle.showLatestChapter` | 列表条目最新章节行显隐 | 实时 |
 | `bookshelfLayoutModePortrait` | `BookshelfStyle.isGridLayout` | 书架默认布局；布局切换反向写本键（§6） | 实时 |
 | `bookshelfGridCoverWidth` | `BookshelfStyle.gridCoverWidth` | 网格最小格宽，列数自适应推导 | 实时 |
+| `bookshelfTitleMaxLines` | `BookshelfStyle.titleMaxLines` | 网格标题最大行数（1..5），改变网格条目高度 | 实时，需重测分页 |
 
 实施要点：
 
@@ -219,8 +228,12 @@ suspend fun setGridLayout(grid: Boolean)
 4. **分页几何重测**：`EInkPageController` 新增重测能力——旋转/分屏等
    改变列数的几何事件后，页项数实测值失效，需重测并把页首拉回第一页
    （§7.1 的边界自本轮起可达）。
+5. **网格标题最大行数**：标题固定用 `bodySmall`（14sp/16sp 紧凑档）并
+   居中；`titleMaxLines` 经 `bookshelfGridTitleHeight` 计算最小高度并
+   限制 `maxLines`，变化时重建网格分页状态。`bookshelfTitleSmallFont` 与
+   `bookshelfTitleCenter` 主动忽略，不进入契约。
 
-## 5. 主动忽略组（28 键）与功能面缺失组（12 键）
+## 5. 主动忽略组（27 键）与功能面缺失组（12 键）
 
 逐键明细（依据列引用阅读界面评审的固化决策）：
 
@@ -234,12 +247,12 @@ suspend fun setGridLayout(grid: Boolean)
 | 尺寸（1） | `bookshelfListCoverWidth` | 列表封面固定 66:90；密度自持，与阅读页「页眉页脚字号不开放设置」同逻辑。网格封面宽 `bookshelfGridCoverWidth` 已移入生效组（决策修订 4） |
 | 布局细化（5） | `bookshelfLayoutListPortrait`、`bookshelfLayoutGridPortrait`（列数，列宽主导下列数由推导产生，决策修订 4）、`bookshelfLayoutCompact`、`bookshelfListCoverCenter`、`bookshelfShowDivider` | 列表列数/紧凑/封面对齐/分隔线是 View 卡片形态细节，eink 行结构自洽 |
 | 横屏（3） | `bookshelfLayoutModeLandscape`、`bookshelfLayoutGridLandscape`、`bookshelfLayoutListLandscape` | E-Ink 按竖屏形态设计 |
-| 网格标题样式（3） | `bookshelfTitleSmallFont`、`bookshelfTitleCenter`、`bookshelfTitleMaxLines` | 网格书名两行居中是 eink 签名，maxLines 参与行高与分页推导，保持固定 |
+| 标题字体档/对齐（2） | `bookshelfTitleSmallFont`、`bookshelfTitleCenter` | E-Ink 已用 14sp 最小字号且网格标题固定居中，支持会放大字体或破坏现有网格观感，主动忽略 |
 | 网格样式（1） | `bookshelfGridLayout` | 叠加样式需渐变遮罩 + 白字，灰阶不可控 |
 | 类型角标（1） | `showTip` | 漫画/有声非 eink 目标场景，小字角标灰阶可读性差 |
 | 功能面不存在（12） | `bookGroupStyle`、`hideEmptyGroups`、`showBookCount`、`saveTabPosition`、folder 布局 6 键、`bookshelfGroupListStyle`、`bookshelfGroupCoverCount` | eink 无分组/文件夹 UI；属功能缺口非配置缺口。未来 eink 建分组时本组重新评估，届时仍走快照扩展（§6） |
 
-合计 1 + 7 + 28 + 12 = 48 键全覆盖。
+合计 1 + 8 + 27 + 12 = 48 键全覆盖。
 
 ## 6. 修改面与演进规则
 
@@ -270,7 +283,8 @@ suspend fun setGridLayout(grid: Boolean)
    布局实测后固定（含 rememberSaveable 恢复）。`EInkMainActivity` 声明了
    `configChanges=orientation|screenSize`，旋转不重建组合——列数（格宽
    推导输入变化）与行高随之改变，实测页项数失效。处理：分页控制器提供
-   重测能力，HomeRoute 以 orientation 为键触发重测并把页首拉回第一页
+   重测能力，HomeRoute 以 orientation 及影响网格高度的标题字体档/最大行数
+   为键触发重建并把页首拉回第一页
    （跨方向保持页码属过度设计，旋转后回首页符合墨水屏整页阅读直觉）。
    E-Ink 专用阅读器（竖屏锁定形态）不触发此路径。
 2. **快照实时档的真实变化源**：宿主改设置、E-Ink 内布局切换反向写，均经
@@ -286,15 +300,18 @@ suspend fun setGridLayout(grid: Boolean)
    2 列（旧 Adaptive 96dp 为 3 列、宿主列数键默认 3）——封面更大、单屏
    书目更少，属既定语义（用户可在宿主封面宽滑杆 40..150 调节），真机
    回归时不得误判为回归。
+6. **标题最大行数作用面**：`titleMaxLines` 作用于网格标题；E-Ink 列表标题
+   保持单行，不改列表行结构。`titleMaxLines` 改变网格条目高度，必须重建
+   网格分页状态；`bookshelfTitleSmallFont` 与 `bookshelfTitleCenter` 主动忽略。
 
 ## 8. 验证策略
 
 | 层 | 验证 | 方式 |
 |---|---|---|
-| 宿主映射 | `toBookshelfStyle` 全字段映射 + gridCoverWidth 钳制；`withGridLayout` 反向写投影 | JVM 纯函数单测 |
+| 宿主映射 | `toBookshelfStyle` 全字段映射 + gridCoverWidth/titleMaxLines 钳制；`withGridLayout` 反向写投影 | JVM 纯函数单测 |
 | 宿主排序 | 六模式 × 升降序与 `sortBooks` 语义对拍；手动排序不依赖 DAO 自然序 | JVM 纯函数单测（比较器镜像） |
 | 模块推导 | `adaptiveGridColumns` 列数推导（含边界：可用宽不足单格、极宽屏）；`bookshelfGridCellWidth` 均分 | JVM 纯函数单测 |
-| 模块消费 | style 并入 UiState；角标组合规则（badge × highlight）；最新章节行显隐；布局切换乐观更新 | 既有 JVM 测试基建 |
+| 模块消费 | style 并入 UiState；角标组合规则（badge × highlight）；最新章节行显隐；布局切换乐观更新；标题最大行数推导 | 既有 JVM 测试基建 |
 | 分页重测 | 几何变化后 `remeasure` 重置页首并重测页项数 | designsystem 既有纯 JVM 分页测试基建 |
 | 端到端 | 宿主改封面宽/排序 → eink 跟随；eink 切布局 → 完整模式书架布局同步变化；旋转后翻页整行对齐 | 真机手工回归（列入交付说明的未验证风险，若当轮未做） |
 

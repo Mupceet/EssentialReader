@@ -120,7 +120,12 @@ fun HomeRoute(
     // 行高是列表分页几何键（行高随字体缩放伸缩，不再恒定）：改变后
     // 分页状态重建、页首回第一页并按新行高重新实测页项数
     val listPager = rememberEInkListPagerState(orientation, listCoverHeight)
-    val gridPager = rememberEInkGridPagerState(orientation)
+    // 标题最大行数改变网格条目高度，必须重建并重测页项数；
+    // 对齐只改文字位置，不影响几何，不入键
+    val gridPager = rememberEInkGridPagerState(
+        orientation,
+        uiState.style.titleMaxLines,
+    )
     val pager: EInkPageController = if (uiState.isGridLayout) gridPager else listPager
     // 「我的」页独立分页状态（条目整页翻页，对齐书架约定；行高与方向
     // 无关，保持无参——不作为几何键）

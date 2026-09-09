@@ -22,6 +22,7 @@ class BookshelfStyleMapperTest {
             bookshelfShowLatestChapter = false,
             bookshelfLayoutModePortrait = 0,
             bookshelfGridCoverWidth = 5,
+            bookshelfTitleMaxLines = 4,
         ).toBookshelfStyle()
 
         assertTrue(style.showUnreadBadge)
@@ -29,6 +30,7 @@ class BookshelfStyleMapperTest {
         assertFalse(style.showLatestChapter)
         assertFalse(style.isGridLayout)
         assertEquals(5, style.gridCoverWidth)
+        assertEquals(4, style.titleMaxLines)
     }
 
     @Test
@@ -41,6 +43,25 @@ class BookshelfStyleMapperTest {
     fun `封面宽非正回落 120`() {
         assertEquals(120, BookshelfSettings(bookshelfGridCoverWidth = 0).toBookshelfStyle().gridCoverWidth)
         assertEquals(120, BookshelfSettings(bookshelfGridCoverWidth = -2).toBookshelfStyle().gridCoverWidth)
+    }
+
+    @Test
+    fun `标题最大行数越界钳制到 1 到 5`() {
+        assertEquals(1, BookshelfSettings(bookshelfTitleMaxLines = 0).toBookshelfStyle().titleMaxLines)
+        assertEquals(5, BookshelfSettings(bookshelfTitleMaxLines = 6).toBookshelfStyle().titleMaxLines)
+    }
+
+    @Test
+    fun `标题小字体与对齐配置主动忽略`() {
+        val base = BookshelfSettings(
+            bookshelfTitleSmallFont = false,
+            bookshelfTitleCenter = true,
+        )
+        val changed = base.copy(
+            bookshelfTitleSmallFont = true,
+            bookshelfTitleCenter = false,
+        )
+        assertEquals(base.toBookshelfStyle(), changed.toBookshelfStyle())
     }
 
     @Test
