@@ -92,4 +92,45 @@ class ReaderTextSelectionTest {
         assertEquals(0, sel.bodyEnd)
         assertEquals("标题", sel.selectedText)
     }
+
+    @Test
+    fun `选词吸附到词边界`() {
+        val snap = snapshot(line("hello world", positions = intArrayOf(0)))
+        // 落在 "world" 中间的字符上 → 吸附到词首
+        val hit = snapToWord(snap, ReaderTextHit(0, 8))
+        assertEquals(ReaderTextHit(0, 6), hit)
+    }
+
+    @Test
+    fun `选区几何产出逐行高亮带`() {
+        val snap = snapshot(
+            line("abcdef", positions = intArrayOf(0), top = 30f, bottom = 70f),
+            line("ghijkl", positions = intArrayOf(6), top = 80f, bottom = 120f),
+        )
+        val sel = buildSelection(snap, ReaderTextHit(0, 3), ReaderTextHit(1, 2))!!
+        val runs = selectionRuns(snap, sel, measure, measure)
+        assertEquals(2, runs.size)
+        // 首行从第 3 字符左缘（x[0]=0 + 30）到行尾（0 + 60）
+        assertEquals(30f, runs[0].left)
+        assertEquals(60f, runs[0].right)
+        assertEquals(30f, runs[0].top)
+        assertEquals(70f, runs[0].bottom)
+        // 次行整行到第 2 字符右缘（单段行 x[0]=0）
+        assertEquals(0f, runs[1].left)
+        assertEquals(20f, runs[1].right)
+    }
+
+    @Test
+    fun `把手锚点取首带左上与末带右上`() {
+        val snap = snapshot(
+            line("abcdef", positions = intArrayOf(0), top = 30f, bottom = 70f),
+            line("ghijkl", positions = intArrayOf(6), top = 80f, bottom = 120f),
+        )
+        val sel = buildSelection(snap, ReaderTextHit(0, 3), ReaderTextHit(1, 2))!!
+        val runs = selectionRuns(snap, sel, measure, measure)
+        val (startAnchor, endAnchor) = handleAnchor(runs)!!
+        assertEquals(30f to 30f, startAnchor)
+        assertEquals(20f to 80f, endAnchor)
+        assertNull(handleAnchor(emptyList()))
+    }
 }

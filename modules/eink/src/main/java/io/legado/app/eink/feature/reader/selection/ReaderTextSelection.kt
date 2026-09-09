@@ -2,6 +2,7 @@ package io.legado.app.eink.feature.reader.selection
 
 import io.legado.app.eink.contract.ReaderPageLine
 import io.legado.app.eink.contract.ReaderPageSnapshot
+import java.text.BreakIterator
 
 /** 行内命中：行下标 + 行内拼接文本的字符偏移（UTF-16）。 */
 data class ReaderTextHit(val lineIndex: Int, val charIndex: Int)
@@ -147,4 +148,74 @@ fun buildSelection(
         bodyEnd = bodyEnd,
         includesTitle = includesTitle,
     )
+}
+
+/**
+ * 长按选词：BreakIterator 词边界吸附（中日文逐字、拉丁按词）。
+ * 吸附失败（迭代器异常等）返回原命中。
+ */
+fun snapToWord(snapshot: ReaderPageSnapshot, hit: ReaderTextHit): ReaderTextHit {
+    val line = snapshot.lines.getOrNull(hit.lineIndex) ?: return hit
+    val text = lineText(line)
+    if (text.isEmpty()) return hit
+    val iterator = BreakIterator.getWordInstance()
+    iterator.setText(text)
+    var wordStart = iterator.first()
+    while (wordStart != BreakIterator.DONE) {
+        val wordEnd = iterator.next()
+        if (wordEnd == BreakIterator.DONE) break
+        if (hit.charIndex in wordStart until wordEnd ||
+            (hit.charIndex >= text.length && wordEnd == text.length)
+        ) {
+            return hit.copy(charIndex = wordStart)
+        }
+        wordStart = wordEnd
+    }
+    return hit
+}
+
+/** 逐行选区高亮带（行盒为高、字符前缀宽为横向）。 */
+data class SelectionRun(
+    val lineIndex: Int,
+    val left: Float,
+    val right: Float,
+    val top: Float,
+    val bottom: Float,
+)
+
+fun selectionRuns(
+    snapshot: ReaderPageSnapshot,
+    selection: ReaderSelectionUi,
+    measureTitle: (String) -> Float,
+    measureContent: (String) -> Float,
+): List<SelectionRun> {
+    val (start, end) = selection.startHit to selection.endHit
+    val runs = ArrayList<SelectionRun>()
+    for (index in start.lineIndex..end.lineIndex) {
+        val line = snapshot.lines.getOrNull(index) ?: continue
+        val measure = if (line.isTitle) measureTitle else measureContent
+        val text = lineText(line)
+        val from = if (index == start.lineIndex) start.charIndex else 0
+        val to = if (index == end.lineIndex) end.charIndex else text.length
+        val left = charX(line, from, measure)
+        val right = charX(line, to, measure)
+        runs += SelectionRun(index, left, right, line.top, line.bottom)
+    }
+    return runs
+}
+
+/** 行内字符偏移的 x 坐标（逐段累加前缀宽）。 */
+internal fun charX(line: ReaderPageLine, charIndex: Int, measure: (String) -> Float): Float {
+    val (chunk, offsetInChunk) = locateChunk(line, charIndex)
+    var x = line.x[chunk]
+    val text = line.chunks[chunk]
+    for (i in 0 until offsetInChunk) x += measure(text[i].toString())
+    return x
+}
+
+/** 把手锚点：首 run 左上（起始把手）与末 run 右上（末端把手）。 */
+fun handleAnchor(runs: List<SelectionRun>): Pair<Pair<Float, Float>, Pair<Float, Float>>? {
+    val first = runs.firstOrNull() ?: return null
+    val last = runs.lastOrNull() ?: return null
+    return (first.left to first.top) to (last.right to last.top)
 }
