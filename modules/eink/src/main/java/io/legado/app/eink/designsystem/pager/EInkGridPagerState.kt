@@ -28,7 +28,7 @@ import kotlinx.coroutines.flow.first
  *
  * 列数由 `GridCells.Adaptive` 按屏宽解析，页项数在首次布局后固定：
  * 旋转等几何变化经 [rememberEInkGridPagerState] 的 inputs 几何键重建
- * 分页状态（页首回第一页并按新布局重测），或经 [remeasure] 显式重测。
+ * 分页状态（页首回第一页并按新布局重测）。
  *
  * 配合 LazyVerticalGrid `userScrollEnabled = false` + [EInkPageSwipe] 使用。
  */
@@ -128,12 +128,6 @@ class EInkGridPagerState(val gridState: LazyGridState) : EInkPageController {
                 // 数据集切换竞态：忽略即可
             }
         }
-    }
-
-    override suspend fun remeasure() {
-        pageStart = 0
-        pageItemCount = 0
-        measureOnFirstLayout()
     }
 
     /**

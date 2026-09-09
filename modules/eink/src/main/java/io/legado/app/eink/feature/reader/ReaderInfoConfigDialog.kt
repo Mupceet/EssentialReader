@@ -23,6 +23,7 @@ import io.legado.app.eink.contract.ReaderTextStyle
 import io.legado.app.eink.designsystem.content.EInkText
 import io.legado.app.eink.designsystem.control.EInkButton
 import io.legado.app.eink.designsystem.control.EInkDialog
+import io.legado.app.eink.designsystem.control.EInkSliderRow
 import io.legado.app.eink.designsystem.theme.EInkTheme
 import io.legado.app.eink.designsystem.theme.EInkSpacing
 
@@ -98,7 +99,7 @@ internal fun ReaderInfoConfigDialog(
                     )
                 }
                 if (!titleSizeFollowBody) {
-                    SliderRow(
+                    EInkSliderRow(
                         label = null,
                         value = style.titleSize ?: catalog.defaultInt(Ids.TITLE_SIZE),
                         valueRange = catalog.intRange(Ids.TITLE_SIZE),
@@ -147,7 +148,7 @@ internal fun ReaderInfoConfigDialog(
                 }
             }
             LabeledSettingRow(label = "页眉页脚字号") {
-                SliderRow(
+                EInkSliderRow(
                     label = null,
                     value = style.footerSize ?: catalog.defaultInt(Ids.FOOTER_SIZE),
                     valueRange = catalog.intRange(Ids.FOOTER_SIZE),

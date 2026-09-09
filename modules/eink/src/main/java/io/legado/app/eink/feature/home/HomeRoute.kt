@@ -9,6 +9,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -39,6 +40,7 @@ import io.legado.app.eink.designsystem.refresh.EInkRefreshIntent
 import io.legado.app.eink.designsystem.refresh.LocalEInkRefreshController
 import io.legado.app.eink.designsystem.theme.EInkTheme
 import io.legado.app.eink.feature.bookshelf.BookshelfScreen
+import io.legado.app.eink.feature.bookshelf.BookshelfStylePanel
 import io.legado.app.eink.feature.bookshelf.BookshelfViewModel
 import io.legado.app.eink.feature.bookshelf.adaptiveGridColumns
 import io.legado.app.eink.feature.bookshelf.bookshelfGridCellWidth
@@ -70,13 +72,15 @@ private val HomeTabIcons = listOf(
  * 结构参考微信读书墨水屏版：
  *  - 顶部固定搜索框（点击进入搜索页）；
  *  - 搜索框下方一行头部（放大标题 + 右侧动作）：书架 Tab 显示刷新按钮
- *    （行为对齐 View 版下拉刷新），"我的" Tab 无动作；
+ *    与书架样式入口（打开个性化配置面板 [BookshelfStylePanel]，六项
+ *    样式即改即提交、书架实时预览），"我的" Tab 无动作；
  *  - 中间内容区：书架 / 我的 两个 Tab；
  *  - 底部通用操作栏（[EInkOperationBar]）：左侧 Tab 切换，
  *    右侧上/下箭头按当前 Tab 整页翻页（书架条目 /「我的」条目，
  *    零动画整页跳转），不可翻页时置灰。
  *
- * 书架布局默认网格、由 [BookshelfUiState.isGridLayout] 驱动，列表与网格
+ * 书架布局默认网格、由 [BookshelfUiState.isGridLayout] 驱动（顶栏不设
+ * 直接切换按钮，布局经个性化配置面板写入宿主样式后回流），列表与网格
  * 各持一套固定页分页状态（[rememberEInkListPagerState] /
  * [rememberEInkGridPagerState]），经 [EInkPageController] 统一驱动
  * 底部操作栏翻页与页首对齐。orientation 与书架列表行高为分页几何键：
@@ -102,6 +106,10 @@ fun HomeRoute(
     // 仅切换 UI 局部状态（当前 Tab），按 UDF 约定保留在 composable
     var selectedTab by rememberSaveable { mutableIntStateOf(HomeTabs.BOOKSHELF) }
 
+    // 书架个性化配置面板显隐（UI 局部状态）：样式改动经 VM updateStyle
+    // 乐观提交，面板关闭只卸载弹层组合
+    var showStylePanel by rememberSaveable { mutableStateOf(false) }
+
     // 列表封面尺寸单点解析（同网格格宽约定：显示与预取共用同一 Dp 值，
     // 封面缓存键逐字节一致）：行高取基础封面高与字体缩放下文字实需高的
     // 较大值（bookshelfListRowHeight KDoc），宽按 66:90 等比随行高伸缩
@@ -120,10 +128,11 @@ fun HomeRoute(
     // 行高是列表分页几何键（行高随字体缩放伸缩，不再恒定）：改变后
     // 分页状态重建、页首回第一页并按新行高重新实测页项数
     val listPager = rememberEInkListPagerState(orientation, listCoverHeight)
-    // 标题最大行数改变网格条目高度，必须重建并重测页项数；
-    // 对齐只改文字位置，不影响几何，不入键
+    // 标题最大行数与封面宽都改变网格条目几何（行高/列数），必须重建并
+    // 重测页项数；对齐只改文字位置，不影响几何，不入键
     val gridPager = rememberEInkGridPagerState(
         orientation,
+        uiState.style.gridCoverWidth,
         uiState.style.titleMaxLines,
     )
     val pager: EInkPageController = if (uiState.isGridLayout) gridPager else listPager
@@ -244,8 +253,7 @@ fun HomeRoute(
             showRefresh = selectedTab == HomeTabs.BOOKSHELF,
             isRefreshing = uiState.isRefreshing,
             onRefresh = viewModel::refresh,
-            isGridLayout = uiState.isGridLayout,
-            onToggleLayout = viewModel::toggleLayout,
+            onShowStylePanel = { showStylePanel = true },
             onSearchClick = onSearch,
             pageArrows = pageArrows,
             bookshelf = {
@@ -276,6 +284,16 @@ fun HomeRoute(
             }
         )
     }
+
+    // 面板挂在 Route 组合尾部（BoxWithConstraints 作用域外）：EInkDialog
+    // 自带全屏点击层，面板开着时天然拦截顶栏按钮的重复点击
+    if (showStylePanel) {
+        BookshelfStylePanel(
+            style = uiState.style,
+            onStyleChange = viewModel::updateStyle,
+            onDismiss = { showStylePanel = false },
+        )
+    }
 }
 
 /**
@@ -294,8 +312,7 @@ internal fun HomeScreen(
     showRefresh: Boolean,
     isRefreshing: Boolean,
     onRefresh: () -> Unit,
-    isGridLayout: Boolean,
-    onToggleLayout: () -> Unit,
+    onShowStylePanel: () -> Unit,
     onSearchClick: () -> Unit,
     pageArrows: @Composable () -> Unit,
     bookshelf: @Composable () -> Unit,
@@ -318,7 +335,7 @@ internal fun HomeScreen(
                         isRefreshing = isRefreshing,
                         onClick = onRefresh
                     )
-                    LayoutToggleAction(isGridLayout, onToggleLayout)
+                    StyleConfigAction(onShowStylePanel)
                 }
             }
         )
@@ -396,16 +413,14 @@ private fun RefreshAction(isRefreshing: Boolean, onClick: () -> Unit) {
 }
 
 /**
- * 书架布局切换按钮：静态显示目标布局的图标（网格态显示列表图标，
- * 点击切列表），零动画即时替换。切换经 VM 乐观更新并反向写宿主竖屏键。
+ * 书架个性化配置入口：点击打开样式面板（[BookshelfStylePanel]），图标与
+ * 阅读页「排版」入口同款语义。面板提交经 VM 乐观层实时预览。
  */
 @Composable
-private fun LayoutToggleAction(isGridLayout: Boolean, onClick: () -> Unit) {
+private fun StyleConfigAction(onClick: () -> Unit) {
     EInkOperationBarIcon(
-        icon = painterResource(
-            if (isGridLayout) R.drawable.eink_list_view_24px else R.drawable.eink_grid_view_24px
-        ),
-        contentDescription = if (isGridLayout) "切换为列表布局" else "切换为网格布局",
+        icon = painterResource(R.drawable.eink_ic_interface_setting),
+        contentDescription = "书架个性化配置",
         onClick = onClick,
     )
 }

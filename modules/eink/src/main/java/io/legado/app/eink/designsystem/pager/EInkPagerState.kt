@@ -47,12 +47,6 @@ interface EInkPageController {
      * 数据集变化后把实际滚动位置拉回当前页首（见各实现的详细说明）。
      */
     suspend fun realignToPageStart(totalItems: Int)
-
-    /**
-     * 几何变化（旋转/分屏改变列数或行高）后重置分页度量：页首拉回
-     * 第一页，并按当前布局重新实测页项数。
-     */
-    suspend fun remeasure()
 }
 
 /**
@@ -193,17 +187,11 @@ class EInkListPagerState(val listState: LazyListState) : EInkPageController {
         }
     }
 
-    override suspend fun remeasure() {
-        pageStart = 0
-        pageItemCount = 0
-        measureOnFirstLayout()
-    }
-
     /**
      * 安全滚动到页首下标。
      *
-     * 列表尚未挂载或当前没有 item 时，[LazyListState.scrollToItem] 会在 remeasure
-     * 时抛 `IndexOutOfBoundsException`（如搜索刚开始/无结果返回空列表），因此先判断
+     * 列表尚未挂载或当前没有 item 时，[LazyListState.scrollToItem] 会抛
+     * `IndexOutOfBoundsException`（如搜索刚开始/无结果返回空列表），因此先判断
      * 列表确有内容再滚动；同时存在竞态：读取 [LazyListState.layoutInfo] 之后、滚动
      * 真正生效之前，数据集可能已被切换为空（重复搜索时旧结果→清空），滚动同样会抛
      * 越界。此时列表为空本就无需滚动，新数据到达后列表自然从首页开始，故捕获忽略。

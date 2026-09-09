@@ -13,7 +13,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -36,6 +35,7 @@ import io.legado.app.eink.designsystem.content.EInkText
 import io.legado.app.eink.designsystem.control.EInkButton
 import io.legado.app.eink.designsystem.control.EInkCloseButton
 import io.legado.app.eink.designsystem.control.EInkDialog
+import io.legado.app.eink.designsystem.control.EInkSliderRow
 import io.legado.app.eink.designsystem.control.EInkSteppedSlider
 import io.legado.app.eink.designsystem.interaction.eInkActionColors
 import io.legado.app.eink.designsystem.interaction.einkClickable
@@ -55,12 +55,6 @@ private val BarHeight = 56.dp
 
 /** 底部操作条总占位（操作条 + 顶部分隔线），面板/弹框覆盖层据此避让，保持操作条可见可点。 */
 internal val ReaderBottomBarInset = BarHeight + 1.dp
-
-/** 步进器加减按钮触控目标。 */
-private val StepTouchTarget = 44.dp
-
-/** 档位滑条行标签列宽（容纳"上边距"三字并对齐各行滑条起点）。 */
-internal val SliderLabelWidth = 64.dp
 
 /** 边距滑条刻度间隔（dp）。 */
 private const val MarginTickStep = 8
@@ -244,7 +238,7 @@ internal fun ReaderProgressPanel(
         // 间隔滑条仅在自动翻页开启后出现，供运行中调节
         // （收起菜单时按新时长启动/重启倒计时）
         if (state.autoPlay) {
-            SliderRow(
+            EInkSliderRow(
                 label = null,
                 value = autoIntervalStepOf(state.autoPlayIntervalSec),
                 valueRange = 0..AutoIntervalStepsSec.lastIndex,
@@ -421,7 +415,7 @@ internal fun ReaderLayoutPanel(
     onOpenInfo: () -> Unit,
     onOpenMargins: () -> Unit,
 ) {
-    SliderRow(
+    EInkSliderRow(
         label = "字号",
         value = style.textSize,
         valueRange = catalog.intRange(Ids.BODY_SIZE),
@@ -430,7 +424,7 @@ internal fun ReaderLayoutPanel(
         onSetValue = onSetTextSize,
     )
     val lsRange = catalog.floatStepIndexRange(Ids.BODY_LETTER_SPACING, LETTER_SPACING_STEP)
-    SliderRow(
+    EInkSliderRow(
         label = "字距",
         value = (style.letterSpacing / LETTER_SPACING_STEP).roundToInt()
             .coerceIn(lsRange.first, lsRange.last),
@@ -439,7 +433,7 @@ internal fun ReaderLayoutPanel(
         tickStep = 2,
         onSetValue = onSetLetterSpacing,
     )
-    SliderRow(
+    EInkSliderRow(
         label = "缩进",
         value = style.indentChars,
         valueRange = catalog.intRange(Ids.BODY_INDENT),
@@ -447,7 +441,7 @@ internal fun ReaderLayoutPanel(
         tickStep = 1,
         onSetValue = onSetIndent,
     )
-    SliderRow(
+    EInkSliderRow(
         label = "行距",
         value = style.lineSpacing,
         valueRange = catalog.intRange(Ids.BODY_LINE_SPACING),
@@ -455,7 +449,7 @@ internal fun ReaderLayoutPanel(
         tickStep = 2,
         onSetValue = onSetLineSpacing,
     )
-    SliderRow(
+    EInkSliderRow(
         label = "段距",
         value = style.paragraphSpacing,
         valueRange = catalog.intRange(Ids.BODY_PARAGRAPH_SPACING),
@@ -578,7 +572,7 @@ private fun MarginRows(
     onSetLeft: (Int) -> Unit,
     onSetRight: (Int) -> Unit,
 ) {
-    SliderRow(
+    EInkSliderRow(
         label = "上边距",
         value = topDp,
         valueRange = 0..maxVertical,
@@ -586,7 +580,7 @@ private fun MarginRows(
         tickStep = MarginTickStep,
         onSetValue = onSetTop,
     )
-    SliderRow(
+    EInkSliderRow(
         label = "下边距",
         value = bottomDp,
         valueRange = 0..maxVertical,
@@ -594,7 +588,7 @@ private fun MarginRows(
         tickStep = MarginTickStep,
         onSetValue = onSetBottom,
     )
-    SliderRow(
+    EInkSliderRow(
         label = "左边距",
         value = leftDp,
         valueRange = 0..maxHorizontal,
@@ -602,7 +596,7 @@ private fun MarginRows(
         tickStep = MarginTickStep,
         onSetValue = onSetLeft,
     )
-    SliderRow(
+    EInkSliderRow(
         label = "右边距",
         value = rightDp,
         valueRange = 0..maxHorizontal,
@@ -664,64 +658,6 @@ internal fun ReaderCachePanel(onCache: (Int) -> Unit) {
 // ====================================================================
 // 通用行组件
 // ====================================================================
-
-/**
- * 档位滑条行：标签在左（可空，空时滑条占满），[−] 滑条 [+] 在右，
- * 当前数值印在滑块上。
- *
- * 滑条支持拖动选值与点按轨道跳档，[−]/[+] 为逐档精调（行内按值域钳制）。
- */
-@Composable
-internal fun SliderRow(
-    label: String?,
-    value: Int,
-    valueRange: IntRange,
-    thumbLabel: (Int) -> String,
-    tickStep: Int,
-    onSetValue: (Int) -> Unit,
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(48.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(EInkSpacing.xs),
-    ) {
-        if (label != null) {
-            EInkText(
-                text = label,
-                modifier = Modifier.width(SliderLabelWidth),
-                style = EInkTheme.typography.bodyMedium,
-            )
-        }
-        EInkButton(
-            text = "−",
-            onClick = { onSetValue((value - 1).coerceIn(valueRange.first, valueRange.last)) },
-            modifier = Modifier.size(StepTouchTarget),
-            bordered = false,
-            height = null,
-            style = EInkTheme.typography.titleLarge,
-            onClickLabel = "减小",
-        )
-        EInkSteppedSlider(
-            value = value,
-            onValueChange = onSetValue,
-            valueRange = valueRange,
-            modifier = Modifier.weight(1f),
-            thumbLabel = thumbLabel,
-            tickStep = tickStep,
-        )
-        EInkButton(
-            text = "＋",
-            onClick = { onSetValue((value + 1).coerceIn(valueRange.first, valueRange.last)) },
-            modifier = Modifier.size(StepTouchTarget),
-            bordered = false,
-            height = null,
-            style = EInkTheme.typography.titleLarge,
-            onClickLabel = "增大",
-        )
-    }
-}
 
 /** 开关行：标签在左（纯展示），开/关块在右（EInkButton，开启实心）。 */
 @Composable

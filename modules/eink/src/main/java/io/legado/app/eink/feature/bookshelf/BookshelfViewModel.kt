@@ -78,8 +78,8 @@ class BookshelfViewModel(application: Application) : AndroidViewModel(applicatio
     private val _isRefreshing = MutableStateFlow(false)
     private val _updatingUrls = MutableStateFlow<Set<String>>(emptySet())
 
-    // 初始值读宿主快照；切换入口在首页顶栏，
-    // 经 [toggleLayout] 乐观更新并反向写宿主竖屏键
+    // 初始值读宿主快照；布局改动唯一写入口是个性化配置面板
+    // [updateStyle]（乐观层反向写宿主），布局随样式快照回流
     private val _isGridLayout = MutableStateFlow(true)
 
     // 乐观覆盖层：提交样式先行置非空，宿主快照追平（同值）后由 init
@@ -111,15 +111,6 @@ class BookshelfViewModel(application: Application) : AndroidViewModel(applicatio
                 style = style,
             )
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), BookshelfUiState())
-
-    /**
-     * 切换书架布局：乐观更新，经 [setStyle] 反向写宿主竖屏键。
-     */
-    fun toggleLayout() {
-        val target = !_isGridLayout.value
-        _isGridLayout.value = target
-        updateStyle(uiState.value.style.copy(isGridLayout = target))
-    }
 
     /**
      * 提交书架样式（个性化配置面板写入口）：乐观置覆盖层，落库后由
@@ -158,8 +149,8 @@ class BookshelfViewModel(application: Application) : AndroidViewModel(applicatio
         }
         // 布局默认值读宿主快照（冷 Flow，首个 UiState 理论上可能先于本读取
         // 渲染默认布局，下一帧自愈；开关与完整模式互斥，会话内不再变化）。
-        // 切换的持久化经 [toggleLayout] 反向写宿主后由 style 重发同值快照，
-        // 本读取只负责启动种子
+        // 面板改布局的持久化经 [updateStyle] 反向写宿主后由 style 重发
+        // 同值快照，本读取只负责启动种子
         val styleFlow = engine.style
         viewModelScope.launch {
             _isGridLayout.value = styleFlow.first().isGridLayout

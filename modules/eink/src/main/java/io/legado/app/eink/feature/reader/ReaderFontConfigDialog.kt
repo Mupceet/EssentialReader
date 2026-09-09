@@ -26,6 +26,7 @@ import io.legado.app.eink.contract.ReaderTextStyle
 import io.legado.app.eink.designsystem.content.EInkText
 import io.legado.app.eink.designsystem.control.EInkButton
 import io.legado.app.eink.designsystem.control.EInkDialog
+import io.legado.app.eink.designsystem.control.EInkSliderRow
 import io.legado.app.eink.designsystem.theme.EInkTheme
 import io.legado.app.eink.designsystem.theme.EInkSpacing
 
@@ -226,7 +227,7 @@ private fun WeightSettingRow(
                 )
             }
             if (isCustom) {
-                SliderRow(
+                EInkSliderRow(
                     label = null,
                     value = value.coerceIn(valueRange.first, valueRange.last),
                     valueRange = valueRange,
