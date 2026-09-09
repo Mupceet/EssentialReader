@@ -78,6 +78,13 @@ class BookshelfStyleMapperTest {
     }
 
     @Test
+    fun `样式快照反向写网格分支`() {
+        val settings = BookshelfSettings(bookshelfLayoutModePortrait = 0)
+            .withStyleProjection(BookshelfStyle(isGridLayout = true))
+        assertEquals(1, settings.bookshelfLayoutModePortrait)
+    }
+
+    @Test
     fun `标题小字体与对齐配置主动忽略`() {
         val base = BookshelfSettings(
             bookshelfTitleSmallFont = false,

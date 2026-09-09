@@ -23,7 +23,6 @@ import kotlinx.coroutines.flow.asFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -78,46 +77,39 @@ class BookshelfViewModel(application: Application) : AndroidViewModel(applicatio
     private val _isRefreshing = MutableStateFlow(false)
     private val _updatingUrls = MutableStateFlow<Set<String>>(emptySet())
 
-    // 初始值读宿主快照；布局改动唯一写入口是个性化配置面板
-    // [updateStyle]（乐观层反向写宿主），布局随样式快照回流
-    private val _isGridLayout = MutableStateFlow(true)
-
-    // 乐观覆盖层：提交样式先行置非空，宿主快照追平（同值）后由 init
-    // 收集器清除，避免落库完成与快照流发射之间的空窗回跳
-    private val _styleOverride = MutableStateFlow<BookshelfStyle?>(null)
+    // 布局随合并样式流派生（uiState.isGridLayout = style.isGridLayout），
+    // 面板提交即时生效
+    private val styleState = BookshelfStyleState(engine.style, viewModelScope)
 
     // notShelf 行已在宿主查询内过滤，并由宿主物理删除；此处
     // 直接使用查询结果，与 View 版保持一致。
     // UiModel 映射放在宿主 bridge：只在 Room 发射（books 表变化）时执行
     // 一次，刷新期间 updatingUrls 频繁翻转时 combine 复用缓存的最新列表。
-    // 样式双流（快照 + 乐观覆盖）先归一再并入 UiState：kotlinx combine
-    // 类型化重载至多 5 流，覆盖非空时优先于快照。
+    // 样式（宿主快照 + 面板乐观覆盖）已在 [styleState] 归一为单一 flow，
+    // 此处直接并入 UiState。
     val uiState: StateFlow<BookshelfUiState> =
         combine(
             engine.observeShelf(),
-            combine(engine.style, _styleOverride) { snapshot, styleOverride ->
-                styleOverride ?: snapshot
-            },
+            styleState.style,
             _isRefreshing,
-            _updatingUrls,
-            _isGridLayout
-        ) { books, style, refreshing, updatingUrls, isGridLayout ->
+            _updatingUrls
+        ) { books, style, refreshing, updatingUrls ->
             BookshelfUiState(
                 books = books,
                 isLoading = false,
                 isRefreshing = refreshing,
                 updatingBookUrls = updatingUrls,
-                isGridLayout = isGridLayout,
+                isGridLayout = style.isGridLayout,
                 style = style,
             )
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), BookshelfUiState())
 
     /**
-     * 提交书架样式（个性化配置面板写入口）：乐观置覆盖层，落库后由
-     * 快照流追平清除。
+     * 提交书架样式（个性化配置面板写入口）：乐观置覆盖层，宿主落库由
+     * [engine.setStyle] 异步完成，快照追平后覆盖层自动清除。
      */
     fun updateStyle(style: BookshelfStyle) {
-        _styleOverride.value = style
+        styleState.submit(style)
         viewModelScope.launch { engine.setStyle(style) }
     }
 
@@ -146,20 +138,6 @@ class BookshelfViewModel(application: Application) : AndroidViewModel(applicatio
         // 统一在此清理，后续查询与刷新无需再逐个过滤。
         viewModelScope.launch(Dispatchers.IO) {
             engine.deleteBooksNotInBookshelf()
-        }
-        // 布局默认值读宿主快照（冷 Flow，首个 UiState 理论上可能先于本读取
-        // 渲染默认布局，下一帧自愈；开关与完整模式互斥，会话内不再变化）。
-        // 面板改布局的持久化经 [updateStyle] 反向写宿主后由 style 重发
-        // 同值快照，本读取只负责启动种子
-        val styleFlow = engine.style
-        viewModelScope.launch {
-            _isGridLayout.value = styleFlow.first().isGridLayout
-        }
-        // 乐观覆盖在宿主快照追平后清除，避免落库完成与流发射之间的空窗回跳
-        viewModelScope.launch {
-            styleFlow.collect { snapshot ->
-                if (_styleOverride.value == snapshot) _styleOverride.value = null
-            }
         }
         // 与 View 版 MainActivity 自动刷新一致：仅在设置开启时，
         // 进入首页延迟 1 秒自动刷新一次；ViewModel 常驻，
