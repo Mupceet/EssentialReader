@@ -2,6 +2,7 @@ package io.legado.app.eink.feature.home
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
@@ -37,8 +38,7 @@ import io.legado.app.eink.designsystem.refresh.LocalEInkRefreshController
 import io.legado.app.eink.designsystem.theme.EInkTheme
 import io.legado.app.eink.feature.bookshelf.BookshelfScreen
 import io.legado.app.eink.feature.bookshelf.BookshelfViewModel
-import io.legado.app.eink.feature.bookshelf.EInkBookshelfGridMinCellWidth
-import io.legado.app.eink.feature.bookshelf.EInkGridCoverHeight
+import io.legado.app.eink.feature.bookshelf.bookshelfGridCellWidth
 import io.legado.app.eink.feature.common.EInkCoverHeight
 import io.legado.app.eink.feature.common.EInkCoverWidth
 import io.legado.app.eink.feature.common.coverTargetSizePx
@@ -152,30 +152,6 @@ fun HomeRoute(
     // snapshotFlow 读取，不扩大 Route 的重组作用域
     val prefetchContext = LocalContext.current
     val prefetchDensity = LocalDensity.current
-    LaunchedEffect(uiState.books, uiState.isGridLayout) {
-        val activePager = if (uiState.isGridLayout) gridPager else listPager
-        // 与 BookGridItem/BookListItem 的显示尺寸严格一致（coverTargetSizePx
-        // 单点换算），否则预取键与显示键错开、命中失效
-        val (coverWidthPx, coverHeightPx) = if (uiState.isGridLayout) {
-            coverTargetSizePx(EInkBookshelfGridMinCellWidth, EInkGridCoverHeight, prefetchDensity)
-        } else {
-            coverTargetSizePx(EInkCoverWidth, EInkCoverHeight, prefetchDensity)
-        }
-        snapshotFlow { activePager.pageStart to activePager.pageItemCount }
-            .collect { page ->
-                val start = page.first
-                val pageSize = page.second
-                if (pageSize <= 0) return@collect
-                prefetchCovers(
-                    context = prefetchContext,
-                    items = uiState.books.drop(start + pageSize).take(pageSize),
-                    widthPx = coverWidthPx,
-                    heightPx = coverHeightPx,
-                    coverUrl = { it.coverUrl },
-                    sourceOrigin = { it.origin },
-                )
-            }
-    }
 
     // 翻页箭头槽：canPageUp/canPageDown 读取分页状态（pageStart 为
     // mutableStateOf），在 Route 作用域读取会让整个首页随每次翻页重组；
@@ -195,38 +171,77 @@ fun HomeRoute(
         )
     }
 
-    HomeScreen(
-        selectedTab = selectedTab,
-        onSelectTab = { selectedTab = it },
-        headerTitle = HomeTabLabels[selectedTab],
-        showRefresh = selectedTab == HomeTabs.BOOKSHELF,
-        isRefreshing = uiState.isRefreshing,
-        onRefresh = viewModel::refresh,
-        onSearchClick = onSearch,
-        pageArrows = pageArrows,
-        bookshelf = {
-            BookshelfScreen(
-                state = uiState,
-                onBookClick = onBookClick,
-                onBookLongClick = onBookLongClick,
-                listState = listPager.listState,
-                gridState = gridPager.gridState,
-                onPageUp = pageUp,
-                onPageDown = pageDown
-            )
-        },
-        mine = {
-            MineScreen(
-                pager = minePager,
-                onPageUp = minePageUp,
-                onPageDown = minePageDown,
-                onOpenFontScale = onOpenFontScale,
-                onOpenFullMode = onOpenFullMode,
-                onOpenThemeDebug = onOpenThemeDebug,
-                onOpenComponentGallery = onOpenComponentGallery
-            )
+    // 格宽单点解析：显示（BookshelfScreen）与预取共用同一 Dp，封面缓存
+    // 键逐字节一致（bookshelfGridCellWidth KDoc）。Route 级一次
+    // BoxWithConstraints，不做逐项测量
+    BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+        val gridCellWidth = bookshelfGridCellWidth(maxWidth, uiState.style.gridColumns)
+
+        // 封面预取：当前页落定后预热下一页封面进内存缓存。加格宽键：
+        // 列数/屏宽变化时按新尺寸重新预热
+        LaunchedEffect(uiState.books, uiState.isGridLayout, gridCellWidth) {
+            val activePager = if (uiState.isGridLayout) gridPager else listPager
+            // 与显示严格同源：网格用 bookshelfGridCellWidth 的同一 Dp 值
+            //（coverTargetSizePx 单点换算），预取键与显示键逐字节一致
+            val (coverWidthPx, coverHeightPx) = if (uiState.isGridLayout) {
+                coverTargetSizePx(
+                    gridCellWidth,
+                    gridCellWidth * (EInkCoverHeight / EInkCoverWidth),
+                    prefetchDensity
+                )
+            } else {
+                coverTargetSizePx(EInkCoverWidth, EInkCoverHeight, prefetchDensity)
+            }
+            snapshotFlow { activePager.pageStart to activePager.pageItemCount }
+                .collect { page ->
+                    val start = page.first
+                    val pageSize = page.second
+                    if (pageSize <= 0) return@collect
+                    prefetchCovers(
+                        context = prefetchContext,
+                        items = uiState.books.drop(start + pageSize).take(pageSize),
+                        widthPx = coverWidthPx,
+                        heightPx = coverHeightPx,
+                        coverUrl = { it.coverUrl },
+                        sourceOrigin = { it.origin },
+                    )
+                }
         }
-    )
+
+        HomeScreen(
+            selectedTab = selectedTab,
+            onSelectTab = { selectedTab = it },
+            headerTitle = HomeTabLabels[selectedTab],
+            showRefresh = selectedTab == HomeTabs.BOOKSHELF,
+            isRefreshing = uiState.isRefreshing,
+            onRefresh = viewModel::refresh,
+            onSearchClick = onSearch,
+            pageArrows = pageArrows,
+            bookshelf = {
+                BookshelfScreen(
+                    state = uiState,
+                    gridCellWidth = gridCellWidth,
+                    onBookClick = onBookClick,
+                    onBookLongClick = onBookLongClick,
+                    listState = listPager.listState,
+                    gridState = gridPager.gridState,
+                    onPageUp = pageUp,
+                    onPageDown = pageDown
+                )
+            },
+            mine = {
+                MineScreen(
+                    pager = minePager,
+                    onPageUp = minePageUp,
+                    onPageDown = minePageDown,
+                    onOpenFontScale = onOpenFontScale,
+                    onOpenFullMode = onOpenFullMode,
+                    onOpenThemeDebug = onOpenThemeDebug,
+                    onOpenComponentGallery = onOpenComponentGallery
+                )
+            }
+        )
+    }
 }
 
 /**
