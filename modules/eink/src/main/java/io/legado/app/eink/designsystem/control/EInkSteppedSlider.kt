@@ -27,6 +27,8 @@ import androidx.compose.ui.semantics.ProgressBarRangeInfo
 import androidx.compose.ui.semantics.progressBarRangeInfo
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.isFinite
@@ -95,7 +97,8 @@ fun EInkSteppedSlider(
     val steps = (end - start).coerceAtLeast(0)
     val safeValue = value.coerceIn(start, end)
     val density = LocalDensity.current
-    val thumbWidthPx = with(density) { ThumbWidth.toPx() }
+    val thumbWidth = sliderThumbWidth(density)
+    val thumbWidthPx = with(density) { thumbWidth.toPx() }
 
     var isPressed by remember { mutableStateOf(false) }
 
@@ -110,16 +113,16 @@ fun EInkSteppedSlider(
     BoxWithConstraints(
         modifier = modifier
             .heightIn(min = minSliderHeight)
-            .pointerInput(enabled, start, end) {
+            .pointerInput(enabled, start, end, thumbWidth) {
                 if (!enabled || steps <= 0) return@pointerInput
                 val touchSlop = viewConfiguration.touchSlop
-                val thumbWidth = ThumbWidth.toPx()
+                val thumbWidthPx = thumbWidth.toPx()
 
                 // x 坐标 → 档位:滑块中心对齐档位位置,两端档位时滑块贴边
                 fun valueAt(xPx: Float): Int {
-                    val travel = (size.width - thumbWidth).coerceAtLeast(0f)
+                    val travel = (size.width - thumbWidthPx).coerceAtLeast(0f)
                     if (travel <= 0f) return start
-                    val fraction = ((xPx - thumbWidth / 2f) / travel).coerceIn(0f, 1f)
+                    val fraction = ((xPx - thumbWidthPx / 2f) / travel).coerceIn(0f, 1f)
                     return start + (fraction * steps).roundToInt()
                 }
 
@@ -132,11 +135,11 @@ fun EInkSteppedSlider(
                     // 点按档位（Material 滑条同款；deferred 模式下该次变更由
                     // 抬手统一提交）。几何用 size 实时换算
                     val current = currentValue
-                    val travel = (size.width - thumbWidth).coerceAtLeast(0f)
+                    val travel = (size.width - thumbWidthPx).coerceAtLeast(0f)
                     val stepWidth = if (steps > 0) travel / steps else 0f
                     val thumbLeft = stepWidth * (current - start)
                     val onThumb = down.position.x >= thumbLeft &&
-                            down.position.x <= thumbLeft + thumbWidth
+                            down.position.x <= thumbLeft + thumbWidthPx
                     val downStep = valueAt(down.position.x)
                     var lastEmitted = current
                     if (!onThumb && downStep != current) {
@@ -253,7 +256,7 @@ fun EInkSteppedSlider(
         Box(
             modifier = Modifier
                 .offset { IntOffset(thumbLeftPx.roundToInt(), 0) }
-                .size(width = ThumbWidth, height = ThumbHeight)
+                .size(width = thumbWidth, height = ThumbHeight)
                 .background(color = thumbContainer, shape = EInkShapes.small)
                 .then(
                     if (!enabled || pressed) {
@@ -309,10 +312,17 @@ private val SliderHeight = 48.dp
 /** 滑条上方标识行（如「默认」）的预留高度（含与滑轨的间隙）。 */
 private val MarkerLabelSpace = 24.dp
 
-/** 滑块固定宽度:文本变化不引起宽度跳变,保证位置映射稳定。 */
+/** 滑块基准宽度：随字体缩放放大以容纳滑块标签，同一组合内宽度稳定。 */
 private val ThumbWidth = 48.dp
 
 private val ThumbHeight = 28.dp
+
+/**
+ * 滑块宽度按字体缩放放大，避免 `24sp`、`120s` 等标签在 1.6x 时被裁。
+ * 宽度在单次组合内固定，不随当前档位文字长度跳变，位置映射保持稳定。
+ */
+internal fun sliderThumbWidth(density: Density): Dp =
+    ThumbWidth * density.fontScale.coerceAtLeast(1f)
 
 private val FilledTrackThickness = 4.dp
 

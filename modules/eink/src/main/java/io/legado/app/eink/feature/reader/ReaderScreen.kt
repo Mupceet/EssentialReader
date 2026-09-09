@@ -51,9 +51,10 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -833,12 +834,12 @@ private fun tipTextStyle(availablePx: Float): TextStyle {
 
 /**
  * 页眉/页脚文字样式（配置字号渲染）：协商目录字号可见后按配置字号
- * 渲染（像素锚定，不随应用内字体缩放），行高锚定条带可用高度、行内
- * 垂直居中——页眉与页脚用同一配置字号（eink 统一写入两侧），视觉上
- * 严格同字号。宿主 extent 本就按同字号的字体度量预留（padding+
- * fontLine+divider），配置字号按构造放得下；模块渲染字体与宿主字体
- * 度量不同时可能轻微越界，但 lineHeight 不裁字形、居中对称，观感
- * 安全。字号缺失或非正（旧宿主桥/极端配置）时回落 [tipTextStyle]
+ * 渲染（配置值按 dp 像素锚定，不随应用内字体缩放），行高锚定条带
+ * 可用高度、行内垂直居中——页眉与页脚用同一配置字号（eink 统一写入
+ * 两侧），视觉上严格同字号。宿主 extent 本就按同字号的字体度量预留
+ * （padding+fontLine+divider），配置字号按构造放得下；模块渲染字体与
+ * 宿主字体度量不同时可能轻微越界，但 lineHeight 不裁字形、居中对称，
+ * 观感安全。字号缺失或非正（旧宿主桥/极端配置）时回落 [tipTextStyle]
  * 推导。
  */
 @Composable
@@ -846,14 +847,21 @@ private fun configuredTipTextStyle(availablePx: Float, configuredSizeSp: Int?): 
     val density = LocalDensity.current
     if (configuredSizeSp != null && configuredSizeSp > 0) {
         val linePx = availablePx.takeIf { it > 0f } ?: with(density) { 23.dp.toPx() }
-        val sizePx = with(density) { configuredSizeSp.sp.toPx() }
         return EInkTheme.typography.bodyMedium.copy(
-            fontSize = with(density) { sizePx.toDp().toSp() },
+            fontSize = configuredTipFontSizeSp(configuredSizeSp, density),
             lineHeight = with(density) { linePx.toDp().toSp() },
         )
     }
     return tipTextStyle(availablePx)
 }
+
+/**
+ * 配置字号换算为像素锚定的 Compose 字号：配置值按 dp 解释，再换算回
+ * 当前 density 下的 sp。这样实际绘制像素不随应用内 fontScale 放大，
+ * 与宿主按像素预留的页眉/页脚条带一致。
+ */
+internal fun configuredTipFontSizeSp(configuredSizeSp: Int, density: Density): TextUnit =
+    with(density) { configuredSizeSp.dp.toSp() }
 
 /**
  * 自动翻页进度条：2dp 高度常驻占位——开关自动翻页不改变页脚高度，
