@@ -1,5 +1,6 @@
 package io.legado.app.eink.bridge
 
+import io.legado.app.constant.AppLog
 import io.legado.app.data.entities.Bookmark
 import io.legado.app.data.repository.BookmarkRepository
 import io.legado.app.domain.model.TextProcessStyle
@@ -8,6 +9,7 @@ import io.legado.app.eink.contract.ReaderSelectionCommit
 import io.legado.app.eink.contract.ReaderSelectionDraft
 import io.legado.app.eink.contract.ReaderSelectionEngine
 import io.legado.app.model.ReadBook
+import kotlin.coroutines.cancellation.CancellationException
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
 
@@ -26,8 +28,9 @@ internal fun einkMarkingStyle(): TextProcessStyle =
     TextProcessStyle(underlineMode = 1, underlineColor = EINK_MARKING_COLOR)
 
 /**
- * 在章节全文中定位选中文本：优先提示位置精确命中，附近 ±[CONTEXT_SEARCH_WINDOW]
- * 窗口搜索纠偏，找不到返回 -1。算法与 MarkingDelegate.selectionContext 一致。
+ * 在章节全文中定位选中文本：窗口口径基于 MarkingDelegate.selectionContext；
+ * 按契约改为两级搜索（先提示位精确后窗口回搜），找不到返回 -1
+ * （不发散到 expectedStart）。
  */
 internal fun locateInContent(content: String, expectedStart: Int, text: String): Int {
     if (text.isEmpty()) return -1
@@ -106,7 +109,10 @@ internal object ReaderSelectionEngineImpl : ReaderSelectionEngine, KoinComponent
         return try {
             bookmarkRepository.save(bookmark)
             true
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
+            AppLog.put("eink saveBookmark failed: ${e.message}", e)
             false
         }
     }
@@ -135,7 +141,11 @@ internal object ReaderSelectionEngineImpl : ReaderSelectionEngine, KoinComponent
             // 新快照经 onContentUpdated 推送（保持页内位置），模块随重绘清选区
             ReaderEngineImpl.relayout()
             true
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
+            // save 成功但 relayout 抛异常时误报失败——标记已落库（锚点 upsert 幂等，重试安全），将在下次成功重排时出现
+            AppLog.put("eink saveMarking failed: ${e.message}", e)
             false
         }
     }
