@@ -7,6 +7,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import io.legado.app.eink.arch.UserMessage
 import io.legado.app.eink.contract.BookshelfItemUiModel
+import io.legado.app.eink.contract.BookshelfStyle
 import io.legado.app.eink.contract.BookshelfTocRefreshResult
 import io.legado.app.eink.contract.EInkEngineRegistry
 import io.legado.app.eink.util.onEachParallel
@@ -22,6 +23,7 @@ import kotlinx.coroutines.flow.asFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -43,6 +45,9 @@ data class BookshelfUiState(
     val updatingBookUrls: Set<String> = emptySet(),
     /** 书架网格布局（true = 网格，列数按屏宽自适应；false = 列表）。默认网格。 */
     val isGridLayout: Boolean = true,
+
+    /** 书架显示样式快照（宿主设置投影，实时档）。 */
+    val style: BookshelfStyle = BookshelfStyle(),
 ) {
     val isEmpty: Boolean get() = books.isEmpty() && !isLoading
 }
@@ -84,16 +89,18 @@ class BookshelfViewModel(application: Application) : AndroidViewModel(applicatio
     val uiState: StateFlow<BookshelfUiState> =
         combine(
             engine.observeShelf(),
+            engine.style,
             _isRefreshing,
             _updatingUrls,
             _isGridLayout
-        ) { books, refreshing, updatingUrls, isGridLayout ->
+        ) { books, style, refreshing, updatingUrls, isGridLayout ->
             BookshelfUiState(
                 books = books,
                 isLoading = false,
                 isRefreshing = refreshing,
                 updatingBookUrls = updatingUrls,
                 isGridLayout = isGridLayout,
+                style = style,
             )
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), BookshelfUiState())
 
@@ -127,6 +134,11 @@ class BookshelfViewModel(application: Application) : AndroidViewModel(applicatio
         // 统一在此清理，后续查询与刷新无需再逐个过滤。
         viewModelScope.launch(Dispatchers.IO) {
             engine.deleteBooksNotInBookshelf()
+        }
+        // 布局默认值读宿主快照（首次发射，处于加载态期间，无可见切换）。
+        // toggleGridLayout 仍为内存态覆盖，入口未开放、不接共享存储
+        viewModelScope.launch {
+            _isGridLayout.value = engine.style.first().isGridLayout
         }
         // 与 View 版 MainActivity 自动刷新一致：仅在设置开启时，
         // 进入首页延迟 1 秒自动刷新一次；ViewModel 常驻，

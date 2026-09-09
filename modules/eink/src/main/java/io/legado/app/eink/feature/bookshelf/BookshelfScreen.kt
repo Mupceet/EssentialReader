@@ -35,6 +35,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import io.legado.app.eink.R
 import io.legado.app.eink.contract.BookshelfItemUiModel
+import io.legado.app.eink.contract.BookshelfStyle
 import io.legado.app.eink.designsystem.content.EInkInfoRow
 import io.legado.app.eink.designsystem.content.EInkLoading
 import io.legado.app.eink.designsystem.content.EInkText
@@ -110,6 +111,7 @@ fun BookshelfScreen(
             state.isGridLayout -> BookGrid(
                 books = state.books,
                 updatingBookUrls = state.updatingBookUrls,
+                style = state.style,
                 onBookClick = onBookClick,
                 onBookLongClick = onBookLongClick,
                 gridState = gridState,
@@ -120,6 +122,7 @@ fun BookshelfScreen(
             else -> BookList(
                 books = state.books,
                 updatingBookUrls = state.updatingBookUrls,
+                style = state.style,
                 onBookClick = onBookClick,
                 onBookLongClick = onBookLongClick,
                 listState = listState,
@@ -134,6 +137,7 @@ fun BookshelfScreen(
 private fun BookList(
     books: List<BookshelfItemUiModel>,
     updatingBookUrls: Set<String>,
+    style: BookshelfStyle,
     onBookClick: (String) -> Unit,
     onBookLongClick: (BookshelfItemUiModel) -> Unit,
     listState: LazyListState,
@@ -162,6 +166,7 @@ private fun BookList(
         items(books) { book ->
             BookListItem(
                 book = book,
+                style = style,
                 isUpdating = updatingBookUrls.contains(book.bookUrl),
                 onBookClick = onBookClick,
                 onBookLongClick = onBookLongClick
@@ -180,6 +185,7 @@ private fun BookList(
 private fun BookGrid(
     books: List<BookshelfItemUiModel>,
     updatingBookUrls: Set<String>,
+    style: BookshelfStyle,
     onBookClick: (String) -> Unit,
     onBookLongClick: (BookshelfItemUiModel) -> Unit,
     gridState: LazyGridState,
@@ -207,6 +213,7 @@ private fun BookGrid(
         items(books) { book ->
             BookGridItem(
                 book = book,
+                style = style,
                 isUpdating = updatingBookUrls.contains(book.bookUrl),
                 onBookClick = onBookClick,
                 onBookLongClick = onBookLongClick
@@ -228,6 +235,7 @@ private fun BookGrid(
 @Composable
 private fun BookGridItem(
     book: BookshelfItemUiModel,
+    style: BookshelfStyle,
     isUpdating: Boolean,
     onBookClick: (String) -> Unit,
     onBookLongClick: (BookshelfItemUiModel) -> Unit
@@ -259,17 +267,18 @@ private fun BookGridItem(
                 width = EInkBookshelfGridMinCellWidth,
                 height = EInkGridCoverHeight
             )
-            // 角标规则与列表项一致：刷新中"…"，未读章节数（本次刷新
-            // 发现新章时高亮）；位置同 View 版网格（封面右上角）
-            val badgeText = when {
-                isUpdating -> "…"
-                unreadCount > 0 -> unreadCount.toString()
-                else -> null
-            }
+            // 角标规则与列表项一致：刷新中"…"，未读角标受宿主开关门控
+            //（本次刷新发现新章时高亮）；位置同 View 版网格（封面右上角）
+            val badgeText = shelfBadgeText(isUpdating, style.showUnreadBadge, unreadCount)
             if (badgeText != null) {
                 ShelfBadge(
                     text = badgeText,
-                    highlight = !isUpdating && book.hasNewChapter,
+                    highlight = shelfBadgeHighlight(
+                        isUpdating,
+                        style.showUnreadBadge,
+                        style.highlightNewChapter,
+                        book.hasNewChapter
+                    ),
                     modifier = Modifier
                         .align(Alignment.TopEnd)
                         .padding(EInkSpacing.xxs)
@@ -299,6 +308,7 @@ private fun BookGridItem(
 @Composable
 private fun BookListItem(
     book: BookshelfItemUiModel,
+    style: BookshelfStyle,
     isUpdating: Boolean,
     onBookClick: (String) -> Unit,
     onBookLongClick: (BookshelfItemUiModel) -> Unit
@@ -340,17 +350,15 @@ private fun BookListItem(
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f)
                 )
-                when {
-                    // 刷新中：角标静态替换为省略号（E-Ink 禁止加载动画）
-                    isUpdating -> ShelfBadge(
-                        text = "…",
-                        highlight = false,
-                        modifier = Modifier.padding(start = EInkSpacing.xs)
-                    )
-                    // 未读章节数（View 版 getUnreadChapterNum；本次刷新发现新章时高亮）
-                    unreadCount > 0 -> ShelfBadge(
-                        text = unreadCount.toString(),
-                        highlight = book.hasNewChapter,
+                shelfBadgeText(isUpdating, style.showUnreadBadge, unreadCount)?.let { text ->
+                    ShelfBadge(
+                        text = text,
+                        highlight = shelfBadgeHighlight(
+                            isUpdating,
+                            style.showUnreadBadge,
+                            style.highlightNewChapter,
+                            book.hasNewChapter
+                        ),
                         modifier = Modifier.padding(start = EInkSpacing.xs)
                     )
                 }
@@ -369,17 +377,47 @@ private fun BookListItem(
                     style = EInkTheme.typography.labelMedium
                 )
             }
-            // 最新章节（同 View 版 iv_last / ic_book_last）
-            book.latestChapterTitle?.let { title ->
-                EInkInfoRow(
-                    iconRes = R.drawable.eink_ic_book_last,
-                    text = title,
-                    style = EInkTheme.typography.labelMedium
-                )
+            // 最新章节（同 View 版 iv_last / ic_book_last；宿主开关门控）
+            if (style.showLatestChapter) {
+                book.latestChapterTitle?.let { title ->
+                    EInkInfoRow(
+                        iconRes = R.drawable.eink_ic_book_last,
+                        text = title,
+                        style = EInkTheme.typography.labelMedium
+                    )
+                }
             }
         }
     }
 }
+
+
+/**
+ * 书架角标文本（网格与列表共用）：刷新中显示省略号（优先，E-Ink 禁止
+ * 加载动画的刷新态表达）；否则未读角标受宿主开关 [showUnreadBadge]
+ * 门控、未读数大于 0 才显示。
+ */
+internal fun shelfBadgeText(
+    isUpdating: Boolean,
+    showUnreadBadge: Boolean,
+    unreadCount: Int,
+): String? = when {
+    isUpdating -> "…"
+    showUnreadBadge && unreadCount > 0 -> unreadCount.toString()
+    else -> null
+}
+
+/**
+ * 角标反色高亮：本次刷新发现新章（语义对齐 View 版
+ * showUpdateBadge = showUnread && showUnreadNew && isNew）。刷新中不高亮，
+ * 角标整体隐藏（未读开关关闭）时高亮无载体。
+ */
+internal fun shelfBadgeHighlight(
+    isUpdating: Boolean,
+    showUnreadBadge: Boolean,
+    highlightNewChapter: Boolean,
+    hasNewChapter: Boolean,
+): Boolean = !isUpdating && showUnreadBadge && highlightNewChapter && hasNewChapter
 
 
 /**
