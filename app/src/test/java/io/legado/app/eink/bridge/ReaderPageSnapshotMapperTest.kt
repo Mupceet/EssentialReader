@@ -3,12 +3,14 @@ package io.legado.app.eink.bridge
 import android.app.Application
 import android.graphics.Bitmap
 import io.legado.app.data.entities.Book
+import io.legado.app.eink.contract.ReaderDecorationRun
 import io.legado.app.eink.contract.ReaderPaintSpec
 import io.legado.app.feature.reader.core.model.ReaderElement
 import io.legado.app.feature.reader.core.model.ReaderPage
 import io.legado.app.feature.reader.core.model.ReaderPageId
 import io.legado.app.feature.reader.core.model.ReaderRect
 import io.legado.app.feature.reader.core.model.ReaderTextStyle
+import io.legado.app.feature.reader.core.model.ReaderUnderline
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -72,11 +74,31 @@ class ReaderPageSnapshotMapperTest {
         baselinePx: Float = top + 40f,
         chapterPosition: Int = 0,
         height: Float = 50f,
+        underlineMode: Int = 0,
+        highlight: Boolean = false,
     ) = ReaderElement.Text(
         bounds = ReaderRect(x, top, x + 20f, top + height),
         baselinePx = baselinePx,
         value = value,
-        style = bodyStyle,
+        style = if (underlineMode != 0 || highlight) {
+            bodyStyle.copy(
+                // 与真实划线/高亮元素同构：backgroundArgb 非空 ⇔ 高亮；
+                // underline.mode 透传（颜色/几何按合理默认，不跨桥）
+                backgroundArgb = if (highlight) 0x80FFFFFF.toInt() else null,
+                underline = if (underlineMode != 0) {
+                    ReaderUnderline(
+                        mode = underlineMode,
+                        colorArgb = 0xFF000000.toInt(),
+                        widthPx = 1f,
+                        offsetPx = 2f,
+                    )
+                } else {
+                    null
+                },
+            )
+        } else {
+            bodyStyle
+        },
         selected = false,
         emphasized = emphasized,
         chapterPosition = chapterPosition,
@@ -107,6 +129,20 @@ class ReaderPageSnapshotMapperTest {
         readProgress = "12.3%",
         imageLoader = { _, _ -> { _, _ -> null } },
     )
+
+    /** ReaderDecorationRun 非 data class（引用相等），按字段断言。 */
+    private fun assertDecorationRun(
+        run: ReaderDecorationRun,
+        start: Int,
+        end: Int,
+        underlineMode: Int,
+        highlight: Boolean,
+    ) {
+        assertEquals(start, run.start)
+        assertEquals(end, run.end)
+        assertEquals(underlineMode, run.underlineMode)
+        assertEquals(highlight, run.highlight)
+    }
 
     @Test
     fun `文本元素按行折叠为 chunk 与起点 x`() {
@@ -179,8 +215,37 @@ class ReaderPageSnapshotMapperTest {
         assertArrayEquals(intArrayOf(7), line1.chapterPositions)
         assertEquals(34f, line1.top, 0.001f)
         assertEquals(54f, line1.bottom, 0.001f)
-        // 装饰桥本任务只落契约：映射侧恒空，Task 2 接入提取
+        // 无样式元素不产生装饰 run
         assertTrue(line0.decorations.isEmpty())
+    }
+
+    @Test
+    fun `同行相邻同款划线合并为单个装饰 run`() {
+        val snapshot = mapElements(
+            textElement(0f, 10f, "划线甲", chapterPosition = 0, height = 20f, baselinePx = 28f,
+                underlineMode = 1),
+            textElement(60f, 10f, "划线乙", chapterPosition = 3, height = 20f, baselinePx = 28f,
+                underlineMode = 1),
+            textElement(120f, 10f, "无样式", chapterPosition = 6, height = 20f, baselinePx = 28f),
+            textElement(180f, 10f, "高亮丙", chapterPosition = 9, height = 20f, baselinePx = 28f,
+                highlight = true),
+            sdkInt = 34,
+        )
+
+        val runs = snapshot.lines.single().decorations
+        assertEquals(2, runs.size)
+        assertDecorationRun(runs[0], start = 0, end = 6, underlineMode = 1, highlight = false)
+        assertDecorationRun(runs[1], start = 9, end = 12, underlineMode = 0, highlight = true)
+    }
+
+    @Test
+    fun `字体色标记不产生装饰 run`() {
+        val snapshot = mapElements(
+            textElement(0f, 10f, "仅变色", chapterPosition = 0, height = 20f, baselinePx = 28f),
+            sdkInt = 34,
+        )
+
+        assertTrue(snapshot.lines.single().decorations.isEmpty())
     }
 
     @Test

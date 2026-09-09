@@ -4,6 +4,7 @@ import android.graphics.Bitmap
 import android.graphics.Paint
 import android.os.Build
 import io.legado.app.data.entities.Book
+import io.legado.app.eink.contract.ReaderDecorationRun
 import io.legado.app.eink.contract.ReaderImageSlot
 import io.legado.app.eink.contract.ReaderPageLine
 import io.legado.app.eink.contract.ReaderPageSnapshot
@@ -25,7 +26,9 @@ import java.text.DecimalFormat
  *  - API35+ 的逐字字距半格补偿（View 版画布行为）在映射期算进 x 坐标，
  *    模块不再感知；
  *  - 图片元素自带最终布局矩形（缩放/居中已由分页器算好），槽位整框
- *    透传，模块按 fullLine 铺满即与引擎布局一致。
+ *    透传，模块按 fullLine 铺满即与引擎布局一致；
+ *  - 划线/高亮样式（ReaderTextStyle.underline/backgroundArgb）折叠为行内
+ *    装饰 run（相邻同款合并）；字体色标记不产生装饰，颜色一律不跨桥。
  *
  * 画笔规格只拷贝测量耦合参数（字号/字距/字体/可变字重）——快照坐标
  * 是引擎按这些参数测量的，模块必须按同值绘制才不错位；阴影/斜体等纯
@@ -93,6 +96,8 @@ internal object ReaderPageSnapshotMapper {
                     line.chunks.add(element.value)
                     line.xs.add(element.bounds.left + halfSpacing)
                     line.chapterPositions.add(element.chapterPosition)
+                    line.underlineModes.add(element.style.underline?.mode ?: 0)
+                    line.highlights.add(element.style.backgroundArgb != null)
                 }
 
                 is ReaderElement.Image -> {
@@ -135,10 +140,41 @@ internal object ReaderPageSnapshotMapper {
         val chunks = ArrayList<String>()
         val xs = ArrayList<Float>()
         val chapterPositions = ArrayList<Int>()
+        // 与 chunks 平行的逐段装饰签名（underline.mode；backgroundArgb 是否非空）
+        val underlineModes = ArrayList<Int>()
+        val highlights = ArrayList<Boolean>()
         var top = 0f
         var bottom = 0f
         var baseY = 0f
         var isTitle = false
+
+        /** flush 时把相邻同签名段合并为行内装饰 run（行内拼接文本 UTF-16 索引）。 */
+        private fun buildDecorations(): List<ReaderDecorationRun> {
+            val runs = ArrayList<ReaderDecorationRun>()
+            var runStart = -1
+            var runMode = 0
+            var runHighlight = false
+            var offset = 0
+            for (i in chunks.indices) {
+                val mode = underlineModes[i]
+                val highlight = highlights[i]
+                val same = runStart >= 0 && mode == runMode && highlight == runHighlight
+                if (!same) {
+                    // 无签名段（0, false）只负责截断前序 run，自身不成 run
+                    if (runStart >= 0 && (runMode != 0 || runHighlight)) {
+                        runs.add(ReaderDecorationRun(runStart, offset, runMode, runHighlight))
+                    }
+                    runStart = offset
+                    runMode = mode
+                    runHighlight = highlight
+                }
+                offset += chunks[i].length
+            }
+            if (runStart >= 0 && (runMode != 0 || runHighlight)) {
+                runs.add(ReaderDecorationRun(runStart, offset, runMode, runHighlight))
+            }
+            return runs
+        }
 
         fun flushInto(lines: MutableList<ReaderPageLine>) {
             if (chunks.isEmpty()) return
@@ -151,7 +187,7 @@ internal object ReaderPageSnapshotMapper {
                     chapterPositions = chapterPositions.toIntArray(),
                     top = top,
                     bottom = bottom,
-                    decorations = emptyList(), // Task 2 接入装饰提取
+                    decorations = buildDecorations(),
                 )
             )
         }
