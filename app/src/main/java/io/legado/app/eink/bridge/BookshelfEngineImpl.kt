@@ -23,6 +23,7 @@ import io.legado.app.model.ReadBook
 import io.legado.app.model.webBook.WebBook
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
@@ -59,8 +60,14 @@ internal object BookshelfEngineImpl : BookshelfEngine, KoinComponent {
     )
 
     override fun observeShelf(): Flow<List<BookshelfItemUiModel>> =
-        appDb.bookDao.flowByGroup(BookGroup.IdAll)
-            .map { books -> books.map { it.toBookshelfItemUiModel() } }
+        combine(
+            appDb.bookDao.flowByGroup(BookGroup.IdAll),
+            bookshelfSettingsGateway.settings
+                .map { BookshelfSortKey(it.bookshelfSort, it.bookshelfSortOrder) }
+                .distinctUntilChanged(),
+        ) { books, sortKey ->
+            books.sortedForBookshelf(sortKey.sort, sortKey.sortOrder)
+        }.map { books -> books.map { it.toBookshelfItemUiModel() } }
 
     override val style: Flow<BookshelfStyle> =
         bookshelfSettingsGateway.settings
@@ -146,4 +153,7 @@ internal object BookshelfEngineImpl : BookshelfEngine, KoinComponent {
     override suspend fun startCacheProcessJob() {
         CacheBook.startProcessJob(Dispatchers.IO)
     }
+
+    /** 排序键投影：设置流任意键变化不触发书架重排，仅排序键变化才重发。 */
+    private data class BookshelfSortKey(val sort: Int, val sortOrder: Int)
 }
