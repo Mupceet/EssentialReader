@@ -90,9 +90,9 @@ object EInkEngineRegistry {
         get() = require(_readerEngine, "ReaderEngine")
 
     /**
-     * 应用更新端口——唯一**可选**端口：未注册 = 宿主无 app 级更新能力
-     * （companion 宿主的合法状态），「我的」页检查更新入口随之不渲染，
-     * 不参与 install 必填校验。
+     * 应用更新端口——**可选**端口（与选区批注 `selectionEngine` 同为可选）：
+     * 未注册 = 宿主无 app 级更新能力（companion 宿主的合法状态），
+     * 「我的」页检查更新入口随之不渲染，不参与 install 必填校验。
      */
     val appUpdateEngine: AppUpdateEngine?
         get() = _appUpdateEngine
