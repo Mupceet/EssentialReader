@@ -78,8 +78,8 @@ class BookshelfViewModel(application: Application) : AndroidViewModel(applicatio
     private val _isRefreshing = MutableStateFlow(false)
     private val _updatingUrls = MutableStateFlow<Set<String>>(emptySet())
 
-    // 默认网格；仅内存单次生命周期（VM 存续期），不落盘——布局切换入口
-    // 暂不开放，[toggleGridLayout] 保留供入口回归时复用
+    // 初始值读宿主快照；切换入口在首页顶栏，
+    // 经 [toggleLayout] 乐观更新并反向写宿主竖屏键
     private val _isGridLayout = MutableStateFlow(true)
 
     // notShelf 行已在宿主查询内过滤，并由宿主物理删除；此处
@@ -104,9 +104,14 @@ class BookshelfViewModel(application: Application) : AndroidViewModel(applicatio
             )
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), BookshelfUiState())
 
-    /** 切换列表/网格布局（仅内存态，不落盘；入口暂未开放）。 */
-    fun toggleGridLayout() {
-        _isGridLayout.value = !_isGridLayout.value
+    /**
+     * 切换书架布局：乐观更新本地态，再反向写宿主竖屏键
+     * （[BookshelfEngine.setGridLayout]）；写入后快照重发同值，无回跳。
+     */
+    fun toggleLayout() {
+        val target = !_isGridLayout.value
+        _isGridLayout.value = target
+        viewModelScope.launch { engine.setGridLayout(target) }
     }
 
     private var refreshJob: Job? = null
@@ -137,7 +142,8 @@ class BookshelfViewModel(application: Application) : AndroidViewModel(applicatio
         }
         // 布局默认值读宿主快照（冷 Flow，首个 UiState 理论上可能先于本读取
         // 渲染默认布局，下一帧自愈；开关与完整模式互斥，会话内不再变化）。
-        // toggleGridLayout 仍为内存态覆盖，入口未开放、不接共享存储
+        // 切换的持久化经 [toggleLayout] 反向写宿主后由 style 重发同值快照，
+        // 本读取只负责启动种子
         viewModelScope.launch {
             _isGridLayout.value = engine.style.first().isGridLayout
         }

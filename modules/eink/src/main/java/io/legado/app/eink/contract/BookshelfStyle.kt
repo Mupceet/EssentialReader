@@ -50,8 +50,9 @@ data class BookshelfStyle(
      * 书架默认布局：true = 网格，false = 列表（宿主 `bookshelfLayoutModePortrait`，
      * 0 = 列表、非 0 = 网格）。
      *
-     * 只读投影：E-Ink 不开放布局切换入口，也不反向写宿主设置（横屏变体
-     * 不投影，E-Ink 按竖屏形态设计）。
+     * 默认值随宿主（实时档）；E-Ink 首页顶栏可切换，经
+     * [BookshelfEngine.setGridLayout] 反向写宿主竖屏键（横屏变体不投影，
+     * E-Ink 按竖屏形态设计）。
      */
     val isGridLayout: Boolean = true,
 

@@ -47,6 +47,12 @@ interface EInkPageController {
      * 数据集变化后把实际滚动位置拉回当前页首（见各实现的详细说明）。
      */
     suspend fun realignToPageStart(totalItems: Int)
+
+    /**
+     * 几何变化（旋转/分屏改变列数或行高）后重置分页度量：页首拉回
+     * 第一页，并按当前布局重新实测页项数。
+     */
+    suspend fun remeasure()
 }
 
 /**
@@ -187,6 +193,12 @@ class EInkListPagerState(val listState: LazyListState) : EInkPageController {
         }
     }
 
+    override suspend fun remeasure() {
+        pageStart = 0
+        pageItemCount = 0
+        measureOnFirstLayout()
+    }
+
     /**
      * 安全滚动到页首下标。
      *
@@ -213,9 +225,11 @@ class EInkListPagerState(val listState: LazyListState) : EInkPageController {
  * 分页状态（[EInkListPagerState.pageStart]/[EInkListPagerState.pageItemCount]）
  * 经 [rememberSaveable] 随导航栈条目保存恢复，与 [rememberLazyListState]
  * 的滚动位置恢复保持一致：从其他界面返回时停在离开时的页，不回第一页。
+ *
+ * `inputs` 传几何键（如 orientation），变化后分页状态重建、页首回第一页。
  */
 @Composable
-fun rememberEInkListPagerState(): EInkListPagerState {
+fun rememberEInkListPagerState(vararg inputs: Any?): EInkListPagerState {
     val listState = rememberLazyListState()
     val saver = remember(listState) {
         Saver<EInkListPagerState, List<Any>>(
@@ -227,7 +241,7 @@ fun rememberEInkListPagerState(): EInkListPagerState {
             }
         )
     }
-    val state = rememberSaveable(saver = saver) { EInkListPagerState(listState) }
+    val state = rememberSaveable(*inputs, saver = saver) { EInkListPagerState(listState) }
     LaunchedEffect(state) { state.measureOnFirstLayout() }
     return state
 }

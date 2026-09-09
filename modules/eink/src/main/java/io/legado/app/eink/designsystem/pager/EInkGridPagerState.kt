@@ -27,8 +27,8 @@ import kotlinx.coroutines.flow.first
  * 分页状态经 [rememberEInkGridPagerState] 随导航栈保存恢复。
  *
  * 列数由 `GridCells.Adaptive` 按屏宽解析，页项数在首次布局后固定：
- * 旋转屏幕等改变列数的事件不会重新测量（与列表版对旋转后行高变化的
- * 处理一致，E-Ink 设备基本不旋转）。
+ * 旋转等几何变化经 [rememberEInkGridPagerState] 的 inputs 几何键重建
+ * 分页状态（页首回第一页并按新布局重测），或经 [remeasure] 显式重测。
  *
  * 配合 LazyVerticalGrid `userScrollEnabled = false` + [EInkPageSwipe] 使用。
  */
@@ -130,6 +130,12 @@ class EInkGridPagerState(val gridState: LazyGridState) : EInkPageController {
         }
     }
 
+    override suspend fun remeasure() {
+        pageStart = 0
+        pageItemCount = 0
+        measureOnFirstLayout()
+    }
+
     /**
      * 安全滚动到页首下标（同列表版：列表空/未挂载或数据切换竞态时跳过）。
      */
@@ -149,9 +155,11 @@ class EInkGridPagerState(val gridState: LazyGridState) : EInkPageController {
  *
  * 分页状态经 [rememberSaveable] 随导航栈条目保存恢复，与
  * [rememberLazyGridState] 的滚动位置恢复保持一致。
+ *
+ * `inputs` 传几何键（如 orientation），变化后分页状态重建、页首回第一页。
  */
 @Composable
-fun rememberEInkGridPagerState(): EInkGridPagerState {
+fun rememberEInkGridPagerState(vararg inputs: Any?): EInkGridPagerState {
     val gridState = rememberLazyGridState()
     val saver = remember(gridState) {
         Saver<EInkGridPagerState, List<Any>>(
@@ -163,7 +171,7 @@ fun rememberEInkGridPagerState(): EInkGridPagerState {
             }
         )
     }
-    val state = rememberSaveable(saver = saver) { EInkGridPagerState(gridState) }
+    val state = rememberSaveable(*inputs, saver = saver) { EInkGridPagerState(gridState) }
     LaunchedEffect(state) { state.measureOnFirstLayout() }
     return state
 }

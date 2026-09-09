@@ -16,6 +16,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.layout
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
@@ -77,7 +78,8 @@ private val HomeTabIcons = listOf(
  * 书架布局默认网格、由 [BookshelfUiState.isGridLayout] 驱动，列表与网格
  * 各持一套固定页分页状态（[rememberEInkListPagerState] /
  * [rememberEInkGridPagerState]），经 [EInkPageController] 统一驱动
- * 底部操作栏翻页与页首对齐。
+ * 底部操作栏翻页与页首对齐。orientation 为分页状态几何键：旋转后分页
+ * 状态重建、页首回第一页。
  */
 @Composable
 fun HomeRoute(
@@ -92,15 +94,20 @@ fun HomeRoute(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
+    // 分页几何键（旋转/分屏改变列数或行高）：变化后书架分页状态整体重建，
+    // 页首回第一页并按新布局重新实测页项数
+    val orientation = LocalConfiguration.current.orientation
+
     // 仅切换 UI 局部状态（当前 Tab），按 UDF 约定保留在 composable
     var selectedTab by rememberSaveable { mutableIntStateOf(HomeTabs.BOOKSHELF) }
 
     // 书架固定页分页：首次布局测出一页项数，之后按该项数整页跳转；
     // 列表与网格各一套状态，切换布局后各自停在离开时的页
-    val listPager = rememberEInkListPagerState()
-    val gridPager = rememberEInkGridPagerState()
+    val listPager = rememberEInkListPagerState(orientation)
+    val gridPager = rememberEInkGridPagerState(orientation)
     val pager: EInkPageController = if (uiState.isGridLayout) gridPager else listPager
-    // 「我的」页独立分页状态（条目整页翻页，对齐书架约定）
+    // 「我的」页独立分页状态（条目整页翻页，对齐书架约定；行高与方向
+    // 无关，保持无参——不作为几何键）
     val minePager = rememberEInkListPagerState()
     val scope = rememberCoroutineScope()
     val totalBooks = uiState.books.size
@@ -215,6 +222,8 @@ fun HomeRoute(
             showRefresh = selectedTab == HomeTabs.BOOKSHELF,
             isRefreshing = uiState.isRefreshing,
             onRefresh = viewModel::refresh,
+            isGridLayout = uiState.isGridLayout,
+            onToggleLayout = viewModel::toggleLayout,
             onSearchClick = onSearch,
             pageArrows = pageArrows,
             bookshelf = {
@@ -261,6 +270,8 @@ internal fun HomeScreen(
     showRefresh: Boolean,
     isRefreshing: Boolean,
     onRefresh: () -> Unit,
+    isGridLayout: Boolean,
+    onToggleLayout: () -> Unit,
     onSearchClick: () -> Unit,
     pageArrows: @Composable () -> Unit,
     bookshelf: @Composable () -> Unit,
@@ -283,9 +294,7 @@ internal fun HomeScreen(
                         isRefreshing = isRefreshing,
                         onClick = onRefresh
                     )
-                    // 布局切换入口暂不开放：默认网格 + VM 内存切换
-                    //（BookshelfViewModel.toggleGridLayout），入口回归时
-                    // 参考历史 LayoutToggleAction 形态
+                    LayoutToggleAction(isGridLayout, onToggleLayout)
                 }
             }
         )
@@ -358,6 +367,21 @@ private fun RefreshAction(isRefreshing: Boolean, onClick: () -> Unit) {
         icon = painterResource(R.drawable.eink_ic_refresh_black_24dp),
         contentDescription = if (isRefreshing) "刷新中" else "刷新",
         enabled = !isRefreshing,
+        onClick = onClick,
+    )
+}
+
+/**
+ * 书架布局切换按钮：静态显示目标布局的图标（网格态显示列表图标，
+ * 点击切列表），零动画即时替换。切换经 VM 乐观更新并反向写宿主竖屏键。
+ */
+@Composable
+private fun LayoutToggleAction(isGridLayout: Boolean, onClick: () -> Unit) {
+    EInkOperationBarIcon(
+        icon = painterResource(
+            if (isGridLayout) R.drawable.eink_list_view_24px else R.drawable.eink_grid_view_24px
+        ),
+        contentDescription = if (isGridLayout) "切换为列表布局" else "切换为网格布局",
         onClick = onClick,
     )
 }
