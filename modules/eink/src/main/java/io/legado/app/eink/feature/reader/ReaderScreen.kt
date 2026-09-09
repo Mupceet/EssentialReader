@@ -135,15 +135,20 @@ fun ReaderRoute(
     // 单页快照，pageVersion 推进（翻页/重排/批注落库重绘）即自动清空，
     // 同时承载批注保存重绘后的清区时序
     var selection by remember { mutableStateOf<ReaderSelectionUi?>(null) }
-    LaunchedEffect(uiState.pageVersion) {
-        selection = null
-    }
-
     // 书签编辑弹层状态：draft 非空即弹层打开，与 pendingSelection（发起
     // 弹层动作的选区，确认提交用）成对置位/清空；弹层期间选区保留——
     // 取消只关弹层，用户可再调整选区，仅保存成功才清选区（设计 §5）
     var bookmarkDraft by remember { mutableStateOf<ReaderSelectionDraft?>(null) }
     var pendingSelection by remember { mutableStateOf<ReaderSelectionUi?>(null) }
+    // pageVersion 推进 = 选区所在内容已被替换：选区、待提交选区与弹层
+    // 草稿一并清空，弹层随内容变化关闭。只清 selection 会残留幽灵弹层：
+    // resolveSelection 在途时翻页，解析结果仍被置入弹层，确认即按新章
+    // 索引落旧章偏移
+    LaunchedEffect(uiState.pageVersion) {
+        selection = null
+        pendingSelection = null
+        bookmarkDraft = null
+    }
     val scope = rememberCoroutineScope()
 
     // 选择浮条动作：复制直接落剪贴板并清选区；书签经端口解析预填后弹层
@@ -159,6 +164,11 @@ fun ReaderRoute(
                         val draft = viewModel.resolveSelection(sel)
                         if (draft == null) {
                             // 无会话书/选中文本为空：选区失效，清区提示
+                            selection = null
+                            Toast.makeText(context, "选区已失效", Toast.LENGTH_SHORT).show()
+                        } else if (selection != sel) {
+                            // 解析挂起期间选区已被翻页/点按清空或重建（selection
+                            // 现读现判）：解析结果作废，不置弹层状态，清区提示
                             selection = null
                             Toast.makeText(context, "选区已失效", Toast.LENGTH_SHORT).show()
                         } else {
@@ -537,9 +547,14 @@ fun ReaderRoute(
             }
         }
 
-        // 书签编辑弹层：确认经端口落库（pendingSelection 现读现判，翻页
-        // 清选区后确认按失效落失败分支）；成功关弹层清选区，失败提示并
-        // 保留弹层与选区可重试或取消（设计 §5）
+        // 书签编辑弹层：确认经端口落库。陈旧/重复触发三重护栏：
+        // - pageVersion 推进（翻页/重排）连同清空 selection/pendingSelection/
+        //   bookmarkDraft，内容变化即关弹层，不残留幽灵弹层；
+        // - 确认时 pendingSelection 现读现判，弹层期间选区被点按清空则落
+        //   失效分支；
+        // - saving 防重入：慢速墨水屏确认回显延迟期间的双击只落库一次。
+        // 成功关弹层清选区，失败提示并保留弹层与选区可重试或取消（设计 §5）
+        var saving by remember { mutableStateOf(false) }
         bookmarkDraft?.let { draft ->
             ReaderBookmarkEditDialog(
                 draft = draft,
@@ -547,17 +562,23 @@ fun ReaderRoute(
                     bookmarkDraft = null
                     pendingSelection = null
                 },
-                onConfirm = { bookText, content ->
+                onConfirm = confirm@{ bookText, content ->
+                    if (saving) return@confirm
+                    saving = true
                     scope.launch {
-                        val sel = pendingSelection
-                        val ok = sel != null && viewModel.saveBookmark(sel, bookText, content)
-                        if (ok) {
-                            bookmarkDraft = null
-                            pendingSelection = null
-                            selection = null
-                            Toast.makeText(context, "已添加书签", Toast.LENGTH_SHORT).show()
-                        } else {
-                            Toast.makeText(context, "保存失败", Toast.LENGTH_SHORT).show()
+                        try {
+                            val sel = pendingSelection
+                            val ok = sel != null && viewModel.saveBookmark(sel, bookText, content)
+                            if (ok) {
+                                bookmarkDraft = null
+                                pendingSelection = null
+                                selection = null
+                                Toast.makeText(context, "已添加书签", Toast.LENGTH_SHORT).show()
+                            } else {
+                                Toast.makeText(context, "保存失败", Toast.LENGTH_SHORT).show()
+                            }
+                        } finally {
+                            saving = false
                         }
                     }
                 },
