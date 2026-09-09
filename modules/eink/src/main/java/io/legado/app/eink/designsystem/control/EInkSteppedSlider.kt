@@ -106,6 +106,12 @@ fun EInkSteppedSlider(
     // 闭包内的 value 快照会过期，经 rememberUpdatedState 读取最新值
     val currentValue by rememberUpdatedState(value)
 
+    // 同理：pointerInput 键不含回调，手势协程会钉死首帧回调闭包——调用方
+    // 以「捕获的状态拷贝」模式写回（style.copy(...)）时会把旧状态整包覆盖
+    // 到新交互上（跨滑条互相污染），经 rememberUpdatedState 转发最新回调
+    val currentOnValueChange by rememberUpdatedState(onValueChange)
+    val currentOnValueChangeFinished by rememberUpdatedState(onValueChangeFinished)
+
     // 标识需要占用滑条上方的额外高度（标识行 + 间隙）
     val hasMarker = markerLabel != null && markerStep != null
     val minSliderHeight = if (hasMarker) SliderHeight + MarkerLabelSpace else SliderHeight
@@ -144,7 +150,7 @@ fun EInkSteppedSlider(
                     var lastEmitted = current
                     if (!onThumb && downStep != current) {
                         lastEmitted = downStep
-                        onValueChange(downStep)
+                        currentOnValueChange(downStep)
                     }
                     try {
                         while (true) {
@@ -173,7 +179,7 @@ fun EInkSteppedSlider(
                             val candidate = valueAt(change.position.x)
                             if (candidate != lastEmitted) {
                                 lastEmitted = candidate
-                                onValueChange(candidate)
+                                currentOnValueChange(candidate)
                             }
                         }
                     } finally {
@@ -182,7 +188,7 @@ fun EInkSteppedSlider(
                     // 抬手生效模式：手势有效结束后统一提交一次（rejected = 竖直
                     // 滚动抢占,视为未交互,不提交）
                     if (!rejected) {
-                        onValueChangeFinished?.invoke()
+                        currentOnValueChangeFinished?.invoke()
                     }
                 }
             }
