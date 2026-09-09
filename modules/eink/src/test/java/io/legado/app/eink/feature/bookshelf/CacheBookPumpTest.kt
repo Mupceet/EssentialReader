@@ -2,6 +2,7 @@ package io.legado.app.eink.feature.bookshelf
 
 import io.legado.app.eink.contract.BookshelfEngine
 import io.legado.app.eink.contract.BookshelfItemUiModel
+import io.legado.app.eink.contract.BookshelfStyle
 import io.legado.app.eink.contract.BookshelfTocRefreshResult
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
@@ -84,6 +85,8 @@ private class FakeEngine(gateOpen: Boolean = false) : BookshelfEngine {
     private val gate = CompletableDeferred<Unit>().apply {
         if (gateOpen) complete(Unit)
     }
+
+    override val style: Flow<BookshelfStyle> = emptyFlow()
 
     override fun observeShelf(): Flow<List<BookshelfItemUiModel>> = emptyFlow()
 

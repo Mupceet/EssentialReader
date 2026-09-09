@@ -49,6 +49,13 @@ enum class BookshelfTocRefreshResult {
 interface BookshelfEngine {
 
     /**
+     * 书架显示样式快照流（宿主书架设置的策划子集投影，实时档；成员语义
+     * 见 [BookshelfStyle]）。模块在 VM 层并入 UiState，与 [observeShelf]
+     * 的书籍流独立发射：样式变化只重组渲染参数，排序变化才重发列表。
+     */
+    val style: Flow<BookshelfStyle>
+
+    /**
      * 书架全量书籍流（全部书架分组；含展示字段映射）。书籍增删、
      * 进度/最新章节变化后发射新列表。
      */
