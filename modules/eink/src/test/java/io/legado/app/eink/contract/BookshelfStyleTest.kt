@@ -7,8 +7,11 @@ import org.junit.Test
 /**
  * 快照默认值必须与宿主 BookshelfSettings 的字段默认值语义一致
  * （showUnread=true、showUnreadNew=true、bookshelfShowLatestChapter=true、
- * bookshelfLayoutModePortrait=1 网格、bookshelfLayoutGridPortrait=3），
- * 同时等于当前 eink 书架的硬编码行为——插件宿主发射默认快照即现状。
+ * bookshelfLayoutModePortrait=1 网格、bookshelfLayoutGridPortrait=3）。
+ *
+ * 注意「默认 3 列」与旧 Adaptive(96dp) 在宽屏设备（617dp 7 英寸墨水屏）
+ * 的 4-5 列不同：列数跟随宿主设置是既定设计决策（宿主完整模式同样
+ * 默认 3 列），非回归。
  */
 class BookshelfStyleTest {
 

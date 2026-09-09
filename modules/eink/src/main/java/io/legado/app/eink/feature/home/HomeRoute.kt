@@ -146,10 +146,7 @@ fun HomeRoute(
         pager.realignToPageStart(uiState.books.size)
     }
 
-    // 封面预取：当前页落定后预热下一页封面进内存缓存，下次翻页
-    // EInkAsyncImage 同步命中——零占位帧、单次绘制（墨水屏上少一次
-    // 全页重绘=少一次屏幕刷新）。pageStart/pageItemCount 在协程内经
-    // snapshotFlow 读取，不扩大 Route 的重组作用域
+    // 预取所需 Context 与 Density（Route 作用域取一次，effect 内不重复解析）
     val prefetchContext = LocalContext.current
     val prefetchDensity = LocalDensity.current
 

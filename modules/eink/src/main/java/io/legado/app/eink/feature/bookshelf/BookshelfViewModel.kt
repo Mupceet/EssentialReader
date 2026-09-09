@@ -135,7 +135,8 @@ class BookshelfViewModel(application: Application) : AndroidViewModel(applicatio
         viewModelScope.launch(Dispatchers.IO) {
             engine.deleteBooksNotInBookshelf()
         }
-        // 布局默认值读宿主快照（首次发射，处于加载态期间，无可见切换）。
+        // 布局默认值读宿主快照（冷 Flow，首个 UiState 理论上可能先于本读取
+        // 渲染默认布局，下一帧自愈；开关与完整模式互斥，会话内不再变化）。
         // toggleGridLayout 仍为内存态覆盖，入口未开放、不接共享存储
         viewModelScope.launch {
             _isGridLayout.value = engine.style.first().isGridLayout

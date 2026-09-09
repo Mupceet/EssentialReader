@@ -248,7 +248,7 @@ private fun BookGridItem(
             )
     ) {
         // 封面占满格宽，按 View 版封面 66:90 比例定高。解码尺寸用格宽公式
-        // （[bookshelfGridCellWidth] 的同一 Dp 值）推导而非逐项
+        // （bookshelfGridCellWidth 的同一 Dp 值）推导而非逐项
         // BoxWithConstraints 实测（子组合在弱 SoC 上拖慢整页翻帧）：格宽
         // 与列数由宿主单点解析，解码尺寸与显示、预取逐字节一致，墨水屏
         // 灰阶下无重采样痕迹
