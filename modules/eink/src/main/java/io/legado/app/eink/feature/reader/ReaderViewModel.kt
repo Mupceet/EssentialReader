@@ -16,9 +16,12 @@ import io.legado.app.eink.contract.ReaderFontOption
 import io.legado.app.eink.contract.ReaderFontSelection
 import io.legado.app.eink.contract.ReaderPageSnapshot
 import io.legado.app.eink.contract.ReaderPrepareResult
+import io.legado.app.eink.contract.ReaderSelectionCommit
+import io.legado.app.eink.contract.ReaderSelectionDraft
 import io.legado.app.eink.contract.ReaderStyleCatalog
 import io.legado.app.eink.contract.ReaderStyleParamIds as Ids
 import io.legado.app.eink.contract.ReaderTextStyle
+import io.legado.app.eink.feature.reader.selection.ReaderSelectionUi
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -527,6 +530,37 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application),
                 null -> Unit
             }
         }
+    }
+
+    // ==================== 选区书签/笔记 ====================
+
+    /**
+     * 选区解析：经批注端口构造编辑弹层预填值（宿主按章节全文定位选区）。
+     * null = 端口未注册（宿主无批注能力）或选区失效（无会话书/选中文本
+     * 为空），调用方清选区并提示。
+     */
+    suspend fun resolveSelection(sel: ReaderSelectionUi): ReaderSelectionDraft? =
+        EInkEngineRegistry.selectionEngine?.resolveSelection(
+            chapterIndex = engine.currentChapterIndex,
+            start = sel.bodyStart,
+            end = sel.bodyEnd,
+            selectedText = sel.selectedText,
+        )
+
+    /** 保存书签（弹层编辑后的标题/内容；笔记备注当前链路不涉及，置空串）。 */
+    suspend fun saveBookmark(sel: ReaderSelectionUi, bookText: String, content: String): Boolean {
+        val port = EInkEngineRegistry.selectionEngine ?: return false
+        return port.saveBookmark(
+            ReaderSelectionCommit(
+                chapterIndex = engine.currentChapterIndex,
+                start = sel.bodyStart,
+                end = sel.bodyEnd,
+                selectedText = sel.selectedText,
+                bookmarkText = bookText,
+                bookmarkContent = content,
+                note = "",
+            ),
+        )
     }
 
     // ==================== 排版参数 ====================

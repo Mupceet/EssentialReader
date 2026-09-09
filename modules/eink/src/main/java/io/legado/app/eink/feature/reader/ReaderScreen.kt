@@ -71,10 +71,12 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import io.legado.app.eink.contract.EInkEngineRegistry
+import io.legado.app.eink.contract.ReaderSelectionDraft
 import io.legado.app.eink.designsystem.content.EInkText
 import io.legado.app.eink.designsystem.control.EInkDialog
 import io.legado.app.eink.designsystem.interaction.einkClickable
 import io.legado.app.eink.designsystem.theme.EInkTheme
+import io.legado.app.eink.feature.reader.selection.ReaderBookmarkEditDialog
 import io.legado.app.eink.feature.reader.selection.ReaderSelectionMenu
 import io.legado.app.eink.feature.reader.selection.ReaderSelectionMenuAction
 import io.legado.app.eink.feature.reader.selection.ReaderSelectionOverlay
@@ -104,7 +106,8 @@ private enum class ReaderStyleDialog { Fonts, Info, Margin }
  *   点击则一次性收起到干净阅读界面；
  * - 一次性消息 → Toast；
  * - 页内长按选区状态在此持有：翻页/重排（pageVersion 推进）自动清空，
- *   选择浮条「复制」直接落剪贴板；
+ *   选择浮条「复制」直接落剪贴板，「书签」经编辑弹层确认后经宿主端口
+ *   落库（失败保留弹层可重试）；
  * - 面板开关为 UI 局部状态（remember），排版数据来自 [ReaderUiState]。
  */
 @Composable
@@ -136,26 +139,49 @@ fun ReaderRoute(
         selection = null
     }
 
-    // 选择浮条动作：复制直接落剪贴板并清选区；书签/笔记弹层与落库在
-    // 后续切片接入（浮条键显隐由 selectionEngine 端口可用性决定）
+    // 书签编辑弹层状态：draft 非空即弹层打开，与 pendingSelection（发起
+    // 弹层动作的选区，确认提交用）成对置位/清空；弹层期间选区保留——
+    // 取消只关弹层，用户可再调整选区，仅保存成功才清选区（设计 §5）
+    var bookmarkDraft by remember { mutableStateOf<ReaderSelectionDraft?>(null) }
+    var pendingSelection by remember { mutableStateOf<ReaderSelectionUi?>(null) }
+    val scope = rememberCoroutineScope()
+
+    // 选择浮条动作：复制直接落剪贴板并清选区；书签经端口解析预填后弹层
+    // 编辑、确认落库；笔记弹层与落库在后续切片接入（浮条键显隐由
+    // selectionEngine 端口可用性决定）
     val clipboard = LocalClipboard.current
     val clipboardScope = rememberCoroutineScope()
-    val onSelectionMenuAction = { action: ReaderSelectionMenuAction, sel: ReaderSelectionUi ->
-        when (action) {
-            // 书签/笔记弹层在后续切片接管，先显式 no-op
-            ReaderSelectionMenuAction.BOOKMARK, ReaderSelectionMenuAction.MARKING -> Unit
-
-            ReaderSelectionMenuAction.COPY -> {
-                clipboardScope.launch {
-                    clipboard.setClipEntry(
-                        ClipEntry(ClipData.newPlainText("text", sel.selectedText))
-                    )
-                    Toast.makeText(context, "已复制", Toast.LENGTH_SHORT).show()
+    val onSelectionMenuAction: (ReaderSelectionMenuAction, ReaderSelectionUi) -> Unit =
+        { action, sel ->
+            when (action) {
+                ReaderSelectionMenuAction.BOOKMARK -> {
+                    scope.launch {
+                        val draft = viewModel.resolveSelection(sel)
+                        if (draft == null) {
+                            // 无会话书/选中文本为空：选区失效，清区提示
+                            selection = null
+                            Toast.makeText(context, "选区已失效", Toast.LENGTH_SHORT).show()
+                        } else {
+                            pendingSelection = sel
+                            bookmarkDraft = draft
+                        }
+                    }
                 }
-                selection = null
+
+                // 笔记弹层在后续切片接管，先显式 no-op
+                ReaderSelectionMenuAction.MARKING -> Unit
+
+                ReaderSelectionMenuAction.COPY -> {
+                    clipboardScope.launch {
+                        clipboard.setClipEntry(
+                            ClipEntry(ClipData.newPlainText("text", sel.selectedText))
+                        )
+                        Toast.makeText(context, "已复制", Toast.LENGTH_SHORT).show()
+                    }
+                    selection = null
+                }
             }
         }
-    }
 
     // 字体文件夹选择（SAF）：持久化读权限后交 VM 落库并刷新字体列表
     val fontFolderLauncher = rememberLauncherForActivityResult(
@@ -509,6 +535,33 @@ fun ReaderRoute(
                     style = EInkTheme.typography.bodyMedium
                 )
             }
+        }
+
+        // 书签编辑弹层：确认经端口落库（pendingSelection 现读现判，翻页
+        // 清选区后确认按失效落失败分支）；成功关弹层清选区，失败提示并
+        // 保留弹层与选区可重试或取消（设计 §5）
+        bookmarkDraft?.let { draft ->
+            ReaderBookmarkEditDialog(
+                draft = draft,
+                onDismiss = {
+                    bookmarkDraft = null
+                    pendingSelection = null
+                },
+                onConfirm = { bookText, content ->
+                    scope.launch {
+                        val sel = pendingSelection
+                        val ok = sel != null && viewModel.saveBookmark(sel, bookText, content)
+                        if (ok) {
+                            bookmarkDraft = null
+                            pendingSelection = null
+                            selection = null
+                            Toast.makeText(context, "已添加书签", Toast.LENGTH_SHORT).show()
+                        } else {
+                            Toast.makeText(context, "保存失败", Toast.LENGTH_SHORT).show()
+                        }
+                    }
+                },
+            )
         }
     }
 }
