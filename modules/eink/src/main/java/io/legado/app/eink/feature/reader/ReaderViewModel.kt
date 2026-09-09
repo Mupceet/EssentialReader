@@ -116,6 +116,14 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application),
         engine.styleCatalog() ?: FallbackReaderStyleCatalog.create()
     }
 
+    /**
+     * 批注端口可用性：决定选择浮条「书签/笔记」键显隐——未注册
+     * [EInkEngineRegistry.selectionEngine] 的宿主为合法降级态，浮条
+     * 只留复制键，长按选择与复制仍可用，不做假死路径。
+     */
+    val selectionEnabled: Boolean
+        get() = EInkEngineRegistry.selectionEngine != null
+
     private val _uiState = MutableStateFlow(
         run {
             val style = engine.currentStyle()

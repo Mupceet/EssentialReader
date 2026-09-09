@@ -91,8 +91,11 @@ private fun drawImageSlot(canvas: Canvas, slot: ReaderImageSlot, paint: Paint) {
  * 阴影/斜体等纯视觉效果不跨桥、不渲染（E-Ink 既定取舍）。API35+ 的逐字
  * 半格补偿已在映射期算进 x，画笔字距保持引擎原值（单字符 drawText 的
  * 字形行为与 View 版一致）。
+ *
+ * internal：选区覆盖层（feature/reader/selection）复用同规格画笔做
+ * 命中测试/高亮带测量，保证与正文绘制按同一字体度量。
  */
-private fun Paint.applySpec(spec: ReaderPaintSpec, colorArgb: Int) {
+internal fun Paint.applySpec(spec: ReaderPaintSpec, colorArgb: Int) {
     // 引擎 upStyle 硬编码 isAntiAlias = true，显式对齐（不依赖 Paint() 默认 flags）
     isAntiAlias = true
     color = colorArgb

@@ -1,7 +1,9 @@
 package io.legado.app.eink.feature.reader
 
 import android.app.Activity
+import android.content.ClipData
 import android.content.Intent
+import android.graphics.Paint
 import android.view.KeyEvent
 import android.view.WindowManager
 import android.widget.Toast
@@ -12,6 +14,7 @@ import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.text.BasicText
@@ -38,14 +41,21 @@ import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.ClipEntry
+import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.TextStyle
@@ -65,6 +75,17 @@ import io.legado.app.eink.designsystem.content.EInkText
 import io.legado.app.eink.designsystem.control.EInkDialog
 import io.legado.app.eink.designsystem.interaction.einkClickable
 import io.legado.app.eink.designsystem.theme.EInkTheme
+import io.legado.app.eink.feature.reader.selection.ReaderSelectionMenu
+import io.legado.app.eink.feature.reader.selection.ReaderSelectionMenuAction
+import io.legado.app.eink.feature.reader.selection.ReaderSelectionOverlay
+import io.legado.app.eink.feature.reader.selection.ReaderSelectionUi
+import io.legado.app.eink.feature.reader.selection.buildSelection
+import io.legado.app.eink.feature.reader.selection.handleAnchor
+import io.legado.app.eink.feature.reader.selection.hitTest
+import io.legado.app.eink.feature.reader.selection.moveEndpoint
+import io.legado.app.eink.feature.reader.selection.selectionRuns
+import io.legado.app.eink.feature.reader.selection.snapToWord
+import kotlinx.coroutines.launch
 
 /** 排版设置的居中弹层形态。 */
 private enum class ReaderStyleDialog { Fonts, Info, Margin }
@@ -82,6 +103,8 @@ private enum class ReaderStyleDialog { Fonts, Info, Margin }
  * - 返回键：面板 → 控件 → 退出阅读 的逐级回退；面板/弹框外空白区
  *   点击则一次性收起到干净阅读界面；
  * - 一次性消息 → Toast；
+ * - 页内长按选区状态在此持有：翻页/重排（pageVersion 推进）自动清空，
+ *   选择浮条「复制」直接落剪贴板；
  * - 面板开关为 UI 局部状态（remember），排版数据来自 [ReaderUiState]。
  */
 @Composable
@@ -104,6 +127,35 @@ fun ReaderRoute(
     var styleDialog by remember { mutableStateOf<ReaderStyleDialog?>(null) }
     // 移出书架二次确认（顶栏切换钮在架态点击只打开确认框）
     var showRemoveConfirm by remember { mutableStateOf(false) }
+
+    // 页内长按选区（Screen 无状态渲染，选区状态在此持有）：选区坐标绑定
+    // 单页快照，pageVersion 推进（翻页/重排/批注落库重绘）即自动清空，
+    // 同时承载批注保存重绘后的清区时序
+    var selection by remember { mutableStateOf<ReaderSelectionUi?>(null) }
+    LaunchedEffect(uiState.pageVersion) {
+        selection = null
+    }
+
+    // 选择浮条动作：复制直接落剪贴板并清选区；书签/笔记弹层与落库在
+    // 后续切片接入（浮条键显隐由 selectionEngine 端口可用性决定）
+    val clipboard = LocalClipboard.current
+    val clipboardScope = rememberCoroutineScope()
+    val onSelectionMenuAction = { action: ReaderSelectionMenuAction, sel: ReaderSelectionUi ->
+        when (action) {
+            // 书签/笔记弹层在后续切片接管，先显式 no-op
+            ReaderSelectionMenuAction.BOOKMARK, ReaderSelectionMenuAction.MARKING -> Unit
+
+            ReaderSelectionMenuAction.COPY -> {
+                clipboardScope.launch {
+                    clipboard.setClipEntry(
+                        ClipEntry(ClipData.newPlainText("text", sel.selectedText))
+                    )
+                    Toast.makeText(context, "已复制", Toast.LENGTH_SHORT).show()
+                }
+                selection = null
+            }
+        }
+    }
 
     // 字体文件夹选择（SAF）：持久化读权限后交 VM 落库并刷新字体列表
     val fontFolderLauncher = rememberLauncherForActivityResult(
@@ -299,6 +351,10 @@ fun ReaderRoute(
                 panel = if (toggleOff) null else target
             },
             onRetry = { viewModel.attach(bookUrl) },
+            selection = selection,
+            selectionEnabled = viewModel.selectionEnabled,
+            onSelectionChange = { selection = it },
+            onSelectionMenuAction = onSelectionMenuAction,
         )
 
         // 面板/弹框外空白区一次性收起：直接回到干净阅读界面
@@ -476,9 +532,17 @@ fun ReaderRoute(
  * 手势（规范 §16）：
  * - 操作条可见时：点/滑动正文任意处收起操作条；
  * - 操作条隐藏时：点中间 40% 唤出操作条，点其余区域下一页；
+ * - 长按正文选词（震动反馈），拖拽延伸选区末端，松手弹出浮条
+ *   （书签/笔记/复制；书签/笔记键按 [selectionEnabled] 显隐）；
+ *   选区存在期间点按先清选区再按分区执行常规行为、水平滑动不翻页，
+ *   把手拖拽调整端点（浮条随锚点重排）；
  * - 水平滑动翻页，判定对齐 View 版：触发距离读引擎 pageTouchSlop（AppConfig.pageTouchSlop 经端口）
  *   （完整版设置"翻页触发距离"，0 = 系统 slop，Compose 版只读不设），
  *   松手前反向回拖取消；无跟手移动，翻页整页立即替换。
+ *
+ * 选区状态由调用方持有（[selection] / [onSelectionChange]），翻页/重排
+ * （pageVersion 推进）清空也由调用方承担；浮条动作经 [onSelectionMenuAction]
+ * 上抛（选区随动作语义由调用方决定去留）。
  */
 @Composable
 internal fun ReaderScreen(
@@ -502,6 +566,10 @@ internal fun ReaderScreen(
     selectedPanel: ReaderPanel?,
     onOpenPanel: (ReaderPanel) -> Unit,
     onRetry: () -> Unit,
+    selection: ReaderSelectionUi?,
+    selectionEnabled: Boolean,
+    onSelectionChange: (ReaderSelectionUi?) -> Unit,
+    onSelectionMenuAction: (ReaderSelectionMenuAction, ReaderSelectionUi) -> Unit,
 ) {
     // 纯净阅读底色/字色随日/夜间主题（决策 B1/B2 修订：仍不读取
     // bgStrEInk / textColorEInk 等用户配色配置，颜色由主题统一下发）
@@ -512,6 +580,40 @@ internal fun ReaderScreen(
             .readerSystemBarInsets(state.hideStatusBar)
     ) {
         val density = LocalDensity.current
+        // ===== 长按选择手势支撑 =====
+        val haptics = LocalHapticFeedback.current
+        // pointerInput 闭包跨手势存活：page/selection 经 State 读实时值，
+        // 不以其为 pointerInput key——长按选词即改写 selection，以之为 key
+        // 会在拖拽中途重启、打断手势（覆盖层同理由，见 ReaderSelectionOverlay）
+        val currentPage by rememberUpdatedState(state.page)
+        val currentSelection by rememberUpdatedState(selection)
+        // 与页画布同规格的测量闭包（applySpec 幂等，重复设置无害）：
+        // 长按命中测试与浮条锚点按引擎同款字体度量
+        val themeForeground = EInkTheme.colorScheme.onBackground
+        val titleSpec = state.page?.titleSpec
+        val contentSpec = state.page?.contentSpec
+        val measureTitle = remember(titleSpec, themeForeground) {
+            val paint = Paint()
+            val spec = titleSpec
+            { text: String ->
+                spec?.let { paint.applySpec(it, themeForeground.toArgb()) }
+                paint.measureText(text)
+            }
+        }
+        val measureContent = remember(contentSpec, themeForeground) {
+            val paint = Paint()
+            val spec = contentSpec
+            { text: String ->
+                spec?.let { paint.applySpec(it, themeForeground.toArgb()) }
+                paint.measureText(text)
+            }
+        }
+        // 松手弹菜单：长按拖拽期间隐藏、松手展示；仅「selection 非空」参与
+        // 菜单组合，选区清空（复制/点按/翻页）后残留 true 无副作用，
+        // 下次长按选词在 onDragStart 归位 false
+        var selectionMenuVisible by remember { mutableStateOf(false) }
+        // 画布实测宽：浮条 x 钳制不越界
+        var canvasWidthPx by remember { mutableStateOf(0) }
         // 排版画布铺满整个阅读区（页眉/页脚装饰空间含在内，由宿主分页器
         // 预留——与完整模式「画布全屏 + 装饰画在预留区」同构）。页眉/页脚
         // 以宿主预留高度定高叠加在画布上，落在正文避让出的预留区内
@@ -519,13 +621,18 @@ internal fun ReaderScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .onSizeChanged { size ->
+                    canvasWidthPx = size.width
                     onContentSized(size.width, size.height)
                 }
-                .pointerInput(state.controlsVisible) {
+                .pointerInput(state.controlsVisible, selection != null) {
                         detectTapGestures { offset ->
                             if (state.controlsVisible) {
                                 onCenterTap() // 收起操作条
                                 return@detectTapGestures
+                            }
+                            if (selection != null) {
+                                // 选区存在：点按先清选区，再按分区执行常规行为
+                                onSelectionChange(null)
                             }
                             val width = size.width
                             if (offset.x in width * 0.3f..width * 0.7f) {
@@ -535,11 +642,12 @@ internal fun ReaderScreen(
                             }
                         }
                     }
-                    .pointerInput(state.controlsVisible) {
+                    .pointerInput(state.controlsVisible, selection != null) {
                         // 水平滑动翻页，判定对齐 View 版：
                         // - 触发距离 = 引擎 pageTouchSlop（px），0 = 系统 touch slop
                         //   （该 slop 已由 detectHorizontalDragGestures 消费）；
-                        // - 松手前最后一次增量与滑动方向相反则取消（等价 View 版 isCancel）。
+                        // - 松手前最后一次增量与滑动方向相反则取消（等价 View 版 isCancel）；
+                        // - 选区存在期间水平手势不翻页（端点调整只经把手拖拽）
                         var dragAccum = 0f
                         var lastDelta = 0f
                         detectHorizontalDragGestures(
@@ -550,7 +658,7 @@ internal fun ReaderScreen(
                             onDragEnd = {
                                 if (state.controlsVisible) {
                                     onCenterTap() // 收起操作条，不翻页
-                                } else {
+                                } else if (selection == null) {
                                     val slop =
                                         EInkEngineRegistry.readerEngine.pageTouchSlop.toFloat()
                                     when {
@@ -572,12 +680,94 @@ internal fun ReaderScreen(
                             if (dragAmount != 0f) lastDelta = dragAmount
                         }
                     }
+                    .pointerInput(state.controlsVisible, state.pageVersion) {
+                        // 长按选词 + 拖拽延伸：键不含 selection——长按选词即改写
+                        // 选区状态，以之为 key 会在拖拽中途重启打断手势，实时值经
+                        // rememberUpdatedState 读取。仅「本次长按新建选区」的拖拽
+                        // 延伸末端（startHit 固定）；已有选区时长按不重建，端点
+                        // 调整只经把手拖拽
+                        var dragCreatedSelection = false
+                        detectDragGesturesAfterLongPress(
+                            onDragStart = { offset ->
+                                dragCreatedSelection = false
+                                if (!state.controlsVisible && state.error == null &&
+                                    currentSelection == null
+                                ) {
+                                    val page = currentPage
+                                    if (page != null) {
+                                        val hit = hitTest(
+                                            page, offset.x, offset.y, measureContent
+                                        )
+                                        if (hit != null) {
+                                            val word = snapToWord(page, hit)
+                                            buildSelection(page, word, word)?.let { created ->
+                                                onSelectionChange(created)
+                                                selectionMenuVisible = false
+                                                haptics.performHapticFeedback(
+                                                    HapticFeedbackType.LongPress
+                                                )
+                                                dragCreatedSelection = true
+                                            }
+                                        }
+                                    }
+                                }
+                            },
+                            onDrag = { change, _ ->
+                                change.consume()
+                                val page = currentPage
+                                val sel = currentSelection
+                                if (!dragCreatedSelection || page == null || sel == null) {
+                                    return@detectDragGesturesAfterLongPress
+                                }
+                                val hit = hitTest(
+                                    page, change.position.x, change.position.y, measureContent
+                                ) ?: return@detectDragGesturesAfterLongPress
+                                onSelectionChange(moveEndpoint(page, sel, isStart = false, hit))
+                            },
+                            onDragEnd = {
+                                // 选区保留，松手弹菜单
+                                if (dragCreatedSelection) selectionMenuVisible = true
+                            },
+                            onDragCancel = {
+                                if (dragCreatedSelection) selectionMenuVisible = true
+                            },
+                        )
+                    }
             ) {
             ReaderPageSnapshotCanvas(
                 page = state.page,
                 pageVersion = state.pageVersion,
                 modifier = Modifier.fillMaxSize(),
             )
+            // 选区覆盖层：高亮带垫在页画布下方（zIndex 由覆盖层自管），
+            // 把手/指针独占在正文上方；浮条在覆盖层之上组合
+            ReaderSelectionOverlay(
+                snapshot = state.page,
+                selection = selection,
+                onSelectionChange = onSelectionChange,
+                modifier = Modifier.matchParentSize(),
+            )
+            if (selection != null && selectionMenuVisible && !state.controlsVisible) {
+                val page = state.page
+                if (page != null) {
+                    val runs = selectionRuns(page, selection, measureTitle, measureContent)
+                    val anchors = handleAnchor(runs)
+                    if (anchors != null) {
+                        ReaderSelectionMenu(
+                            anchorLeft = anchors.first.first,
+                            anchorTop = anchors.first.second,
+                            anchorRight = anchors.second.first,
+                            anchorBottom = runs.last().bottom,
+                            canvasWidth = canvasWidthPx.toFloat(),
+                            showBookmark = selectionEnabled,
+                            showMarking = selectionEnabled && !selection.includesTitle,
+                            onAction = { action ->
+                                onSelectionMenuAction(action, selection)
+                            },
+                        )
+                    }
+                }
+            }
             if (state.isLoading && state.page == null) {
                 Box(
                     modifier = Modifier.fillMaxSize(),
