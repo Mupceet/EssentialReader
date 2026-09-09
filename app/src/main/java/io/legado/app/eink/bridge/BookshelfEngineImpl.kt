@@ -6,9 +6,11 @@ import io.legado.app.data.appDb
 import io.legado.app.data.entities.Book
 import io.legado.app.data.entities.BookGroup
 import io.legado.app.data.entities.BookSource
+import io.legado.app.domain.gateway.BookshelfSettingsGateway
 import io.legado.app.domain.gateway.DownloadCacheSettingsGateway
 import io.legado.app.eink.contract.BookshelfEngine
 import io.legado.app.eink.contract.BookshelfItemUiModel
+import io.legado.app.eink.contract.BookshelfStyle
 import io.legado.app.eink.contract.BookshelfTocRefreshResult
 import io.legado.app.help.book.BookHelp
 import io.legado.app.help.book.addType
@@ -21,6 +23,7 @@ import io.legado.app.model.ReadBook
 import io.legado.app.model.webBook.WebBook
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import org.koin.core.component.KoinComponent
@@ -39,6 +42,7 @@ import kotlin.math.min
 internal object BookshelfEngineImpl : BookshelfEngine, KoinComponent {
 
     private val downloadCacheSettingsGateway: DownloadCacheSettingsGateway by inject()
+    private val bookshelfSettingsGateway: BookshelfSettingsGateway by inject()
 
     /** [Book] → [BookshelfItemUiModel]：条目渲染字段的唯一抽取点。 */
     private fun Book.toBookshelfItemUiModel() = BookshelfItemUiModel(
@@ -57,6 +61,11 @@ internal object BookshelfEngineImpl : BookshelfEngine, KoinComponent {
     override fun observeShelf(): Flow<List<BookshelfItemUiModel>> =
         appDb.bookDao.flowByGroup(BookGroup.IdAll)
             .map { books -> books.map { it.toBookshelfItemUiModel() } }
+
+    override val style: Flow<BookshelfStyle> =
+        bookshelfSettingsGateway.settings
+            .map { it.toBookshelfStyle() }
+            .distinctUntilChanged()
 
     override fun lastReadBookUrl(): String? = appDb.bookDao.lastReadBook?.bookUrl
 
