@@ -124,7 +124,9 @@ internal fun ReaderSelectionOverlay(
                         val hit = hitTest(
                             snapshot, change.position.x, change.position.y, measureContent
                         )
-                        if (sel != null && hit != null) {
+                        // sel 非空由本组合入口早退保证（selection == null 不组合），
+                        // 无需判空；hit 真可空（拖出文本区）
+                        if (hit != null) {
                             onSelectionChange(moveEndpoint(snapshot, sel, grab, hit))
                         }
                     }

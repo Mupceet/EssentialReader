@@ -102,6 +102,30 @@ class ReaderTextSelectionTest {
     }
 
     @Test
+    fun `长按选词区间闭合到完整词`() {
+        val snap = snapshot(line("hello world", positions = intArrayOf(0)))
+        // 裸长按（未拖拽）落在 "world" 中间 → 区间两端闭合到词首/词尾
+        val (wordStart, wordEnd) = snapToWordRange(snap, ReaderTextHit(0, 8))
+        assertEquals(ReaderTextHit(0, 6), wordStart)
+        assertEquals(ReaderTextHit(0, 11), wordEnd)
+        val sel = buildSelection(snap, wordStart, wordEnd)!!
+        assertEquals("world", sel.selectedText)
+        assertEquals(6, sel.bodyStart)
+        assertEquals(11, sel.bodyEnd)
+    }
+
+    @Test
+    fun `中文选词区间非退化`() {
+        val snap = snapshot(line("你好世界今天阅读", positions = intArrayOf(0)))
+        val (wordStart, wordEnd) = snapToWordRange(snap, ReaderTextHit(0, 3))
+        // 分词粒度随 ICU 词典变化，只钉非退化与包含关系：命中字符落在区间内
+        assertTrue(wordStart.charIndex <= 3 && 3 < wordEnd.charIndex)
+        assertTrue(wordStart.charIndex < wordEnd.charIndex)
+        val sel = buildSelection(snap, wordStart, wordEnd)!!
+        assertTrue(sel.selectedText.isNotEmpty())
+    }
+
+    @Test
     fun `选区几何产出逐行高亮带`() {
         val snap = snapshot(
             line("abcdef", positions = intArrayOf(0), top = 30f, bottom = 70f),

@@ -87,7 +87,7 @@ import io.legado.app.eink.feature.reader.selection.handleAnchor
 import io.legado.app.eink.feature.reader.selection.hitTest
 import io.legado.app.eink.feature.reader.selection.moveEndpoint
 import io.legado.app.eink.feature.reader.selection.selectionRuns
-import io.legado.app.eink.feature.reader.selection.snapToWord
+import io.legado.app.eink.feature.reader.selection.snapToWordRange
 import kotlinx.coroutines.launch
 
 /** 排版设置的居中弹层形态。 */
@@ -847,8 +847,12 @@ internal fun ReaderScreen(
                                             page, offset.x, offset.y, measureContent
                                         )
                                         if (hit != null) {
-                                            val word = snapToWord(page, hit)
-                                            buildSelection(page, word, word)?.let { created ->
+                                            // 词区间两端闭合：裸长按即选中完整词，
+                                            // 不产生零长度选区（复制为空/书签笔记失效）
+                                            val (wordStart, wordEnd) = snapToWordRange(
+                                                page, hit
+                                            )
+                                            buildSelection(page, wordStart, wordEnd)?.let { created ->
                                                 onSelectionChange(created)
                                                 selectionMenuVisible = false
                                                 haptics.performHapticFeedback(

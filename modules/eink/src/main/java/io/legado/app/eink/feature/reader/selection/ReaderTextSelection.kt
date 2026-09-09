@@ -152,7 +152,7 @@ fun buildSelection(
 
 /**
  * 长按选词：BreakIterator 词边界吸附（中日文逐字、拉丁按词）。
- * 吸附失败（迭代器异常等）返回原命中。
+ * 词边界退化、空文本或行不存在时返回原命中。
  */
 fun snapToWord(snapshot: ReaderPageSnapshot, hit: ReaderTextHit): ReaderTextHit {
     val line = snapshot.lines.getOrNull(hit.lineIndex) ?: return hit
@@ -172,6 +172,43 @@ fun snapToWord(snapshot: ReaderPageSnapshot, hit: ReaderTextHit): ReaderTextHit 
         wordStart = wordEnd
     }
     return hit
+}
+
+/**
+ * 长按选词的区间版本：把命中字符闭合成完整词区间（BreakIterator 词边界），
+ * 返回（词首命中, 词尾命中），供 [buildSelection] 构建非零长度选区——
+ * 裸长按（未拖拽）即选中一个词，复制/书签/笔记不再得到空文本。
+ * 命中在行尾（charIndex == 行长）时取最后一段；空文本或行不存在时
+ * 返回（原命中, 原命中）；词边界退化（空分段）时钳制出长度 1 的区间，
+ * 避免零长度选区。
+ */
+fun snapToWordRange(
+    snapshot: ReaderPageSnapshot,
+    hit: ReaderTextHit,
+): Pair<ReaderTextHit, ReaderTextHit> {
+    val line = snapshot.lines.getOrNull(hit.lineIndex) ?: return hit to hit
+    val text = lineText(line)
+    if (text.isEmpty()) return hit to hit
+    val iterator = BreakIterator.getWordInstance()
+    iterator.setText(text)
+    var wordStart = iterator.first()
+    while (wordStart != BreakIterator.DONE) {
+        val wordEnd = iterator.next()
+        if (wordEnd == BreakIterator.DONE) break
+        if (hit.charIndex in wordStart until wordEnd ||
+            (hit.charIndex >= text.length && wordEnd == text.length)
+        ) {
+            // 退化分段防御：end = wordStart + 1 钳制到行长，保证区间非空
+            val safeEnd = if (wordEnd <= wordStart) {
+                (wordStart + 1).coerceAtMost(text.length)
+            } else {
+                wordEnd
+            }
+            return hit.copy(charIndex = wordStart) to hit.copy(charIndex = safeEnd)
+        }
+        wordStart = wordEnd
+    }
+    return hit to hit
 }
 
 /** 逐行选区高亮带（行盒为高、字符前缀宽为横向）。 */
