@@ -12,8 +12,8 @@ import java.lang.reflect.Proxy
 
 /**
  * 引擎端口注册表（service locator）：未注册访问抛指名异常、install
- * 后端口可达、重复 install 整体替换（keyEventHub 一并重置）、更新端口
- * 可选缺席。
+ * 后端口可达、重复 install 整体替换（keyEventHub 一并重置）、可选端口
+ * （更新/选区）未注册为 null。
  *
  * 端口桩经 JDK 动态代理生成（install 只存引用不调方法，桩方法返回
  * null 即可），避免为 8 个接口手写假实现。
@@ -43,6 +43,11 @@ class EInkEngineRegistryTest {
                 assertTrue("异常应指名修复入口 install", e.message!!.contains("install"))
             }
         }
+    }
+
+    @Test
+    fun `aa_selectionEngine 为可选端口未注册返回 null`() {
+        assertNull(EInkEngineRegistry.selectionEngine)
     }
 
     @Test
