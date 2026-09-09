@@ -42,6 +42,7 @@ import io.legado.app.eink.feature.bookshelf.BookshelfScreen
 import io.legado.app.eink.feature.bookshelf.BookshelfViewModel
 import io.legado.app.eink.feature.bookshelf.adaptiveGridColumns
 import io.legado.app.eink.feature.bookshelf.bookshelfGridCellWidth
+import io.legado.app.eink.feature.bookshelf.bookshelfListRowHeight
 import io.legado.app.eink.feature.common.EInkCoverHeight
 import io.legado.app.eink.feature.common.EInkCoverWidth
 import io.legado.app.eink.feature.common.coverTargetSizePx
@@ -78,8 +79,8 @@ private val HomeTabIcons = listOf(
  * 书架布局默认网格、由 [BookshelfUiState.isGridLayout] 驱动，列表与网格
  * 各持一套固定页分页状态（[rememberEInkListPagerState] /
  * [rememberEInkGridPagerState]），经 [EInkPageController] 统一驱动
- * 底部操作栏翻页与页首对齐。orientation 为分页状态几何键：旋转后分页
- * 状态重建、页首回第一页。
+ * 底部操作栏翻页与页首对齐。orientation 与书架列表行高为分页几何键：
+ * 旋转或字体缩放改变行高后，分页状态重建、页首回第一页并重新实测页项数。
  */
 @Composable
 fun HomeRoute(
@@ -101,9 +102,24 @@ fun HomeRoute(
     // 仅切换 UI 局部状态（当前 Tab），按 UDF 约定保留在 composable
     var selectedTab by rememberSaveable { mutableIntStateOf(HomeTabs.BOOKSHELF) }
 
+    // 列表封面尺寸单点解析（同网格格宽约定：显示与预取共用同一 Dp 值，
+    // 封面缓存键逐字节一致）：行高取基础封面高与字体缩放下文字实需高的
+    // 较大值（bookshelfListRowHeight KDoc），宽按 66:90 等比随行高伸缩
+    val typography = EInkTheme.typography
+    val listCoverHeight = bookshelfListRowHeight(
+        density = LocalDensity.current,
+        titleLineHeight = typography.titleMedium.lineHeight,
+        authorLineHeight = typography.bodySmall.lineHeight,
+        chapterLineHeight = typography.labelMedium.lineHeight,
+        showLatestChapter = uiState.style.showLatestChapter
+    )
+    val listCoverWidth = listCoverHeight * (EInkCoverWidth / EInkCoverHeight)
+
     // 书架固定页分页：首次布局测出一页项数，之后按该项数整页跳转；
-    // 列表与网格各一套状态，切换布局后各自停在离开时的页
-    val listPager = rememberEInkListPagerState(orientation)
+    // 列表与网格各一套状态，切换布局后各自停在离开时的页。
+    // 行高是列表分页几何键（行高随字体缩放伸缩，不再恒定）：改变后
+    // 分页状态重建、页首回第一页并按新行高重新实测页项数
+    val listPager = rememberEInkListPagerState(orientation, listCoverHeight)
     val gridPager = rememberEInkGridPagerState(orientation)
     val pager: EInkPageController = if (uiState.isGridLayout) gridPager else listPager
     // 「我的」页独立分页状态（条目整页翻页，对齐书架约定；行高与方向
@@ -184,12 +200,13 @@ fun HomeRoute(
         val gridColumns = adaptiveGridColumns(maxWidth, uiState.style.gridCoverWidth.dp)
         val gridCellWidth = bookshelfGridCellWidth(maxWidth, gridColumns)
 
-        // 封面预取：当前页落定后预热下一页封面进内存缓存。加格宽键：
-        // 列数/屏宽变化时按新尺寸重新预热
-        LaunchedEffect(uiState.books, uiState.isGridLayout, gridCellWidth) {
+        // 封面预取：当前页落定后预热下一页封面进内存缓存。加格宽/列表
+        // 行高键：列数/屏宽/字体缩放变化时按新尺寸重新预热
+        LaunchedEffect(uiState.books, uiState.isGridLayout, gridCellWidth, listCoverHeight) {
             val activePager = if (uiState.isGridLayout) gridPager else listPager
-            // 与显示严格同源：网格用 bookshelfGridCellWidth 的同一 Dp 值
-            //（coverTargetSizePx 单点换算），预取键与显示键逐字节一致
+            // 与显示严格同源：网格用 bookshelfGridCellWidth、列表用
+            // bookshelfListRowHeight 的同一 Dp 值（coverTargetSizePx 单点
+            // 换算），预取键与显示键逐字节一致
             val (coverWidthPx, coverHeightPx) = if (uiState.isGridLayout) {
                 coverTargetSizePx(
                     gridCellWidth,
@@ -197,7 +214,7 @@ fun HomeRoute(
                     prefetchDensity
                 )
             } else {
-                coverTargetSizePx(EInkCoverWidth, EInkCoverHeight, prefetchDensity)
+                coverTargetSizePx(listCoverWidth, listCoverHeight, prefetchDensity)
             }
             snapshotFlow { activePager.pageStart to activePager.pageItemCount }
                 .collect { page ->
@@ -231,6 +248,8 @@ fun HomeRoute(
                     state = uiState,
                     gridCellWidth = gridCellWidth,
                     gridColumns = gridColumns,
+                    listCoverWidth = listCoverWidth,
+                    listCoverHeight = listCoverHeight,
                     onBookClick = onBookClick,
                     onBookLongClick = onBookLongClick,
                     listState = listPager.listState,

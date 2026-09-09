@@ -32,12 +32,15 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import io.legado.app.eink.R
 import io.legado.app.eink.contract.BookshelfItemUiModel
 import io.legado.app.eink.contract.BookshelfStyle
 import io.legado.app.eink.designsystem.content.EInkInfoRow
+import io.legado.app.eink.designsystem.content.EInkInfoRowIconSize
 import io.legado.app.eink.designsystem.content.EInkLoading
 import io.legado.app.eink.designsystem.content.EInkText
 import io.legado.app.eink.designsystem.pager.EInkPageSwipe
@@ -47,6 +50,7 @@ import io.legado.app.eink.designsystem.theme.EInkTheme
 import io.legado.app.eink.feature.common.EInkBookCover
 import io.legado.app.eink.feature.common.EInkCoverHeight
 import io.legado.app.eink.feature.common.EInkCoverWidth
+import io.legado.app.eink.feature.common.EInkListCoverHeight
 
 /**
  * 网格格宽：可用宽扣除左右内容边距（各 [EInkSpacing.m]）与列间距
@@ -72,6 +76,46 @@ internal fun adaptiveGridColumns(availableWidth: Dp, minCellWidth: Dp): Int {
 }
 
 /**
+ * 列表行高单点解析（列表模式对应网格的 [bookshelfGridCellWidth]）：
+ * 取「基础封面高 [EInkListCoverHeight]」与「worst-case 文字实需高」
+ * 的较大值——标题行 + 作者行 + 当前进度行（[showLatestChapter] 时
+ * 再加最新章节行）逐行累加，信息行高为 max(图标 [EInkInfoRowIconSize]，
+ * 文字行高)。
+ *
+ * 字体缩放只放大 sp、不改 dp：行高钉死常量时，放大文字即被竖向截断
+ * （钉死 90dp 时按系统非线性缩放曲线约 1.35x 起四行实需超出内容框，
+ * 1.6x 达约 102dp）。行高随缩放伸缩后，与文字列等高的封面一并放大；
+ * 列内 xxs 垂直内边距（2dp×2）由基础封面高 120dp 的余量吸收——注意
+ * Android 的 sp→dp 走非线性曲线（Compose 复刻系统查表插值，fontScale
+ * ≥ 1.03 生效），不是线性放大，换算必须经真实 [Density]（同宿主），
+ * 不可线性外推。
+ *
+ * 所有条目共用同一行高（不逐条实测）：固定页项数分页
+ * （EInkListPagerState）依赖条目等高保证"页内项全部完整展示"，逐条
+ * 高度会重新引入半截条目。行高直接决定封面解码尺寸与内存缓存键——
+ * 显示与预取必须共用同一解析值（同 [bookshelfGridCellWidth]，宿主
+ * 单点解析后下发），并作为列表分页状态的几何键（行高变化后分页
+ * 重建重测）。
+ *
+ * 纯函数不读主题：typography 经 CompositionLocal 下发、组合外不可用，
+ * 三种行高由调用方（HomeRoute 组合内）传入。
+ */
+internal fun bookshelfListRowHeight(
+    density: Density,
+    titleLineHeight: TextUnit,
+    authorLineHeight: TextUnit,
+    chapterLineHeight: TextUnit,
+    showLatestChapter: Boolean,
+): Dp = with(density) {
+    val titleHeight = titleLineHeight.toDp()
+    val authorRowHeight = maxOf(EInkInfoRowIconSize, authorLineHeight.toDp())
+    val chapterRowHeight = maxOf(EInkInfoRowIconSize, chapterLineHeight.toDp())
+    val textHeight = titleHeight + authorRowHeight + chapterRowHeight +
+        if (showLatestChapter) chapterRowHeight else 0.dp
+    maxOf(EInkListCoverHeight, textHeight)
+}
+
+/**
  * 无状态书架列表 Screen — 纯渲染。
  *
  * 由首页（home/HomeRoute）承载：顶部搜索框与底部操作栏在外层，
@@ -92,7 +136,10 @@ internal fun adaptiveGridColumns(availableWidth: Dp, minCellWidth: Dp): Int {
  * 切换入口在首页顶栏，切换经 VM 乐观更新并反向写宿主竖屏键）：
  * 网格模式条目为 封面 + 未读角标 + 书名（对齐 View 版 item_bookshelf_grid），
  * 列数按封面宽自适应推导（adaptiveGridColumns）（GridCells.Fixed，格宽
- * [bookshelfGridCellWidth] 均分）。两种模式同为
+ * [bookshelfGridCellWidth] 均分）；列表模式条目为 封面 + 四行信息
+ * （对齐 View 版 item_bookshelf_list），行高由宿主按字体缩放单点解析
+ * （[bookshelfListRowHeight]），封面与文字列等高、全部条目同一行高
+ * （固定页项数分页的等高前提）。两种模式同为
  * E-Ink 分页模式（禁自由滚动，整页翻页），[listState]/[gridState]
  * 均由外层提升供首页底部操作栏驱动。
  */
@@ -101,6 +148,8 @@ fun BookshelfScreen(
     state: BookshelfUiState,
     gridCellWidth: Dp,
     gridColumns: Int,
+    listCoverWidth: Dp,
+    listCoverHeight: Dp,
     onBookClick: (String) -> Unit,
     onBookLongClick: (BookshelfItemUiModel) -> Unit,
     listState: LazyListState = rememberLazyListState(),
@@ -129,6 +178,8 @@ fun BookshelfScreen(
                 books = state.books,
                 updatingBookUrls = state.updatingBookUrls,
                 style = state.style,
+                listCoverWidth = listCoverWidth,
+                listCoverHeight = listCoverHeight,
                 onBookClick = onBookClick,
                 onBookLongClick = onBookLongClick,
                 listState = listState,
@@ -144,6 +195,8 @@ private fun BookList(
     books: List<BookshelfItemUiModel>,
     updatingBookUrls: Set<String>,
     style: BookshelfStyle,
+    listCoverWidth: Dp,
+    listCoverHeight: Dp,
     onBookClick: (String) -> Unit,
     onBookLongClick: (BookshelfItemUiModel) -> Unit,
     listState: LazyListState,
@@ -173,6 +226,8 @@ private fun BookList(
             BookListItem(
                 book = book,
                 style = style,
+                listCoverWidth = listCoverWidth,
+                listCoverHeight = listCoverHeight,
                 isUpdating = updatingBookUrls.contains(book.bookUrl),
                 onBookClick = onBookClick,
                 onBookLongClick = onBookLongClick
@@ -317,11 +372,22 @@ private fun BookGridItem(
     }
 }
 
+/**
+ * 书架列表条目：封面 + 标题/角标 + 作者 + 当前进度 + 最新章节，对齐
+ * View 版 item_bookshelf_list 的组成。
+ *
+ * 封面与文字列等高、全部条目同一行高（[bookshelfListRowHeight] 解析，
+ * 宿主单点下发）：等高是固定页项数分页"页内项全部完整展示"的前提；
+ * 行距固定 xs、整组纵向居中，行数不足的条目（无进度/未开最新章节）
+ * 整组居中、仍占满行高。
+ */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun BookListItem(
     book: BookshelfItemUiModel,
     style: BookshelfStyle,
+    listCoverWidth: Dp,
+    listCoverHeight: Dp,
     isUpdating: Boolean,
     onBookClick: (String) -> Unit,
     onBookLongClick: (BookshelfItemUiModel) -> Unit
@@ -336,23 +402,33 @@ private fun BookListItem(
             )
             .padding(horizontal = EInkSpacing.m, vertical = EInkSpacing.s)
     ) {
+        // 解码目标尺寸（width/height 参数）与显示尺寸（modifier）同源：
+        // 内存缓存键带尺寸，与预取逐字节一致（EInkBookCover KDoc）
         EInkBookCover(
             url = book.coverUrl,
             name = book.name,
             author = book.displayAuthor,
             sourceOrigin = book.origin,
             modifier = Modifier
-                .width(EInkCoverWidth)
-                .height(EInkCoverHeight)
+                .width(listCoverWidth)
+                .height(listCoverHeight),
+            width = listCoverWidth,
+            height = listCoverHeight
         )
         Spacer(modifier = Modifier.width(EInkSpacing.m))
         Column(
             modifier = Modifier
                 .weight(1f)
-                // 与封面等高，四行信息间距平均分布
-                .height(EInkCoverHeight)
+                // 与封面等高；行距固定 xs、整组纵向居中——SpaceBetween 会把
+                // 120dp 行高的余量全摊进行距（默认倍率下约 13dp），视觉过空；
+                // 收紧后 1.6x 曲线实需 ~101.6dp + 3×xs 仍在 116dp 内容框内
+                //（行距若取 s=8dp，1.6x 四行 worst case 溢出重新截断，不可）
+                .height(listCoverHeight)
                 .padding(vertical = EInkSpacing.xxs),
-            verticalArrangement = Arrangement.SpaceBetween
+            verticalArrangement = Arrangement.spacedBy(
+                EInkSpacing.xs,
+                Alignment.CenterVertically
+            )
         ) {
             // 书名行：标题占满剩余宽度，角标只与标题同一行
             Row(verticalAlignment = Alignment.CenterVertically) {

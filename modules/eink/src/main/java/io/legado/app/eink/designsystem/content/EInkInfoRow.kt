@@ -18,8 +18,14 @@ import androidx.compose.ui.unit.dp
 import io.legado.app.eink.designsystem.theme.EInkSpacing
 import io.legado.app.eink.designsystem.theme.EInkTheme
 
-/** 信息行图标尺寸（同 View 版 @dimen/desc_icon_size = 18dp）。 */
-private val DescIconSize = 18.dp
+/**
+ * 信息行图标尺寸（同 View 版 @dimen/desc_icon_size = 18dp）。
+ *
+ * 行高 = max(本值, 文字行高)——文字缩放（sp）超过图标（dp）后行高由
+ * 文字主导；书架列表行高解析（bookshelfListRowHeight）按同一公式计入，
+ * 故 internal 跨包消费，避免常量复制后静默失同步。
+ */
+internal val EInkInfoRowIconSize = 18.dp
 
 /**
  * 图标 + 文字信息行：书架/搜索/详情列表项共用的元信息行，
@@ -44,7 +50,7 @@ fun EInkInfoRow(
         Image(
             painter = painterResource(iconRes),
             contentDescription = null,
-            modifier = Modifier.size(DescIconSize),
+            modifier = Modifier.size(EInkInfoRowIconSize),
             colorFilter = iconTint
         )
         Spacer(modifier = Modifier.width(EInkSpacing.xs))

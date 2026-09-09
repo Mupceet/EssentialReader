@@ -33,6 +33,14 @@ val EInkCoverWidth = 66.dp
 val EInkCoverHeight = 90.dp
 
 /**
+ * 列表模式封面基准高：66×90 在列表模式下观感偏小，2026-09 由用户决策
+ * 抬至 120dp（默认字体倍率下的下限）；宽度由调用方按 66:90 比例推导
+ * （120 × 66/90 = 88dp）。仅书架列表消费：网格模式只用 66:90 比例、
+ * 搜索结果维持 66×90 不变。
+ */
+val EInkListCoverHeight = 120.dp
+
+/**
  * 封面目标像素尺寸（Dp → px 向下取整）。
  *
  * 单点换算供三处共用：显示（[EInkBookCover]）、预取（[prefetchCovers]）、
