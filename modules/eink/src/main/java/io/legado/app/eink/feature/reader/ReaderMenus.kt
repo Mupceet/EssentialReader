@@ -164,7 +164,7 @@ internal fun ReaderBottomBar(
                 onClick = { onOpenPanel(ReaderPanel.PROGRESS) },
             )
             BottomIconAction(
-                iconRes = R.drawable.eink_ic_interface_setting,
+                iconRes = R.drawable.eink_ic_typography,
                 contentDescription = "排版",
                 selected = selectedPanel == ReaderPanel.LAYOUT,
                 onClick = { onOpenPanel(ReaderPanel.LAYOUT) },
