@@ -162,10 +162,6 @@ class BookshelfViewModel(application: Application) : AndroidViewModel(applicatio
             benchReset()
             _isRefreshing.value = true
             _updatingUrls.value = emptySet()
-            // 接管预缓存泵的刷新态读取器：上一轮泵可能仍在消费旧队列
-            //（泵在进程级作用域，或由已销毁的书架 VM 启动），目录优先
-            // 要求本轮刷新期间暂停它。
-            CacheBookPump.updateRefreshState { refreshJob?.isActive == true }
             try {
                 val books = engine.updatableBooks()
                 val concurrency = min(settings.threadCount, MAX_REFRESH_CONCURRENCY)
@@ -186,9 +182,9 @@ class BookshelfViewModel(application: Application) : AndroidViewModel(applicatio
                         "EInk refresh end elapsedMs=${SystemClock.elapsedRealtime() - benchStart} " +
                                 "ok=${benchOk.get()} err=${benchErr.get()} peakInFlight=$benchPeak"
                     )
-                    // 无论正常完成还是被取消/失败，都触发预缓存泵处理已
-                    // 入队章节；泵在进程级作用域运行（CacheBookPump），
-                    // 本 VM 随后销毁也不影响其继续消费。
+                    // 兜底触发预缓存泵：刷新被取消时，最后一批入队可能
+                    // 落在逐书触发之后；泵幂等复用，重复触发无代价。泵在
+                    // 进程级作用域运行，本 VM 随后销毁也不影响其继续消费。
                     startCacheBook()
                 }
             }
@@ -196,19 +192,20 @@ class BookshelfViewModel(application: Application) : AndroidViewModel(applicatio
     }
 
     /**
-     * 触发预缓存泵（对齐 View 版 `MainViewModel.cacheBook`）：消费宿主
-     * 入队的章节，已缓存跳过、失败重试 3 次。目录刷新进行中暂停泵
-     * （目录优先，对齐 View 版 workingState 联动）。
+     * 触发预缓存泵（消费逻辑对齐 View 版 `MainViewModel.cacheBook`）：
+     * 消费宿主入队的章节，已缓存跳过、失败重试 3 次。
      *
-     * 泵曾运行在本 VM 的 viewModelScope：VM 随进入阅读页销毁，已入队
-     * 章节便无人消费，直到阅读页懒加载才恢复下载。现改由进程级
-     * [CacheBookPump] 承载，本方法只做门槛判断与触发。View 版的
+     * 与 View 版的调度差异：不整轮刷新结束后才启动，也不在刷新期间
+     * 暂停——原「目录优先」会让多书刷新的几分钟里一章不下，而目录刷新
+     * 与章节下载并发额度分离（threadCount vs cacheBookThreadCount），
+     * 且均为挂起式网络请求，可安全并行。泵随每本书入队触发（见
+     * [updateToc]），此处亦为刷新结束/取消的兜底。View 版的
      * CacheBookService 前台服务判断省略——E-Ink 模式与完整模式互斥
      * （切换即 CLEAR_TASK），服务不会并行运行。
      */
     private fun startCacheBook() {
         if (settings.preDownloadChapterCount == 0) return
-        CacheBookPump.start(engine) { refreshJob?.isActive == true }
+        CacheBookPump.start(engine)
     }
 
     /**
@@ -228,6 +225,11 @@ class BookshelfViewModel(application: Application) : AndroidViewModel(applicatio
                 BookshelfTocRefreshResult.NO_BOOK -> "noBook"
                 BookshelfTocRefreshResult.NO_SOURCE -> "noSource"
                 BookshelfTocRefreshResult.ERROR -> "error"
+            }
+            if (benchResult == "ok") {
+                // 该书预缓存已在宿主入队，立即触发泵消费，不等整轮刷新
+                // 结束（泵幂等复用，逐书触发无重复代价）
+                startCacheBook()
             }
         } finally {
             benchInFlight.decrementAndGet()
