@@ -88,8 +88,8 @@ internal fun adaptiveGridColumns(availableWidth: Dp, minCellWidth: Dp): Int {
  * 列表项遵循规范 §41: title + secondary text + metadata + divider：
  * 点击进阅读，长按进详情（对齐 View 版书架交互）。
  *
- * 布局模式由 [BookshelfUiState.isGridLayout] 驱动（默认网格；切换入口
- * 暂不开放，布局态仅 VM 存续期有效）：
+ * 布局模式由 [BookshelfUiState.isGridLayout] 驱动（初始值读宿主快照；
+ * 切换入口在首页顶栏，切换经 VM 乐观更新并反向写宿主竖屏键）：
  * 网格模式条目为 封面 + 未读角标 + 书名（对齐 View 版 item_bookshelf_grid），
  * 列数按封面宽自适应推导（adaptiveGridColumns）（GridCells.Fixed，格宽
  * [bookshelfGridCellWidth] 均分）。两种模式同为
