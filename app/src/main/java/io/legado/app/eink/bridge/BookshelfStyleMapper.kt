@@ -17,9 +17,18 @@ internal fun BookshelfSettings.toBookshelfStyle(): BookshelfStyle = BookshelfSty
     showLatestChapter = bookshelfShowLatestChapter,
     isGridLayout = bookshelfLayoutModePortrait != 0,
     gridCoverWidth = if (bookshelfGridCoverWidth <= 0) 120 else bookshelfGridCoverWidth,
-    titleMaxLines = bookshelfTitleMaxLines.coerceIn(1, 5),
+    titleMaxLines = if (bookshelfTitleMaxLines in 1..5) bookshelfTitleMaxLines else 2,
 )
 
-/** 布局切换的反向写投影：1 = 网格、0 = 列表（只动竖屏键）。 */
-internal fun BookshelfSettings.withGridLayout(grid: Boolean): BookshelfSettings =
-    copy(bookshelfLayoutModePortrait = if (grid) 1 else 0)
+/**
+ * 样式快照反向写投影（setStyle 唯一消费点）：六键一次原子 copy，
+ * 非本通道键（排序/横屏等）由调用方 update 语义保持原值。
+ */
+internal fun BookshelfSettings.withStyleProjection(style: BookshelfStyle): BookshelfSettings = copy(
+    showUnread = style.showUnreadBadge,
+    showUnreadNew = style.highlightNewChapter,
+    bookshelfShowLatestChapter = style.showLatestChapter,
+    bookshelfLayoutModePortrait = if (style.isGridLayout) 1 else 0,
+    bookshelfGridCoverWidth = style.gridCoverWidth,
+    bookshelfTitleMaxLines = style.titleMaxLines,
+)

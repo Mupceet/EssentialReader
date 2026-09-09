@@ -9,8 +9,8 @@ import org.junit.Test
 
 /**
  * BookshelfSettings → BookshelfStyle 策划投影逐字段验证（设计 §4/§5）：
- * 投影键的对应关系、布局模式 0/非 0 语义、gridCoverWidth 非法值钳制、
- * 布局切换反向写投影。
+ * 投影键的对应关系、布局模式 0/非 0 语义、gridCoverWidth/titleMaxLines
+ * 非法值回落、样式快照反向写投影六键。
  */
 class BookshelfStyleMapperTest {
 
@@ -46,9 +46,35 @@ class BookshelfStyleMapperTest {
     }
 
     @Test
-    fun `标题最大行数越界钳制到 1 到 5`() {
-        assertEquals(1, BookshelfSettings(bookshelfTitleMaxLines = 0).toBookshelfStyle().titleMaxLines)
-        assertEquals(5, BookshelfSettings(bookshelfTitleMaxLines = 6).toBookshelfStyle().titleMaxLines)
+    fun `标题行数越界回落 2`() {
+        assertEquals(2, BookshelfSettings(bookshelfTitleMaxLines = 0).toBookshelfStyle().titleMaxLines)
+        assertEquals(2, BookshelfSettings(bookshelfTitleMaxLines = 6).toBookshelfStyle().titleMaxLines)
+    }
+
+    @Test
+    fun `样式快照反向写投影六键`() {
+        val style = BookshelfStyle(
+            showUnreadBadge = false,
+            highlightNewChapter = false,
+            showLatestChapter = false,
+            isGridLayout = false,
+            gridCoverWidth = 88,
+            titleMaxLines = 3,
+        )
+        val settings = BookshelfSettings(
+            bookshelfSort = 2,
+            bookshelfLayoutModeLandscape = 1,
+        ).withStyleProjection(style)
+
+        assertFalse(settings.showUnread)
+        assertFalse(settings.showUnreadNew)
+        assertFalse(settings.bookshelfShowLatestChapter)
+        assertEquals(0, settings.bookshelfLayoutModePortrait)
+        assertEquals(88, settings.bookshelfGridCoverWidth)
+        assertEquals(3, settings.bookshelfTitleMaxLines)
+        // 非本通道键不受影响：排序键与横屏键保持原值
+        assertEquals(2, settings.bookshelfSort)
+        assertEquals(1, settings.bookshelfLayoutModeLandscape)
     }
 
     @Test
@@ -68,14 +94,5 @@ class BookshelfStyleMapperTest {
     fun `默认设置投影等于契约默认快照`() {
         val style = BookshelfSettings().toBookshelfStyle()
         assertEquals(BookshelfStyle(), style)
-    }
-
-    @Test
-    fun `布局切换反向写只动竖屏键`() {
-        val base = BookshelfSettings(bookshelfSort = 2, bookshelfLayoutModePortrait = 1)
-        val toList = base.withGridLayout(false)
-        assertEquals(0, toList.bookshelfLayoutModePortrait)
-        assertEquals(2, toList.bookshelfSort)
-        assertEquals(1, base.withGridLayout(true).bookshelfLayoutModePortrait)
     }
 }

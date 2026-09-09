@@ -82,14 +82,22 @@ class BookshelfViewModel(application: Application) : AndroidViewModel(applicatio
     // 经 [toggleLayout] 乐观更新并反向写宿主竖屏键
     private val _isGridLayout = MutableStateFlow(true)
 
+    // 乐观覆盖层：提交样式先行置非空，宿主快照追平（同值）后由 init
+    // 收集器清除，避免落库完成与快照流发射之间的空窗回跳
+    private val _styleOverride = MutableStateFlow<BookshelfStyle?>(null)
+
     // notShelf 行已在宿主查询内过滤，并由宿主物理删除；此处
     // 直接使用查询结果，与 View 版保持一致。
     // UiModel 映射放在宿主 bridge：只在 Room 发射（books 表变化）时执行
     // 一次，刷新期间 updatingUrls 频繁翻转时 combine 复用缓存的最新列表。
+    // 样式双流（快照 + 乐观覆盖）先归一再并入 UiState：kotlinx combine
+    // 类型化重载至多 5 流，覆盖非空时优先于快照。
     val uiState: StateFlow<BookshelfUiState> =
         combine(
             engine.observeShelf(),
-            engine.style,
+            combine(engine.style, _styleOverride) { snapshot, styleOverride ->
+                styleOverride ?: snapshot
+            },
             _isRefreshing,
             _updatingUrls,
             _isGridLayout
@@ -105,13 +113,21 @@ class BookshelfViewModel(application: Application) : AndroidViewModel(applicatio
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), BookshelfUiState())
 
     /**
-     * 切换书架布局：乐观更新本地态，再反向写宿主竖屏键
-     * （[BookshelfEngine.setGridLayout]）；写入后快照重发同值，无回跳。
+     * 切换书架布局：乐观更新，经 [setStyle] 反向写宿主竖屏键。
      */
     fun toggleLayout() {
         val target = !_isGridLayout.value
         _isGridLayout.value = target
-        viewModelScope.launch { engine.setGridLayout(target) }
+        updateStyle(uiState.value.style.copy(isGridLayout = target))
+    }
+
+    /**
+     * 提交书架样式（个性化配置面板写入口）：乐观置覆盖层，落库后由
+     * 快照流追平清除。
+     */
+    fun updateStyle(style: BookshelfStyle) {
+        _styleOverride.value = style
+        viewModelScope.launch { engine.setStyle(style) }
     }
 
     private var refreshJob: Job? = null
@@ -144,8 +160,15 @@ class BookshelfViewModel(application: Application) : AndroidViewModel(applicatio
         // 渲染默认布局，下一帧自愈；开关与完整模式互斥，会话内不再变化）。
         // 切换的持久化经 [toggleLayout] 反向写宿主后由 style 重发同值快照，
         // 本读取只负责启动种子
+        val styleFlow = engine.style
         viewModelScope.launch {
-            _isGridLayout.value = engine.style.first().isGridLayout
+            _isGridLayout.value = styleFlow.first().isGridLayout
+        }
+        // 乐观覆盖在宿主快照追平后清除，避免落库完成与流发射之间的空窗回跳
+        viewModelScope.launch {
+            styleFlow.collect { snapshot ->
+                if (_styleOverride.value == snapshot) _styleOverride.value = null
+            }
         }
         // 与 View 版 MainActivity 自动刷新一致：仅在设置开启时，
         // 进入首页延迟 1 秒自动刷新一次；ViewModel 常驻，

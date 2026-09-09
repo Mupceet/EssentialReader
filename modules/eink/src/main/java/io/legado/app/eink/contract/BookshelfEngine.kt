@@ -56,14 +56,15 @@ interface BookshelfEngine {
     val style: Flow<BookshelfStyle>
 
     /**
-     * 切换书架布局并同步宿主（首页顶栏切换按钮的反向写通道）。
+     * 提交书架显示样式（个性化配置面板的唯一写通道）。
      *
-     * 写宿主 `bookshelfLayoutModePortrait`（1 = 网格、0 = 列表）——只写
-     * 竖屏键，横屏键不动（E-Ink 按竖屏形态设计）。宿主实现经设置网关
-     * 原子 update 落库，返回即落库完成；写入成功后 [style] 重发新快照。
-     * 模块 UI 乐观更新，不等待本方法返回。
+     * 模块传改后完整快照，宿主经设置网关一次原子 update 写六键
+     * （showUnread / showUnreadNew / bookshelfShowLatestChapter /
+     * bookshelfLayoutModePortrait 竖屏键 / bookshelfGridCoverWidth /
+     * bookshelfTitleMaxLines；横屏键不动）。返回即落库完成，写入成功后
+     * [style] 重发新快照。模块 UI 乐观更新，不等待本方法返回。
      */
-    suspend fun setGridLayout(grid: Boolean)
+    suspend fun setStyle(style: BookshelfStyle)
 
     /**
      * 书架全量书籍流（全部书架分组；含展示字段映射）。书籍增删、

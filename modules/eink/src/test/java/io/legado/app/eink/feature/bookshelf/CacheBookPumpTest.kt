@@ -88,7 +88,7 @@ private class FakeEngine(gateOpen: Boolean = false) : BookshelfEngine {
 
     override val style: Flow<BookshelfStyle> = emptyFlow()
 
-    override suspend fun setGridLayout(grid: Boolean) = Unit
+    override suspend fun setStyle(style: BookshelfStyle) = Unit
 
     override fun observeShelf(): Flow<List<BookshelfItemUiModel>> = emptyFlow()
 

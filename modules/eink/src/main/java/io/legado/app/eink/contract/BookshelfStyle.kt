@@ -12,7 +12,7 @@ import io.legado.app.eink.arch.EInkImmutable
  * 映射纪律（宿主构造义务）：
  *  - 字段按模块语义命名，不照搬宿主键名；宿主键到字段的对应关系见各成员
  *    KDoc，宿主实现不得扩大或收窄语义；
- *  - [gridCoverWidth] 的非法值钳制在本层完成，模块收到的值恒可用；
+ *  - [gridCoverWidth]/[titleMaxLines] 的非法值钳制在本层完成，模块收到的值恒可用；
  *  - 快照为实时档：宿主设置变化后经 Flow 发射新值，模块组合期订阅，
  *    立即重组（与 [GlobalSettings.useDefaultCover] 的快照状态档同语义）。
  *
@@ -51,7 +51,7 @@ data class BookshelfStyle(
      * 0 = 列表、非 0 = 网格）。
      *
      * 默认值随宿主（实时档）；E-Ink 首页顶栏可切换，经
-     * [BookshelfEngine.setGridLayout] 反向写宿主竖屏键（横屏变体不投影，
+     * [BookshelfEngine.setStyle] 反向写宿主竖屏键（横屏变体不投影，
      * E-Ink 按竖屏形态设计）。
      */
     val isGridLayout: Boolean = true,
@@ -67,10 +67,11 @@ data class BookshelfStyle(
     val gridCoverWidth: Int = 120,
 
     /**
-     * 网格标题最大行数（宿主 `bookshelfTitleMaxLines`，宿主滑杆范围 1..5）。
+     * 网格标题最大行数（宿主 `bookshelfTitleMaxLines`，合法域 1..5，默认 2）。
      *
-     * 模块消费前钳制到 1..5；行数变化会改变网格条目高度，宿主/模块需
-     * 重新测量固定页分页。仅 [isGridLayout] = true 时消费。
+     * 仅网格消费：标题最小高度与 maxLines 随之伸缩，行高变化需重建网格
+     * 分页状态；E-Ink 列表标题保持单行。宿主映射义务：越界（<=0 或 >5）
+     * 回落 2。
      */
     val titleMaxLines: Int = 2,
 )
