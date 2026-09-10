@@ -19,10 +19,12 @@ import io.legado.app.help.book.ContentProcessor
 import io.legado.app.help.bookmark.MarkingExporter
 import io.legado.app.utils.GSON
 import io.legado.app.utils.fromJsonObject
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.withContext
 
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
@@ -54,7 +56,7 @@ object MarksEngineImpl : MarksEngine, KoinComponent {
                 .map { list -> list.map { it.toUiModel() } }
         }
 
-    /** 解析书 → 无书发空列表，有书接 DAO 流；书籍记录变化（换源替换）时自动重解析。 */
+    /** 解析书 → 无书发空列表，有书接 DAO 流；getBook 为一次性查询，每次重新收集才重解析书籍记录（换源替换后需重新进入页面触发新收集）。 */
     private fun <T> bookFlow(
         bookUrl: String,
         source: suspend (Book) -> Flow<List<T>>,
@@ -115,12 +117,16 @@ object MarksEngineImpl : MarksEngine, KoinComponent {
         }
     }
 
-    /** 本地重定位（对齐 ReadBookmarkNavigateDelegate.relocateMarking：仅本地已缓存章节，不发起网络）。 */
+    /**
+     * 本地重定位（对齐 ReadBookmarkNavigateDelegate.relocateMarking：仅本地已缓存章节，
+     * 不发起网络）；章节内容读取为磁盘 IO，统一切到 [Dispatchers.IO]（同
+     * [MarkingExporter.exportToUri] 先例）。
+     */
     private suspend fun relocateMarking(
         book: Book,
         chapterName: String,
         anchor: TextProcessAnchor,
-    ): RelocateMarkingTargetUseCase.Target? {
+    ): RelocateMarkingTargetUseCase.Target? = withContext(Dispatchers.IO) {
         val processor = ContentProcessor.get(book)
         val candidates = bookRepository.getChapters(book.bookUrl)
             .asSequence()
@@ -138,7 +144,7 @@ object MarksEngineImpl : MarksEngine, KoinComponent {
                 )
             }
             .toList()
-        return relocateUseCase.locate(anchor, candidates)
+        relocateUseCase.locate(anchor, candidates)
     }
 
     override suspend fun exportMarkingsMarkdown(bookUrl: String, uri: String): Boolean {

@@ -79,8 +79,9 @@ internal fun NoteScreen(
                     EInkOperationBarIcon(
                         icon = painterResource(R.drawable.eink_ic_note_export),
                         contentDescription = "导出",
-                        // 空列表/导出中不动作（canExport=false）
-                        onClick = { if (state.canExport) onExport() },
+                        // 空列表/导出中置灰不可点（设计 §5，canExport=false）
+                        enabled = state.canExport,
+                        onClick = onExport,
                     )
                 },
             )

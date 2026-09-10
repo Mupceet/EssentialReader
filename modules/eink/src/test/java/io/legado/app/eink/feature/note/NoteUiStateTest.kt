@@ -23,4 +23,14 @@ class NoteUiStateTest {
         )
         assertTrue(s.canExport)
     }
+
+    @Test
+    fun `导出中不可导出`() {
+        val s = NoteUiState(
+            isLoading = false,
+            exporting = true,
+            markings = listOf(MarkingUiModel("a", 0, "第一章", "文", "", false, 1L)),
+        )
+        assertFalse(s.canExport)
+    }
 }

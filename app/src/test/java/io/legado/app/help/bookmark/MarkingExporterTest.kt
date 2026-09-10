@@ -70,4 +70,12 @@ class MarkingExporterTest {
         val md = MarkingExporter.formatToMarkdown("书", "", listOf(marking(2, "", "文本"), bad))
         assertEquals("# 书\n\n## 第 3 章\n\n> 文本\n", md)
     }
+
+    @Test
+    fun `多行划线逐行加引用前缀`() {
+        val md = MarkingExporter.formatToMarkdown(
+            "书", "", listOf(marking(0, "", "第一行\n第二行"))
+        )
+        assertEquals("# 书\n\n## 第 1 章\n\n> 第一行\n> 第二行\n", md)
+    }
 }

@@ -55,7 +55,9 @@ interface MarksEngine {
 data class BookmarkUiModel(
     /** 书签标识（= 宿主 Bookmark.time 主键），跳转解析回传。 */
     val id: Long,
+    /** 章节下标（0-based）。 */
     val chapterIndex: Int,
+    /** 章节标题（条目次级信息）。 */
     val chapterName: String,
     /** 页面文本摘录（快速书签自动记录）。 */
     val bookText: String,
@@ -68,7 +70,9 @@ data class BookmarkUiModel(
 data class MarkingUiModel(
     /** 标记标识（= 宿主 BookMarking.id），跳转解析回传。 */
     val id: String,
+    /** 章节下标（0-based）。 */
     val chapterIndex: Int,
+    /** 章节标题（条目次级信息）。 */
     val chapterName: String,
     /** 划线选中原文。 */
     val selectedText: String,
@@ -76,6 +80,7 @@ data class MarkingUiModel(
     val note: String,
     /** true = 想法（宿主从 styleJson 推导 underlineMode == 2）。 */
     val thought: Boolean,
+    /** 创建时间戳（毫秒）。 */
     val createdAt: Long,
 )
 
@@ -85,7 +90,7 @@ sealed interface JumpResolution {
     /** 目标可靠，直接按坐标跳转。 */
     data class Located(val chapterIndex: Int, val chapterPos: Int) : JumpResolution
 
-    /** 目标存疑：模块弹「仍跳转/取消」确认；[fallback] 为存储坐标，null 时确认后仅提示不跳。 */
+    /** 目标存疑：模块弹「仍跳转/取消」确认；[fallback] 为存储坐标，null 时确认后仅关闭弹层不跳转。 */
     data class NeedConfirm(val message: String, val fallback: Located?) : JumpResolution
 
     /** 无法解析（记录不存在/数据损坏）：模块 toast [message]，不跳转。 */
@@ -97,6 +102,6 @@ sealed interface JumpResolution {
 data class PendingJumpConfirm(
     /** 展示给用户的确认文案（宿主拼装，含章节名等上下文）。 */
     val message: String,
-    /** 确认后的跳转坐标（null = 仅提示不跳）。 */
+    /** 确认后的跳转坐标（null = 确认后仅关闭弹层不跳转）。 */
     val fallback: JumpResolution.Located?,
 )
