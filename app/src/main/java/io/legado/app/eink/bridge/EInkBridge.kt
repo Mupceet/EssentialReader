@@ -46,6 +46,7 @@ object EInkBridge {
             readerEngine = ReaderEngineImpl,
             appUpdateEngine = AppUpdateEngineImpl,
             selectionEngine = ReaderSelectionEngineImpl,
+            marksEngine = MarksEngineImpl,
         )
         // 封面开关为快照状态缓存：每次进入 E-Ink 与宿主设置快照对齐，
         // 防止完整模式（或上一会话）修改后的陈旧值
