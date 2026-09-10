@@ -41,9 +41,17 @@ class ReaderSelectionEngineImplTest {
     }
 
     @Test
-    fun `eink 笔记固定实线样式`() {
-        val style = einkMarkingStyle()
+    fun `eink 划线样式为实线`() {
+        val style = einkMarkingStyle(thought = false)
         assertEquals(1, style.underlineMode)
+        assertEquals(0xFF63C37D.toInt(), style.underlineColor)
+        assertEquals(null, style.bgColor)
+    }
+
+    @Test
+    fun `eink 想法样式为虚线`() {
+        val style = einkMarkingStyle(thought = true)
+        assertEquals(2, style.underlineMode)
         assertEquals(0xFF63C37D.toInt(), style.underlineColor)
         assertEquals(null, style.bgColor)
     }

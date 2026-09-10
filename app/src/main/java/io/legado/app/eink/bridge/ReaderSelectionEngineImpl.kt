@@ -3,6 +3,8 @@ package io.legado.app.eink.bridge
 import io.legado.app.constant.AppLog
 import io.legado.app.data.entities.Bookmark
 import io.legado.app.data.repository.BookmarkRepository
+import io.legado.app.domain.gateway.BookMarkingGateway
+import io.legado.app.domain.model.TextProcessAnchor
 import io.legado.app.domain.model.TextProcessStyle
 import io.legado.app.domain.usecase.SaveMarkingUseCase
 import io.legado.app.eink.contract.ReaderMarkingDetail
@@ -10,6 +12,8 @@ import io.legado.app.eink.contract.ReaderSelectionCommit
 import io.legado.app.eink.contract.ReaderSelectionDraft
 import io.legado.app.eink.contract.ReaderSelectionEngine
 import io.legado.app.model.ReadBook
+import io.legado.app.utils.GSON
+import io.legado.app.utils.fromJsonObject
 import kotlin.coroutines.cancellation.CancellationException
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
@@ -22,11 +26,14 @@ private const val CONTEXT_SEARCH_WINDOW = 256
 private val EINK_MARKING_COLOR: Int = 0xFF63C37D.toInt()
 
 /**
- * eink 创建的笔记固定实线样式（无样式配置——既定产品决策）；颜色为宿主渲染
- * 回退默认，eink 页面按主题黑绘制。
+ * eink 笔记固定样式（无样式配置——既定产品决策）：划线实线（underlineMode=1）、
+ * 想法虚线（underlineMode=2）；颜色为宿主渲染回退默认，eink 页面按主题黑绘制。
  */
-internal fun einkMarkingStyle(): TextProcessStyle =
-    TextProcessStyle(underlineMode = 1, underlineColor = EINK_MARKING_COLOR)
+internal fun einkMarkingStyle(thought: Boolean): TextProcessStyle =
+    TextProcessStyle(
+        underlineMode = if (thought) 2 else 1,
+        underlineColor = EINK_MARKING_COLOR,
+    )
 
 /**
  * 在章节全文中定位选中文本：窗口口径基于 MarkingDelegate.selectionContext；
@@ -61,6 +68,7 @@ internal fun extractContext(content: String, start: Int, length: Int): Pair<Stri
 internal object ReaderSelectionEngineImpl : ReaderSelectionEngine, KoinComponent {
 
     private val bookmarkRepository: BookmarkRepository by inject()
+    private val bookMarkingRepository: BookMarkingGateway by inject()
     private val saveMarkingUseCase: SaveMarkingUseCase by inject()
 
     /** 当前会话章节的语义正文（章节不匹配返回 null）。 */
@@ -133,9 +141,9 @@ internal object ReaderSelectionEngineImpl : ReaderSelectionEngine, KoinComponent
                 chapterIndex = commit.chapterIndex,
                 chapterPosition = located,
                 selectedText = commit.selectedText,
-                style = einkMarkingStyle(),
+                style = einkMarkingStyle(commit.thought),
                 chapterName = displayTitle(),
-                note = commit.note,
+                note = if (commit.thought) commit.note else "",
                 contextBefore = before,
                 contextAfter = after,
             )
@@ -151,15 +159,35 @@ internal object ReaderSelectionEngineImpl : ReaderSelectionEngine, KoinComponent
         }
     }
 
-    /** Task 3 实现（v2 删除标记占位）。 */
-    override suspend fun deleteMarking(markingId: String): Boolean =
-        throw NotImplementedError("Task 3")
+    /** 按 id 删 book_marks 后触发当前章重排（新快照经 onContentUpdated 推送）。 */
+    override suspend fun deleteMarking(markingId: String): Boolean {
+        ReadBook.book ?: return false
+        return try {
+            bookMarkingRepository.delete(markingId)
+            ReaderEngineImpl.relayout()
+            true
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            AppLog.put("eink deleteMarking failed: ${e.message}", e)
+            false
+        }
+    }
 
-    /** Task 3 实现（v2 标记详情占位）。 */
-    override suspend fun findMarking(markingId: String): ReaderMarkingDetail? =
-        throw NotImplementedError("Task 3")
+    /** 按 id 读 book_marks 映射详情（只读，不触发重排）。null = 标记不存在。 */
+    override suspend fun findMarking(markingId: String): ReaderMarkingDetail? {
+        ReadBook.book ?: return null
+        val mark = bookMarkingRepository.getById(markingId) ?: return null
+        val anchor = GSON.fromJsonObject<TextProcessAnchor>(mark.anchorJson).getOrNull()
+        val style = GSON.fromJsonObject<TextProcessStyle>(mark.styleJson).getOrNull()
+        return ReaderMarkingDetail(
+            selectedText = anchor?.selectedText.orEmpty(),
+            note = mark.note,
+            thought = style?.underlineMode == 2,
+        )
+    }
 
-    /** Task 3 实现（v2 页面书签 toggle 占位）。 */
+    /** Task 8 实现（v2 页面书签 toggle 占位）。 */
     override suspend fun togglePageBookmark(): Boolean? =
-        throw NotImplementedError("Task 3")
+        throw NotImplementedError("Task 8")
 }
