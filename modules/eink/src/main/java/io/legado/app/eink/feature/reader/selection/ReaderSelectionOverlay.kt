@@ -1,6 +1,7 @@
 package io.legado.app.eink.feature.reader.selection
 
 import android.graphics.Paint
+import android.os.SystemClock
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
@@ -51,10 +52,19 @@ internal val SelectionHandleTouchRadiusDp = 28.dp
  *   下层点按/翻页/长按检测器照常工作（空白处点击 = 清选区由 Screen 承担；
  *   浮条菜单以 zIndex(2f) 组合在本层之上，把手热区不吞菜单键点击）。
  *
- * 拖拽循环内经 rememberUpdatedState 读实时把手位/选区：不以 selection 为
- * pointerInput key——每次端点替换都会触发重组，以之为 key 会在拖拽中途
- * 重启、打断手势。端点替换语义幂等（只替换一端、另一端固定），重组滞后
- * 不产生累积误差。
+ * 拖拽循环内经 rememberUpdatedState 读实时把手位/选区/页快照/测量闭包：
+ * 不以 selection/snapshot 为 pointerInput key——每次端点替换或续选会话翻页
+ * （v2 Task 8）都会触发重组，以之为 key 会在拖拽中途重启、打断手势。端点
+ * 替换语义幂等（只替换一端、另一端固定），重组滞后不产生累积误差；翻页
+ * 推进 pageVersion 后新快照经 State 实时读入，端点命中/吸附即用新页数据
+ * （指针按住跨页不中断）。
+ *
+ * 跨页续选（v2 Task 8，设计 §4）：拖拽循环内每次 move 后判翻页方向
+ * （flipDirectionForPointer——起始把手判页顶带、结束把手判页底带，越出
+ * 页缘按方向兜底），端点进带并持续按住超系统长按时值经 [onFlipRequest]
+ * 上抛一次；一次按住只触发一次，拖出触发带重新武装（FlipTrigger）。
+ * 拖拽松手经 [onHandleRelease] 上抛提交（Route 侧合成会话最终选区后走
+ * 落库 + 冻结 + 浮条链路；无会话时即提交页内选区）。
  *
  * [handlesEnabled] = false（落库冻结）时把手转只读展示：选区与把手保持
  * 绘制，但不进入抓取、不消费任何事件，按下落回下层检测器（点按照常清
@@ -67,6 +77,8 @@ internal fun ReaderSelectionOverlay(
     selection: ReaderSelectionUi?,
     handlesEnabled: Boolean,
     onSelectionChange: (ReaderSelectionUi?) -> Unit,
+    onFlipRequest: (Int) -> Unit,
+    onHandleRelease: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     if (snapshot == null || selection == null) return
@@ -98,9 +110,12 @@ internal fun ReaderSelectionOverlay(
         selectionRuns(snapshot, selection, measureTitle, measureContent)
     }
     val anchors = remember(runs) { handleAnchor(runs) }
-    // 拖拽循环内读实时值：按下时刻的把手位/选区不冻结（见类 KDoc）
+    // 拖拽循环内读实时值：按下时刻的把手位/选区/页快照/测量闭包不冻结
+    // （见类 KDoc——续选会话翻页推进 pageVersion 后新快照实时生效）
     val currentAnchors by rememberUpdatedState(anchors)
     val currentSelection by rememberUpdatedState(selection)
+    val currentSnapshot by rememberUpdatedState(snapshot)
+    val currentMeasureContent by rememberUpdatedState(measureContent)
     val currentHandlesEnabled by rememberUpdatedState(handlesEnabled)
 
     // 实线下划线预览：垫在页画布下方，与落库后的划线渲染同形（见类 KDoc）。
@@ -117,11 +132,13 @@ internal fun ReaderSelectionOverlay(
             )
         }
     }
-    // 把手 + 指针独占：按下即命中把手才消费指针，独占本次拖拽
+    // 把手 + 指针独占：按下即命中把手才消费指针，独占本次拖拽。
+    // 键为 Unit：全部实时值经 rememberUpdatedState 读取（续选会话翻页
+    // 推进 pageVersion 不重启、不打断在途拖拽，见类 KDoc）
     Canvas(
         modifier = modifier
             .zIndex(1f)
-            .pointerInput(snapshot, measureTitle, measureContent) {
+            .pointerInput(Unit) {
                 awaitEachGesture {
                     val down = awaitFirstDown(requireUnconsumed = false)
                     // 落库冻结：把手停用（只读展示），不进入抓取、不消费事件，
@@ -129,23 +146,39 @@ internal fun ReaderSelectionOverlay(
                     if (!currentHandlesEnabled) return@awaitEachGesture
                     val grab = grabHandle(currentAnchors, down.position, touchRadiusPx)
                         ?: return@awaitEachGesture
+                    // 页顶/页底按住翻页触发状态机：每次按住一个，入带计时
+                    // 超长按时值上抛一次，出带重新武装
+                    val flipTrigger = FlipTrigger(viewConfiguration.longPressTimeoutMillis)
                     while (true) {
                         val event = awaitPointerEvent()
                         val change = event.changes.firstOrNull { it.id == down.id } ?: break
                         if (!change.pressed) {
-                            // 把手上的裸点按就地消费，不外漏成「清选区」tap
+                            // 把手上的裸点按就地消费，不外漏成「清选区」tap；
+                            // 拖拽松手上抛提交链路（Route 侧会话合成，见类 KDoc）
                             change.consume()
+                            onHandleRelease()
                             break
                         }
                         change.consume()
                         val sel = currentSelection
-                        val hit = hitTest(
-                            snapshot, change.position.x, change.position.y, measureContent
-                        )
+                        val snapshotNow = currentSnapshot
+                        val hit = snapshotNow?.let {
+                            hitTest(it, change.position.x, change.position.y, currentMeasureContent)
+                        }
                         // sel 非空由本组合入口早退保证（selection == null 不组合），
-                        // 无需判空；hit 真可空（拖出文本区）
-                        if (hit != null) {
-                            onSelectionChange(moveEndpoint(snapshot, sel, grab, hit))
+                        // 无需判空；hit/snapshot 真可空（拖出文本区/页快照换页瞬间）
+                        if (snapshotNow != null && hit != null) {
+                            onSelectionChange(moveEndpoint(snapshotNow, sel, grab, hit))
+                        }
+                        // 页顶/页底按住翻页（v2 Task 8）：方向判定经指针级
+                        // 兜底（越出页缘仍视为按住触发带），计时满上抛一次
+                        if (snapshotNow != null) {
+                            val direction = flipDirectionForPointer(
+                                snapshotNow, hit, change.position.y, grab
+                            )
+                            flipTrigger.onDirection(
+                                direction, SystemClock.elapsedRealtime()
+                            )?.let(onFlipRequest)
                         }
                     }
                 }

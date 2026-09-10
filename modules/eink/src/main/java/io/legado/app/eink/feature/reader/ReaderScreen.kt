@@ -4,6 +4,7 @@ import android.app.Activity
 import android.content.ClipData
 import android.content.Intent
 import android.graphics.Paint
+import android.os.SystemClock
 import android.view.KeyEvent
 import android.view.WindowManager
 import android.widget.Toast
@@ -80,17 +81,26 @@ import io.legado.app.eink.designsystem.content.EInkText
 import io.legado.app.eink.designsystem.control.EInkDialog
 import io.legado.app.eink.designsystem.interaction.einkClickable
 import io.legado.app.eink.designsystem.theme.EInkTheme
+import io.legado.app.eink.feature.reader.selection.FlipTrigger
 import io.legado.app.eink.feature.reader.selection.ReaderSelectionMenu
 import io.legado.app.eink.feature.reader.selection.ReaderSelectionMenuAction
 import io.legado.app.eink.feature.reader.selection.ReaderSelectionOverlay
+import io.legado.app.eink.feature.reader.selection.ReaderSelectionSegment
 import io.legado.app.eink.feature.reader.selection.ReaderSelectionUi
 import io.legado.app.eink.feature.reader.selection.ReaderThoughtDialog
 import io.legado.app.eink.feature.reader.selection.ReaderThoughtMode
 import io.legado.app.eink.feature.reader.selection.buildSelection
+import io.legado.app.eink.feature.reader.selection.captureSegment
+import io.legado.app.eink.feature.reader.selection.chapterPositionOf
 import io.legado.app.eink.feature.reader.selection.findDecorationAt
+import io.legado.app.eink.feature.reader.selection.flipDirectionForPointer
+import io.legado.app.eink.feature.reader.selection.flipEdgeHit
 import io.legado.app.eink.feature.reader.selection.handleAnchor
 import io.legado.app.eink.feature.reader.selection.hitTest
+import io.legado.app.eink.feature.reader.selection.joinSegments
+import io.legado.app.eink.feature.reader.selection.mergeSegment
 import io.legado.app.eink.feature.reader.selection.moveEndpoint
+import io.legado.app.eink.feature.reader.selection.selectionFromChapterRange
 import io.legado.app.eink.feature.reader.selection.selectionOfDecoration
 import io.legado.app.eink.feature.reader.selection.selectionRuns
 import io.legado.app.eink.feature.reader.selection.snapToWordRange
@@ -124,6 +134,29 @@ private data class ReaderMarkingThought(
     val note: String,
     val selectedText: String,
     val selection: ReaderSelectionUi,
+)
+
+/**
+ * 跨页续选会话状态（v2 Task 8，设计 §3.4/§4，模块本地 UI 状态）：
+ * [ReaderSelectionUi] 不加字段——会话状态独立持有，会话进行中页变清态
+ * 效应挂起，会话结束（松手提交/清区）置 null 恢复。
+ *
+ * - [bodyStart]/[bodyEnd]：会话累计章内区间极值，min/max 单向累计——
+ *   翻页刷新窗口内旧页命中不污染极值，会话内选区只增不减；
+ * - [segments]：翻页时刻捕获的各页文本段（captureSegment；各页章内区间
+ *   天然不相交，会话内翻回已累计页的重捕由重叠覆盖合并，见 mergeSegment）；
+ * - [activeHandleIsStart]：最近一次翻页的把手侧（true = 起始把手向后
+ *   翻），翻页边吸附据此定被拖端点；
+ * - [flipArmed]：翻页请求武装位（发出即 false，无页可翻复位 true）；
+ *   手势层一次性武装由 FlipTrigger 承担，此位只做会话侧记录。
+ */
+@Stable
+private data class ReaderSelectionSessionState(
+    val bodyStart: Int,
+    val bodyEnd: Int,
+    val segments: List<ReaderSelectionSegment>,
+    val activeHandleIsStart: Boolean,
+    val flipArmed: Boolean,
 )
 
 /**
@@ -176,6 +209,11 @@ fun ReaderRoute(
     // 单页快照，pageVersion 推进（翻页/重排/批注落库重绘）即自动清空，
     // 同时承载批注保存重绘后的清区时序
     var selection by remember { mutableStateOf<ReaderSelectionUi?>(null) }
+    // 跨页续选会话（v2 Task 8，设计 §3.4/§4）：null = 无会话（单页直选
+    // 行为不变）。首次翻页请求时以当前选区极值建会话；松手提交或清区置
+    // null。会话期间 selection 语义变为「会话区间 ∩ 当前页」的页内视觉，
+    // 累计真值在会话状态里
+    var selectionSession by remember { mutableStateOf<ReaderSelectionSessionState?>(null) }
     // 落库冻结（防重复标记）：松手提交（onSelectionCommitted）发起即置 true——
     // 把手停用（调界停用），选区与浮条保持只读展示；哪怕落库失败也保持冻结
     // （失败已有 toast，再调整同样造成锚点漂移，冻结是安全侧）。页变清态
@@ -200,8 +238,47 @@ fun ReaderRoute(
     var markingThought by remember { mutableStateOf<ReaderMarkingThought?>(null) }
     // pageVersion 推进 = 选区所在内容已被替换：选区、冻结态、提交快照、
     // 想法弹层与点按浮条/浮窗一并清空，浮层随内容变化关闭，不残留幽灵
-    // 浮层（在途提交按各自现读现判护栏落失效/失败分支）
+    // 浮层（在途提交按各自现读现判护栏落失效/失败分支）。
+    // 续选会话挂起（v2 Task 8，设计 §4）：会话进行中（session != null）
+    // 翻页推进 pageVersion 不清选区，并把被拖端点吸附到新页翻页边——
+    // 向后翻（起始把手）吸附新页末正文行末字符、向前翻（结束把手）吸附
+    // 新页首正文行首字符，后续 move 自然形成「翻页边 → 手指位置」视觉；
+    // 会话结束置 null 后本效应恢复清态语义。uiState.page 与 pageVersion
+    // 同批更新，效应执行时已持新快照（翻页刷新窗口的命中容差见会话极值
+    // 的 min/max 单向累计）。跳章/自动翻页等非续选页变在会话中同样走
+    // 挂起分支，不做额外处理（风险已记录设计 §9，真机验证项）
     LaunchedEffect(uiState.pageVersion) {
+        val sessionNow = selectionSession
+        if (sessionNow != null) {
+            uiState.page?.let { page ->
+                val edgeHit = flipEdgeHit(page, sessionNow.activeHandleIsStart)
+                val edgeLine = edgeHit?.let { page.lines.getOrNull(it.lineIndex) }
+                if (edgeHit != null && edgeLine != null) {
+                    val edgePos = chapterPositionOf(edgeLine, edgeHit.charIndex)
+                    val start = if (sessionNow.activeHandleIsStart) {
+                        minOf(sessionNow.bodyStart, edgePos)
+                    } else {
+                        sessionNow.bodyStart
+                    }
+                    val end = if (!sessionNow.activeHandleIsStart) {
+                        maxOf(sessionNow.bodyEnd, edgePos)
+                    } else {
+                        sessionNow.bodyEnd
+                    }
+                    selectionSession = sessionNow.copy(bodyStart = start, bodyEnd = end)
+                    selection = if (captureSegment(page, start, end) != null) {
+                        selectionFromChapterRange(page, start, end) ?: selection
+                    } else {
+                        // 翻页边零宽锚点（会话区间与页正文暂无交集的过渡态）：
+                        // 把手吸附新页翻页边，后续 move 自然展开「翻页边 → 手指
+                        // 位置」。不走 selectionFromChapterRange 的覆盖全页兜底
+                        // ——全页呈现的 (0,0) 锚会污染下一次 move 的端点归属
+                        buildSelection(page, edgeHit, edgeHit) ?: selection
+                    }
+                }
+            }
+            return@LaunchedEffect
+        }
         selection = null
         selectionFrozen = false
         committedSelection = null
@@ -264,6 +341,69 @@ fun ReaderRoute(
                 if (!viewModel.saveMarking(sel, note = "", thought = false)) {
                     Toast.makeText(context, "保存失败", Toast.LENGTH_SHORT).show()
                 }
+            }
+        }
+    }
+
+    // 松手提交（会话感知入口，v2 Task 8）：无会话原样上抛现状不变；有会话
+    // 先合成最终选区再走既有落库 + 冻结 + 浮条链路，并结束会话（置 null
+    // 恢复页变清态语义）。合成 = joinSegments（已捕获页段 + 末页 capture，
+    // 按 startPos 排序、gap>0 补换行）+ 会话区间极值；页段为空（纯标题
+    // 起点等无可累计段）时按页内选区原样提交。includesTitle 以会话语义
+    // 判定：会话选文全部来自正文空间捕获，含标题选区不会进入会话累计
+    val commitSelection: (ReaderSelectionUi) -> Unit = { sel ->
+        val sessionNow = selectionSession
+        val page = uiState.page
+        val final = if (sessionNow != null && page != null) {
+            val lastSegment = captureSegment(page, sessionNow.bodyStart, sessionNow.bodyEnd)
+            // 末页 capture 经重叠覆盖合并：会话内翻回已累计页再松手时，
+            // 该页已有翻页时刻捕获，直接追加会被 joinSegments 重复拼接
+            val all = lastSegment?.let { mergeSegment(sessionNow.segments, it) }
+                ?: sessionNow.segments
+            if (all.isEmpty()) {
+                sel
+            } else {
+                sel.copy(
+                    selectedText = joinSegments(all),
+                    bodyStart = sessionNow.bodyStart,
+                    bodyEnd = sessionNow.bodyEnd,
+                    includesTitle = false,
+                )
+            }
+        } else {
+            sel
+        }
+        selectionSession = null
+        onSelectionCommitted(final)
+    }
+
+    // 翻页请求（v2 Task 8，设计 §4 页顶/页底按住翻页）：方向 -1 上一页 /
+    // +1 下一页。先捕获当前页段（会话区间 ∩ 当前页——各页章内区间不相交，
+    // 交集即本页被选部分）入会话，再翻页；无页可翻忽略并复位武装位。
+    // 翻页推进 pageVersion 后由上方页变效应吸附翻页边（会话挂起使选区
+    // 不被清）。会话不存在时以当前选区极值建会话（首个翻页请求即会话起点）
+    val onFlipRequest: (Int) -> Unit = { direction ->
+        val page = uiState.page
+        val visual = selection
+        if (page != null && visual != null) {
+            val base = selectionSession ?: ReaderSelectionSessionState(
+                bodyStart = visual.bodyStart,
+                bodyEnd = visual.bodyEnd,
+                segments = emptyList(),
+                activeHandleIsStart = direction < 0,
+                flipArmed = false,
+            )
+            val segment = captureSegment(page, base.bodyStart, base.bodyEnd)
+            val moved = if (direction < 0) viewModel.prevPage() else viewModel.nextPage()
+            selectionSession = if (moved) {
+                base.copy(
+                    segments = segment?.let { mergeSegment(base.segments, it) } ?: base.segments,
+                    activeHandleIsStart = direction < 0,
+                    flipArmed = false,
+                )
+            } else {
+                // 无页可翻：忽略且 flipArmed 复位
+                base.copy(flipArmed = true)
             }
         }
     }
@@ -556,19 +696,60 @@ fun ReaderRoute(
             // 共用 ReaderSelectionMenu 呈现
             markingSelection = markingBar?.selection,
             onSelectionChange = { sel ->
-                selection = sel
-                if (sel == null) {
-                    // 清区路径（点外；复制经浮条分支）随行复位冻结与提交快照，
-                    // 下一轮选区从可调界态开始
-                    selectionFrozen = false
-                    committedSelection = null
+                val sessionNow = selectionSession
+                val previous = selection
+                if (sessionNow != null && sel != null && previous != null) {
+                    // 会话中的端点移动（v2 Task 8）：页内 moveEndpoint 结果仅作
+                    // 命中载体，按移动侧把命中章内位置与会话极值合成（min/max
+                    // 单向累计——翻页刷新窗口内旧页命中不污染极值），视觉取会话
+                    // 区间 ∩ 当前页。命中行失效或落在标题行（标题空间无正文语义）
+                    // 时忽略本次移动，维持原视觉
+                    val page = uiState.page
+                    val startMoved = sel.startHit != previous.startHit
+                    val movedHit = if (startMoved) sel.startHit else sel.endHit
+                    val movedLine = page?.lines?.getOrNull(movedHit.lineIndex)
+                    if (page != null && movedLine != null && !movedLine.isTitle) {
+                        val hitPos = chapterPositionOf(movedLine, movedHit.charIndex)
+                        val start = if (startMoved) {
+                            minOf(sessionNow.bodyStart, hitPos)
+                        } else {
+                            sessionNow.bodyStart
+                        }
+                        val end = if (!startMoved) {
+                            maxOf(sessionNow.bodyEnd, hitPos)
+                        } else {
+                            sessionNow.bodyEnd
+                        }
+                        selectionSession = sessionNow.copy(bodyStart = start, bodyEnd = end)
+                        selection = if (captureSegment(page, start, end) != null) {
+                            selectionFromChapterRange(page, start, end) ?: sel
+                        } else {
+                            // 会话区间与页正文暂无交集（零宽过渡/非续选页变）：
+                            // 维持原视觉——覆盖全页兜底的 (0,0) 锚会污染下一次
+                            // move 的端点归属
+                            selection
+                        }
+                    }
                 } else {
-                    // 新选区建立（长按选词）：点按标记浮条随行关闭，避免选区
-                    // 浮条与标记浮条双浮层叠加
-                    markingBar = null
+                    selection = sel
+                    if (sel == null) {
+                        // 清区路径（点外；复制经浮条分支）随行复位冻结与提交快照，
+                        // 下一轮选区从可调界态开始；会话防御性终止（挂起恢复）
+                        selectionFrozen = false
+                        committedSelection = null
+                        selectionSession = null
+                    } else {
+                        // 新选区建立（长按选词）：点按标记浮条随行关闭，避免选区
+                        // 浮条与标记浮条双浮层叠加
+                        markingBar = null
+                    }
                 }
             },
-            onSelectionCommitted = onSelectionCommitted,
+            onSelectionCommitted = commitSelection,
+            // 跨页续选会话（v2 Task 8）：页顶/页底按住翻页请求与把手拖拽
+            // 松手提交（Route 侧合成最终选区，见 commitSelection）
+            onFlipRequest = onFlipRequest,
+            onHandleRelease = { selection?.let(commitSelection) },
             onSelectionMenuAction = onSelectionMenuAction,
             onMarkingTap = onMarkingTap,
             onMarkingMenuAction = onMarkingMenuAction,
@@ -870,7 +1051,11 @@ fun ReaderRoute(
  *   可用性与选区是否含标题行显隐，删除键按 [deleteEnabled] 置灰）；落库
  *   后选区冻结（[handlesEnabled] = false，把手只读展示），调界仅发生在
  *   落库前；选区存在期间点按先清选区再按分区执行常规行为、水平滑动不翻
- *   页，把手拖拽调整端点（浮条随锚点重排）；[markingSelection] 非空时
+ *   页，把手拖拽调整端点（浮条随锚点重排）；跨页续选（v2 Task 8，设计
+ *   §3.4/§4）：端点拖入页顶/页底触发带（首/末行行盒）按住超长按时值经
+ *   [onFlipRequest] 上抛翻页方向，会话内累计选区、松手按完整章内区间落
+ *   一条划线（会话合成在 Route 侧），把手拖拽松手经 [onHandleRelease]
+ *   上抛提交；[markingSelection] 非空时
  *   （无选区）点按标记浮条以命中 run 几何锚定展示，动作经
  *   [onMarkingMenuAction] 上抛（删除即时可用）；
  * - 水平滑动翻页，判定对齐 View 版：触发距离读引擎 pageTouchSlop（AppConfig.pageTouchSlop 经端口）
@@ -912,6 +1097,8 @@ internal fun ReaderScreen(
     markingSelection: ReaderSelectionUi?,
     onSelectionChange: (ReaderSelectionUi?) -> Unit,
     onSelectionCommitted: (ReaderSelectionUi) -> Unit,
+    onFlipRequest: (Int) -> Unit,
+    onHandleRelease: () -> Unit,
     onSelectionMenuAction: (ReaderSelectionMenuAction, ReaderSelectionUi) -> Unit,
     onMarkingTap: (selection: ReaderSelectionUi, markingId: String, onMiss: () -> Unit) -> Unit,
     onMarkingMenuAction: (ReaderSelectionMenuAction) -> Unit,
@@ -959,6 +1146,10 @@ internal fun ReaderScreen(
                 paint.measureText(text)
             }
         }
+        // 测量闭包经 State 实时读：长按检测器不再以 pageVersion 为 key
+        // （续选会话翻页推进 pageVersion，重启会打断在途拖拽），翻页后
+        // 端点吸附/命中须用新快照的同规格测量
+        val currentMeasureContent by rememberUpdatedState(measureContent)
         // 松手弹菜单：长按拖拽期间隐藏、松手展示；仅「selection 非空」参与
         // 菜单组合，选区清空（复制/点按/翻页）后残留 true 无副作用，
         // 下次长按选词在 onDragStart 归位 false
@@ -1059,18 +1250,21 @@ internal fun ReaderScreen(
                             if (dragAmount != 0f) lastDelta = dragAmount
                         }
                     }
-                    .pointerInput(state.pageVersion) {
-                        // 长按选词 + 拖拽延伸：键不含 selection/controlsVisible——
-                        // 长按选词即改写选区状态、控件开合也可发生在手势中途，
-                        // 以之为 key 会在拖拽中途重启打断手势（onDragEnd/
-                        // onDragCancel 不再执行，选区僵死），实时值经
-                        // rememberUpdatedState 读取。仅「本次长按新建选区」的拖拽
-                        // 延伸末端（startHit 固定）；已有选区时长按不重建，端点
-                        // 调整只经把手拖拽
+                    .pointerInput(selectionEnabled) {
+                        // 长按选词 + 拖拽延伸：键不含 selection/controlsVisible/
+                        // pageVersion——长按选词即改写选区状态、控件开合也可发生在
+                        // 手势中途、续选会话翻页推进 pageVersion（v2 Task 8），以之
+                        // 为 key 会在拖拽中途重启打断手势（onDragEnd/onDragCancel
+                        // 不再执行，选区僵死），实时值经 rememberUpdatedState 读取。
+                        // 仅「本次长按新建选区」的拖拽延伸末端（startHit 固定）；
+                        // 已有选区时长按不重建，端点调整只经把手拖拽
                         var dragCreatedSelection = false
+                        // 页顶/页底按住翻页触发状态机（每次按住一个，v2 Task 8）
+                        var flipTrigger: FlipTrigger? = null
                         detectDragGesturesAfterLongPress(
                             onDragStart = { offset ->
                                 dragCreatedSelection = false
+                                flipTrigger = null
                                 // 端口缺失：选择交互整体不启用（契约 §3.3 降级
                                 // 语义）——不选词、不触觉，长按手势整体旁路；
                                 // 点按标记浮条/浮窗同随端口缺失不可达（无端口
@@ -1084,7 +1278,7 @@ internal fun ReaderScreen(
                                     val page = currentPage
                                     if (page != null) {
                                         val hit = hitTest(
-                                            page, offset.x, offset.y, measureContent
+                                            page, offset.x, offset.y, currentMeasureContent
                                         )
                                         if (hit != null) {
                                             // 词区间两端闭合：裸长按即选中完整词，
@@ -1112,9 +1306,34 @@ internal fun ReaderScreen(
                                     return@detectDragGesturesAfterLongPress
                                 }
                                 val hit = hitTest(
-                                    page, change.position.x, change.position.y, measureContent
-                                ) ?: return@detectDragGesturesAfterLongPress
-                                onSelectionChange(moveEndpoint(page, sel, isStart = false, hit))
+                                    page, change.position.x, change.position.y,
+                                    currentMeasureContent,
+                                )
+                                if (hit != null) {
+                                    onSelectionChange(moveEndpoint(page, sel, isStart = false, hit))
+                                }
+                                // 页顶/页底按住翻页（v2 Task 8，长按拖拽路径）：
+                                // 被拖端点的把手侧按命中与选区起点比较——命中在
+                                // 起点之前或恰在起点（拖拽已越过/贴住起点向上）
+                                // 判起始把手页顶带，否则结束把手判页底带；命中为
+                                // 空（拖出行盒）时按越出方向兜底。端点进带并持续
+                                // 按住超长按时值上抛一次，出带重新武装（FlipTrigger）
+                                val draggingStart = hit != null && (
+                                    hit.lineIndex < sel.startHit.lineIndex ||
+                                        (
+                                            hit.lineIndex == sel.startHit.lineIndex &&
+                                                hit.charIndex <= sel.startHit.charIndex
+                                            )
+                                    )
+                                val direction = flipDirectionForPointer(
+                                    page, hit, change.position.y, draggingStart
+                                )
+                                val trigger = flipTrigger ?: FlipTrigger(
+                                    viewConfiguration.longPressTimeoutMillis
+                                ).also { flipTrigger = it }
+                                trigger.onDirection(
+                                    direction, SystemClock.elapsedRealtime()
+                                )?.let(onFlipRequest)
                             },
                             onDragEnd = {
                                 // 选区保留，松手弹菜单 + 即存落划线（v2 松手
@@ -1147,6 +1366,13 @@ internal fun ReaderScreen(
                 selection = selection,
                 handlesEnabled = handlesEnabled,
                 onSelectionChange = onSelectionChange,
+                onFlipRequest = onFlipRequest,
+                onHandleRelease = {
+                    // 把手拖拽松手 = 确认选区：浮条随行 + 上抛提交链路
+                    //（会话合成在 Route 侧）
+                    selectionMenuVisible = true
+                    onHandleRelease()
+                },
                 modifier = Modifier.matchParentSize(),
             )
             if (selection != null && selectionMenuVisible && !state.controlsVisible) {

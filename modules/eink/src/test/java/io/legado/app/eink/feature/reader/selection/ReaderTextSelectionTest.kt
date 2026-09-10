@@ -215,4 +215,216 @@ class ReaderTextSelectionTest {
         assertNull(selectionOfDecoration(snap, 5, decorationRun(0, 2)))
         assertNull(selectionOfDecoration(snap, 0, decorationRun(20, 30)))
     }
+
+    // ==================== 跨页续选会话（v2 Task 8） ====================
+
+    /** 三行页：软换行（gap=0）+ 段落间隙（gap=1），正文区间 [0, 10)。 */
+    private fun threeLinePage() = snapshot(
+        line("第一段落", positions = intArrayOf(0), top = 30f, bottom = 70f),
+        line("续行", positions = intArrayOf(4), top = 80f, bottom = 120f),
+        line("新段落", positions = intArrayOf(7), top = 130f, bottom = 170f),
+    )
+
+    @Test
+    fun `captureSegment 整页区间拼接含段落间隙换行`() {
+        val seg = captureSegment(threeLinePage(), 0, 100)!!
+        assertEquals("第一段落续行\n新段落", seg.text)
+        assertEquals(0, seg.startPos)
+        assertEquals(10, seg.endPos)
+    }
+
+    @Test
+    fun `captureSegment 部分区间在页内裁剪`() {
+        // 与 buildSelection 的「段落续行\n新」同一区间同一拼接口径
+        val seg = captureSegment(threeLinePage(), 2, 8)!!
+        assertEquals("段落续行\n新", seg.text)
+        assertEquals(2, seg.startPos)
+        assertEquals(8, seg.endPos)
+    }
+
+    @Test
+    fun `captureSegment 空交集与零长区间返回null`() {
+        assertNull(captureSegment(threeLinePage(), 100, 200))
+        assertNull(captureSegment(threeLinePage(), 5, 5))
+        // 零长度行（防御脏数据）不参与拼接
+        assertNull(captureSegment(snapshot(line("", positions = intArrayOf(0))), 0, 10))
+    }
+
+    @Test
+    fun `captureSegment 跳过标题行只取正文空间`() {
+        val snap = snapshot(
+            line("标题", positions = intArrayOf(100), isTitle = true, top = 30f, bottom = 70f),
+            line("正文内容", positions = intArrayOf(0), top = 80f, bottom = 120f),
+        )
+        val seg = captureSegment(snap, 0, 100)!!
+        assertEquals("正文内容", seg.text)
+        assertEquals(0, seg.startPos)
+        assertEquals(4, seg.endPos)
+    }
+
+    @Test
+    fun `joinSegments 有序拼接gap为零直连`() {
+        assertEquals(
+            "abcdef",
+            joinSegments(listOf(ReaderSelectionSegment("abc", 0, 3), ReaderSelectionSegment("def", 3, 6))),
+        )
+        assertEquals("", joinSegments(emptyList()))
+        assertEquals("abc", joinSegments(listOf(ReaderSelectionSegment("abc", 0, 3))))
+    }
+
+    @Test
+    fun `joinSegments 相邻gap大于零补换行`() {
+        assertEquals(
+            "abc\ndef",
+            joinSegments(listOf(ReaderSelectionSegment("abc", 0, 3), ReaderSelectionSegment("def", 5, 8))),
+        )
+    }
+
+    @Test
+    fun `joinSegments 乱序输入按startPos排序`() {
+        assertEquals(
+            "第一段落续行\n新段落",
+            joinSegments(
+                listOf(
+                    ReaderSelectionSegment("新段落", 7, 10),
+                    ReaderSelectionSegment("第一段落续行", 0, 6),
+                )
+            ),
+        )
+    }
+
+    @Test
+    fun `flipDirection 起始把手页顶触发上翻`() {
+        val snap = threeLinePage()
+        assertEquals(-1, flipDirection(ReaderTextHit(0, 3), snap, handleIsStart = true))
+    }
+
+    @Test
+    fun `flipDirection 起始把手非触发带返回null`() {
+        val snap = threeLinePage()
+        assertNull(flipDirection(ReaderTextHit(1, 0), snap, handleIsStart = true))
+        assertNull(flipDirection(ReaderTextHit(2, 0), snap, handleIsStart = true))
+    }
+
+    @Test
+    fun `flipDirection 结束把手页底触发下翻`() {
+        val snap = threeLinePage()
+        assertEquals(1, flipDirection(ReaderTextHit(2, 3), snap, handleIsStart = false))
+    }
+
+    @Test
+    fun `flipDirection 结束把手在首行返回null`() {
+        val snap = threeLinePage()
+        assertNull(flipDirection(ReaderTextHit(0, 0), snap, handleIsStart = false))
+        assertNull(flipDirection(ReaderTextHit(1, 0), snap, handleIsStart = false))
+    }
+
+    @Test
+    fun `flipDirectionForPointer 越出页缘按方向兜底`() {
+        val snap = threeLinePage()
+        // 命中为空但指针越过页顶：起始把手判上翻，结束把手不判
+        assertEquals(-1, flipDirectionForPointer(snap, null, y = 10f, handleIsStart = true))
+        assertNull(flipDirectionForPointer(snap, null, y = 10f, handleIsStart = false))
+        // 越过页底：结束把手判下翻
+        assertEquals(1, flipDirectionForPointer(snap, null, y = 300f, handleIsStart = false))
+        assertNull(flipDirectionForPointer(snap, null, y = 300f, handleIsStart = true))
+        // 行盒之间空档不判触发
+        assertNull(flipDirectionForPointer(snap, null, y = 75f, handleIsStart = true))
+        // 有命中时与 flipDirection 同判
+        assertEquals(-1, flipDirectionForPointer(snap, ReaderTextHit(0, 3), 40f, handleIsStart = true))
+        assertNull(flipDirectionForPointer(snap, ReaderTextHit(1, 0), 100f, handleIsStart = true))
+    }
+
+    @Test
+    fun `selectionFromChapterRange 页内裁剪构造选区`() {
+        val snap = threeLinePage()
+        val sel = selectionFromChapterRange(snap, 2, 8)!!
+        assertEquals(ReaderTextHit(0, 2), sel.startHit)
+        assertEquals(ReaderTextHit(2, 1), sel.endHit)
+        assertEquals("段落续行\n新", sel.selectedText)
+        assertEquals(2, sel.bodyStart)
+        assertEquals(8, sel.bodyEnd)
+        assertFalse(sel.includesTitle)
+    }
+
+    @Test
+    fun `selectionFromChapterRange 范围不在本页返回覆盖全页`() {
+        val snap = snapshot(
+            line("标题", positions = intArrayOf(100), isTitle = true, top = 30f, bottom = 70f),
+            line("正文", positions = intArrayOf(0), top = 80f, bottom = 120f),
+        )
+        val sel = selectionFromChapterRange(snap, 500, 600)!!
+        // 覆盖全页：首行首字符到末行末字符
+        assertEquals(ReaderTextHit(0, 0), sel.startHit)
+        assertEquals(ReaderTextHit(1, 2), sel.endHit)
+        assertEquals("标题\n正文", sel.selectedText)
+    }
+
+    @Test
+    fun `selectionFromChapterRange 空页返回null`() {
+        assertNull(selectionFromChapterRange(snapshot(), 0, 10))
+    }
+
+    @Test
+    fun `flipEdgeHit 向后翻吸附末正文行末字符`() {
+        val snap = threeLinePage()
+        assertEquals(ReaderTextHit(2, 3), flipEdgeHit(snap, handleIsStart = true))
+    }
+
+    @Test
+    fun `flipEdgeHit 向前翻吸附首正文行首字符`() {
+        val snap = threeLinePage()
+        assertEquals(ReaderTextHit(0, 0), flipEdgeHit(snap, handleIsStart = false))
+    }
+
+    @Test
+    fun `flipEdgeHit 无正文行返回null`() {
+        val snap = snapshot(line("标题", positions = intArrayOf(0), isTitle = true))
+        assertNull(flipEdgeHit(snap, handleIsStart = true))
+        assertNull(flipEdgeHit(snap, handleIsStart = false))
+    }
+
+    @Test
+    fun `mergeSegment 保留不相交段并以新段覆盖同页重捕`() {
+        val first = ReaderSelectionSegment("aaa", 0, 3)
+        val second = ReaderSelectionSegment("bbb", 20, 23)
+        // 不相交段保留
+        val base = mergeSegment(emptyList(), first)
+        assertEquals(listOf(first), base)
+        assertEquals(listOf(first, second), mergeSegment(base, second))
+        // 同页重捕（向前多翻一次又翻回后区间被扩大）：旧段与新段重叠 → 新段覆盖
+        val recapture = ReaderSelectionSegment("cccc", 10, 23)
+        assertEquals(listOf(first, recapture), mergeSegment(listOf(first, second), recapture))
+        // 相邻不重叠（end == start）都保留（列表序不保证，拼接侧 joinSegments 按 startPos 排序）
+        val adjacent = ReaderSelectionSegment("ddd", 3, 6)
+        assertEquals(
+            setOf(first, adjacent, second),
+            mergeSegment(listOf(first, second), adjacent).toSet(),
+        )
+    }
+
+    @Test
+    fun `FlipTrigger 入带计时超时触发一次出带重新武装`() {
+        val trigger = FlipTrigger(timeoutMillis = 500)
+        // 入带首事件：只起表不触发
+        assertNull(trigger.onDirection(1, nowMillis = 1000))
+        // 带内未满时值：不触发
+        assertNull(trigger.onDirection(1, nowMillis = 1200))
+        // 满 500ms：触发一次
+        assertEquals(1, trigger.onDirection(1, nowMillis = 1500))
+        // 带内继续按住：已 disarm 不再触发
+        assertNull(trigger.onDirection(1, nowMillis = 1600))
+        // 出带：重新武装并清计时
+        assertNull(trigger.onDirection(null, nowMillis = 1700))
+        // 再入带：重新起表，未满不触发
+        assertNull(trigger.onDirection(-1, nowMillis = 1800))
+        assertEquals(-1, trigger.onDirection(-1, nowMillis = 2300))
+        // 出带再瞬间回带又出带：计时被打断不误触发
+        assertNull(trigger.onDirection(null, nowMillis = 2400))
+        assertNull(trigger.onDirection(1, nowMillis = 2500))
+        assertNull(trigger.onDirection(null, nowMillis = 2600))
+        assertNull(trigger.onDirection(1, nowMillis = 3000))
+        assertNull(trigger.onDirection(1, nowMillis = 3100))
+        assertEquals(1, trigger.onDirection(1, nowMillis = 3500))
+    }
 }

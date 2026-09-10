@@ -294,3 +294,207 @@ fun handleAnchor(runs: List<SelectionRun>): Pair<Pair<Float, Float>, Pair<Float,
     val last = runs.lastOrNull() ?: return null
     return (first.left to first.top) to (last.right to last.top)
 }
+
+// ==================== 跨页续选会话（v2 Task 8） ====================
+
+/**
+ * 跨页会话中一页被选中的文本段（章内端点用于跨段拼接的 gap 判定）。
+ * 端点为语义正文空间 UTF-16 索引，[text] 段内拼接口径与 [buildSelection]
+ * 一致（正文行间 gap>0 补换行）。
+ */
+data class ReaderSelectionSegment(val text: String, val startPos: Int, val endPos: Int)
+
+/**
+ * 当前页内 [rangeStart, rangeEnd) ∩ 页正文范围的文本段（端点经
+ * [chapterPositionOf] 换算）。标题行在标题空间、无正文语义，不参与拼接；
+ * 正文行物理不相邻（中间隔标题/空行）或章内 gap>0（段落分隔符/占位字符）
+ * 时补一个换行，与 [buildSelection] 的 gap 规则同源。交集为空（含零长
+ * 区间、零长度行）返回 null。
+ */
+fun captureSegment(
+    snapshot: ReaderPageSnapshot,
+    rangeStart: Int,
+    rangeEnd: Int,
+): ReaderSelectionSegment? {
+    if (rangeStart >= rangeEnd) return null
+    val text = StringBuilder()
+    var startPos = 0
+    var endPos = 0
+    var seen = false
+    var prevLineIndex = -1
+    var prevLineEnd = 0
+    snapshot.lines.forEachIndexed { index, line ->
+        if (line.isTitle) return@forEachIndexed
+        val lineLength = lineText(line).length
+        if (lineLength == 0) return@forEachIndexed
+        val lineStart = line.chapterPositions.first()
+        val lineEnd = lineStart + lineLength
+        val from = maxOf(rangeStart, lineStart)
+        val to = minOf(rangeEnd, lineEnd)
+        if (from >= to) return@forEachIndexed
+        if (seen) {
+            // 物理不相邻（隔标题/空行）按段落分隔；相邻正文行按章内 gap 判
+            val physicallyAdjacent = index == prevLineIndex + 1
+            if (!physicallyAdjacent || from - prevLineEnd > 0) text.append('\n')
+        } else {
+            startPos = from
+        }
+        text.append(lineText(line).substring(from - lineStart, to - lineStart))
+        endPos = to
+        prevLineIndex = index
+        prevLineEnd = lineEnd
+        seen = true
+    }
+    if (!seen) return null
+    return ReaderSelectionSegment(text.toString(), startPos, endPos)
+}
+
+/**
+ * 页段按 [ReaderSelectionSegment.startPos] 排序拼接；相邻 gap>0 补一个
+ * 换行（与 [buildSelection] 的 gap 规则同源），gap<=0 直连。空列表返回
+ * 空串。
+ */
+fun joinSegments(segments: List<ReaderSelectionSegment>): String {
+    if (segments.isEmpty()) return ""
+    val text = StringBuilder()
+    var prevEnd = 0
+    segments.sortedBy { it.startPos }.forEachIndexed { index, segment ->
+        if (index > 0 && segment.startPos - prevEnd > 0) text.append('\n')
+        text.append(segment.text)
+        prevEnd = segment.endPos
+    }
+    return text.toString()
+}
+
+/**
+ * 会话段合并：保留与 [incoming] 不相交的既有段，重叠段（同页重捕——
+ * 会话内翻回已累计页后区间只会扩大）由更完整的新段覆盖。
+ */
+fun mergeSegment(
+    segments: List<ReaderSelectionSegment>,
+    incoming: ReaderSelectionSegment,
+): List<ReaderSelectionSegment> =
+    segments.filter { it.endPos <= incoming.startPos || it.startPos >= incoming.endPos } + incoming
+
+/**
+ * 把手端点处于页顶/页底触发带（首行/末行行盒区间，一行高）内的翻页方向：
+ * 起始把手只判页顶（-1 上一页），结束把手只判页底（+1 下一页），
+ * 非触发带或不匹配的把手侧返回 null。
+ */
+fun flipDirection(
+    hit: ReaderTextHit,
+    snapshot: ReaderPageSnapshot,
+    handleIsStart: Boolean,
+): Int? = when {
+    handleIsStart && hit.lineIndex == 0 -> -1
+    !handleIsStart && hit.lineIndex == snapshot.lines.lastIndex -> 1
+    else -> null
+}
+
+/**
+ * 把手拖拽的翻页方向判定（指针级）：命中结果进 [flipDirection] 判触发带；
+ * 命中为空（拖出文本行盒）时按越出方向兜底——起始把手越过页顶、结束把手
+ * 越过页底仍视为按住触发带（手指拖出页缘不解除翻页意图），文本行盒之间
+ * 的空档不判触发。页面无文本行返回 null。
+ */
+fun flipDirectionForPointer(
+    snapshot: ReaderPageSnapshot,
+    hit: ReaderTextHit?,
+    y: Float,
+    handleIsStart: Boolean,
+): Int? {
+    hit?.let { return flipDirection(it, snapshot, handleIsStart) }
+    val first = snapshot.lines.firstOrNull() ?: return null
+    val last = snapshot.lines.lastOrNull() ?: return null
+    return when {
+        handleIsStart && y <= first.top -> -1
+        !handleIsStart && y >= last.bottom -> 1
+        else -> null
+    }
+}
+
+/**
+ * 会话翻页边吸附命中：起始把手（向后翻）吸附新页末正文行末字符，结束
+ * 把手（向前翻）吸附新页首正文行首字符；端点章内位置由调用方经
+ * [chapterPositionOf] 换算。页面无正文行返回 null。
+ */
+fun flipEdgeHit(snapshot: ReaderPageSnapshot, handleIsStart: Boolean): ReaderTextHit? {
+    val line = if (handleIsStart) {
+        snapshot.lines.lastOrNull { !it.isTitle }
+    } else {
+        snapshot.lines.firstOrNull { !it.isTitle }
+    } ?: return null
+    val index = snapshot.lines.indexOf(line)
+    val charIndex = if (handleIsStart) lineText(line).length else 0
+    return ReaderTextHit(index, charIndex)
+}
+
+/**
+ * 会话视觉选区：以章内区间 [rangeStart, rangeEnd) ∩ 页正文范围裁剪出
+ * startHit/endHit，交 [buildSelection] 构造（文本拼接与位置口径天然一致）。
+ * 范围与页正文完全无交集时返回覆盖全页的呈现（会话视觉不消失——翻页刷新
+ * 窗口/整页越界的过渡态）；页面无文本行返回 null。
+ */
+fun selectionFromChapterRange(
+    snapshot: ReaderPageSnapshot,
+    rangeStart: Int,
+    rangeEnd: Int,
+): ReaderSelectionUi? {
+    if (snapshot.lines.isEmpty()) return null
+    var startHit: ReaderTextHit? = null
+    var endHit: ReaderTextHit? = null
+    snapshot.lines.forEachIndexed { index, line ->
+        if (line.isTitle) return@forEachIndexed
+        val lineLength = lineText(line).length
+        if (lineLength == 0) return@forEachIndexed
+        val lineStart = line.chapterPositions.first()
+        val from = maxOf(rangeStart, lineStart)
+        val to = minOf(rangeEnd, lineStart + lineLength)
+        if (from >= to) return@forEachIndexed
+        if (startHit == null) startHit = ReaderTextHit(index, from - lineStart)
+        endHit = ReaderTextHit(index, to - lineStart)
+    }
+    val clippedStart = startHit
+    val clippedEnd = endHit
+    if (clippedStart != null && clippedEnd != null) {
+        return buildSelection(snapshot, clippedStart, clippedEnd)
+    }
+    // 覆盖全页兜底：首行首字符 → 末行末字符（含标题行）
+    val last = snapshot.lines.last()
+    return buildSelection(snapshot, ReaderTextHit(0, 0), ReaderTextHit(snapshot.lines.lastIndex, lineText(last).length))
+}
+
+/**
+ * 翻页触发状态机（一次按住内）：端点进入触发带起计时，持续按住超过
+ * [timeoutMillis] 上抛方向一次；触发后 disarm（带内不重复触发），拖出
+ * 触发带重新武装并清计时。时间由调用方注入（如 SystemClock.elapsedRealtime
+ * 的单调毫秒），保持纯逻辑可单测。
+ */
+class FlipTrigger(private val timeoutMillis: Long) {
+    private var armed = true
+    private var bandEnterTimeMillis = 0L
+
+    /**
+     * 每次 move 上报方向判定：null = 端点在触发带外（重新武装并清计时）；
+     * 非 null 且返回值非 null = 应触发翻页（方向与入参一致）。
+     */
+    fun onDirection(direction: Int?, nowMillis: Long): Int? {
+        if (direction == null) {
+            armed = true
+            bandEnterTimeMillis = 0L
+            return null
+        }
+        if (!armed) return null
+        if (bandEnterTimeMillis == 0L) {
+            bandEnterTimeMillis = nowMillis
+            return null
+        }
+        return if (nowMillis - bandEnterTimeMillis >= timeoutMillis) {
+            armed = false
+            bandEnterTimeMillis = 0L
+            direction
+        } else {
+            null
+        }
+    }
+}
