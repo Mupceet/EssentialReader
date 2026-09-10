@@ -47,7 +47,10 @@ internal fun locateInContent(content: String, expectedStart: Int, text: String):
     val clamped = expectedStart.coerceIn(0, content.length)
     content.indexOf(text, clamped).takeIf { it >= 0 && it <= clamped + CONTEXT_SEARCH_WINDOW }
         ?.let { return it }
-    val windowStart = (clamped - CONTEXT_SEARCH_WINDOW).coerceAtLeast(0)
+    // 回搜距离至少覆盖原文全长：点按链以行内位置作提示、selectedText 为标记
+    // 完整原文，真实起点可在提示之前超过 CONTEXT_SEARCH_WINDOW 处（长标记跨页）
+    val backWindow = maxOf(CONTEXT_SEARCH_WINDOW, text.length)
+    val windowStart = (clamped - backWindow).coerceAtLeast(0)
     content.indexOf(text, windowStart).takeIf { it >= 0 && it <= clamped + CONTEXT_SEARCH_WINDOW }
         ?.let { return it }
     return -1
