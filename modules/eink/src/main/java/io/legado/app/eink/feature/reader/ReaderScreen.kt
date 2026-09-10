@@ -191,7 +191,7 @@ fun ReaderRoute(
     // NEW 模式预填空：松手浮条「写想法」（划线转想法）与点按划线浮条共用
     var thoughtSelection by remember { mutableStateOf<ReaderSelectionUi?>(null) }
     // v2 点按标记浮条（Task 6，设计 §4「点已有标记」）：非空 = 点按命中已有
-    // 划线（thought=false），浮条锚定命中 run 几何（无选区/把手/高亮带），
+    // 划线（thought=false），浮条锚定命中 run 几何（无选区/把手/下划线预览），
     // markingId 供删除键即时可用（松手场景无 id 的时序此处不存在）
     var markingBar by remember { mutableStateOf<ReaderMarkingBar?>(null) }
     // v2 点按想法浮窗（EDIT 模式）：点按命中想法标记（thought=true）直接开
@@ -1140,7 +1140,7 @@ internal fun ReaderScreen(
                 pageVersion = state.pageVersion,
                 modifier = Modifier.fillMaxSize(),
             )
-            // 选区覆盖层：高亮带垫在页画布下方（zIndex 由覆盖层自管），
+            // 选区覆盖层：实线下划线预览垫在页画布下方（zIndex 由覆盖层自管），
             // 把手/指针独占在正文上方；浮条以 zIndex(2f) 组合在本层之上
             ReaderSelectionOverlay(
                 snapshot = state.page,

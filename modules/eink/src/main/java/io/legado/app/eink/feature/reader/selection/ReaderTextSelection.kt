@@ -249,7 +249,7 @@ fun snapToWordRange(
     return hit to hit
 }
 
-/** 逐行选区高亮带（行盒为高、字符前缀宽为横向）。 */
+/** 逐行选区 run（行盒为高、字符前缀宽为横向；预览下划线/浮条锚定/命中均以此为准）。 */
 data class SelectionRun(
     val lineIndex: Int,
     val left: Float,

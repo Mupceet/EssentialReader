@@ -12,9 +12,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.toArgb
@@ -42,12 +40,12 @@ enum class ReaderSelectionMenuAction { COPY, THOUGHT, DELETE }
 internal val SelectionHandleTouchRadiusDp = 28.dp
 
 /**
- * 选区覆盖层：逐行高亮带 + 首末把手。
+ * 选区覆盖层：实线下划线预览（与落库后的划线渲染同形，所见即所得）+ 首末把手。
  *
  * 分两层绘制——
- * - 高亮带（zIndex(-1f)）：垫在页画布**下方**，正文压在高亮上。取
- *   secondaryContainer 不透明实灰：E-Ink 禁 alpha 混灰（残影，规范 §1.3），
- *   而 surfaceVariant 在高对比灰阶板下与背景同值（纯白/纯黑）完全不可见；
+ * - 下划线预览（zIndex(-1f)）：垫在页画布**下方**，对选区 runs 逐行画基线下
+ *   12% 行盒高的实线（主题 onBackground、1.5f·density），与画布正式装饰
+ *   下划线同一公式与规格，拖拽调界随 runs 重建逐帧重绘；
  * - 把手 + 指针独占（zIndex(1f)）：压在正文上方。pointerInput 只在按下
  *   即命中把手时消费指针、独占本次拖拽；否则不消费任何事件直接返回，
  *   下层点按/翻页/长按检测器照常工作（空白处点击 = 清选区由 Screen 承担；
@@ -73,8 +71,9 @@ internal fun ReaderSelectionOverlay(
 ) {
     if (snapshot == null || selection == null) return
     val themeForeground = EInkTheme.colorScheme.onBackground
-    val highlightArgb = EInkTheme.colorScheme.secondaryContainer
     val density = LocalDensity.current
+    // 与画布正式装饰下划线同规格（1.5f·density，见 ReaderPageSnapshotCanvas）
+    val underlineStrokePx = 1.5f * density.density
     val handleRadiusPx = with(density) { 4.dp.toPx() }
     val touchRadiusPx = with(density) { SelectionHandleTouchRadiusDp.toPx() }
 
@@ -104,14 +103,17 @@ internal fun ReaderSelectionOverlay(
     val currentSelection by rememberUpdatedState(selection)
     val currentHandlesEnabled by rememberUpdatedState(handlesEnabled)
 
-    // 高亮带：垫在页画布下方，正文压在高亮上（见类 KDoc）
+    // 实线下划线预览：垫在页画布下方，与落库后的划线渲染同形（见类 KDoc）。
+    // y 取基线下 12% 行盒高——与画布正式装饰下划线同一公式，baseY 按行取自快照
     Canvas(modifier = modifier.zIndex(-1f)) {
         for (run in runs) {
-            drawRoundRect(
-                color = highlightArgb,
-                topLeft = Offset(run.left, run.top),
-                size = Size(run.right - run.left, run.bottom - run.top),
-                cornerRadius = CornerRadius(4f, 4f),
+            val line = snapshot.lines.getOrNull(run.lineIndex) ?: continue
+            val y = line.baseY + (line.bottom - line.top) * 0.12f
+            drawLine(
+                color = themeForeground,
+                start = Offset(run.left, y),
+                end = Offset(run.right, y),
+                strokeWidth = underlineStrokePx,
             )
         }
     }
