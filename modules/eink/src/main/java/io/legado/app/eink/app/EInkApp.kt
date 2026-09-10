@@ -211,11 +211,28 @@ fun EInkApp(
                         }
 
                         is EInkScreen.Note -> {
-                            // 占位路由（Task 8 接线）：列表/跳转/导出由后续任务交付
                             NoteRoute(
                                 bookUrl = screen.bookUrl,
-                                fromReader = screen.fromReader,
                                 onBack = { controller.pop() },
+                                // 划线/想法跳转：引擎动作（跳章/落进度）已由
+                                // NoteRoute 完成，此处只做导航
+                                onJumpToLocation = {
+                                    if (screen.fromReader) {
+                                        // Note 之下是目录页：连续两次 pop 弹出
+                                        // Note+Toc 回到下方既有阅读页（阅读页重新
+                                        // 挂载时按已跳转的进度落位；pop 同步操作
+                                        // 同一栈列表，同帧两次无旧栈问题）
+                                        controller.pop()
+                                        controller.pop()
+                                    } else {
+                                        // 预留链路（详情等路径，Note 之下同为
+                                        // fromReader=false 的目录页）：Note 出栈、
+                                        // 目录被阅读页替换，返回栈形态对齐目录页
+                                        // fromReader=false 的跳转结果
+                                        controller.pop()
+                                        controller.replaceTop(EInkScreen.Reader(screen.bookUrl))
+                                    }
+                                },
                             )
                         }
 

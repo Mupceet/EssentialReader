@@ -151,6 +151,51 @@ class EInkNavControllerTest {
     }
 
     @Test
+    fun `同帧连续两次 pop 弹出两层并回到下层既有屏`() {
+        // EInkApp Note 跳转回阅读页：同一回调内 pop 掉 Note+Toc 两层。
+        // 锚定 pop 的栈同步性：第二次 pop 读到第一次 pop 之后的栈
+        //（backStack 为普通同步列表，非快照态），无旧栈问题
+        val controller = newController(EInkScreen.Home)
+        controller.navigate(EInkScreen.Reader("book-a"))
+        val readerStore = controller.currentViewModelStore
+        controller.navigate(EInkScreen.Toc("book-a", fromReader = true))
+        val tocStore = controller.currentViewModelStore
+        controller.navigate(EInkScreen.Note("book-a", fromReader = true))
+        val noteStore = controller.currentViewModelStore
+        noteStore.put("vm", TestViewModel())
+        tocStore.put("vm", TestViewModel())
+
+        assertTrue(controller.pop())
+        assertTrue(controller.pop())
+
+        assertEquals("两次 pop 后回到既有阅读页", EInkScreen.Reader("book-a"), controller.screen)
+        assertSame("阅读页条目存储复用（保留既有状态）", readerStore, controller.currentViewModelStore)
+        assertNull("Note 条目存储已释放", noteStore.get("vm"))
+        assertNull("Toc 条目存储已释放", tocStore.get("vm"))
+    }
+
+    @Test
+    fun `pop 后 replaceTop 替换下层中间页并保留更下层`() {
+        // EInkApp Note fromReader=false 跳转：先 pop 掉 Note，再 replaceTop
+        // 用阅读页替换目录页，返回栈回到详情页（对齐目录页跳转结果）
+        val controller = newController(EInkScreen.Home)
+        controller.navigate(EInkScreen.BookDetail("名", "作者", "book-a"))
+        val detailStore = controller.currentViewModelStore
+        detailStore.put("vm", TestViewModel())
+        controller.navigate(EInkScreen.Toc("book-a", fromReader = false))
+        controller.navigate(EInkScreen.Note("book-a", fromReader = false))
+
+        assertTrue(controller.pop())
+        controller.replaceTop(EInkScreen.Reader("book-a"))
+
+        assertEquals(EInkScreen.Reader("book-a"), controller.screen)
+        assertTrue("详情页保留在栈中", controller.canPop)
+        controller.pop()
+        assertEquals(EInkScreen.BookDetail("名", "作者", "book-a"), controller.screen)
+        assertSame("详情页存储未被清理", detailStore, controller.currentViewModelStore)
+    }
+
+    @Test
     fun `clearAll 清空全部条目存储`() {
         val controller = newController(EInkScreen.Home, EInkScreen.Search)
         val searchStore = controller.currentViewModelStore
