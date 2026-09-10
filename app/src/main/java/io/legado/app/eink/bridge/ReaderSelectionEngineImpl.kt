@@ -5,6 +5,7 @@ import io.legado.app.data.entities.Bookmark
 import io.legado.app.data.repository.BookmarkRepository
 import io.legado.app.domain.model.TextProcessStyle
 import io.legado.app.domain.usecase.SaveMarkingUseCase
+import io.legado.app.eink.contract.ReaderMarkingDetail
 import io.legado.app.eink.contract.ReaderSelectionCommit
 import io.legado.app.eink.contract.ReaderSelectionDraft
 import io.legado.app.eink.contract.ReaderSelectionEngine
@@ -149,4 +150,16 @@ internal object ReaderSelectionEngineImpl : ReaderSelectionEngine, KoinComponent
             false
         }
     }
+
+    /** Task 3 实现（v2 删除标记占位）。 */
+    override suspend fun deleteMarking(markingId: String): Boolean =
+        throw NotImplementedError("Task 3")
+
+    /** Task 3 实现（v2 标记详情占位）。 */
+    override suspend fun findMarking(markingId: String): ReaderMarkingDetail? =
+        throw NotImplementedError("Task 3")
+
+    /** Task 3 实现（v2 页面书签 toggle 占位）。 */
+    override suspend fun togglePageBookmark(): Boolean? =
+        throw NotImplementedError("Task 3")
 }

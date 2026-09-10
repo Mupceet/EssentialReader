@@ -45,6 +45,26 @@ interface ReaderSelectionEngine {
      * onContentUpdated 推送——模块不请求刷新。false = 落库失败。
      */
     suspend fun saveMarking(commit: ReaderSelectionCommit): Boolean
+
+    /**
+     * 删除标记。false = 删除失败（模块提示并保留现场）。
+     * 宿主删除后触发当前章重排（同 saveMarking 推送路径）。
+     */
+    suspend fun deleteMarking(markingId: String): Boolean
+
+    /**
+     * 读取标记详情（点按想法时浮窗展示与写想法预填）。
+     * null = 标记不存在（换源清理等，模块按标记失效处理，不弹浮窗）。
+     */
+    suspend fun findMarking(markingId: String): ReaderMarkingDetail?
+
+    /**
+     * 当前页书签 toggle（宿主快速书签语义：同页已有多条时删最近一条）。
+     * 自动记录：页位置 + 页文本为标题，无编辑层。
+     * 宿主落库后触发当前章重排（角标随新快照推送）。
+     * null = 无会话书；true = 本次添加；false = 本次移除。
+     */
+    suspend fun togglePageBookmark(): Boolean?
 }
 
 /** 选区解析结果：两个编辑弹层的预填初值。 */
@@ -79,6 +99,22 @@ class ReaderSelectionCommit(
     /** 用户编辑后的书签 content。 */
     val bookmarkContent: String,
 
-    /** 用户输入的笔记备注（可空串）。 */
+    /** 想法内容（划线为空串）。 */
+    val note: String = "",
+
+    /** true = 想法（虚线样式）；false = 划线（实线样式）。 */
+    val thought: Boolean = false,
+)
+
+/** 标记详情（点按浮窗与写想法预填）。 */
+@Stable
+class ReaderMarkingDetail(
+    /** 划线选中的原文。 */
+    val selectedText: String,
+
+    /** 想法内容（划线为空串）。 */
     val note: String,
+
+    /** true = 想法（虚线）；false = 划线（实线）。 */
+    val thought: Boolean,
 )

@@ -10,4 +10,4 @@
 
 | 端口 | 必需性 | 职责 |
 |---|---|---|
-| ReaderSelectionEngine | 可选 | 阅读页长按选择的书签/笔记落库；未注册时选择菜单降级为仅复制 |
+| ReaderSelectionEngine | 可选 | 阅读页长按选择的书签/笔记落库。v2 方法清单：saveMarking（划线/想法同锚点 upsert）、deleteMarking、findMarking、togglePageBookmark，Commit 增 note（默认空串）/thought（默认 false）与 ReaderMarkingDetail；v2 过渡期同时保留 v1 方法（resolveSelection/saveBookmark），Task 5 收敛移除。未注册时选择菜单降级为仅复制 |
