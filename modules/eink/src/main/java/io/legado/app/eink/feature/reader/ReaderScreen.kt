@@ -93,6 +93,7 @@ import io.legado.app.eink.feature.reader.selection.buildSelection
 import io.legado.app.eink.feature.reader.selection.captureSegment
 import io.legado.app.eink.feature.reader.selection.chapterPositionOf
 import io.legado.app.eink.feature.reader.selection.findDecorationAt
+import io.legado.app.eink.feature.reader.selection.flipCaptureRange
 import io.legado.app.eink.feature.reader.selection.flipDirectionForPointer
 import io.legado.app.eink.feature.reader.selection.flipEdgeHit
 import io.legado.app.eink.feature.reader.selection.handleAnchor
@@ -100,6 +101,7 @@ import io.legado.app.eink.feature.reader.selection.hitTest
 import io.legado.app.eink.feature.reader.selection.joinSegments
 import io.legado.app.eink.feature.reader.selection.mergeSegment
 import io.legado.app.eink.feature.reader.selection.moveEndpoint
+import io.legado.app.eink.feature.reader.selection.offPageHandleIsStart
 import io.legado.app.eink.feature.reader.selection.selectionFromChapterRange
 import io.legado.app.eink.feature.reader.selection.selectionOfDecoration
 import io.legado.app.eink.feature.reader.selection.selectionRuns
@@ -143,12 +145,16 @@ private data class ReaderMarkingThought(
  *
  * - [bodyStart]/[bodyEnd]：会话累计章内区间极值，min/max 单向累计——
  *   翻页刷新窗口内旧页命中不污染极值，会话内选区只增不减；
- * - [segments]：翻页时刻捕获的各页文本段（captureSegment；各页章内区间
- *   天然不相交，会话内翻回已累计页的重捕由重叠覆盖合并，见 mergeSegment）；
+ * - [segments]：翻页时刻捕获的各页文本段（captureSegment 经
+ *   flipCaptureRange 取离页整段；各页章内区间天然不相交，会话内翻回
+ *   已累计页的重捕由重叠覆盖合并，见 mergeSegment）；
  * - [activeHandleIsStart]：最近一次翻页的把手侧（true = 起始把手向后
  *   翻），翻页边吸附据此定被拖端点；
- * - [flipArmed]：翻页请求武装位（发出即 false，无页可翻复位 true）；
- *   手势层一次性武装由 FlipTrigger 承担，此位只做会话侧记录。
+ * - [includesTitle]：建立会话时选区的标题参与（如实记录）。会话期间
+ *   capture 只收正文、标题不可达——该值即最终合成的标题门禁依据（§3.4
+ *   含标题不落划线静默忽略），提交时传递到合成选区，不强制 false。
+ *
+ * 翻页请求的一次性武装由手势层 FlipTrigger 承担，会话侧不另记武装位。
  */
 @Stable
 private data class ReaderSelectionSessionState(
@@ -156,7 +162,7 @@ private data class ReaderSelectionSessionState(
     val bodyEnd: Int,
     val segments: List<ReaderSelectionSegment>,
     val activeHandleIsStart: Boolean,
-    val flipArmed: Boolean,
+    val includesTitle: Boolean,
 )
 
 /**
@@ -348,62 +354,78 @@ fun ReaderRoute(
     // 松手提交（会话感知入口，v2 Task 8）：无会话原样上抛现状不变；有会话
     // 先合成最终选区再走既有落库 + 冻结 + 浮条链路，并结束会话（置 null
     // 恢复页变清态语义）。合成 = joinSegments（已捕获页段 + 末页 capture，
-    // 按 startPos 排序、gap>0 补换行）+ 会话区间极值；页段为空（纯标题
-    // 起点等无可累计段）时按页内选区原样提交。includesTitle 以会话语义
-    // 判定：会话选文全部来自正文空间捕获，含标题选区不会进入会话累计
+    // 按 startPos 排序、gap>0 补换行）+ 会话区间极值。includesTitle 如实
+    // 传递会话建立时记录值：capture 只收正文、标题不可达——建立时含标题的
+    // 会话在此静默不落库、清会话与选区（§3.4 门禁，与单页路径的静默门控
+    // 一致），不合成只落正文段的假划线
     val commitSelection: (ReaderSelectionUi) -> Unit = { sel ->
         val sessionNow = selectionSession
         val page = uiState.page
-        val final = if (sessionNow != null && page != null) {
-            val lastSegment = captureSegment(page, sessionNow.bodyStart, sessionNow.bodyEnd)
-            // 末页 capture 经重叠覆盖合并：会话内翻回已累计页再松手时，
-            // 该页已有翻页时刻捕获，直接追加会被 joinSegments 重复拼接
-            val all = lastSegment?.let { mergeSegment(sessionNow.segments, it) }
-                ?: sessionNow.segments
-            if (all.isEmpty()) {
-                sel
-            } else {
-                sel.copy(
-                    selectedText = joinSegments(all),
-                    bodyStart = sessionNow.bodyStart,
-                    bodyEnd = sessionNow.bodyEnd,
-                    includesTitle = false,
-                )
+        when {
+            sessionNow != null && sessionNow.includesTitle -> {
+                // 标题门禁（§3.4）：会话建立时选区已含标题行，合成划线会
+                // 绕过「含标题不落划线」静默门控——直接结束：清会话与选区，
+                // 不落库、不冻结、无提示
+                selectionSession = null
+                selection = null
             }
-        } else {
-            sel
+
+            sessionNow != null && page != null -> {
+                val lastSegment = captureSegment(page, sessionNow.bodyStart, sessionNow.bodyEnd)
+                // 末页 capture 经重叠覆盖合并：会话内翻回已累计页再松手时，
+                // 该页已有翻页时刻捕获，直接追加会被 joinSegments 重复拼接
+                val all = lastSegment?.let { mergeSegment(sessionNow.segments, it) }
+                    ?: sessionNow.segments
+                val final = if (all.isEmpty()) {
+                    sel
+                } else {
+                    sel.copy(
+                        selectedText = joinSegments(all),
+                        bodyStart = sessionNow.bodyStart,
+                        bodyEnd = sessionNow.bodyEnd,
+                        // 守卫分支已拦截含标题会话，此处如实传递（恒 false）
+                        includesTitle = sessionNow.includesTitle,
+                    )
+                }
+                selectionSession = null
+                onSelectionCommitted(final)
+            }
+
+            else -> {
+                selectionSession = null
+                onSelectionCommitted(sel)
+            }
         }
-        selectionSession = null
-        onSelectionCommitted(final)
     }
 
     // 翻页请求（v2 Task 8，设计 §4 页顶/页底按住翻页）：方向 -1 上一页 /
-    // +1 下一页。先捕获当前页段（会话区间 ∩ 当前页——各页章内区间不相交，
-    // 交集即本页被选部分）入会话，再翻页；无页可翻忽略并复位武装位。
-    // 翻页推进 pageVersion 后由上方页变效应吸附翻页边（会话挂起使选区
-    // 不被清）。会话不存在时以当前选区极值建会话（首个翻页请求即会话起点）
+    // +1 下一页。翻页成功才建立/推进会话——无页可翻维持现状（失败的翻页
+    // 不得把当前选区会话化，普通选区原样保留）。成功时先按 flipCaptureRange
+    // 捕获离页整段（被拖侧端 = 会话边界、对侧端 = 离开页正文边——被选部分
+    // 直到页边，提交范围与 selectedText 严格一致）经 mergeSegment 入会话，
+    // 再翻页；翻页推进 pageVersion 后由上方页变效应吸附翻页边（会话挂起使
+    // 选区不被清）。会话不存在时以当前选区极值建会话（首个翻页请求即会话
+    // 起点），includesTitle 按当时选区如实带入（capture 只收正文，会话期间
+    // 标题不可达，见 commitSelection 的标题门禁）
     val onFlipRequest: (Int) -> Unit = { direction ->
         val page = uiState.page
         val visual = selection
         if (page != null && visual != null) {
-            val base = selectionSession ?: ReaderSelectionSessionState(
-                bodyStart = visual.bodyStart,
-                bodyEnd = visual.bodyEnd,
-                segments = emptyList(),
-                activeHandleIsStart = direction < 0,
-                flipArmed = false,
-            )
-            val segment = captureSegment(page, base.bodyStart, base.bodyEnd)
             val moved = if (direction < 0) viewModel.prevPage() else viewModel.nextPage()
-            selectionSession = if (moved) {
-                base.copy(
+            if (moved) {
+                val base = selectionSession ?: ReaderSelectionSessionState(
+                    bodyStart = visual.bodyStart,
+                    bodyEnd = visual.bodyEnd,
+                    segments = emptyList(),
+                    activeHandleIsStart = direction < 0,
+                    includesTitle = visual.includesTitle,
+                )
+                val range = flipCaptureRange(page, direction, base.bodyStart, base.bodyEnd)
+                val segment = range?.let { captureSegment(page, it.first, it.second) }
+                selectionSession = base.copy(
                     segments = segment?.let { mergeSegment(base.segments, it) } ?: base.segments,
                     activeHandleIsStart = direction < 0,
-                    flipArmed = false,
                 )
-            } else {
-                // 无页可翻：忽略且 flipArmed 复位
-                base.copy(flipArmed = true)
             }
         }
     }
@@ -1316,15 +1338,23 @@ internal fun ReaderScreen(
                                 // 被拖端点的把手侧按命中与选区起点比较——命中在
                                 // 起点之前或恰在起点（拖拽已越过/贴住起点向上）
                                 // 判起始把手页顶带，否则结束把手判页底带；命中为
-                                // 空（拖出行盒）时按越出方向兜底。端点进带并持续
-                                // 按住超长按时值上抛一次，出带重新武装（FlipTrigger）
-                                val draggingStart = hit != null && (
-                                    hit.lineIndex < sel.startHit.lineIndex ||
-                                        (
-                                            hit.lineIndex == sel.startHit.lineIndex &&
-                                                hit.charIndex <= sel.startHit.charIndex
-                                            )
-                                    )
+                                // 空（拖出文本行盒）时按越出边归属
+                                // （offPageHandleIsStart：页顶外 = 起始侧、
+                                // 页底外 = 结束侧，行盒之间空档不判触发）——会话
+                                // 内反向拖出页缘（前向翻页后拖出页顶 / 向后翻页
+                                // 后拖出页底）的双向翻页依赖此归属。端点进带并
+                                // 持续按住超长按时值上抛一次，出带重新武装
+                                // （FlipTrigger）
+                                val draggingStart = when {
+                                    hit != null ->
+                                        hit.lineIndex < sel.startHit.lineIndex ||
+                                            (
+                                                hit.lineIndex == sel.startHit.lineIndex &&
+                                                    hit.charIndex <= sel.startHit.charIndex
+                                                )
+
+                                    else -> offPageHandleIsStart(page, change.position.y) ?: false
+                                }
                                 val direction = flipDirectionForPointer(
                                     page, hit, change.position.y, draggingStart
                                 )

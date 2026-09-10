@@ -414,6 +414,51 @@ fun flipDirectionForPointer(
 }
 
 /**
+ * 空命中（拖出文本行盒）的把手侧归属：按越出边判定——页顶外 = 起始侧
+ * （页顶触发带 → -1），页底外 = 结束侧（页底触发带 → +1），文本行盒之间
+ * 的空档返回 null（调用方维持最近归属，不判触发）。会话双向翻页（设计
+ * §4）依赖此归属：前向翻页（结束把手拖拽）后反向拖出页顶、向后翻页
+ * （起始把手拖拽）后正向拖出页底，空命中均按越出边归属对侧把手，向后/
+ * 向前翻可达；非空命中的归属仍按把手侧（见 [flipDirection]）。页面无
+ * 文本行返回 null。
+ */
+fun offPageHandleIsStart(snapshot: ReaderPageSnapshot, y: Float): Boolean? {
+    val first = snapshot.lines.firstOrNull() ?: return null
+    val last = snapshot.lines.lastOrNull() ?: return null
+    return when {
+        y <= first.top -> true
+        y >= last.bottom -> false
+        else -> null
+    }
+}
+
+/**
+ * 翻页时刻离页段的捕获区间（提交范围 = 文本）：被拖侧端用会话边界（手指
+ * 到达处），对侧端扩到离开页的正文边——被选部分直到页边整段捕获，与页变
+ * 效应膨胀到翻页边的会话边界严格一致，不产生未被 selectedText 覆盖的落库
+ * 区间。direction < 0 向后翻（起始把手上翻）取 [离开页正文起始, rangeEnd]；
+ * direction > 0 向前翻（结束把手下翻）取 [rangeStart, 离开页正文末尾]。
+ * 标题行在标题空间、无正文语义，不参与正文边（同 captureSegment 口径）；
+ * 页面无正文行返回 null。
+ */
+fun flipCaptureRange(
+    snapshot: ReaderPageSnapshot,
+    direction: Int,
+    rangeStart: Int,
+    rangeEnd: Int,
+): Pair<Int, Int>? {
+    val first = snapshot.lines.firstOrNull { !it.isTitle && lineText(it).isNotEmpty() }
+        ?: return null
+    val last = snapshot.lines.lastOrNull { !it.isTitle && lineText(it).isNotEmpty() }
+        ?: return null
+    return if (direction < 0) {
+        first.chapterPositions.first() to rangeEnd
+    } else {
+        rangeStart to (last.chapterPositions.first() + lineText(last).length)
+    }
+}
+
+/**
  * 会话翻页边吸附命中：起始把手（向后翻）吸附新页末正文行末字符，结束
  * 把手（向前翻）吸附新页首正文行首字符；端点章内位置由调用方经
  * [chapterPositionOf] 换算。页面无正文行返回 null。

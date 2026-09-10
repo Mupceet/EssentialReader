@@ -403,6 +403,79 @@ class ReaderTextSelectionTest {
         )
     }
 
+    // ==================== 修复轮（三编排缺陷） ====================
+
+    @Test
+    fun `flipCaptureRange 向前翻取会话起点到离页正文末尾`() {
+        // threeLinePage 正文 [0,10)；会话区间 [2,8)（手指在 8），向前翻（结束
+        // 把手下翻）离页段整段到页边——被选部分直到页边，边界与文本一致
+        assertEquals(
+            2 to 10,
+            flipCaptureRange(threeLinePage(), direction = 1, rangeStart = 2, rangeEnd = 8),
+        )
+    }
+
+    @Test
+    fun `flipCaptureRange 向后翻取离页正文起始到会话终点`() {
+        assertEquals(
+            0 to 8,
+            flipCaptureRange(threeLinePage(), direction = -1, rangeStart = 2, rangeEnd = 8),
+        )
+    }
+
+    @Test
+    fun `flipCaptureRange 正文边跳过标题行`() {
+        val snap = snapshot(
+            line("标题", positions = intArrayOf(100), isTitle = true, top = 30f, bottom = 70f),
+            line("正文", positions = intArrayOf(0), top = 80f, bottom = 120f),
+            line("尾行", positions = intArrayOf(2), top = 130f, bottom = 170f),
+        )
+        // 正文范围 [0,4)：向前翻取 [rangeStart, 4)，向后翻取 [0, rangeEnd)
+        assertEquals(3 to 4, flipCaptureRange(snap, direction = 1, rangeStart = 3, rangeEnd = 4))
+        assertEquals(0 to 3, flipCaptureRange(snap, direction = -1, rangeStart = 0, rangeEnd = 3))
+    }
+
+    @Test
+    fun `flipCaptureRange 无正文行返回null`() {
+        assertNull(
+            flipCaptureRange(
+                snapshot(line("标题", positions = intArrayOf(0), isTitle = true)),
+                direction = 1, rangeStart = 0, rangeEnd = 5,
+            )
+        )
+    }
+
+    @Test
+    fun `offPageHandleIsStart 页顶外起始侧页底外结束侧空档null`() {
+        val snap = threeLinePage() // 行盒 [30, 170]
+        assertTrue(offPageHandleIsStart(snap, y = 10f)!!)    // 页顶外 = 起始侧（-1 可达）
+        assertFalse(offPageHandleIsStart(snap, y = 300f)!!)  // 页底外 = 结束侧（+1 可达）
+        // 行盒之间空档：返回 null，调用方维持最近归属（不判触发）
+        assertNull(offPageHandleIsStart(snap, y = 75f))
+        assertNull(offPageHandleIsStart(snapshot(), y = 10f))
+    }
+
+    @Test
+    fun `前向会话反向拖出页缘空命中按越出边归属双向翻页可达`() {
+        val snap = threeLinePage()
+        // 前向翻页（结束把手拖拽）后反向拖出页顶：空命中按越出边归属起始侧 → -1
+        assertEquals(
+            -1,
+            flipDirectionForPointer(
+                snap, hit = null, y = 10f,
+                handleIsStart = offPageHandleIsStart(snap, y = 10f)!!,
+            ),
+        )
+        // 对称：向后翻页（起始把手拖拽）后正向拖出页底：归属结束侧 → +1
+        assertEquals(
+            1,
+            flipDirectionForPointer(
+                snap, hit = null, y = 300f,
+                handleIsStart = offPageHandleIsStart(snap, y = 300f)!!,
+            ),
+        )
+    }
+
     @Test
     fun `FlipTrigger 入带计时超时触发一次出带重新武装`() {
         val trigger = FlipTrigger(timeoutMillis = 500)

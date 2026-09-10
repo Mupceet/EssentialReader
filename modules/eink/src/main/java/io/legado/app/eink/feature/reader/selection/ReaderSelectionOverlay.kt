@@ -60,8 +60,9 @@ internal val SelectionHandleTouchRadiusDp = 28.dp
  * （指针按住跨页不中断）。
  *
  * 跨页续选（v2 Task 8，设计 §4）：拖拽循环内每次 move 后判翻页方向
- * （flipDirectionForPointer——起始把手判页顶带、结束把手判页底带，越出
- * 页缘按方向兜底），端点进带并持续按住超系统长按时值经 [onFlipRequest]
+ * （flipDirectionForPointer——起始把手判页顶带、结束把手判页底带；空命中
+ * 按越出边归属把手侧，offPageHandleIsStart——会话内反向拖出页缘的双向
+ * 翻页依赖此归属），端点进带并持续按住超系统长按时值经 [onFlipRequest]
  * 上抛一次；一次按住只触发一次，拖出触发带重新武装（FlipTrigger）。
  * 拖拽松手经 [onHandleRelease] 上抛提交（Route 侧合成会话最终选区后走
  * 落库 + 冻结 + 浮条链路；无会话时即提交页内选区）。
@@ -170,11 +171,22 @@ internal fun ReaderSelectionOverlay(
                         if (snapshotNow != null && hit != null) {
                             onSelectionChange(moveEndpoint(snapshotNow, sel, grab, hit))
                         }
-                        // 页顶/页底按住翻页（v2 Task 8）：方向判定经指针级
-                        // 兜底（越出页缘仍视为按住触发带），计时满上抛一次
+                        // 页顶/页底按住翻页（v2 Task 8）：非空命中按抓取把手侧
+                        // 判触发带（现状不变）；空命中（拖出文本行盒）按越出边
+                        // 归属把手侧（offPageHandleIsStart——页顶外 = 起始侧、
+                        // 页底外 = 结束侧，行盒之间空档不判触发）：会话内反向
+                        // 拖出页缘（前向翻页后拖出页顶 / 向后翻页后拖出页底）
+                        // 的双向翻页依赖此归属。计时满上抛一次，出带重新武装
+                        // （FlipTrigger）
                         if (snapshotNow != null) {
+                            val handleIsStart = when {
+                                hit != null -> grab
+                                else ->
+                                    offPageHandleIsStart(snapshotNow, change.position.y)
+                                        ?: grab
+                            }
                             val direction = flipDirectionForPointer(
-                                snapshotNow, hit, change.position.y, grab
+                                snapshotNow, hit, change.position.y, handleIsStart
                             )
                             flipTrigger.onDirection(
                                 direction, SystemClock.elapsedRealtime()
