@@ -70,8 +70,15 @@ interface TocEngine {
     suspend fun cachedChapterFileNames(bookUrl: String): Set<String>
 
     /**
-     * 写回阅读进度到指定章节：更新章节下标与标题、重置页内位置、
+     * 写回阅读进度到指定章节：更新章节下标与标题、写回章内位置、
      * 刷新阅读时间（书架排序依据）。
+     *
+     * [chapterPos] 为无会话路径的书签/笔记跳转落点，0 = 重置到章首。
      */
-    suspend fun saveReadingProgress(bookUrl: String, chapterIndex: Int, chapterTitle: String)
+    suspend fun saveReadingProgress(
+        bookUrl: String,
+        chapterIndex: Int,
+        chapterTitle: String,
+        chapterPos: Int = 0,
+    )
 }

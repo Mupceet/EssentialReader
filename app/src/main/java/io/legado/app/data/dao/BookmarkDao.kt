@@ -19,9 +19,9 @@ interface BookmarkDao {
     fun flowAll(): Flow<List<Bookmark>>
 
     @Query(
-        """select * from bookmarks 
-        where bookName = :bookName and bookAuthor = :bookAuthor 
-        order by chapterIndex"""
+        """select * from bookmarks
+        where bookName = :bookName and bookAuthor = :bookAuthor
+        order by chapterIndex, chapterPos"""
     )
     fun flowByBook(bookName: String, bookAuthor: String): Flow<List<Bookmark>>
 
@@ -34,11 +34,15 @@ interface BookmarkDao {
     fun flowSearch(bookName: String, bookAuthor: String, key: String): Flow<List<Bookmark>>
 
     @Query(
-        """select * from bookmarks 
-        where bookName = :bookName and bookAuthor = :bookAuthor 
-        order by chapterIndex"""
+        """select * from bookmarks
+        where bookName = :bookName and bookAuthor = :bookAuthor
+        order by chapterIndex, chapterPos"""
     )
     fun getByBook(bookName: String, bookAuthor: String): List<Bookmark>
+
+    /** 按主键（创建时间戳）取单条书签：书签/笔记跳转落点解析用。 */
+    @Query("select * from bookmarks where time = :time")
+    suspend fun getById(time: Long): Bookmark?
 
     @Query(
         """SELECT * FROM bookmarks 

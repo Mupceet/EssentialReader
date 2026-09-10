@@ -157,10 +157,11 @@ internal object TocEngineImpl : TocEngine {
         bookUrl: String,
         chapterIndex: Int,
         chapterTitle: String,
+        chapterPos: Int,
     ) {
         val book = appDb.bookDao.getBook(bookUrl) ?: return
         book.durChapterIndex = chapterIndex
-        book.durChapterPos = 0
+        book.durChapterPos = chapterPos
         book.durChapterTitle = chapterTitle
         book.durChapterTime = System.currentTimeMillis()
         appDb.bookDao.update(book)
