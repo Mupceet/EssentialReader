@@ -1,102 +1,80 @@
-# eink 阅读界面长按选择：书签与笔记功能设计
+# eink 阅读界面长按选择：划线笔记与页面书签功能设计（v2）
 
-状态：已实施（实施精化于 2026-09-10 回填）。
-日期：2026-09-09。
+状态：v2 已实施（2026-09-10），待真机验证（v1 创建闭环已于同日实施完成）。
+日期：2026-09-09（v1）/ 2026-09-10（v2 交互重设计）。
 
 ## 决策记录
 
-- 2026-09-09（用户确认）：范围为**创建闭环**——长按选择系统 + 选择菜单 + 书签/笔记编辑弹层 +
-  落库 + 页面划线渲染。列表查看/点击跳转/点按已标记文字再编辑留后续切片。
-- 2026-09-09（用户确认）：菜单项为**书签 / 笔记 / 复制** 三项，菜单结构可扩展。
-- 2026-09-09（用户确认）：eink 创建的划线**固定实线，无样式配置入口**（本期与将来都不做
-  样式设置）；宿主创建的既有标记按其原样式如实渲染（数据保真，不是配置项）。
-- 2026-09-09（用户确认）：架构取**方案一**——快照携带章内位置桥，选择交互完全在模块本地，
-  宿主仅新增瘦提交端口；否决「选择语义全在宿主」的细粒度几何查询方案（契约碎、拖拽跨接口、
-  companion 插件场景几乎不可用）。
-- 2026-09-10（实施回填）：`resolveSelection` 增加 `selectedText` 参数作为宿主保存期
-  窗口搜索定位依据，resolve 本身不做定位；装饰「同行相邻 run 合并」执行侧定为宿主
-  映射器（映射侧合并、模块直绘）。
+- 2026-09-09（用户确认，v1）：范围为**创建闭环**——长按选择系统 + 选择菜单 + 书签/笔记编辑弹层 +
+  落库 + 页面划线渲染。列表查看/点击跳转留后续切片。
+- 2026-09-09（用户确认，v1）：架构取**方案一**——快照携带章内位置桥，选择交互完全在模块本地，
+  宿主仅新增瘦提交端口；否决「选择语义全在宿主」的细粒度几何查询方案。
+- 2026-09-09（用户确认，v1）：eink 创建的划线**无样式配置入口**；宿主创建的既有标记按原样式
+  如实渲染（数据保真，不是配置项）。
+- 2026-09-10（实施回填，v1）：`resolveSelection` 增加 `selectedText` 参数作为宿主保存期
+  窗口搜索定位依据；装饰「同行相邻 run 合并」执行侧定为宿主映射器。
+- 2026-09-10（用户确认，**v2 交互重设计，取代 v1 的创建闭环交互**）：
+  - **选择即划线**：长按选择松手后自动记录为「划线」笔记（实线），不再经菜单显式保存。
+  - 浮条三键【复制】【写想法】【删除】：松手后与点按划线时同款；点按**想法**（虚线）为浮窗
+    （展示想法内容 + 同款三键，「写想法」即编辑）。
+  - 类型语言：**划线 = 实线（underlineMode=1，note 空）；想法 = 虚线（underlineMode=2，
+    note 非空）**。
+  - **选择过程实时下划线预览**：拖拽调界时当前区间以实线划线样式实时重绘（取代灰色选区带），
+    把手保留。
+  - **跨页续选双向**：起始把手拖到页顶按住 → 翻上一页；结束把手拖到页底按住 → 翻下一页；
+    翻页后选中「翻页边 → 手指位置」的内容，会话内可多次翻页，松手按完整章内区间落一条划线。
+  - **书签改页面级交互**：顶栏按钮 + 阅读区下拉手势做**当前页书签 toggle**，自动记录
+    （页位置 + 页文本为标题，无编辑弹层），页角标随快照下发。
+  - **反馈最小化**：创建/删除/想法保存均无 toast（划线与虚线的呈现本身即反馈）；仅复制保留
+    toast（剪贴板不可见需确认）。
+  - 「复制」统一复制**划线选中的原文**。
+- 2026-09-10（实施回填，v2）：三处实施精化——
+  - 点按场景想法弹层的预览与提交携带 `findMarking` 的标记**完整原文**（跨行
+    标记按 run 行内截段提交会同锚点不命中、另落重复记录）；松手场景仍为本地
+    选区文本。
+  - 落库后选区**冻结**：把手停用、浮条动作绑定落库时捕获的原始锚点；调界仅
+    发生在落库前（防跨锚点重复标记）。
+  - 跨页续选的翻页归属采用**越出边归属**：空命中（拖出文本行盒）按越出边
+    归属把手侧——页顶外 = 起始侧（向前）、页底外 = 结束侧（向后）；长按新建
+    拖拽期同样判定，单页选区拖出页边按住即进入续选。
 
 ## 1. 背景
 
-宿主 MD3 阅读器已有完整选择系统：长按选词 → 把手拖拽 → `TextActionSelectionMenu` 浮层。
-两个目标功能的宿主实现：
+宿主 MD3 阅读器的笔记为「划线体系」：`book_marks` 表，锚点 `TextProcessAnchor`
+（chapterIndex / chapterPosition / selectedText / contextBefore / contextAfter /
+normalizedTextHash）+ 样式 `TextProcessStyle`（underlineMode：1 实线 / 2 虚线 / 3 波浪 /
+4 双线 / 5 SVG，bg 高亮，textColor 字体色）+ note 备注；保存后宿主重排当前章，标记经
+ContentProcessor → 排版元素样式进入页面绘制。书签为 `bookmarks` 表，宿主有「当前页快速
+书签」先例（页位置 + 页文本为标题，同页多条时删最近一条）与每页书签角标
+（`ReaderPage.decoration.bookmarkBadge`）。
 
-- **书签**：`bookmarks` 表（chapterIndex / chapterPos=选区 bodyStart / chapterName=窗口标题 /
-  bookText=选中文本 / content=备注），编辑弹层 `BookmarkEditSheet` 可编辑 bookText 与 content。
-- **笔记**（划线体系）：`book_marks` 表，锚点 `TextProcessAnchor`（chapterIndex /
-  chapterPosition / selectedText / contextBefore / contextAfter / normalizedTextHash）+
-  样式 `TextProcessStyle`（underlineMode：1 实线 / 2 虚线 / 3 波浪 / 4 双线 / 5 SVG，
-  bg 高亮，textColor 字体色）+ note 备注；保存后宿主重排当前章，标记经
-  ContentProcessor → 排版元素样式进入页面绘制。
-
-eink 模块阅读页完全自绘，数据源 `ReaderPageSnapshot` 只有行坐标与文本段，无章内字符位置，
-无任何选择/书签/笔记能力。本设计补齐这条链，数据与宿主同库同构，两模式互认。
+eink 模块（v1 已实施）：快照行携带章内位置桥（chapterPositions/top/bottom/decorations），
+模块自持选择交互，经可选端口 `ReaderSelectionEngine` 落库。v2 在此基座上重设计交互：
+选择即划线、点按再操作、跨页续选、页面级书签。数据与宿主同库同构，两模式互认。
 
 ## 2. 范围
 
 目标：
 
-- eink 阅读页长按选择文本（选词、把手拖拽调界、选区高亮与把手绘制）。
-- 选择菜单（书签/笔记/复制）与两个编辑弹层，经宿主端口落库。
-- 当前章页面上的划线/高亮装饰渲染（含宿主模式创建的既有标记）。
+- 选择即划线：松手自动落实线划线 + 浮条三键（复制/写想法/删除）；拖拽期实时下划线预览。
+- 跨页续选（双向：页顶按住向前、页底按住向后，会话内多次翻页）。
+- 点按已有标记：划线 → 三键浮条；想法 → 浮窗（想法内容 + 三键）；写想法弹层（新建/编辑，
+  转虚线）。
+- 书签页面级：顶栏按钮 + 下拉手势 toggle、页角标。
+- 保留：页面装饰渲染（实/虚/波/双原生，SVG 降级实线，TEXT 不渲染）。
 
 非目标（后续切片）：
 
 - 书签/笔记列表查看与点击跳转。
-- 点按已标记文字的再编辑/删除。
-- 划线样式配置（明示不做）。
-- 下滑快速书签手势、跨页选择、朗读/搜索/词典等其他宿主菜单项。
+- 划线样式配置（明示不做，见决策记录）。
+- 向前翻页手势（阅读页翻页仍 next-only；跨页续选的「向前」指选区扩展方向）。
+- 朗读/搜索/词典等其他宿主能力。
 
-## 3. 契约扩展（AAR minor）
+## 3. 契约变更（AAR 破坏性变更，minor）
 
-契约面共三处改动。`ReaderPageLine` 为破坏性构造变更，随 minor 版本升级，
-宿主 bridge 同仓同步实现，无跨仓协调。
+`ReaderPageLine`（v1 已实施）不变。v2 变更四处：
 
-### 3.1 `ReaderPageLine` 增加位置桥与装饰
-
-```kotlin
-/**
- * 单文本行：[chunks] 的第 i 段绘制于横坐标 [x][i]，基线纵坐标 [baseY]。
- * [chunks] 与 [x]、[chapterPositions] 等长。
- */
-@Stable
-class ReaderPageLine(
-    /** 行基线纵坐标（px，引擎排版坐标系）。 */
-    val baseY: Float,
-
-    /** true = 标题行，使用 [ReaderPageSnapshot.titleSpec] 的画笔规格。 */
-    val isTitle: Boolean,
-
-    /** 行内文本段（按绘制顺序；段间断行由引擎测量决定）。 */
-    val chunks: List<String>,
-
-    /** 各文本段起始横坐标（px；与 [chunks] 一一对应）。 */
-    val x: FloatArray,
-
-    /**
-     * 各文本段首字符的章内字符位置（UTF-16 索引，与宿主
-     * TextProcessAnchor.chapterPosition 同一坐标系，标题行亦携带其元素值）。
-     * 宿主实现义务：从排版元素 chapterPosition 原样拷贝，不做换算。
-     */
-    val chapterPositions: IntArray,
-
-    /**
-     * 行盒顶/底边界（px，来自排版元素 bounds 的原样拷贝）。选择高亮带、
-     * 把手与菜单锚定的几何依据；模块不得用字体度量估算行高。
-     */
-    val top: Float,
-    val bottom: Float,
-
-    /**
-     * 本行划线/高亮装饰（缺省空）。宿主实现义务：从排版元素的用户标记
-     * 样式提取，区间为行内拼接文本的 UTF-16 索引；与选中态无关，常驻。
-     */
-    val decorations: List<ReaderDecorationRun> = emptyList(),
-)
-```
-
-### 3.2 `ReaderDecorationRun`
+### 3.1 `ReaderDecorationRun` 增加 markingId
 
 ```kotlin
 /**
@@ -110,233 +88,282 @@ class ReaderDecorationRun(
 
     /**
      * 宿主 TextProcessStyle.underlineMode 原样透传
-     * （1 实线 / 2 虚线 / 3 波浪 / 4 双线 / 5 SVG 花色）。
-     * 模块渲染：1/2/3/4 原生绘制，5 降级为实线（明示不支持花色）。
+     * （1 实线 / 2 虚线 / 3 波浪 / 4 双线 / 5 SVG 花色；0 = 无下划线）。
+     * 模块渲染：1/2/3/4 原生绘制，5 及未知值降级为实线（明示不支持花色）。
      */
     val underlineMode: Int,
 
     /** true = 背景高亮带（TextProcessStyle.bgColor 非空的标记）。 */
     val highlight: Boolean,
+
+    /**
+     * 标记身份（宿主 book_marks.id，含宿主高亮规则等非用户标记来源的
+     * 合成 id）。点按命中 → 端口操作（findMarking/deleteMarking）的定位键。
+     * 宿主实现义务：装饰合并按 markingId + 样式签名分组，不同标记不并入
+     * 同一 run。
+     */
+    val markingId: String,
 )
 ```
 
-诚实降级声明（写入契约注释与本文档）：**字体色效果（MarkingEffect.TEXT）在 eink
-页面不渲染**——模块正文一律主题色，字体色不可表达；该类标记在 eink 页面不可见，
-宿主模式可见。不伪造近似效果。
+### 3.2 `ReaderPageSnapshot` 增加 bookmarkBadge
 
-### 3.3 新增可选端口 `ReaderSelectionEngine`
+```kotlin
+    /**
+     * 当前页是否带有书签角标（宿主 page.decoration.bookmarkBadge 原样
+     * 拷贝）。模块页角绘制角标，顶栏书签按钮的选中态据此推导——模块不
+     * 自持「当前页是否有书签」状态。
+     */
+    val bookmarkBadge: Boolean = false,
+```
+
+### 3.3 端口 `ReaderSelectionEngine`（v2 形态）
 
 ```kotlin
 /**
- * 选区语义与批注落库端口：宿主负责把模块选区解析为宿主语义字段
- * （书签 bodyStart、锚点上下文与哈希）并写入 bookmarks / book_marks。
- * 模块不复制这些规则。
+ * 选区语义与批注落库端口：宿主负责锚点构造（上下文与哈希）并写
+ * book_marks，提供页面级书签 toggle。模块不复制这些规则。
  *
- * 可选端口（同 appUpdateEngine 先例）：注册表缺失本端口时，模块隐藏
- * 书签/笔记菜单项，仅保留长按选择与复制，不做假死路径。
+ * 可选端口（同 appUpdateEngine 先例）：注册表缺失本端口时，模块降级——
+ * 长按选择整体不启用（松手无动作、无浮条，选择交互无可用出路），
+ * 下拉书签与顶栏书签钮隐藏，不做假死路径。
  */
 interface ReaderSelectionEngine {
 
     /**
-     * 选区解析：按章节全文构造编辑弹层预填内容（书签标题/内容按宿主
-     * BookmarkEditSheet 预填规则；选中文本供笔记预览）。
-     * [selectedText]：选中文本，按行拼接、段落间隙以换行连接；宿主保存时
-     * 以其在章节全文窗口搜索定位，resolve 本身不做定位（含标题选区在正文
-     * 空间无文本，属合法输入）。
-     * 返回 null = 无会话书或选中文本为空，模块清选区。
-     */
-    suspend fun resolveSelection(
-        chapterIndex: Int,
-        start: Int,
-        end: Int,
-        selectedText: String,
-    ): ReaderSelectionDraft?
-
-    /**
-     * 保存书签（字段为用户编辑后的值）。宿主落库 bookmarks 表。
-     * false = 落库失败，模块提示并保留弹层。
-     */
-    suspend fun saveBookmark(commit: ReaderSelectionCommit): Boolean
-
-    /**
-     * 保存笔记（固定实线样式由宿主桥写入 TextProcessStyle：
-     * underlineMode=1、颜色取宿主笔记默认值；note 为用户备注，可空）。
-     * 宿主落库 book_marks 后自行触发当前章重排（保持页内位置），
-     * 新快照经 onContentUpdated 携带装饰推送——模块不请求刷新。
-     * false = 落库失败。
+     * 保存标记（同锚点 upsert，创建/写想法/编辑想法复用）。
+     * [ReaderSelectionCommit.thought] = false → 划线（实线，note 空串）；
+     * true → 想法（虚线 + note）。虚线颜色取宿主默认，样式由宿主桥写入
+     * TextProcessStyle（underlineMode 1/2）。
+     * 宿主落库后自行触发当前章重排（保持页内位置），新快照经
+     * onContentUpdated 携带装饰推送——模块不请求刷新。
+     * false = 落库失败（模块提示「保存失败」并恢复现场）。
      */
     suspend fun saveMarking(commit: ReaderSelectionCommit): Boolean
+
+    /**
+     * 删除标记。false = 删除失败（模块提示并保留现场）。
+     * 宿主删除后触发当前章重排（同 saveMarking 推送路径）。
+     */
+    suspend fun deleteMarking(markingId: String): Boolean
+
+    /**
+     * 读取标记详情（点按想法时浮窗展示与写想法预填）。
+     * null = 标记不存在（换源清理等，模块按标记失效处理，不弹浮窗）。
+     */
+    suspend fun findMarking(markingId: String): ReaderMarkingDetail?
+
+    /**
+     * 当前页书签 toggle（宿主快速书签语义：同页已有多条时删最近一条）。
+     * 自动记录：页位置 + 页文本为标题，无编辑层。
+     * 宿主落库后触发当前章重排（角标随新快照推送）。
+     * null = 无会话书；true = 本次添加；false = 本次移除。
+     */
+    suspend fun togglePageBookmark(): Boolean?
 }
 
-/** 选区解析结果：两个编辑弹层的预填初值。 */
+/** 标记详情（点按浮窗与写想法预填）。 */
 @Stable
-class ReaderSelectionDraft(
-    /** 选中文本（笔记预览展示；与 bookmarkText 同源，独立成字段以便宿主规则分化）。 */
+class ReaderMarkingDetail(
+    /** 划线选中的原文。 */
     val selectedText: String,
 
-    /** 书签 bookText 预填（宿主规则：选中文本）。 */
-    val bookmarkText: String,
+    /** 想法内容（划线为空串）。 */
+    val note: String,
 
-    /** 书签 content 预填（宿主规则：空）。 */
-    val bookmarkContent: String,
+    /** true = 想法（虚线）；false = 划线（实线）。 */
+    val thought: Boolean,
 )
 
-/** 菜单动作提交载荷：选区坐标 + 用户编辑后的各字段。 */
+/** 标记提交载荷。 */
 @Stable
 class ReaderSelectionCommit(
     /** 选区所在章节下标。 */
     val chapterIndex: Int,
 
-    /** 章内字符区间 [start, end)（UTF-16 索引）。 */
+    /** 章内字符区间 [start, end)（UTF-16、语义正文空间）。 */
     val start: Int,
     val end: Int,
 
-    /** 选中文本（宿主用于校验/锚点构造）。 */
+    /** 选中文本（按行拼接、段落间隙以换行连接；跨页选区为跨页累计拼接）。
+     *  宿主保存时以其在章节全文窗口搜索定位。 */
     val selectedText: String,
 
-    /** 用户编辑后的书签 bookText。 */
-    val bookmarkText: String,
-
-    /** 用户编辑后的书签 content。 */
-    val bookmarkContent: String,
-
-    /** 用户输入的笔记备注（可空串）。 */
+    /** 想法内容（划线为空串）。 */
     val note: String,
+
+    /** true = 想法（虚线样式）；false = 划线（实线样式）。 */
+    val thought: Boolean,
 )
 ```
 
-注册进 `EInkEngineRegistry` 为可选端口。
+移除（v1 → v2）：`resolveSelection`（松手即存 + 点按走 findMarking 后无消费方）、
+`saveBookmark`（书签改页面级 toggle）、`ReaderSelectionDraft`、commit 的
+`bookmarkText`/`bookmarkContent` 字段。注册仍为可选端口。
 
 ### 3.4 位置口径
 
-- 一律 **UTF-16 索引**，与宿主选区偏移同一空间，不做码点换算。
-- 标题行亦携带其元素的 chapterPosition；选区含标题行时**笔记不可用**（菜单隐藏该项，
-  宿主同款规则），书签允许——bodyStart 等宿主语义字段由桥实现负责从选区区间映射，
-  模块不解释标题/正文位置空间差异（实现期核对项见 §9）。
-- 选区仅限当前页内文本（eink 为整页翻页模型，无连续滚动，跨页选择无意义）。
+- 一律 **UTF-16 索引**，语义正文空间；标题行独立空间、无正文语义。
+- 选区含标题行：不落划线（静默忽略，宿主同款约束）。
+- **选区允许跨页**（v2）：章内区间跨页累计；跨页选中文本由模块按页段累计拼接
+  （页边界若在段内则无分隔符，段落间隙以换行连接），宿主窗口搜索定位兜底。
 
-### 3.5 数据流
+### 3.5 数据流（v2）
 
 ```text
-长按/拖拽（模块本地：命中 → 选词 → 把手）→ 松手弹菜单
-  ├─ 复制 ──► 模块本地剪贴板 + tip，清选区
-  ├─ 书签 ──► resolveSelection ──► 编辑弹层（预填可改）──► saveBookmark
-  │                                              └─► 成功 tip「已添加书签」，清选区
-  └─ 笔记 ──► resolveSelection ──► 编辑弹层（备注）──► saveMarking
-         └─► 宿主落库 + 当前章重排 ─► onContentUpdated（保持页内位置）
-                ─► 新快照携带 decorations ─► 模块整页重绘，清选区收尾
+长按/拖拽（模块本地：命中 → 选词 → 把手，实时实线预览；页顶/页底按住翻页续选）
+  └─松手──► saveMarking(thought=false) ─► 宿主落库+重排 ─► 新快照呈现划线
+         └─浮条【复制】【写想法】【删除】
+             ├─复制──► 剪贴板 + toast「已复制」，收浮条清选区
+             ├─写想法──► 想法弹层（选文预览+输入）──► saveMarking(thought=true, note)
+             │                                          └─► 重排后虚线呈现
+             └─删除──► deleteMarking ─► 重排后消失
+                      （仅点按浮条；松手浮条删除键置灰——无 markingId）
+点按已有标记 ─► 命中 decoration.run（markingId 非空方为用户标记，空串为
+                宿主高亮规则等非用户来源视为未命中）─► markingId
+  ├─划线──► 浮条三键（同上）
+  └─想法──► findMarking ─► 浮窗（想法内容 + 三键）；写想法 = 编辑
+下拉/顶栏书签 ──► togglePageBookmark ─► 宿主落库+重排 ─► 角标随新快照刷新
 ```
 
-## 4. 模块选择交互
+## 4. 模块交互（v2 状态机）
 
-选择状态完全在模块本地（无跨桥往返），宿主无感知：
+选择状态完全在模块本地；宿主仅经端口收到落库/删除请求：
 
 ```text
 阅读态 ──长按(系统 longPressTimeout，正文行上)──► 选词态
         命中测试：y → 行盒 top/bottom 定行；x → 行内逐字符宽度测最近字符
-        选词：BreakIterator(章节 locale) 吸附词边界；触觉反馈一次
-选词态 ──拖把手──► 调界态：moveEndpoint 吸附字符边界；拖拽期局部快速刷新
-       ──松手──► 菜单态：浮条锚选区上方/下方（放不下取另一侧）
-菜单态 ──点菜单项──► 执行；──点选区外──► 清选区
-选词态 ──点选区内非把手──► 清选区（防误触无路可退）
-任意含选区态 ──翻页/跳章/自动翻页──► 清选区（无跨页残留）
+        选词：BreakIterator 词区间吸附（snapToWordRange）；触觉反馈一次
+选词态/调界态 ──拖把手──► 调界态：实时实线划线预览随字符数变化重绘 + 把手
+  调界中 ──起始把手至页顶按住──► 翻上一页，选区续接「本页底部 → 手指位置」
+        ──结束把手至页底按住──► 翻下一页，选区续接「本页顶部 → 手指位置」
+       （续选会话：pageVersion 清态效应对选区挂起；选中文本按页段累计；
+        会话内可多次双向翻页；翻页刷新期间端点吸附翻页边后跟随手指；
+        触发带归属含越出边兜底，见下）
+       ──松手──► saveMarking(thought=false) 落划线 + 浮条三键
+              + 选区冻结（落库发起即冻结，见下）
+浮条态（已冻结）──复制──► 剪贴板 + toast「已复制」，收浮条清选区并解冻
+       ──写想法──► 想法弹层 ──保存──► saveMarking(thought=true)
+       ──删除──► deleteMarking（无 toast；仅点按场景——松手场景无
+                 markingId，删除键置灰不可达）
+       ──点浮条外──► 收浮条清选区（已落的划线保留，删除走点按）
+阅读态 ──点已有标记（markingId 非空方为用户标记）──► 划线 → 浮条三键；
+        想法 → findMarking → 浮窗（内容+三键，写想法 = 编辑）
+阅读态 ──阅读区竖直下拉（无选区、非把手）──► togglePageBookmark
+顶栏书签钮 ──点击──► 同一 toggle；选中态 = 当前页快照 bookmarkBadge
+任意含选区态 ──跳章/自动翻页（非续选会话）──► 清选区（随行解冻）
 ```
 
-- 把手样式与宿主一致（竖线+圆点），命中热区 28dp；把手命中优先于翻页手势，
-  选区存在期间水平拖动手势不触发翻页（拖拽语义优先）；物理键/自动翻页仍会清选区。
-- 菜单为设计系统 Action Bar 风格浮条：无阴影、按压反色、零动画直切，横排三键。
-  两项显隐规则：
-  - 选区含标题行 → 隐藏笔记键（书签/复制保留）；
-  - `ReaderSelectionEngine` 端口缺失 → 隐藏书签/笔记键（仅复制）。
-- 复制：`ClipboardManager` 本地写入 + eink 风格 tip「已复制」→ 清选区。
-- 中间区域点按呼出菜单的原有行为保持：仅在无选区时生效。
+- 把手样式与宿主一致（竖线+圆点），命中热区 28dp；把手命中优先于翻页手势；
+  选区存在期间水平拖动手势不触发翻页。
+- 页顶/页底触发翻页的判定：被拖端点拖入页顶/页底触发带（首/末行行盒，各约
+  一行高）并保持按住超过系统长按时值 → 翻页；一次按住只触发一次，翻页后需
+  重新拖出再进触发带。归属规则（实施精化）：非空命中按把手侧判带（起始把手
+  只判页顶、结束把手只判页底）；空命中（拖出文本行盒）按**越出边归属**——
+  页顶外 = 起始侧、页底外 = 结束侧（会话内反向拖出页缘的双向翻页依赖此
+  归属），行盒间空档不判触发、维持最近归属。长按新建拖拽期同样判定：
+  单页选区拖出页边按住同样进入续选会话。
+- 落库冻结（实施精化）：松手提交发起即冻结选区——把手停用（只读展示），
+  浮条动作绑定落库时捕获的原始锚点快照（写想法同锚点 upsert 命中已落记录，
+  不产生第二条标记）；调界仅发生在落库前。落库失败同样保持冻结（再调整会
+  漂移锚点，冻结是安全侧），选区清空（复制/点外/页变）后解冻。
+- 浮条/浮窗为设计系统 Action Bar 风格（实心反白键、无阴影、零动画直切）。
+  删除键按时序可用：松手场景置灰（saveMarking 无 markingId 回传），点按
+  标记场景即时可用。
+- 下拉手势：竖直位移超阈值（约 80dp）且 dominant 方向为下 → toggle；与横向
+  翻页、把手拖拽、长按选择互斥（无选区时才生效）。
 
-## 5. 编辑弹层与提交
+## 5. 想法弹层
 
-弹层复用模块现有面板/EInkDialog 体系（设计系统 §20/§21：标准 TextField、
-软键盘避让、零动画）。
+EInkDialog（设计系统 §20/§21，IME 避让由弹框自带 imePadding 承担）：
 
-**书签弹层**（字段与宿主 BookmarkEditSheet 对齐）：
-
-- 标题输入框（预填 `draft.bookmarkText`，可改 → `commit.bookmarkText`）。
-- 内容输入框（预填 `draft.bookmarkContent` 即空，可改 → `commit.bookmarkContent`）。
-- 保存/取消。成功 → tip「已添加书签」→ 关弹层清选区；失败 → tip「保存失败」，
-  弹层不关，可重试或取消。
-
-**笔记弹层**：
-
-- 顶部只读预览选中文本（`draft.selectedText`）。
-- 备注输入框（可空，空=纯划线 → `commit.note`）。
-- 样式不暴露选择：固定实线落库（见 §3.3 端口注释）。
-- 保存成功：弹层立即关闭并 tip「已添加笔记」；**选区保持显示**，等
-  `onContentUpdated` 新快照整页重绘（带装饰）后随重绘一并清除——重排期间选区不闪断，
-  避免「点了保存屏上什么都没发生」的 eink 停滞感。宿主 `onLayoutException` 时
-  tip 提示并清选区——标记已落库，不丢数据。
+- 顶部只读预览选中文本（超长截断展示，落库不受影响）：松手场景取本地选区
+  文本；点按场景取 `findMarking` 的标记**完整原文**（可跨行），不经快照
+  命中 run 的行内截段——跨行标记按截段提交会同锚点不命中、另落重复记录
+  （v2 Task 6 修复轮裁定）。预览不经端口二次解析。
+- 想法输入框：新建为空；编辑预填 `findMarking` 的 note。
+- 保存/取消。保存 = `saveMarking(thought=true, note)`；成功无 toast（虚线呈现即反馈），
+  失败 tip「保存失败」弹层保留可重试。编辑（点按想法浮窗）模式底部另加
+  「复制」「删除」文字钮（复制完整原文、删除即时可用）——保存即「写想法」
+  编辑，提交选区以完整原文覆写 selectedText、同锚点 upsert。
 
 ## 6. 页面装饰渲染
 
-模块画布随行绘制 `decorations`：
-
 - 下划线：基线下方行盒高度的 12%，模式 1 实线 / 2 虚线 / 3 波浪 / 4 双线原生绘制，
-  颜色走模块主题（黑）；模式 5 SVG 降级实线；TEXT 字体色效果不进装饰数据（§3.2）。
-- 高亮带：主题灰底色；同行相邻 run 合并在宿主映射器执行（提取装饰时相邻同款
-  合并为单 run），模块直绘不合并，避免逐 run 碎块灰带。
-- 字符区间 → x 坐标换算用画布自有 `Paint.measureText`（与正文绘制同一把尺）。
-- 刷新成本：装饰只随 `onContentUpdated` 新快照出现，归入正常整页刷新，零额外开销；
-  与拖拽期局部快速刷新互不干扰。
+  颜色走模块主题（黑）；模式 5 SVG 降级实线；TEXT 字体色效果不进装饰数据。
+- 高亮带：主题灰底色；合并（markingId + 样式分组）在宿主映射器执行，模块直绘。
+- **实时下划线预览**：调界态的选区预览直接复用装饰绘制路径——以当前区间构造临时实线
+  run，随拖拽逐帧重绘（模块本地，零宿主开销）；预览层垫在页画布下方（正文
+  笔迹覆盖线体，观感与正式划线一致），把手叠加其上。灰色选区带取消。
+- 刷新成本：装饰与预览均走模块画布本地重绘；落库后的确认刷新随宿主重排整页一次。
 
 ## 7. 宿主 bridge 实现
 
-- **映射器扩展**（`ReaderPageSnapshotMapper`）：行盒 top/bottom 与每段 chapterPositions
-  从排版元素原样拷贝；装饰 run 从元素用户标记样式提取（含同 marking 跨行折叠为多行 run）。
-- **`resolveSelection`**：按章节全文构造 `ReaderSelectionDraft`（书签预填复用
-  composeSelectionBookmark 规则）；同时校验选区越界（返回 null 路径）。
-- **锚点构造**：与 `SaveMarkingUseCase` 输入同构（前后 48 字上下文、normalizedTextHash），
-  复用 `SaveMarkingUseCase.save` 落库（同锚点原地更新语义由其承担）。
-- **`saveBookmark`**：组装 `Bookmark`（bookName/author/bookUrl 取会话书）落库 bookmarks。
-- **`saveMarking` 成功后**：触发当前章重排（保持页内位置），经既有回调推送新快照。
+- **映射器**：装饰提取按 markingId + 样式签名分组合并（不同标记不并入同一 run）；
+  拷贝 `page.decoration.bookmarkBadge` 进快照。
+- **saveMarking**：锚点构造同 v1（48 字上下文 + 哈希 + 窗口搜索定位；先提示位
+  精确、后窗口回搜，定位不到视为选区失效从严返回 false），
+  `thought` → underlineMode 1/2；复用 `SaveMarkingUseCase.save`（同锚点原地更新承担
+  写想法转换/编辑）；成功后 `ReaderEngineImpl.relayout()` 推送。
+- **deleteMarking**：按 id 删 `book_marks`（gateway/DAO delete）+ relayout。
+- **findMarking**：按 id 读 gateway → `ReaderMarkingDetail`（selectedText/note/thought
+  由 anchor.selectedText、note、style.underlineMode 推导）。
+- **togglePageBookmark**：宿主快速书签语义（当前页无则加——页位置 + 页文本为
+  标题、剔除排版占位符；有则删离当前阅读位置最近的一条）+ relayout（角标
+  刷新）；toggle 全程互斥锁（先查再写非原子，防快速连点重复插入）。
 
 ## 8. 测试与验证
 
 | 层 | 内容 |
 |---|---|
-| 模块单测 | 命中测试（y→行、x→字符）纯函数；BreakIterator 选词吸附；行内区间→x 换算 |
-| 宿主 bridge 单测 | 映射器 chapterPositions 与 chunks/x 对齐、装饰 run 提取与同行相邻合并、跨行折叠；resolveSelection 预填与选中文本为空 null；锚点构造与 SaveMarkingUseCase 输入同构；saveMarking 后重排触发 |
-| 降级测试 | 注册表无 ReaderSelectionEngine → 菜单仅复制，无假死路径 |
-| 真机手工 | 全链路（长按→拖拽→书签/笔记/复制）；同库互认；清选区路径；弹层软键盘避让——逐项清单见 §9 真机验证清单 |
+| 模块单测 | 跨页会话的页段累计与拼接（前/后向、多次翻页、段内/段落边界 gap 规则、重叠覆盖合并）；页顶/页底触发带判定（含越出边归属与 FlipTrigger 一次武装）；点按命中 run → markingId；想法/划线的浮条状态推导 |
+| 宿主 bridge 单测 | 映射器按 markingId+样式分组合并、bookmarkBadge 拷贝；定位窗口搜索与上下文钳制、thought→样式 1/2 纯函数锚定；deleteMarking/findMarking/togglePageBookmark 为 gateway 薄委托（编译 + 真机覆盖） |
+| 降级测试 | 注册表无端口 → 松手不落划线、点按无动作、下拉与顶栏书签钮隐藏，无假死路径 |
+| 真机手工 | 逐项清单见 §9 |
 
-模块单测沿用既有 seam 惯例（ViewModel 抽象调度，避免 runTest 收尾无限 drain）。
-验证命令：`:modules:eink` 单测任务、`:app:compileAppDebugKotlin`、宿主 bridge 所在测试集，
-具体任务名在实施计划中按当时构建脚本确认后列出。
+模块单测沿用既有 seam 惯例；验证命令 `:modules:eink:testDebugUnitTest`、
+`:app:compileAppDebugKotlin`、`testAppDebugUnitTest`。
 
-## 9. 风险与实现期核对项
+## 9. 风险与真机验证清单（v2 口径）
 
-- **标题/正文位置空间口径**：标题元素的 chapterPosition 与书签 bodyStart 的映射关系
-  在桥实现期对照宿主 composeSelectionBookmark 精确核对；映射规则全部消化在桥内。
-- **eink 真机软键盘**：弹层输入与避让需真机验证（eink 设备输入法表现差异大）。
-- **波浪/虚线的低刷新观感**：装饰线型在真机灰屏上的实际效果待手工确认。
-- **AAR 版本分栈**：契约 minor 升级后，宿主与模块版本配套关系按发布纪律更新。
+结构性风险（设计层已建模，真机复核）：
 
-### 真机验证清单（2026-09-10 实施后汇总）
+- **续选会话与 pageVersion 清态的挂起**：翻页不清选区的窗口期内，宿主推来的非续选
+  重排（如追更）不得撕裂会话。
+- **AAR 版本分栈**：破坏性契约变更随 minor 升级，宿主与模块版本配套按发布纪律更新。
 
-- 选区浮条三键显隐：无标题 3 键 / 含标题 2 键 / 无端口 1 键（可临时注释 EInkBridge
-  装配验证降级）。
-- 空白区长按拖拽为死手势（框架固有），确认无翻页误触。
-- 自动翻页推进终止拖拽并清选区。
-- secondaryContainer 高亮带与四种下划线（实/虚/波/双）灰屏观感。
-- 保存笔记 → 重排 → 选区随新快照清除的感知时序；selectionMenuVisible 在重排窗口的重现。
-- onLayoutException 后 ErrorView 覆盖与已落库笔记的恢复路径。
-- 书签跨模式互认：eink 加书签 → 宿主完整模式书签列表可见且跳转位置正确（bodyStart
-  口径核对）。
-- 笔记跨模式互认：eink 划线 → 宿主可见；宿主建的波浪/虚线 → eink 如实显示。
-- 弹层软键盘避让与真机输入法表现。
-- 弹框输入时软键盘弹出：正文不重排不跳页，编辑框保持在键盘上方可编辑。
+真机手工清单（v2 全量）：
+
+1. **松手即划线全链路**：裸长按（不拖拽，选中一词即落划线）、长按拖拽延伸松手、
+   落库后把手冻结不可再调界、浮条写想法不产生第二条标记（原始锚点 upsert）。
+2. **浮条三键**：复制（toast「已复制」+ 清区）、写想法（弹层 → 保存 → 划线转
+   虚线）、删除（点按场景即时可用、松手场景置灰）。
+3. **点按已有标记**：划线 → 浮条三键；想法 → 浮窗（note 预填 + 复制/删除，
+   保存即编辑）；标记失效（换源清理）静默回落分区行为。
+4. **跨页双向续选**：多页累计、跨段落/跨标题边界拼接、前向翻页后反向再翻
+   （越出边归属）、松手按完整章内区间落一条划线且宿主定位命中。
+5. **触发带**：页顶/页底按住触发翻页的端点吸附与跟手性；正常拖拽调界、行盒
+   间空档、空白区长按拖拽死手势不得误触发。
+6. **实时下划线预览观感**：拖拽期逐帧重绘在真机灰屏上的刷新波形与残影。
+7. **页面书签**：顶栏钮选中态（随快照 bookmarkBadge）、下拉 toggle、页角标随
+   重排刷新、同页多条时删最近一条；跨模式互认（eink 书签/划线/想法 ↔ 宿主
+   显示，宿主建的波浪/双线在 eink 如实显示）。
+8. **想法弹层软键盘**：IME 避让不压缩阅读视口，正文不重排不跳页。
+9. **降级宿主**：注释 `EInkBridge` 的 selectionEngine 装配 → 长按选择整体不启用
+   （不选词、松手无动作）、下拉与顶栏书签钮不渲染，无假死路径。
+10. **含标题选区**：静默不落划线（含标题的跨页会话同样不落），浮条只留复制键。
+11. **onLayoutException 恢复路径**。
 
 ## 10. 实施切片（详见实施计划）
 
-1. 契约类型 + 宿主映射器扩展（位置桥 + 装饰桥，带测试，纯数据不改 UI）。
-2. 模块选择系统 + 复制（无端口依赖，独立可验）。
-3. 书签链路（端口实现 + 书签弹层）。
-4. 笔记链路（弹层 + 落库 + 装饰渲染闭环）。
+1. 契约 v2（DecorationRun.markingId、snapshot.bookmarkBadge、Commit 收敛 + thought、
+   ReaderMarkingDetail、端口方法增删）+ 注册表。
+2. 宿主映射器（markingId 分组合并 + bookmarkBadge 拷贝）+ 测试。
+3. 端口实现：saveMarking(thought)/deleteMarking/findMarking + 测试。
+4. 书签链路：togglePageBookmark 实现 + 页角标绘制 + 顶栏按钮 + 下拉手势。
+5. 模块选择重构：实时下划线预览 + 松手自动落划线 + 浮条三键（复制/写想法/删除）。
+6. 点按标记：命中 → markingId → 浮条/浮窗 + 想法弹层 + 删除。
+7. 跨页续选双向会话。
+8. 退役清理（resolveSelection/saveBookmark/书签弹层）+ 全量验证 + 文档回填。
 
 每片独立可回滚，交付时按 AGENTS.md 门禁说明验证与未验证风险。
