@@ -74,13 +74,10 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import io.legado.app.eink.contract.EInkEngineRegistry
-import io.legado.app.eink.contract.ReaderSelectionDraft
 import io.legado.app.eink.designsystem.content.EInkText
 import io.legado.app.eink.designsystem.control.EInkDialog
 import io.legado.app.eink.designsystem.interaction.einkClickable
 import io.legado.app.eink.designsystem.theme.EInkTheme
-import io.legado.app.eink.feature.reader.selection.ReaderBookmarkEditDialog
-import io.legado.app.eink.feature.reader.selection.ReaderMarkingEditDialog
 import io.legado.app.eink.feature.reader.selection.ReaderSelectionMenu
 import io.legado.app.eink.feature.reader.selection.ReaderSelectionMenuAction
 import io.legado.app.eink.feature.reader.selection.ReaderSelectionOverlay
@@ -154,27 +151,17 @@ fun ReaderRoute(
     // 实时 selection，THOUGHT 确认落库锚点 = 已落库锚点，同锚点 upsert
     // 命中原记录，不产生「A 划线 + B 想法」第二条标记
     var committedSelection by remember { mutableStateOf<ReaderSelectionUi?>(null) }
-    // ===== v1 书签/笔记弹层链路状态（已不可达，Task 5 物理清理）=====
-    // 浮条枚举重命名移除书签/笔记分支后 bookmarkDraft/markingDraft 永不
-    // 置位，下方对应弹层组合不再构成可达路径；仅保留待 Task 5 契约收敛
-    // 随 resolveSelection/saveBookmark/书签弹层一并清理
-    var bookmarkDraft by remember { mutableStateOf<ReaderSelectionDraft?>(null) }
-    var markingDraft by remember { mutableStateOf<ReaderSelectionDraft?>(null) }
-    var pendingSelection by remember { mutableStateOf<ReaderSelectionUi?>(null) }
     // v2 想法弹层：thoughtSelection 非空即弹层打开（发起弹层的选区快照，
     // 确认提交用；预览文本取其 selectedText，不经端口解析——设计 §5）。
     // 新建预填空；点按编辑预填 findMarking 的 note 属 Task 6 点按场景
     var thoughtSelection by remember { mutableStateOf<ReaderSelectionUi?>(null) }
-    // pageVersion 推进 = 选区所在内容已被替换：选区、弹层选区快照与弹层
-    // 草稿一并清空，弹层随内容变化关闭，不残留幽灵弹层（在途提交按各自
-    // 现读现判护栏落失效/失败分支）
+    // pageVersion 推进 = 选区所在内容已被替换：选区、冻结态、提交快照与
+    // 弹层选区快照一并清空，弹层随内容变化关闭，不残留幽灵弹层（在途提交
+    // 按各自现读现判护栏落失效/失败分支）
     LaunchedEffect(uiState.pageVersion) {
         selection = null
         selectionFrozen = false
         committedSelection = null
-        pendingSelection = null
-        bookmarkDraft = null
-        markingDraft = null
         thoughtSelection = null
     }
     val scope = rememberCoroutineScope()
@@ -649,73 +636,6 @@ fun ReaderRoute(
                 },
             )
         }
-
-        // ===== v1 书签/笔记弹层（已不可达，Task 5 物理清理）=====
-        // bookmarkDraft/markingDraft 随浮条书签/笔记分支移除永不置位，
-        // 以下组合不构成可达路径；护栏与清区时序注释保留作后续任务参照
-        bookmarkDraft?.let { draft ->
-            ReaderBookmarkEditDialog(
-                draft = draft,
-                onDismiss = {
-                    bookmarkDraft = null
-                    pendingSelection = null
-                },
-                onConfirm = confirm@{ bookText, content ->
-                    if (saving) return@confirm
-                    saving = true
-                    scope.launch {
-                        try {
-                            val sel = pendingSelection
-                            val ok = sel != null && viewModel.saveBookmark(sel, bookText, content)
-                            if (ok) {
-                                bookmarkDraft = null
-                                pendingSelection = null
-                                selection = null
-                                Toast.makeText(context, "已添加书签", Toast.LENGTH_SHORT).show()
-                            } else {
-                                Toast.makeText(context, "保存失败", Toast.LENGTH_SHORT).show()
-                            }
-                        } finally {
-                            saving = false
-                        }
-                    }
-                },
-            )
-        }
-        // v1 笔记编辑弹层（已不可达）：确认落库后成功/失败的清区差异见
-        // 上方想法弹层护栏注释
-        markingDraft?.let { draft ->
-            ReaderMarkingEditDialog(
-                draft = draft,
-                onDismiss = {
-                    markingDraft = null
-                    pendingSelection = null
-                },
-                onConfirm = confirm@{ note ->
-                    if (saving) return@confirm
-                    saving = true
-                    scope.launch {
-                        try {
-                            val sel = pendingSelection
-                            val ok = sel != null && viewModel.saveMarking(sel, note)
-                            // 弹层两条路径都关；selection 去留是成功/失败唯一差异
-                            markingDraft = null
-                            pendingSelection = null
-                            if (ok) {
-                                // 不清 selection：保留到新快照重绘，由 pageVersion
-                                // 效应收尾（设计 §5）
-                                Toast.makeText(context, "已添加笔记", Toast.LENGTH_SHORT).show()
-                            } else {
-                                selection = null
-                                Toast.makeText(context, "保存失败", Toast.LENGTH_SHORT).show()
-                            }
-                        } finally {
-                            saving = false
-                        }
-                    }
-                },
-            )
-        }
     }
 }
 
@@ -921,7 +841,7 @@ internal fun ReaderScreen(
                                         )
                                         if (hit != null) {
                                             // 词区间两端闭合：裸长按即选中完整词，
-                                            // 不产生零长度选区（复制为空/书签笔记失效）
+                                            // 不产生零长度选区（复制为空/批注失效）
                                             val (wordStart, wordEnd) = snapToWordRange(
                                                 page, hit
                                             )

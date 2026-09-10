@@ -17,7 +17,6 @@ import io.legado.app.eink.contract.ReaderFontSelection
 import io.legado.app.eink.contract.ReaderPageSnapshot
 import io.legado.app.eink.contract.ReaderPrepareResult
 import io.legado.app.eink.contract.ReaderSelectionCommit
-import io.legado.app.eink.contract.ReaderSelectionDraft
 import io.legado.app.eink.contract.ReaderStyleCatalog
 import io.legado.app.eink.contract.ReaderStyleParamIds as Ids
 import io.legado.app.eink.contract.ReaderTextStyle
@@ -532,44 +531,7 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application),
         }
     }
 
-    // ==================== 选区书签/笔记 ====================
-
-    /**
-     * 选区解析：经批注端口构造编辑弹层预填值（宿主按章节全文定位选区）。
-     * null = 端口未注册（宿主无批注能力）或选区失效（无会话书/选中文本
-     * 为空），调用方清选区并提示。
-     *
-     * v2 已无调用方（松手即存 + 想法弹层预览改取本地选区文本，不经端口）：
-     * 仅保留待 Task 5 契约收敛随端口 resolveSelection 一并退役，勿新增调用。
-     */
-    suspend fun resolveSelection(sel: ReaderSelectionUi): ReaderSelectionDraft? =
-        EInkEngineRegistry.selectionEngine?.resolveSelection(
-            chapterIndex = engine.currentChapterIndex,
-            start = sel.bodyStart,
-            end = sel.bodyEnd,
-            selectedText = sel.selectedText,
-        )
-
-    /**
-     * 保存书签（弹层编辑后的标题/内容；笔记备注当前链路不涉及，置空串）。
-     *
-     * v2 已无调用方（页面书签改走 togglePageBookmark，Task 9 接线）：
-     * 仅保留待 Task 5 契约收敛随端口 saveBookmark 一并退役，勿新增调用。
-     */
-    suspend fun saveBookmark(sel: ReaderSelectionUi, bookText: String, content: String): Boolean {
-        val port = EInkEngineRegistry.selectionEngine ?: return false
-        return port.saveBookmark(
-            ReaderSelectionCommit(
-                chapterIndex = engine.currentChapterIndex,
-                start = sel.bodyStart,
-                end = sel.bodyEnd,
-                selectedText = sel.selectedText,
-                bookmarkText = bookText,
-                bookmarkContent = content,
-                note = "",
-            ),
-        )
-    }
+    // ==================== 选区批注 ====================
 
     /**
      * 保存划线/想法（v2 松手即存与想法弹层确认共用入口）：[thought] = true
@@ -593,29 +555,8 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application),
                 start = sel.bodyStart,
                 end = sel.bodyEnd,
                 selectedText = sel.selectedText,
-                bookmarkText = "",
-                bookmarkContent = "",
                 note = note,
                 thought = thought,
-            ),
-        )
-    }
-
-    /**
-     * v1 笔记保存（笔记编辑弹层链路已随浮条 v2 重构不可达）：Task 5
-     * 契约收敛时退役，勿新增调用。
-     */
-    suspend fun saveMarking(sel: ReaderSelectionUi, note: String): Boolean {
-        val port = EInkEngineRegistry.selectionEngine ?: return false
-        return port.saveMarking(
-            ReaderSelectionCommit(
-                chapterIndex = engine.currentChapterIndex,
-                start = sel.bodyStart,
-                end = sel.bodyEnd,
-                selectedText = sel.selectedText,
-                bookmarkText = "",
-                bookmarkContent = "",
-                note = note,
             ),
         )
     }

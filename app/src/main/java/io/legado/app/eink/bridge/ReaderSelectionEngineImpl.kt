@@ -1,15 +1,12 @@
 package io.legado.app.eink.bridge
 
 import io.legado.app.constant.AppLog
-import io.legado.app.data.entities.Bookmark
-import io.legado.app.data.repository.BookmarkRepository
 import io.legado.app.domain.gateway.BookMarkingGateway
 import io.legado.app.domain.model.TextProcessAnchor
 import io.legado.app.domain.model.TextProcessStyle
 import io.legado.app.domain.usecase.SaveMarkingUseCase
 import io.legado.app.eink.contract.ReaderMarkingDetail
 import io.legado.app.eink.contract.ReaderSelectionCommit
-import io.legado.app.eink.contract.ReaderSelectionDraft
 import io.legado.app.eink.contract.ReaderSelectionEngine
 import io.legado.app.model.ReadBook
 import io.legado.app.utils.GSON
@@ -60,15 +57,14 @@ internal fun extractContext(content: String, start: Int, length: Int): Pair<Stri
 }
 
 /**
- * 选区批注端口实现：把模块提交的正文空间选区解析为宿主语义字段并落库
- * bookmarks 表。定位与失效判定不在 resolveSelection 做——含标题的选区在
- * 正文空间本就找不到文本，属合法输入；saveBookmark/saveMarking 时才以
- * 提示位置为锚做窗口搜索。
+ * 选区批注端口实现：把模块提交的正文空间选区在章节全文中定位、构造
+ * 锚点并落库 book_marks 表。定位在 saveMarking 时以提示位置为锚做窗口
+ * 搜索（含标题的选区在正文空间本就找不到文本，模块侧按设计 §3.4 不落
+ * 划线静默忽略，不会提交到本端口）。
  */
 internal object ReaderSelectionEngineImpl : ReaderSelectionEngine, KoinComponent {
 
-    private val bookmarkRepository: BookmarkRepository by inject()
-    private val bookMarkingRepository: BookMarkingGateway by inject()
+    private val bookMarkingGateway: BookMarkingGateway by inject()
     private val saveMarkingUseCase: SaveMarkingUseCase by inject()
 
     /** 当前会话章节的语义正文（章节不匹配返回 null）。 */
@@ -77,60 +73,15 @@ internal object ReaderSelectionEngineImpl : ReaderSelectionEngine, KoinComponent
             ?.takeIf { it.chapter.index == chapterIndex }
             ?.source?.semanticContent
 
-    /** 当前窗口标题（书签 chapterName，宿主同款口径）。 */
+    /** 当前窗口标题（标记 chapterName，宿主同款口径）。 */
     private fun displayTitle(): String =
         ReadBook.readerChapterInputWindow.current?.displayTitle.orEmpty()
-
-    override suspend fun resolveSelection(
-        chapterIndex: Int,
-        start: Int,
-        end: Int,
-        selectedText: String,
-    ): ReaderSelectionDraft? {
-        // 预填构造不做正文定位：含标题选区在正文空间本就找不到文本，
-        // 属合法输入；定位与失效判定在 saveBookmark/saveMarking 时执行
-        ReadBook.book ?: return null
-        if (selectedText.isBlank()) return null
-        return ReaderSelectionDraft(
-            selectedText = selectedText,
-            bookmarkText = selectedText,
-            bookmarkContent = "",
-        )
-    }
-
-    override suspend fun saveBookmark(commit: ReaderSelectionCommit): Boolean {
-        val book = ReadBook.book ?: return false
-        val content = semanticContent(commit.chapterIndex)
-        val chapterPos = content
-            ?.let { locateInContent(it, commit.start, commit.selectedText) }
-            ?.takeIf { it >= 0 }
-            ?: commit.start
-        val bookmark = Bookmark(
-            bookName = book.name,
-            bookAuthor = book.author,
-            bookUrl = book.bookUrl,
-            chapterIndex = commit.chapterIndex,
-            chapterPos = chapterPos,
-            chapterName = displayTitle(),
-            bookText = commit.bookmarkText,
-            content = commit.bookmarkContent,
-        )
-        return try {
-            bookmarkRepository.save(bookmark)
-            true
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Exception) {
-            AppLog.put("eink saveBookmark failed: ${e.message}", e)
-            false
-        }
-    }
 
     override suspend fun saveMarking(commit: ReaderSelectionCommit): Boolean {
         val book = ReadBook.book ?: return false
         val content = semanticContent(commit.chapterIndex) ?: return false
         val located = locateInContent(content, commit.start, commit.selectedText)
-        // 选区失效从严：笔记是文本锚点，与书签的宽松回退策略不同
+        // 选区失效从严：标记是文本锚点，定位不到即视为失效，不回退提示位
         if (located < 0) return false
         val (before, after) = extractContext(content, located, commit.selectedText.length)
         return try {
@@ -163,7 +114,7 @@ internal object ReaderSelectionEngineImpl : ReaderSelectionEngine, KoinComponent
     override suspend fun deleteMarking(markingId: String): Boolean {
         ReadBook.book ?: return false
         return try {
-            bookMarkingRepository.delete(markingId)
+            bookMarkingGateway.delete(markingId)
             ReaderEngineImpl.relayout()
             true
         } catch (e: CancellationException) {
@@ -177,7 +128,7 @@ internal object ReaderSelectionEngineImpl : ReaderSelectionEngine, KoinComponent
     /** 按 id 读 book_marks 映射详情（只读，不触发重排）。null = 标记不存在。 */
     override suspend fun findMarking(markingId: String): ReaderMarkingDetail? {
         ReadBook.book ?: return null
-        val mark = bookMarkingRepository.getById(markingId) ?: return null
+        val mark = bookMarkingGateway.getById(markingId) ?: return null
         val anchor = GSON.fromJsonObject<TextProcessAnchor>(mark.anchorJson).getOrNull()
         val style = GSON.fromJsonObject<TextProcessStyle>(mark.styleJson).getOrNull()
         return ReaderMarkingDetail(

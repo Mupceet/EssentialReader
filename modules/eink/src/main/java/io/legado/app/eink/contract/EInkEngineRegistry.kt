@@ -99,7 +99,7 @@ object EInkEngineRegistry {
 
     /**
      * 选区批注端口——**可选**端口：未注册 = 宿主无批注落库能力，
-     * 阅读页选择菜单隐藏书签/笔记项（长按选择与复制保留），
+     * 阅读页按 [ReaderSelectionEngine] 接口 KDoc 的降级语义处理，
      * 不参与 install 必填校验。
      */
     val selectionEngine: ReaderSelectionEngine?
@@ -125,7 +125,7 @@ object EInkEngineRegistry {
      * @param appUpdateEngine 应用更新端口实现（可选，默认 null：
      *   宿主无更新能力时不传，「我的」页入口不渲染）。
      * @param selectionEngine 选区批注端口实现（可选，默认 null：
-     *   宿主无批注落库能力时不传，阅读页选择菜单隐藏书签/笔记项）。
+     *   宿主无批注落库能力时不传，阅读页按接口 KDoc 的降级语义处理）。
      */
     fun install(
         globalSettings: GlobalSettings,
