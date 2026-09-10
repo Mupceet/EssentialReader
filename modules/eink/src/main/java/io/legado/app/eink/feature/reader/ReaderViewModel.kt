@@ -14,6 +14,7 @@ import io.legado.app.eink.contract.ReaderBookSnapshot
 import io.legado.app.eink.contract.ReaderEngineCallback
 import io.legado.app.eink.contract.ReaderFontOption
 import io.legado.app.eink.contract.ReaderFontSelection
+import io.legado.app.eink.contract.ReaderMarkingDetail
 import io.legado.app.eink.contract.ReaderPageSnapshot
 import io.legado.app.eink.contract.ReaderPrepareResult
 import io.legado.app.eink.contract.ReaderSelectionCommit
@@ -568,6 +569,16 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application),
     suspend fun deleteMarking(markingId: String): Boolean {
         val port = EInkEngineRegistry.selectionEngine ?: return false
         return port.deleteMarking(markingId)
+    }
+
+    /**
+     * 读取标记详情（Task 6 点按流：划线浮条/想法浮窗展示与写想法预填）。
+     * null = 端口未注册或标记不存在（换源清理等）——调用方按标记失效处理，
+     * 静默回落点按分区行为，不弹浮条/浮窗。
+     */
+    suspend fun findMarking(markingId: String): ReaderMarkingDetail? {
+        val port = EInkEngineRegistry.selectionEngine ?: return null
+        return port.findMarking(markingId)
     }
 
     // ==================== 排版参数 ====================

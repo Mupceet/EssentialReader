@@ -1,5 +1,6 @@
 package io.legado.app.eink.feature.reader.selection
 
+import io.legado.app.eink.contract.ReaderDecorationRun
 import io.legado.app.eink.contract.ReaderPageLine
 import io.legado.app.eink.contract.ReaderPageSnapshot
 import io.legado.app.eink.contract.ReaderPaintSpec
@@ -19,10 +20,21 @@ private fun line(
     top: Float = 30f,
     bottom: Float = 70f,
     isTitle: Boolean = false,
+    decorations: List<ReaderDecorationRun> = emptyList(),
 ): ReaderPageLine = ReaderPageLine(
     baseY = baseY, isTitle = isTitle, chunks = chunks.toList(),
     x = FloatArray(chunks.size) { i -> i * 100f },
     chapterPositions = positions, top = top, bottom = bottom,
+    decorations = decorations,
+)
+
+/** 实线装饰 run（点按命中测试用）。 */
+private fun decorationRun(
+    start: Int,
+    end: Int,
+    markingId: String = "m1",
+): ReaderDecorationRun = ReaderDecorationRun(
+    start = start, end = end, underlineMode = 1, highlight = false, markingId = markingId,
 )
 
 private fun snapshot(vararg lines: ReaderPageLine) = ReaderPageSnapshot(
@@ -156,5 +168,51 @@ class ReaderTextSelectionTest {
         assertEquals(30f to 30f, startAnchor)
         assertEquals(20f to 80f, endAnchor)
         assertNull(handleAnchor(emptyList()))
+    }
+
+    @Test
+    fun `装饰命中返回覆盖字符的run`() {
+        val line = line("abcdef", positions = intArrayOf(0), decorations = listOf(decorationRun(2, 5)))
+        // 区间 [start, end)：起点与内部命中，恰在右端点不算
+        assertEquals("m1", findDecorationAt(line, 2)!!.markingId)
+        assertEquals("m1", findDecorationAt(line, 4)!!.markingId)
+        assertNull(findDecorationAt(line, 5))
+    }
+
+    @Test
+    fun `装饰未命中返回null`() {
+        // 无装饰行
+        val plain = line("abcdef", positions = intArrayOf(0))
+        assertNull(findDecorationAt(plain, 3))
+        // 有装饰但命中在区间外/间隙
+        val line = line("abcdef", positions = intArrayOf(0), decorations = listOf(decorationRun(2, 4)))
+        assertNull(findDecorationAt(line, 1))
+        assertNull(findDecorationAt(line, 4))
+        assertNull(findDecorationAt(line, 10))
+    }
+
+    @Test
+    fun `多run取包含者且间隙不误取`() {
+        val line = line("abcdefghij", positions = intArrayOf(0),
+            decorations = listOf(decorationRun(0, 3, "m1"), decorationRun(5, 8, "m2")))
+        assertEquals("m1", findDecorationAt(line, 1)!!.markingId)
+        assertEquals("m2", findDecorationAt(line, 6)!!.markingId)
+        // 相邻 run 之间的间隙不误取
+        assertNull(findDecorationAt(line, 4))
+    }
+
+    @Test
+    fun `命中装饰选区快照按行内区间构造`() {
+        val snap = snapshot(line("abcdefghij", positions = intArrayOf(100), top = 30f, bottom = 70f))
+        val sel = selectionOfDecoration(snap, 0, decorationRun(2, 6, "m1"))!!
+        assertEquals(ReaderTextHit(0, 2), sel.startHit)
+        assertEquals(ReaderTextHit(0, 6), sel.endHit)
+        assertEquals("cdef", sel.selectedText)
+        assertEquals(102, sel.bodyStart)
+        assertEquals(106, sel.bodyEnd)
+        assertFalse(sel.includesTitle)
+        // 防御：行下标越界 / run 区间越界钳制后退化为空
+        assertNull(selectionOfDecoration(snap, 5, decorationRun(0, 2)))
+        assertNull(selectionOfDecoration(snap, 0, decorationRun(20, 30)))
     }
 }

@@ -10,4 +10,4 @@
 
 | 端口 | 必需性 | 职责 |
 |---|---|---|
-| ReaderSelectionEngine | 可选 | 阅读页长按选择的划线/想法落库与页面级书签 toggle。v2 方法清单：saveMarking（划线/想法同锚点 upsert）、deleteMarking、findMarking、togglePageBookmark；Commit = chapterIndex/start/end/selectedText/note/thought，附 ReaderMarkingDetail（v1 选区书签链路——解析预填、选区书签落库与书签弹层——已退役，页面级书签接管）。无端口降级宿主：松手后选区即冻结（把手停用），调界仅发生在落库前；长按选择整体不启用与下拉/顶栏书签钮隐藏的终态降级由 Task 9 装配收敛 |
+| ReaderSelectionEngine | 可选 | 阅读页长按选择的划线/想法落库、点按已有标记的浮条/浮窗（删除/写想法）与页面级书签 toggle。v2 方法清单：saveMarking（划线/想法同锚点 upsert）、deleteMarking、findMarking、togglePageBookmark；Commit = chapterIndex/start/end/selectedText/note/thought，附 ReaderMarkingDetail（v1 选区书签链路——解析预填、选区书签落库与书签弹层——已退役，页面级书签接管）。无端口：长按选择不启用（无浮条/无落库），点按标记浮条/浮窗不可达，下拉书签与顶栏书签钮隐藏（Task 9 落地其 UI 门控） |

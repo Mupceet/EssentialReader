@@ -1,5 +1,6 @@
 package io.legado.app.eink.feature.reader.selection
 
+import io.legado.app.eink.contract.ReaderDecorationRun
 import io.legado.app.eink.contract.ReaderPageLine
 import io.legado.app.eink.contract.ReaderPageSnapshot
 import java.text.BreakIterator
@@ -39,6 +40,43 @@ internal fun locateChunk(line: ReaderPageLine, charIndex: Int): Pair<Int, Int> {
 internal fun chapterPositionOf(line: ReaderPageLine, charIndex: Int): Int {
     val (chunk, offsetInChunk) = locateChunk(line, charIndex)
     return line.chapterPositions[chunk] + offsetInChunk
+}
+
+/**
+ * 行内装饰命中（v2 点按流）：返回第一个覆盖 [charIndex] 的装饰 run
+ * （区间 [start, end)，右端开）。映射侧已按 markingId + 样式分组合并，
+ * 同行 run 不重叠；未命中返回 null。
+ */
+fun findDecorationAt(line: ReaderPageLine, charIndex: Int): ReaderDecorationRun? =
+    line.decorations.firstOrNull { charIndex in it.start until it.end }
+
+/**
+ * 点按命中装饰的选区快照（v2 点按流）：run 行内区间 → 选区两端与正文区间
+ * （run 即行内拼接文本的字符索引，直接换算），selectedText = run 覆盖的
+ * 行内文本段。点按场景 saveMarking 与浮条锚定共用此快照——同锚点落库
+ * 命中原标记记录（单行标记精确命中；跨行标记以行内片段为锚点，宿主
+ * 窗口搜索以提示位回溯）。
+ * 行下标越界、run 区间越界钳制后退化为空区间时返回 null（防御宿主映射
+ * 脏数据，调用方静默回落分区行为）。
+ */
+fun selectionOfDecoration(
+    page: ReaderPageSnapshot,
+    lineIndex: Int,
+    run: ReaderDecorationRun,
+): ReaderSelectionUi? {
+    val line = page.lines.getOrNull(lineIndex) ?: return null
+    val text = lineText(line)
+    val start = run.start.coerceIn(0, text.length)
+    val end = run.end.coerceIn(start, text.length)
+    if (start >= end) return null
+    return ReaderSelectionUi(
+        startHit = ReaderTextHit(lineIndex, start),
+        endHit = ReaderTextHit(lineIndex, end),
+        selectedText = text.substring(start, end),
+        bodyStart = chapterPositionOf(line, start),
+        bodyEnd = chapterPositionOf(line, end),
+        includesTitle = line.isTitle,
+    )
 }
 
 /** 命中测试：y 按行盒定行（含容差半行高），x 按前缀宽度定最近字符。 */
