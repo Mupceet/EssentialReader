@@ -15,7 +15,7 @@ import io.legado.app.eink.contract.EInkEngineRegistry.keyEventHub
  * ```text
  * 宿主入口 attachBaseContext
  *    └─ onInstallEngines() ──► 宿主 bridge（如 EInkBridge.install()）
- *                                └─ install(8 个必填端口实现 + 可选 appUpdateEngine / selectionEngine)
+ *                                └─ install(8 个必填端口实现 + 可选 appUpdateEngine / selectionEngine / marksEngine)
  *                                      └─ 静态注册表整体替换（last-wins）
  *                                             │ keyEventHub 一并重建
  *                                             ▼
@@ -53,6 +53,7 @@ object EInkEngineRegistry {
     private var _readerEngine: ReaderEngine? = null
     private var _appUpdateEngine: AppUpdateEngine? = null
     private var _selectionEngine: ReaderSelectionEngine? = null
+    private var _marksEngine: MarksEngine? = null
 
     /** 模块自有的按键枢纽（非宿主端口）：每次 install 重置，丢弃陈旧 handler。 */
     private var _keyEventHub = EInkKeyEventHub()
@@ -105,6 +106,14 @@ object EInkEngineRegistry {
     val selectionEngine: ReaderSelectionEngine?
         get() = _selectionEngine
 
+    /**
+     * 书签/笔记端口——**可选**端口：未注册 = 宿主无书签/笔记列表能力，
+     * 目录页书签 Tab 与笔记页按 [MarksEngine] 接口 KDoc 的降级语义处理，
+     * 不参与 install 必填校验。
+     */
+    val marksEngine: MarksEngine?
+        get() = _marksEngine
+
     /** 模块自有按键枢纽（入口基类分发、阅读页注册处理器；恒可用）。 */
     val keyEventHub: EInkKeyEventHub
         get() = _keyEventHub
@@ -126,6 +135,9 @@ object EInkEngineRegistry {
      *   宿主无更新能力时不传，「我的」页入口不渲染）。
      * @param selectionEngine 选区批注端口实现（可选，默认 null：
      *   宿主无批注落库能力时不传，阅读页按接口 KDoc 的降级语义处理）。
+     * @param marksEngine 书签/笔记端口实现（可选，默认 null：
+     *   宿主无书签/笔记列表能力时不传，目录页书签 Tab 与笔记页按接口
+     *   KDoc 的降级语义处理）。
      */
     fun install(
         globalSettings: GlobalSettings,
@@ -138,6 +150,7 @@ object EInkEngineRegistry {
         readerEngine: ReaderEngine,
         appUpdateEngine: AppUpdateEngine? = null,
         selectionEngine: ReaderSelectionEngine? = null,
+        marksEngine: MarksEngine? = null,
     ) {
         _globalSettings = globalSettings
         _bookshelfEngine = bookshelfEngine
@@ -149,6 +162,7 @@ object EInkEngineRegistry {
         _readerEngine = readerEngine
         _appUpdateEngine = appUpdateEngine
         _selectionEngine = selectionEngine
+        _marksEngine = marksEngine
         _keyEventHub = EInkKeyEventHub()
     }
 

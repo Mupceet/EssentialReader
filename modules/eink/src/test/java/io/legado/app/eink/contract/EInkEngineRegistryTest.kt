@@ -13,7 +13,7 @@ import java.lang.reflect.Proxy
 /**
  * 引擎端口注册表（service locator）：未注册访问抛指名异常、install
  * 后端口可达、重复 install 整体替换（keyEventHub 一并重置）、可选端口
- * （更新/选区）未注册为 null。
+ * （更新/选区/书签）未注册为 null。
  *
  * 端口桩经 JDK 动态代理生成（install 只存引用不调方法，桩方法返回
  * null 即可），避免为 8 个接口手写假实现。
@@ -119,6 +119,36 @@ class EInkEngineRegistryTest {
         val hub = EInkEngineRegistry.keyEventHub
         assertNotNull(hub)
         assertNull("默认无注册处理器（按键放行系统）", hub.handler)
+    }
+
+    /** 书签/笔记端口桩（代理生成，只做存取断言，方法不实际调用）。 */
+    private val fakeMarksEngine: MarksEngine = stub()
+
+    @Test
+    fun `marksEngine 未注册时为 null 且不参与必填校验`() {
+        installDefaults() // 不传 marksEngine：install 正常完成即证明非必填
+        assertNull(EInkEngineRegistry.marksEngine)
+    }
+
+    @Test
+    fun `install 传入 marksEngine 后可取回`() {
+        installDefaults(marksEngine = fakeMarksEngine)
+        assertSame(fakeMarksEngine, EInkEngineRegistry.marksEngine)
+    }
+
+    /** 装配全部必填端口（代理桩），可选端口仅透传 marksEngine（缺省不传）。 */
+    private fun installDefaults(marksEngine: MarksEngine? = null) {
+        EInkEngineRegistry.install(
+            globalSettings = stub(),
+            bookshelfEngine = stub(),
+            searchEngine = stub(),
+            tocEngine = stub(),
+            bookDetailEngine = stub(),
+            changeSourceEngine = stub(),
+            coverEngine = stub(),
+            readerEngine = stub(),
+            marksEngine = marksEngine,
+        )
     }
 }
 
