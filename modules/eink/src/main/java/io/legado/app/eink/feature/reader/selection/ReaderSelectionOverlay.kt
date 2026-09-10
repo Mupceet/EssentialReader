@@ -190,6 +190,8 @@ internal fun moveEndpoint(
  * 选择浮条：横排动作键，锚在选区上方（放不下取下方），零动画直切。
  * 位置随选区把手锚点重算（把手拖拽期间浮条跟随重排）；x 跟随选区中心
  * 并钳制在画布内。书签/笔记键按批注端口可用性显隐（降级后仅复制）。
+ * 按键取实心反白高对比形态（selected = true，titleMedium 16sp 加粗），
+ * 不透明色块浮于正文之上，正文不透过按键（透明底会与正文视觉打架）。
  * 整体置于 zIndex(2f)：盖过把手独占层（zIndex(1f)），下方放置时菜单键
  * 落在把手 28dp 热区内也不被其 pointerInput 吞掉。
  *
@@ -231,6 +233,8 @@ internal fun ReaderSelectionMenu(
         if (showBookmark) {
             EInkButton(
                 text = "书签",
+                selected = true,
+                style = EInkTheme.typography.titleMedium,
                 onClick = { onAction(ReaderSelectionMenuAction.BOOKMARK) },
                 modifier = Modifier.width(itemWidthDp),
             )
@@ -238,12 +242,16 @@ internal fun ReaderSelectionMenu(
         if (showMarking) {
             EInkButton(
                 text = "笔记",
+                selected = true,
+                style = EInkTheme.typography.titleMedium,
                 onClick = { onAction(ReaderSelectionMenuAction.MARKING) },
                 modifier = Modifier.width(itemWidthDp),
             )
         }
         EInkButton(
             text = "复制",
+            selected = true,
+            style = EInkTheme.typography.titleMedium,
             onClick = { onAction(ReaderSelectionMenuAction.COPY) },
             modifier = Modifier.width(itemWidthDp),
         )
