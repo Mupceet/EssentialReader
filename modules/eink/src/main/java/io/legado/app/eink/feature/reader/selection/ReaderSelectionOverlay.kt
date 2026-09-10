@@ -29,8 +29,14 @@ import io.legado.app.eink.designsystem.theme.EInkTheme
 import io.legado.app.eink.feature.reader.applySpec
 import kotlin.math.roundToInt
 
-/** 选择浮条菜单动作。 */
-enum class ReaderSelectionMenuAction { BOOKMARK, MARKING, COPY }
+/**
+ * 选择浮条菜单动作（v2 三键）：
+ * - [COPY] 复制：选文落剪贴板；
+ * - [THOUGHT] 写想法：想法弹层，确认后 saveMarking(thought=true)；
+ * - [DELETE] 删除：deleteMarking（点按场景携带 markingId，Task 6 接线；
+ *   松手场景无 id，删除键置灰不可达）。
+ */
+enum class ReaderSelectionMenuAction { COPY, THOUGHT, DELETE }
 
 /** 把手热区半径（dp，对齐宿主 28f*density）。 */
 internal val SelectionHandleTouchRadiusDp = 28.dp
@@ -187,15 +193,20 @@ internal fun moveEndpoint(
     ) ?: selection
 
 /**
- * 选择浮条：横排动作键，锚在选区上方（放不下取下方），零动画直切。
- * 位置随选区把手锚点重算（把手拖拽期间浮条跟随重排）；x 跟随选区中心
- * 并钳制在画布内。书签/笔记键按批注端口可用性显隐（降级后仅复制）。
+ * 选择浮条：横排动作键（复制/写想法/删除），锚在选区上方（放不下取下方），
+ * 零动画直切。位置随选区把手锚点重算（把手拖拽期间浮条跟随重排）；x 跟随
+ * 选区中心并钳制在画布内。写想法/删除为批注动作，按批注端口可用性与选区
+ * 是否含标题行显隐（[showMarkingActions]——未注册端口或纯标题选区只留复制，
+ * 长按选择与复制仍可用，不做假死路径）；删除键在标记落库确认并拿到
+ * markingId 前禁用置灰（[deleteEnabled]——松手场景端口 saveMarking 只回
+ * Boolean 无 id，恒为禁用；Task 6 点按场景经快照命中 run 携带 id 后启用）。
  * 按键取实心反白高对比形态（selected = true，titleMedium 16sp 加粗），
  * 不透明色块浮于正文之上，正文不透过按键（透明底会与正文视觉打架）。
  * 整体置于 zIndex(2f)：盖过把手独占层（zIndex(1f)），下方放置时菜单键
  * 落在把手 28dp 热区内也不被其 pointerInput 吞掉。
  *
  * @param canvasWidth 画布实测宽（调用方以 onSizeChanged 传入），浮条 x 钳制边界
+ * @param deleteEnabled 删除键可用性（false = 置灰弱化、点击不响应）
  */
 @Composable
 internal fun ReaderSelectionMenu(
@@ -204,14 +215,14 @@ internal fun ReaderSelectionMenu(
     anchorRight: Float,
     anchorBottom: Float,
     canvasWidth: Float,
-    showBookmark: Boolean,
-    showMarking: Boolean,
+    showMarkingActions: Boolean,
+    deleteEnabled: Boolean,
     onAction: (ReaderSelectionMenuAction) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val density = LocalDensity.current
     val itemWidthDp = 72.dp
-    val itemCount = listOf(showBookmark, showMarking, true).count { it }
+    val itemCount = if (showMarkingActions) 3 else 1
     val menuWidthPx = with(density) { (itemWidthDp * itemCount).toPx() }
     val menuHeightPx = with(density) { 48.dp.toPx() }
     val gapPx = with(density) { 8.dp.toPx() }
@@ -230,24 +241,6 @@ internal fun ReaderSelectionMenu(
             .zIndex(2f)
             .offset { IntOffset(x.roundToInt(), y) },
     ) {
-        if (showBookmark) {
-            EInkButton(
-                text = "书签",
-                selected = true,
-                style = EInkTheme.typography.titleMedium,
-                onClick = { onAction(ReaderSelectionMenuAction.BOOKMARK) },
-                modifier = Modifier.width(itemWidthDp),
-            )
-        }
-        if (showMarking) {
-            EInkButton(
-                text = "笔记",
-                selected = true,
-                style = EInkTheme.typography.titleMedium,
-                onClick = { onAction(ReaderSelectionMenuAction.MARKING) },
-                modifier = Modifier.width(itemWidthDp),
-            )
-        }
         EInkButton(
             text = "复制",
             selected = true,
@@ -255,5 +248,23 @@ internal fun ReaderSelectionMenu(
             onClick = { onAction(ReaderSelectionMenuAction.COPY) },
             modifier = Modifier.width(itemWidthDp),
         )
+        if (showMarkingActions) {
+            EInkButton(
+                text = "写想法",
+                selected = true,
+                style = EInkTheme.typography.titleMedium,
+                onClick = { onAction(ReaderSelectionMenuAction.THOUGHT) },
+                modifier = Modifier.width(itemWidthDp),
+            )
+            // 松手场景标记 id 不可得：置灰而非假装可用（点击无效果，见类 KDoc）
+            EInkButton(
+                text = "删除",
+                selected = true,
+                enabled = deleteEnabled,
+                style = EInkTheme.typography.titleMedium,
+                onClick = { onAction(ReaderSelectionMenuAction.DELETE) },
+                modifier = Modifier.width(itemWidthDp),
+            )
+        }
     }
 }

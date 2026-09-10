@@ -85,6 +85,7 @@ import io.legado.app.eink.feature.reader.selection.ReaderSelectionMenu
 import io.legado.app.eink.feature.reader.selection.ReaderSelectionMenuAction
 import io.legado.app.eink.feature.reader.selection.ReaderSelectionOverlay
 import io.legado.app.eink.feature.reader.selection.ReaderSelectionUi
+import io.legado.app.eink.feature.reader.selection.ReaderThoughtDialog
 import io.legado.app.eink.feature.reader.selection.buildSelection
 import io.legado.app.eink.feature.reader.selection.handleAnchor
 import io.legado.app.eink.feature.reader.selection.hitTest
@@ -109,10 +110,12 @@ private enum class ReaderStyleDialog { Fonts, Info, Margin }
  * - 返回键：面板 → 控件 → 退出阅读 的逐级回退；面板/弹框外空白区
  *   点击则一次性收起到干净阅读界面；
  * - 一次性消息 → Toast；
- * - 页内长按选区状态在此持有：翻页/重排（pageVersion 推进）自动清空，
- *   选择浮条「复制」直接落剪贴板，「书签」经编辑弹层确认后经宿主端口
- *   落库（失败保留弹层可重试），「笔记」确认后落库并等宿主重排新快照
- *   （带装饰）重绘时清选区收尾；
+ * - 页内长按选区状态在此持有：翻页/重排（pageVersion 推进）自动清空。
+ *   v2 松手即存（设计 §3.5/§4）：选词/调界松手即落划线，浮条照常展示、
+ *   动作不依赖落库结果；浮条「复制」直接落剪贴板，「写想法」经想法弹层
+ *   确认后落库（失败保留弹层可重试），落库成功等宿主重排新快照（带
+ *   装饰）重绘时清选区收尾；「删除」在松手场景置灰（端口 saveMarking
+ *   只回 Boolean 无 markingId，Task 6 点按场景接线）；
  * - 面板开关为 UI 局部状态（remember），排版数据来自 [ReaderUiState]。
  */
 @Composable
@@ -140,74 +143,38 @@ fun ReaderRoute(
     // 单页快照，pageVersion 推进（翻页/重排/批注落库重绘）即自动清空，
     // 同时承载批注保存重绘后的清区时序
     var selection by remember { mutableStateOf<ReaderSelectionUi?>(null) }
-    // 书签编辑弹层状态：draft 非空即弹层打开，与 pendingSelection（发起
-    // 弹层动作的选区，确认提交用）成对置位/清空；弹层期间选区保留——
-    // 取消只关弹层，用户可再调整选区，仅保存成功才清选区（设计 §5）
+    // ===== v1 书签/笔记弹层链路状态（已不可达，Task 5 物理清理）=====
+    // 浮条枚举重命名移除书签/笔记分支后 bookmarkDraft/markingDraft 永不
+    // 置位，下方对应弹层组合不再构成可达路径；仅保留待 Task 5 契约收敛
+    // 随 resolveSelection/saveBookmark/书签弹层一并清理
     var bookmarkDraft by remember { mutableStateOf<ReaderSelectionDraft?>(null) }
-    // 笔记编辑弹层状态：与 bookmarkDraft 互斥（pendingSelection 单份，同一
-    // 时刻至多一个弹层打开）；预览文本取 draft.selectedText
     var markingDraft by remember { mutableStateOf<ReaderSelectionDraft?>(null) }
     var pendingSelection by remember { mutableStateOf<ReaderSelectionUi?>(null) }
-    // pageVersion 推进 = 选区所在内容已被替换：选区、待提交选区与弹层
-    // 草稿一并清空，弹层随内容变化关闭。只清 selection 会残留幽灵弹层：
-    // resolveSelection 在途时翻页，解析结果仍被置入弹层，确认即按新章
-    // 索引落旧章偏移
+    // v2 想法弹层：thoughtSelection 非空即弹层打开（发起弹层的选区快照，
+    // 确认提交用；预览文本取其 selectedText，不经端口解析——设计 §5）。
+    // 新建预填空；点按编辑预填 findMarking 的 note 属 Task 6 点按场景
+    var thoughtSelection by remember { mutableStateOf<ReaderSelectionUi?>(null) }
+    // pageVersion 推进 = 选区所在内容已被替换：选区、弹层选区快照与弹层
+    // 草稿一并清空，弹层随内容变化关闭，不残留幽灵弹层（在途提交按各自
+    // 现读现判护栏落失效/失败分支）
     LaunchedEffect(uiState.pageVersion) {
         selection = null
         pendingSelection = null
         bookmarkDraft = null
         markingDraft = null
+        thoughtSelection = null
     }
     val scope = rememberCoroutineScope()
 
-    // 选择浮条动作：复制直接落剪贴板并清选区；书签/笔记经端口解析预填后
-    // 弹层编辑、确认落库（笔记成功后选区保留到新快照重绘再清，见确认路径
-    // 注释；浮条键显隐由 selectionEngine 端口可用性决定）
+    // 选择浮条动作（v2 三键）：复制直接落剪贴板并清选区；写想法开想法
+    // 弹层（选区快照随弹层保存，确认提交用，见下方想法弹层注释）；删除
+    // 松手场景置灰不可达（无 markingId，Task 6 点按场景接线）。落划线
+    // 不在此路径——松手即存见 onSelectionCommitted
     val clipboard = LocalClipboard.current
     val clipboardScope = rememberCoroutineScope()
     val onSelectionMenuAction: (ReaderSelectionMenuAction, ReaderSelectionUi) -> Unit =
         { action, sel ->
             when (action) {
-                ReaderSelectionMenuAction.BOOKMARK -> {
-                    scope.launch {
-                        val draft = viewModel.resolveSelection(sel)
-                        if (draft == null) {
-                            // 无会话书/选中文本为空：选区失效，清区提示
-                            selection = null
-                            Toast.makeText(context, "选区已失效", Toast.LENGTH_SHORT).show()
-                        } else if (selection != sel) {
-                            // 解析挂起期间选区已被翻页/点按清空或重建（selection
-                            // 现读现判）：解析结果作废，不置弹层状态，清区提示
-                            selection = null
-                            Toast.makeText(context, "选区已失效", Toast.LENGTH_SHORT).show()
-                        } else {
-                            pendingSelection = sel
-                            bookmarkDraft = draft
-                        }
-                    }
-                }
-
-                // 笔记：解析与失效守卫同书签分支；成功落库后的清区时序不同
-                // （选区保留到新快照重绘），见下方确认路径注释
-                ReaderSelectionMenuAction.MARKING -> {
-                    scope.launch {
-                        val draft = viewModel.resolveSelection(sel)
-                        if (draft == null) {
-                            // 无会话书/选中文本为空：选区失效，清区提示
-                            selection = null
-                            Toast.makeText(context, "选区已失效", Toast.LENGTH_SHORT).show()
-                        } else if (selection != sel) {
-                            // 解析挂起期间选区已被翻页/点按清空或重建（selection
-                            // 现读现判）：解析结果作废，不置弹层状态，清区提示
-                            selection = null
-                            Toast.makeText(context, "选区已失效", Toast.LENGTH_SHORT).show()
-                        } else {
-                            pendingSelection = sel
-                            markingDraft = draft
-                        }
-                    }
-                }
-
                 ReaderSelectionMenuAction.COPY -> {
                     clipboardScope.launch {
                         clipboard.setClipEntry(
@@ -217,8 +184,32 @@ fun ReaderRoute(
                     }
                     selection = null
                 }
+
+                ReaderSelectionMenuAction.THOUGHT -> thoughtSelection = sel
+
+                ReaderSelectionMenuAction.DELETE -> {
+                    // 松手场景无 markingId（端口 saveMarking 只回 Boolean），
+                    // 删除键置灰不可达；Task 6 点按场景经快照命中 run 携带
+                    // id 后在此接 viewModel.deleteMarking
+                }
             }
         }
+
+    // 松手即存（v2 设计 §3.5/§4）：选词/调界松手即落划线（thought=false，
+    // 同锚点原地更新），浮条照常展示、动作不依赖落库结果。两类不请求落库：
+    // 端口未注册（降级宿主，长按选择与复制仍可用）；含标题选区（§3.4
+    // 不落划线静默忽略，浮条本就只留复制键）——均无提示，不做假死路径。
+    // 落库失败 toast「保存失败」，浮条保留（划线未落，删除键本就置灰，
+    // 写想法仍可重试或复制）
+    val onSelectionCommitted: (ReaderSelectionUi) -> Unit = { sel ->
+        if (viewModel.selectionEnabled && !sel.includesTitle) {
+            scope.launch {
+                if (!viewModel.saveMarking(sel, note = "", thought = false)) {
+                    Toast.makeText(context, "保存失败", Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
+    }
 
     // 字体文件夹选择（SAF）：持久化读权限后交 VM 落库并刷新字体列表
     val fontFolderLauncher = rememberLauncherForActivityResult(
@@ -416,7 +407,11 @@ fun ReaderRoute(
             onRetry = { viewModel.attach(bookUrl) },
             selection = selection,
             selectionEnabled = viewModel.selectionEnabled,
+            // 松手场景恒禁用：标记 id 不可得（端口 saveMarking 只回 Boolean），
+            // Task 6 点按场景携带快照命中 run 的 markingId 后启用
+            deleteEnabled = false,
             onSelectionChange = { selection = it },
+            onSelectionCommitted = onSelectionCommitted,
             onSelectionMenuAction = onSelectionMenuAction,
         )
 
@@ -574,23 +569,55 @@ fun ReaderRoute(
             }
         }
 
-        // 书签/笔记编辑弹层：确认经端口落库。陈旧/重复触发三重护栏：
-        // - pageVersion 推进（翻页/重排/批注重绘）连同清空 selection/
-        //   pendingSelection/两个弹层草稿，内容变化即关弹层，不残留幽灵弹层；
-        // - 确认时 pendingSelection 现读现判，弹层期间选区被点按清空则落
-        //   失效分支；
-        // - saving 防重入：慢速墨水屏确认回显延迟期间的双击只落库一次
-        //   （书签/笔记共用一枚——pendingSelection 单份，同一时刻至多一个
-        //   弹层打开）。
-        // 书签成功关弹层清选区，失败提示并保留弹层与选区可重试或取消。
-        // 笔记两条路径都关弹层：成功后选区保留——等宿主重排（save → DB →
-        // relayout → onContentUpdated → pageVersion++）推送带装饰的新快照，
-        // 由上面的 pageVersion 效应清区，重排期间选区不闪断（设计 §5 收尾
-        // 时序）；失败（或确认时选区已失效）则选区上下文已不可信，兜底清区
-        // （宿主重排异常另有 onLayoutException 错误态提示）。若宿主重排未
-        // 推进 pageVersion（内容哈希未变的极端情况），选区保留至下次翻页，
-        // 属可接受的 v1 降级
+        // 想法弹层（v2，设计 §5）：确认经端口落库（thought=true，同锚点
+        // 原地更新把松手已落的划线转换为想法）。护栏沿用 v1：
+        // - pageVersion 推进（落库重排/翻页/点按重绘）连同清空
+        //   thoughtSelection，内容变化即关弹层，不残留幽灵弹层；
+        // - 确认时 thoughtSelection 现读现判，落库前弹层选区已被并发清空
+        //   则落「选区已失效」分支；
+        // - saving 防重入：慢速墨水屏确认回显延迟期间的双击只落库一次。
+        // 成功关弹层不清 selection：等宿主重排（save → DB → relayout →
+        // onContentUpdated → pageVersion++）推送带虚线装饰的新快照，由
+        // pageVersion 效应清区收尾；若宿主重排未推进 pageVersion（内容
+        // 哈希未变的极端情况），选区保留至下次翻页，属可接受的 v1 降级。
+        // 失败 toast「保存失败」弹层保留可重试。
         var saving by remember { mutableStateOf(false) }
+        thoughtSelection?.let { sel ->
+            ReaderThoughtDialog(
+                thoughtText = "",
+                selectedText = sel.selectedText,
+                onDismiss = { thoughtSelection = null },
+                onConfirm = confirm@{ note ->
+                    if (saving) return@confirm
+                    saving = true
+                    scope.launch {
+                        try {
+                            // 现读现判：确认发起后选区快照已被页变/点按清空
+                            // 则落失效分支（thoughtSelection 非空时即弹层快照）
+                            val target = thoughtSelection
+                            when {
+                                target == null -> Toast.makeText(
+                                    context, "选区已失效", Toast.LENGTH_SHORT
+                                ).show()
+
+                                viewModel.saveMarking(target, note, thought = true) ->
+                                    thoughtSelection = null
+
+                                else -> Toast.makeText(
+                                    context, "保存失败", Toast.LENGTH_SHORT
+                                ).show()
+                            }
+                        } finally {
+                            saving = false
+                        }
+                    }
+                },
+            )
+        }
+
+        // ===== v1 书签/笔记弹层（已不可达，Task 5 物理清理）=====
+        // bookmarkDraft/markingDraft 随浮条书签/笔记分支移除永不置位，
+        // 以下组合不构成可达路径；护栏与清区时序注释保留作后续任务参照
         bookmarkDraft?.let { draft ->
             ReaderBookmarkEditDialog(
                 draft = draft,
@@ -620,7 +647,8 @@ fun ReaderRoute(
                 },
             )
         }
-        // 笔记编辑弹层：确认落库后成功/失败的清区差异见上方护栏注释
+        // v1 笔记编辑弹层（已不可达）：确认落库后成功/失败的清区差异见
+        // 上方想法弹层护栏注释
         markingDraft?.let { draft ->
             ReaderMarkingEditDialog(
                 draft = draft,
@@ -675,17 +703,18 @@ fun ReaderRoute(
  * 手势（规范 §16）：
  * - 操作条可见时：点/滑动正文任意处收起操作条；
  * - 操作条隐藏时：点中间 40% 唤出操作条，点其余区域下一页；
- * - 长按正文选词（震动反馈），拖拽延伸选区末端，松手弹出浮条
- *   （书签/笔记/复制；书签/笔记键按 [selectionEnabled] 显隐）；
- *   选区存在期间点按先清选区再按分区执行常规行为、水平滑动不翻页，
- *   把手拖拽调整端点（浮条随锚点重排）；
+ * - 长按正文选词（震动反馈），拖拽延伸选区末端，松手落划线并弹出浮条
+ *   （复制/写想法/删除；写想法/删除键按批注端口可用性与选区是否含标题行
+ *   显隐，删除键按 [deleteEnabled] 置灰）；选区存在期间点按先清选区再按
+ *   分区执行常规行为、水平滑动不翻页，把手拖拽调整端点（浮条随锚点重排）；
  * - 水平滑动翻页，判定对齐 View 版：触发距离读引擎 pageTouchSlop（AppConfig.pageTouchSlop 经端口）
  *   （完整版设置"翻页触发距离"，0 = 系统 slop，Compose 版只读不设），
  *   松手前反向回拖取消；无跟手移动，翻页整页立即替换。
  *
  * 选区状态由调用方持有（[selection] / [onSelectionChange]），翻页/重排
- * （pageVersion 推进）清空也由调用方承担；浮条动作经 [onSelectionMenuAction]
- * 上抛（选区随动作语义由调用方决定去留）。
+ * （pageVersion 推进）清空也由调用方承担；选词/调界松手（含手势取消）
+ * 经 [onSelectionCommitted] 上抛一次触发落划线，浮条动作经
+ * [onSelectionMenuAction] 上抛（选区随动作语义由调用方决定去留）。
  */
 @Composable
 internal fun ReaderScreen(
@@ -711,7 +740,9 @@ internal fun ReaderScreen(
     onRetry: () -> Unit,
     selection: ReaderSelectionUi?,
     selectionEnabled: Boolean,
+    deleteEnabled: Boolean,
     onSelectionChange: (ReaderSelectionUi?) -> Unit,
+    onSelectionCommitted: (ReaderSelectionUi) -> Unit,
     onSelectionMenuAction: (ReaderSelectionMenuAction, ReaderSelectionUi) -> Unit,
 ) {
     // 纯净阅读底色/字色随日/夜间主题（决策 B1/B2 修订：仍不读取
@@ -880,11 +911,20 @@ internal fun ReaderScreen(
                                 onSelectionChange(moveEndpoint(page, sel, isStart = false, hit))
                             },
                             onDragEnd = {
-                                // 选区保留，松手弹菜单
-                                if (dragCreatedSelection) selectionMenuVisible = true
+                                // 选区保留，松手弹菜单 + 即存落划线（v2 松手
+                                // 即存，浮条动作不依赖落库结果）
+                                if (dragCreatedSelection) {
+                                    selectionMenuVisible = true
+                                    currentSelection?.let(onSelectionCommitted)
+                                }
                             },
                             onDragCancel = {
-                                if (dragCreatedSelection) selectionMenuVisible = true
+                                // 手势取消视同松手：浮条与落库随行，避免菜单
+                                // 已展示而划线未落的不一致现场
+                                if (dragCreatedSelection) {
+                                    selectionMenuVisible = true
+                                    currentSelection?.let(onSelectionCommitted)
+                                }
                             },
                         )
                     }
@@ -914,8 +954,8 @@ internal fun ReaderScreen(
                             anchorRight = anchors.second.first,
                             anchorBottom = runs.last().bottom,
                             canvasWidth = canvasWidthPx.toFloat(),
-                            showBookmark = selectionEnabled,
-                            showMarking = selectionEnabled && !selection.includesTitle,
+                            showMarkingActions = selectionEnabled && !selection.includesTitle,
+                            deleteEnabled = deleteEnabled,
                             onAction = { action ->
                                 onSelectionMenuAction(action, selection)
                             },

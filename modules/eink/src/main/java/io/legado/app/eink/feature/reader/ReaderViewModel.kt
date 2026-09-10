@@ -120,9 +120,9 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application),
     }
 
     /**
-     * 批注端口可用性：决定选择浮条「书签/笔记」键显隐——未注册
+     * 批注端口可用性：决定选择浮条「写想法/删除」键显隐——未注册
      * [EInkEngineRegistry.selectionEngine] 的宿主为合法降级态，浮条
-     * 只留复制键，长按选择与复制仍可用，不做假死路径。
+     * 只留复制键、松手不落划线，长按选择与复制仍可用，不做假死路径。
      */
     val selectionEnabled: Boolean
         get() = EInkEngineRegistry.selectionEngine != null
@@ -538,6 +538,9 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application),
      * 选区解析：经批注端口构造编辑弹层预填值（宿主按章节全文定位选区）。
      * null = 端口未注册（宿主无批注能力）或选区失效（无会话书/选中文本
      * 为空），调用方清选区并提示。
+     *
+     * v2 已无调用方（松手即存 + 想法弹层预览改取本地选区文本，不经端口）：
+     * 仅保留待 Task 5 契约收敛随端口 resolveSelection 一并退役，勿新增调用。
      */
     suspend fun resolveSelection(sel: ReaderSelectionUi): ReaderSelectionDraft? =
         EInkEngineRegistry.selectionEngine?.resolveSelection(
@@ -547,7 +550,12 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application),
             selectedText = sel.selectedText,
         )
 
-    /** 保存书签（弹层编辑后的标题/内容；笔记备注当前链路不涉及，置空串）。 */
+    /**
+     * 保存书签（弹层编辑后的标题/内容；笔记备注当前链路不涉及，置空串）。
+     *
+     * v2 已无调用方（页面书签改走 togglePageBookmark，Task 9 接线）：
+     * 仅保留待 Task 5 契约收敛随端口 saveBookmark 一并退役，勿新增调用。
+     */
     suspend fun saveBookmark(sel: ReaderSelectionUi, bookText: String, content: String): Boolean {
         val port = EInkEngineRegistry.selectionEngine ?: return false
         return port.saveBookmark(
@@ -564,9 +572,38 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application),
     }
 
     /**
-     * 保存笔记（样式固定实线；备注可空串）。宿主落库 book_marks 后自行触发
-     * 当前章重排并经 onContentUpdated 推送带装饰的新快照（pageVersion 随之
-     * 推进，Route 效应清选区收尾）——模块不请求刷新。false = 落库失败。
+     * 保存划线/想法（v2 松手即存与想法弹层确认共用入口）：[thought] = true
+     * 为想法（宿主写 underlineMode=2 虚线），false 为划线（underlineMode=1
+     * 实线）；[note] 为想法内容（划线恒空串）。同锚点落库为原地更新
+     * （SaveMarkingUseCase.save），松手划线经想法弹层确认即转换为想法。
+     * 宿主落库 book_marks 后自行触发当前章重排（保持页内位置）并经
+     * onContentUpdated 推送带装饰的新快照（pageVersion 随之推进，Route
+     * 效应清选区收尾）——模块不请求刷新。false = 端口未注册（降级宿主）
+     * 或落库失败。
+     *
+     * 注意端口只回 Boolean、不返回落库标记的 markingId：松手浮条的删除
+     * 因此不可用（置灰），删除走 Task 6 点按场景（快照命中 run 携带 id）
+     * 的 [deleteMarking]。
+     */
+    suspend fun saveMarking(sel: ReaderSelectionUi, note: String, thought: Boolean): Boolean {
+        val port = EInkEngineRegistry.selectionEngine ?: return false
+        return port.saveMarking(
+            ReaderSelectionCommit(
+                chapterIndex = engine.currentChapterIndex,
+                start = sel.bodyStart,
+                end = sel.bodyEnd,
+                selectedText = sel.selectedText,
+                bookmarkText = "",
+                bookmarkContent = "",
+                note = note,
+                thought = thought,
+            ),
+        )
+    }
+
+    /**
+     * v1 笔记保存（笔记编辑弹层链路已随浮条 v2 重构不可达）：Task 5
+     * 契约收敛时退役，勿新增调用。
      */
     suspend fun saveMarking(sel: ReaderSelectionUi, note: String): Boolean {
         val port = EInkEngineRegistry.selectionEngine ?: return false
@@ -581,6 +618,15 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application),
                 note = note,
             ),
         )
+    }
+
+    /**
+     * 删除标记（Task 6 点按场景消费；松手场景无 markingId，浮条删除键
+     * 置灰不可达本方法）。false = 端口未注册或删除失败。
+     */
+    suspend fun deleteMarking(markingId: String): Boolean {
+        val port = EInkEngineRegistry.selectionEngine ?: return false
+        return port.deleteMarking(markingId)
     }
 
     // ==================== 排版参数 ====================
