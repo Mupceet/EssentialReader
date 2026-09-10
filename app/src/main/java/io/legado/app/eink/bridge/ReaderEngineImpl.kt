@@ -316,6 +316,13 @@ internal object ReaderEngineImpl : ReaderEngine, KoinComponent {
     override fun prevChapter(): Boolean =
         ReadBook.moveToPrevChapter(upContent = true, toLast = false)
 
+    override fun jumpToPosition(chapterIndex: Int, chapterPos: Int): Boolean {
+        if (ReadBook.book == null) return false
+        ReadBook.saveReadingAnchorBeforeChapterJump(chapterIndex, chapterPos)
+        ReadBook.openChapter(chapterIndex, chapterPos)
+        return true
+    }
+
     override val autoReadIntervalSec: Int
         get() = ReadBookConfig.autoReadSpeed
 

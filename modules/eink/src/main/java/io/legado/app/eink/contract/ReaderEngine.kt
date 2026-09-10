@@ -282,6 +282,14 @@ interface ReaderEngine {
     fun prevChapter(): Boolean
 
     /**
+     * 会话内跳转到指定章节的章内字符位置（书签/笔记跳转用；区别于
+     * [loadContent]——本方法保留页内落点，且先记录回跳锚点）。
+     * 跳转即移动阅读位置（进度随后续保存时机落库）。
+     * @return false = 无会话（调用方走无会话落进度路径）。
+     */
+    fun jumpToPosition(chapterIndex: Int, chapterPos: Int): Boolean
+
+    /**
      * 自动翻页间隔（秒）。与宿主阅读引擎的自动阅读速度共用同一配置
      * （默认 10，有效范围 1..120），两模式调参互相同步。
      */
