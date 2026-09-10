@@ -18,6 +18,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -513,6 +514,18 @@ fun ReaderRoute(
         }
     }
 
+    // 页面书签 toggle（v2 Task 9，设计 §4）：顶栏书签钮与阅读区竖直下拉
+    // 共用；端口在位才可达（降级宿主两者皆不渲染/不响应，见 ReaderScreen）。
+    // 非 true（false = 移除失败、null = 端口缺失/无页/无会话书）toast
+    // 「操作失败」；成功无 toast——角标变化随宿主重排的新快照即反馈
+    val onPageBookmarkToggle: () -> Unit = {
+        scope.launch {
+            if (viewModel.togglePageBookmark() != true) {
+                Toast.makeText(context, "操作失败", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
     // 字体文件夹选择（SAF）：持久化读权限后交 VM 落库并刷新字体列表
     val fontFolderLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenDocumentTree()
@@ -698,6 +711,7 @@ fun ReaderRoute(
             onOpenCachePanel = { panel = ReaderPanel.CACHE },
             onAddToBookshelf = viewModel::addToBookshelf,
             onRemoveFromBookshelf = { showRemoveConfirm = true },
+            onTogglePageBookmark = onPageBookmarkToggle,
             selectedPanel = panel,
             onOpenPanel = { target ->
                 // 再次点击已打开的面板按钮 = 关闭（取消选中）；
@@ -1109,6 +1123,7 @@ internal fun ReaderScreen(
     onOpenCachePanel: () -> Unit,
     onAddToBookshelf: () -> Unit,
     onRemoveFromBookshelf: () -> Unit,
+    onTogglePageBookmark: () -> Unit,
     selectedPanel: ReaderPanel?,
     onOpenPanel: (ReaderPanel) -> Unit,
     onRetry: () -> Unit,
@@ -1270,6 +1285,46 @@ internal fun ReaderScreen(
                             change.consume()
                             dragAccum += dragAmount
                             if (dragAmount != 0f) lastDelta = dragAmount
+                        }
+                    }
+                    .pointerInput(selectionEnabled) {
+                        // 竖直下拉书签（v2 Task 9，设计 §4「阅读区竖直下拉」）：
+                        // 累计下拉 ≥ 80dp 且无选区、操作条收起、无排版错误、
+                        // 批注端口在位时 toggle 当前页书签一次；一次手势至多
+                        // 触发一次，结束/取消复位。与既有手势共存：横/竖触摸
+                        // slop 判定互斥（横向翻页检测器赢走的拖动会取消本检测
+                        // 器，反之亦然）；长按选择在位移超 slop 时即被取消，把
+                        // 手拖拽属选区场景（选区非空恒不触发）。端口缺失（降级
+                        // 宿主）恒不触发（no-op）。检测器不以 selection/controls
+                        // 为 key（拖拽中途翻转状态不重启手势），实时值经
+                        // rememberUpdatedState 读取
+                        val triggerThreshold = 80.dp.toPx()
+                        var dragAccum = 0f
+                        var triggered = false
+                        detectVerticalDragGestures(
+                            onDragStart = {
+                                dragAccum = 0f
+                                triggered = false
+                            },
+                            onDragEnd = {
+                                dragAccum = 0f
+                                triggered = false
+                            },
+                            onDragCancel = {
+                                dragAccum = 0f
+                                triggered = false
+                            },
+                        ) { change, dragAmount ->
+                            change.consume()
+                            if (triggered) return@detectVerticalDragGestures
+                            dragAccum += dragAmount
+                            if (dragAccum >= triggerThreshold && selectionEnabled &&
+                                !currentControlsVisible && currentError == null &&
+                                currentSelection == null
+                            ) {
+                                triggered = true
+                                onTogglePageBookmark()
+                            }
                         }
                     }
                     .pointerInput(selectionEnabled) {
@@ -1499,12 +1554,18 @@ internal fun ReaderScreen(
             ) {
                 ReaderTopBar(
                     state = state,
+                    // 页面书签钮（v2 Task 9，设计 §4）：选中态 = 当前页快照
+                    // bookmarkBadge；批注端口缺失（selectionEnabled = false）
+                    // 时整颗不渲染（契约 §3.3 降级语义）
+                    bookmarkEnabled = selectionEnabled,
+                    bookmarkBadge = state.page?.bookmarkBadge == true,
                     onOpenDetail = onOpenDetail,
                     onChangeSource = onChangeSource,
                     onRefresh = onRefresh,
                     onOpenCachePanel = onOpenCachePanel,
                     onAddToBookshelf = onAddToBookshelf,
                     onRemoveFromBookshelf = onRemoveFromBookshelf,
+                    onToggleBookmark = onTogglePageBookmark,
                 )
             }
         }

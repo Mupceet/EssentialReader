@@ -66,12 +66,15 @@ private const val MarginTickStep = 8
 @Composable
 internal fun ReaderTopBar(
     state: ReaderUiState,
+    bookmarkEnabled: Boolean,
+    bookmarkBadge: Boolean,
     onOpenDetail: () -> Unit,
     onChangeSource: () -> Unit,
     onRefresh: () -> Unit,
     onOpenCachePanel: () -> Unit,
     onAddToBookshelf: () -> Unit,
     onRemoveFromBookshelf: () -> Unit,
+    onToggleBookmark: () -> Unit,
 ) {
     // 通用顶栏（贴右动作模式）：书名可点击进详情（按压反色、背景贴
     // 屏幕左缘、禁用中灰），动作按钮直接使用 EInkOperationBarIcon
@@ -82,6 +85,20 @@ internal fun ReaderTopBar(
         titleClickLabel = "书籍详情",
         actionsFillMax = true,
         actions = {
+            // 页面书签切换钮（v2 Task 9，设计 §4）：选中态 = 当前页快照
+            // bookmarkBadge（模块不自持书签状态），点击 toggle 当前页书签。
+            // 模块无书签图标资产，按设计降级用文本钮；批注端口缺失时整颗
+            // 不渲染（契约 §3.3 降级语义）
+            if (bookmarkEnabled) {
+                EInkButton(
+                    text = "书签",
+                    onClick = onToggleBookmark,
+                    selected = bookmarkBadge,
+                    height = 40.dp,
+                    style = EInkTheme.typography.bodyMedium,
+                    onClickLabel = if (bookmarkBadge) "移除书签" else "添加书签",
+                )
+            }
             EInkOperationBarIcon(
                 icon = painterResource(R.drawable.eink_ic_exchange),
                 contentDescription = "换源",

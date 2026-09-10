@@ -18,6 +18,7 @@ import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.unit.dp
 import io.legado.app.eink.contract.EInkEngineRegistry
 import io.legado.app.eink.contract.ReaderImageSlot
 import io.legado.app.eink.contract.ReaderPageSnapshot
@@ -52,7 +53,11 @@ internal fun ReaderPageSnapshotCanvas(
 ) {
     val themeTextColorArgb = EInkTheme.colorScheme.onBackground.toArgb()
     val themeHighlightArgb = EInkTheme.colorScheme.secondaryContainer.toArgb()
+    val themePrimaryArgb = EInkTheme.colorScheme.primary.toArgb()
     val imageAntiAlias = EInkEngineRegistry.globalSettings.useAntiAlias
+    // 页眉预留高度（px）：书签角标贴其下缘（正文顶缘）起画——宿主
+    // ReaderBookmarkBadge 同位（topPx = contentTopPx）
+    val headerExtentPx = EInkEngineRegistry.readerEngine.headerDecorationExtentPx
     val titlePaint = remember { Paint() }
     val contentPaint = remember { Paint() }
     val highlightPaint = remember { Paint() }
@@ -117,6 +122,27 @@ internal fun ReaderPageSnapshotCanvas(
                         else -> drawSolidLine(span.first, span.second, y, strokeWidth, themeTextColorArgb)
                     }
                 }
+            }
+
+            // 4) 页面书签角标（v2 Task 9，设计 §4/§6）：当前页带书签时在页眉
+            //    避让区右缘画一枚实心书签折角（主题 primary，16×24dp，底缘
+            //    中央内切缺口），贴正文顶缘、右缩进 6dp——宿主 ReaderBookmarkBadge
+            //    同位（topPx = contentTopPx）。零动画，随页快照直切
+            if (snapshot.bookmarkBadge) {
+                val badgeWidth = 16.dp.toPx()
+                val badgeHeight = 24.dp.toPx()
+                val right = size.width - 6f * density
+                val top = headerExtentPx
+                val notch = badgeHeight * 0.25f
+                val ribbon = Path().apply {
+                    moveTo(right - badgeWidth, top)
+                    lineTo(right, top)
+                    lineTo(right, top + badgeHeight)
+                    lineTo(right - badgeWidth / 2f, top + badgeHeight - notch)
+                    lineTo(right - badgeWidth, top + badgeHeight)
+                    close()
+                }
+                drawPath(ribbon, Color(themePrimaryArgb))
             }
         }
     }

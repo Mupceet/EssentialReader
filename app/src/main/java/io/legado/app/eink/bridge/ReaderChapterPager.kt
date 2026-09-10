@@ -1,5 +1,6 @@
 package io.legado.app.eink.bridge
 
+import io.legado.app.data.entities.Book
 import io.legado.app.data.repository.HighlightRuleRepository
 import io.legado.app.eink.contract.ReaderPageSnapshot
 import io.legado.app.feature.reader.core.model.ReaderPage
@@ -25,6 +26,20 @@ import kotlin.math.abs
 
 /** 小于该值的视口高度漂移不触发重排（页眉/页脚内容后填导致的首帧漂移）。 */
 private const val VIEWPORT_EPSILON_PX = 24
+
+/**
+ * 当前阅读页的页级元数据（页面级书签 toggle 的落库来源，v2 设计 §7）。
+ * body 区间为正文空间章内字符位置，口径与宿主 toggle 消费的
+ * ReaderPageContext.startPosition/endPosition 同源
+ * （[ReaderPageNavigator.pageContext]：正文元素范围极值，末页钳到次页首位置）。
+ */
+internal data class ReaderPageMeta(
+    val chapterIndex: Int,
+    val chapterTitle: String,
+    val text: String,
+    val bodyStart: Int,
+    val bodyEnd: Int,
+)
 
 /**
  * E-Ink 章节分页协调器：宿主 Compose 渲染层（ReadBookController 直排页）
@@ -156,10 +171,21 @@ internal class ReaderChapterPager(
         chapters = emptyMap()
     }
 
-    /** 当前阅读位置所在页映射为快照；未分页或无阅读位置返回 null。 */
-    fun currentPageSnapshot(): ReaderPageSnapshot? {
-        // 章节守卫：按当前章下标索引缓存，新章分页落地之间返回 null
-        // （模块保持旧页或显示加载中），其他章节页绝不可作为当前章渲染
+    /** 当前页定位结果：缓存条目 + 局部页下标 + 页对象 + 会话书（守卫已判非空）。 */
+    private class LocatedPage(
+        val entry: ChapterPages,
+        val index: Int,
+        val page: ReaderPage,
+        val book: Book,
+    )
+
+    /**
+     * 当前阅读位置所在页定位：守卫与 locate 同原 currentPageSnapshot——
+     * 章节守卫（按当前章下标索引缓存，新章分页落地之间返回 null，其他
+     * 章节页绝不可作为当前章）、页非空、会话书在位、[ReaderPageNavigator.locate]
+     * 命中。
+     */
+    private fun locateCurrentPage(): LocatedPage? {
         val entry = chapters[ReadBook.durChapterIndex] ?: return null
         val pages = entry.pages
         if (pages.isEmpty()) return null
@@ -170,20 +196,56 @@ internal class ReaderChapterPager(
             ReadBook.durChapterPos,
         )
         val page = pages.getOrNull(index) ?: return null
+        return LocatedPage(entry, index, page, book)
+    }
+
+    /** 当前阅读位置所在页映射为快照；未分页或无阅读位置返回 null。 */
+    fun currentPageSnapshot(): ReaderPageSnapshot? {
+        val located = locateCurrentPage() ?: return null
+        // 页角标（v2 Task 9）：当前页正文区间落有书签时置位——纯内存读
+        // （EInkBookmarkState 缓存），无正文元素的页落空分支不画角标
+        val bookmarkBadge = bodyRange(located.entry.pages, located.index)
+            ?.let { (start, end) ->
+                EInkBookmarkState.hasBookmarkInRange(located.page.id.chapterIndex, start, end)
+            }
+            ?: false
         return ReaderPageSnapshotMapper.map(
-            page = page,
-            paginationStyle = entry.style,
-            sessionBook = book,
+            page = located.page,
+            paginationStyle = located.entry.style,
+            sessionBook = located.book,
             readProgress = ReaderPageSnapshotMapper.readProgress(
-                chapterIndex = page.id.chapterIndex,
-                localPageIndex = index,
-                chapterPageCount = pages.size,
+                chapterIndex = located.page.id.chapterIndex,
+                localPageIndex = located.index,
+                chapterPageCount = located.entry.pages.size,
                 chapterSize = ReadBook.chapterSize,
             ),
-            // Task 9 接 EInkBookmarkState 真值
-            bookmarkBadge = false,
+            bookmarkBadge = bookmarkBadge,
         )
     }
+
+    /**
+     * 当前阅读页的页级元数据（页面级书签 toggle 落库来源）：守卫同
+     * [currentPageSnapshot]；body 区间复用宿主 [ReaderPageNavigator.pageContext]
+     * 口径（宿主快速书签 toggle 消费的 ReaderPageContext.startPosition/
+     * endPosition 同源同值）。无正文元素的页返回 null，调用方按
+     * 「无法定位」处理（不落书签）。
+     */
+    fun currentPageMeta(): ReaderPageMeta? {
+        val located = locateCurrentPage() ?: return null
+        val context = ReaderPageNavigator.pageContext(located.entry.pages, located.index)
+            ?: return null
+        return ReaderPageMeta(
+            chapterIndex = located.page.id.chapterIndex,
+            chapterTitle = located.page.chapterTitle,
+            text = located.page.text,
+            bodyStart = context.startPosition,
+            bodyEnd = context.endPosition,
+        )
+    }
+
+    /** 页正文位置区间（pageContext 的 start/endPosition 二元组）。 */
+    private fun bodyRange(pages: List<ReaderPage>, index: Int): Pair<Int, Int>? =
+        ReaderPageNavigator.pageContext(pages, index)?.let { it.startPosition to it.endPosition }
 
     private fun requestPagination() {
         if (viewportWidth <= 0 || viewportHeight <= 0) return

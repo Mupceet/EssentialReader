@@ -1,6 +1,8 @@
 package io.legado.app.eink.bridge
 
 import io.legado.app.constant.AppLog
+import io.legado.app.data.entities.Bookmark
+import io.legado.app.data.repository.BookmarkRepository
 import io.legado.app.domain.gateway.BookMarkingGateway
 import io.legado.app.domain.model.TextProcessAnchor
 import io.legado.app.domain.model.TextProcessStyle
@@ -12,6 +14,9 @@ import io.legado.app.model.ReadBook
 import io.legado.app.utils.GSON
 import io.legado.app.utils.fromJsonObject
 import kotlin.coroutines.cancellation.CancellationException
+import kotlin.math.abs
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
 
@@ -66,6 +71,17 @@ internal object ReaderSelectionEngineImpl : ReaderSelectionEngine, KoinComponent
 
     private val bookMarkingGateway: BookMarkingGateway by inject()
     private val saveMarkingUseCase: SaveMarkingUseCase by inject()
+    private val bookmarkRepository: BookmarkRepository by inject()
+
+    /**
+     * 串行化书签 toggle（宿主 ReadBookmarkDelegate.toggleForCurrentPage 同款）：
+     * 先查再写不是原子的，快速连滑/连点会双双看到「空」而重复插入。锁住
+     * 读-查-写整段后，两次触发退化成正确的两次 toggle（加一条再删一条）。
+     */
+    private val toggleMutex = Mutex()
+
+    /** 与宿主 ReadBookmarkDelegate/ReadBookController.addBookmark 一致：剔除正文里的排版占位符。 */
+    private val BOOK_TEXT_MARKS = Regex("[袮꧁]")
 
     /** 当前会话章节的语义正文（章节不匹配返回 null）。 */
     private fun semanticContent(chapterIndex: Int): String? =
@@ -138,7 +154,53 @@ internal object ReaderSelectionEngineImpl : ReaderSelectionEngine, KoinComponent
         )
     }
 
-    /** Task 8 实现（v2 页面书签 toggle 占位）。 */
-    override suspend fun togglePageBookmark(): Boolean? =
-        throw NotImplementedError("Task 8")
+    /**
+     * 当前页书签 toggle（v2 Task 9，设计 §7）：宿主快速书签语义镜像
+     * （ReadBookmarkDelegate.toggleForCurrentPage）——本页区间无书签则存一条
+     * （页位置 + 页文本为标题，无编辑层），有则删离当前阅读位置最近的一条；
+     * 成功后触发当前章重排，角标随新快照推送。null = 无会话书/当前页无法
+     * 定位/落库异常；true = 本次添加；false = 本次移除。
+     */
+    override suspend fun togglePageBookmark(): Boolean? = try {
+        toggleMutex.withLock {
+            val book = ReadBook.book ?: return@withLock null
+            val meta = ReaderEngineImpl.currentPageMeta() ?: return@withLock null
+            val existing = bookmarkRepository.getByChapterRange(
+                bookName = book.name,
+                bookAuthor = book.author,
+                chapterIndex = meta.chapterIndex,
+                startPos = meta.bodyStart,
+                endPos = meta.bodyEnd,
+            )
+            if (existing.isEmpty()) {
+                bookmarkRepository.save(
+                    Bookmark(
+                        bookName = book.name,
+                        bookAuthor = book.author,
+                        bookUrl = book.bookUrl,
+                        chapterIndex = meta.chapterIndex,
+                        chapterName = meta.chapterTitle,
+                        chapterPos = ReadBook.durChapterPos,
+                        bookText = meta.text.replace(BOOK_TEXT_MARKS, "").trim(),
+                        content = "",
+                    )
+                )
+                // 角标随新快照刷新（保持页内位置）
+                ReaderEngineImpl.relayout()
+                true
+            } else {
+                // 只删离当前阅读位置最近的一条：同一页可能有多条书签，不应整页误删
+                val nearest = existing.minByOrNull { abs(it.chapterPos - ReadBook.durChapterPos) }
+                    ?: return@withLock null
+                bookmarkRepository.delete(nearest)
+                ReaderEngineImpl.relayout()
+                false
+            }
+        }
+    } catch (e: CancellationException) {
+        throw e
+    } catch (e: Exception) {
+        AppLog.put("eink togglePageBookmark failed: ${e.message}", e)
+        null
+    }
 }

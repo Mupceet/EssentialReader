@@ -170,10 +170,16 @@ internal object ReaderEngineImpl : ReaderEngine, KoinComponent {
         return chapterPager.currentPageSnapshot()
     }
 
+    /** 当前阅读位置所在页元数据（页面级书签 toggle 落库来源）；未分页返回 null。 */
+    internal fun currentPageMeta(): ReaderPageMeta? = chapterPager.currentPageMeta()
+
     // ---- 会话控制 ----
 
     override fun loadBook(book: BookHandle) {
         val b = (book as BookHandleImpl).book
+        // 书签位置缓存对齐会话书（E-Ink 自有缓存，宿主 ReaderBookmarkState
+        // 在 eink 模式不初始化）：换书/重载都刷新收集源，同书幂等不重订
+        EInkBookmarkState.attach(b)
         // 模块从目录/换源返回时对同一本书也会重走 loadBook：同书不清分页
         // 缓存，返回阅读页直接用热缓存渲染；换书必须清，防止旧书页残留
         if (ReadBook.book?.bookUrl != b.bookUrl) {
@@ -187,6 +193,7 @@ internal object ReaderEngineImpl : ReaderEngine, KoinComponent {
 
     override fun reloadBook(book: BookHandle) {
         val b = (book as BookHandleImpl).book
+        EInkBookmarkState.attach(b)
         if (ReadBook.book?.bookUrl != b.bookUrl) {
             chapterPager.clear()
         }
