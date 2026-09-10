@@ -584,9 +584,10 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application),
     /**
      * 当前页书签 toggle（v2 Task 9，设计 §4）：宿主快速书签语义（本页无则
      * 加、有则删最近一条），落库后宿主自行触发当前章重排，角标随新快照
-     * 推送——模块不自持书签状态。null = 端口未注册（降级宿主）/无会话书/
-     * 当前页无法定位；true = 本次添加；false = 本次移除。调用方对非 true
-     * 提示「操作失败」，成功无 toast（角标变化即反馈）。
+     * 推送——模块不自持书签状态。三态：null = 端口未注册（降级宿主）/
+     * 无会话书/当前页无法定位；true = 本次添加；false = 本次移除（删除
+     * 成功 + relayout 后返回）。仅 null 由界面提示「操作失败」，true/false
+     * 均静默成功（角标变化即反馈）。
      */
     suspend fun togglePageBookmark(): Boolean? {
         val port = EInkEngineRegistry.selectionEngine ?: return null

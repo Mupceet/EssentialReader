@@ -516,11 +516,11 @@ fun ReaderRoute(
 
     // 页面书签 toggle（v2 Task 9，设计 §4）：顶栏书签钮与阅读区竖直下拉
     // 共用；端口在位才可达（降级宿主两者皆不渲染/不响应，见 ReaderScreen）。
-    // 非 true（false = 移除失败、null = 端口缺失/无页/无会话书）toast
-    // 「操作失败」；成功无 toast——角标变化随宿主重排的新快照即反馈
+    // 三态：null = 端口缺失/无页/无会话书 → toast「操作失败」；true = 本次
+    // 添加、false = 本次移除，均静默——角标变化随宿主重排的新快照即反馈
     val onPageBookmarkToggle: () -> Unit = {
         scope.launch {
-            if (viewModel.togglePageBookmark() != true) {
+            if (viewModel.togglePageBookmark() == null) {
                 Toast.makeText(context, "操作失败", Toast.LENGTH_SHORT).show()
             }
         }
