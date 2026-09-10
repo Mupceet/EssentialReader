@@ -188,9 +188,9 @@ class TocViewModel(application: Application) : AndroidViewModel(application) {
 
     /** 书签点击：解析跳转三分支分派（直接跳/弹确认/提示失败）。 */
     fun onBookmarkClick(id: Long) {
-        val engine = marksEngine ?: return
+        val marks = marksEngine ?: return
         viewModelScope.launch {
-            when (val r = engine.resolveBookmarkJump(id)) {
+            when (val r = marks.resolveBookmarkJump(id)) {
                 is JumpResolution.Located -> _jumpTarget.tryEmit(r)
                 is JumpResolution.NeedConfirm -> _uiState.update {
                     it.copy(pendingJump = PendingJumpConfirm(r.message, r.fallback))

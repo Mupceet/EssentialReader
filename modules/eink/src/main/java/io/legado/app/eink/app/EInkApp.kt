@@ -25,6 +25,7 @@ import io.legado.app.eink.feature.bookdetail.BookDetailRoute
 import io.legado.app.eink.feature.changesource.ChangeSourceRoute
 import io.legado.app.eink.feature.home.FontScaleSettingsRoute
 import io.legado.app.eink.feature.home.HomeRoute
+import io.legado.app.eink.feature.note.NoteRoute
 import io.legado.app.eink.feature.reader.ReaderRoute
 import io.legado.app.eink.feature.search.SearchRoute
 import io.legado.app.eink.feature.toc.TocRoute
@@ -190,7 +191,31 @@ fun EInkApp(
                                         // 详情页等路径：目录出栈、阅读页入栈，返回回到详情页
                                         controller.replaceTop(EInkScreen.Reader(bookUrl))
                                     }
+                                },
+                                // 笔记入口：携带同一来源链路（fromReader 跳转后 pop 回阅读页）
+                                onOpenNote = {
+                                    controller.navigate(
+                                        EInkScreen.Note(screen.bookUrl, screen.fromReader)
+                                    )
+                                },
+                                // 书签跳转：引擎动作已由 TocRoute 完成，此处只做导航
+                                //（fromReader 同 onOpenReader 的复用语义）
+                                onJumpToLocation = {
+                                    if (screen.fromReader) {
+                                        controller.pop()
+                                    } else {
+                                        controller.replaceTop(EInkScreen.Reader(screen.bookUrl))
+                                    }
                                 }
+                            )
+                        }
+
+                        is EInkScreen.Note -> {
+                            // 占位路由（Task 8 接线）：列表/跳转/导出由后续任务交付
+                            NoteRoute(
+                                bookUrl = screen.bookUrl,
+                                fromReader = screen.fromReader,
+                                onBack = { controller.pop() },
                             )
                         }
 
