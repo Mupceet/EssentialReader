@@ -121,8 +121,9 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application),
 
     /**
      * 批注端口可用性：决定选择浮条「写想法/删除」键显隐——未注册
-     * [EInkEngineRegistry.selectionEngine] 的宿主为合法降级态，浮条
-     * 只留复制键、松手不落划线，长按选择与复制仍可用，不做假死路径。
+     * [EInkEngineRegistry.selectionEngine] 的宿主为合法降级态，
+     * 长按选择整体不启用（无选词/无触觉/无浮条），下拉书签与顶栏书签钮
+     * 隐藏，不做假死路径。
      */
     val selectionEnabled: Boolean
         get() = EInkEngineRegistry.selectionEngine != null

@@ -1,5 +1,6 @@
 package io.legado.app.eink.feature.reader.selection
 
+import androidx.compose.runtime.Stable
 import io.legado.app.eink.contract.ReaderDecorationRun
 import io.legado.app.eink.contract.ReaderPageLine
 import io.legado.app.eink.contract.ReaderPageSnapshot
@@ -12,6 +13,7 @@ data class ReaderTextHit(val lineIndex: Int, val charIndex: Int)
  * 页内选区（Screen 本地 UI 状态）。正文区间为语义正文空间提示值：
  * 含标题行时取选区内正文行子区间（纯标题退化为 0..0，由宿主窗口搜索兜底）。
  */
+@Stable
 data class ReaderSelectionUi(
     val startHit: ReaderTextHit,
     val endHit: ReaderTextHit,
@@ -504,7 +506,8 @@ fun selectionFromChapterRange(
     if (clippedStart != null && clippedEnd != null) {
         return buildSelection(snapshot, clippedStart, clippedEnd)
     }
-    // 覆盖全页兜底：首行首字符 → 末行末字符（含标题行）
+    // 覆盖全页兜底：首行首字符 → 末行末字符（含标题行）。
+    // 防御性兜底，现调用方不会到达（均已前置 captureSegment != null 守卫）
     val last = snapshot.lines.last()
     return buildSelection(snapshot, ReaderTextHit(0, 0), ReaderTextHit(snapshot.lines.lastIndex, lineText(last).length))
 }

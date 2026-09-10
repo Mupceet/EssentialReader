@@ -336,10 +336,10 @@ fun ReaderRoute(
     // 捕获提交快照 committedSelection——调界仅发生在落库前，落库后再拖把手
     // 会让 THOUGHT 以漂移锚点落库、upsert 不命中产生第二条标记；哪怕落库
     // 失败也保持冻结（失败已有 toast，再调整同样漂移，冻结是安全侧）。
-    // 两类不请求落库：端口未注册（降级宿主，长按选择与复制仍可用）；含
-    // 标题选区（§3.4 不落划线静默忽略，浮条本就只留复制键）——均无提示，
-    // 不做假死路径。落库失败 toast「保存失败」，浮条保留（划线未落，删除
-    // 键本就置灰，写想法仍可重试或复制）
+    // 两类不请求落库：端口未注册（降级宿主，长按选择整体不启用：无选词/
+    // 无触觉/无浮条，下拉书签与顶栏书签钮隐藏）；含标题选区（§3.4 不落
+    // 划线静默忽略）——均无提示，不做假死路径。落库失败 toast「保存失败」，
+    // 浮条保留（划线未落，删除键本就置灰，写想法仍可重试或复制）
     val onSelectionCommitted: (ReaderSelectionUi) -> Unit = { sel ->
         selectionFrozen = true
         committedSelection = sel
@@ -388,8 +388,15 @@ fun ReaderRoute(
                         includesTitle = sessionNow.includesTitle,
                     )
                 }
+                // 翻页零宽过渡期的空选区，静默丢弃：翻页刷新窗口内松手且段
+                // 列表为空时合成结果可为空串，上抛会被桥 locate -1 误报
+                // 「保存失败」——清选区/会话即可，无 toast、不落库
                 selectionSession = null
-                onSelectionCommitted(final)
+                if (final.selectedText.isBlank()) {
+                    selection = null
+                } else {
+                    onSelectionCommitted(final)
+                }
             }
 
             else -> {

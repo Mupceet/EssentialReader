@@ -92,7 +92,8 @@ class ReaderPageLine(
 
     /**
      * 本行划线/高亮装饰（缺省空，与选中态无关、常驻）。区间为行内拼接
-     * 文本的 UTF-16 索引；同行相邻同类 run 已在映射侧合并。
+     * 文本的 UTF-16 索引；同行相邻同 markingId 且同款样式的 run 已在映射侧
+     * 合并（不同标记不并入同一 run）。
      */
     val decorations: List<ReaderDecorationRun> = emptyList(),
 )
