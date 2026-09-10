@@ -57,11 +57,17 @@ internal val SelectionHandleTouchRadiusDp = 28.dp
  * pointerInput key——每次端点替换都会触发重组，以之为 key 会在拖拽中途
  * 重启、打断手势。端点替换语义幂等（只替换一端、另一端固定），重组滞后
  * 不产生累积误差。
+ *
+ * [handlesEnabled] = false（落库冻结）时把手转只读展示：选区与把手保持
+ * 绘制，但不进入抓取、不消费任何事件，按下落回下层检测器（点按照常清
+ * 选区）；冻结值同样经 rememberUpdatedState 实时读、不作 pointerInput
+ * key——冻结发生在浮条展示期（无在途把手手势），以之为 key 徒增重启面。
  */
 @Composable
 internal fun ReaderSelectionOverlay(
     snapshot: ReaderPageSnapshot?,
     selection: ReaderSelectionUi?,
+    handlesEnabled: Boolean,
     onSelectionChange: (ReaderSelectionUi?) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -96,6 +102,7 @@ internal fun ReaderSelectionOverlay(
     // 拖拽循环内读实时值：按下时刻的把手位/选区不冻结（见类 KDoc）
     val currentAnchors by rememberUpdatedState(anchors)
     val currentSelection by rememberUpdatedState(selection)
+    val currentHandlesEnabled by rememberUpdatedState(handlesEnabled)
 
     // 高亮带：垫在页画布下方，正文压在高亮上（见类 KDoc）
     Canvas(modifier = modifier.zIndex(-1f)) {
@@ -115,6 +122,9 @@ internal fun ReaderSelectionOverlay(
             .pointerInput(snapshot, measureTitle, measureContent) {
                 awaitEachGesture {
                     val down = awaitFirstDown(requireUnconsumed = false)
+                    // 落库冻结：把手停用（只读展示），不进入抓取、不消费事件，
+                    // 按下落回下层检测器（点按照常清选区，见类 KDoc）
+                    if (!currentHandlesEnabled) return@awaitEachGesture
                     val grab = grabHandle(currentAnchors, down.position, touchRadiusPx)
                         ?: return@awaitEachGesture
                     while (true) {

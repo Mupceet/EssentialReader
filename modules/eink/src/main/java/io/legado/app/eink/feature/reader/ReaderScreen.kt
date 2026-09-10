@@ -111,8 +111,9 @@ private enum class ReaderStyleDialog { Fonts, Info, Margin }
  *   点击则一次性收起到干净阅读界面；
  * - 一次性消息 → Toast；
  * - 页内长按选区状态在此持有：翻页/重排（pageVersion 推进）自动清空。
- *   v2 松手即存（设计 §3.5/§4）：选词/调界松手即落划线，浮条照常展示、
- *   动作不依赖落库结果；浮条「复制」直接落剪贴板，「写想法」经想法弹层
+ *   v2 松手即存（设计 §3.5/§4）：长按手势内松手（含拖拽延伸）触发落划线；
+ *   落库后选区冻结，调界仅发生在落库前，浮条动作绑定落库时快照、不依赖
+ *   落库结果；浮条「复制」直接落剪贴板，「写想法」经想法弹层
  *   确认后落库（失败保留弹层可重试），落库成功等宿主重排新快照（带
  *   装饰）重绘时清选区收尾；「删除」在松手场景置灰（端口 saveMarking
  *   只回 Boolean 无 markingId，Task 6 点按场景接线）；
@@ -143,6 +144,16 @@ fun ReaderRoute(
     // 单页快照，pageVersion 推进（翻页/重排/批注落库重绘）即自动清空，
     // 同时承载批注保存重绘后的清区时序
     var selection by remember { mutableStateOf<ReaderSelectionUi?>(null) }
+    // 落库冻结（防重复标记）：松手提交（onSelectionCommitted）发起即置 true——
+    // 把手停用（调界停用），选区与浮条保持只读展示；哪怕落库失败也保持冻结
+    // （失败已有 toast，再调整同样造成锚点漂移，冻结是安全侧）。页变清态
+    // （pageVersion 效应）与选区清空（复制/点外）一并复位，下一轮选区从
+    // 可调界态开始
+    var selectionFrozen by remember { mutableStateOf(false) }
+    // 落库时捕获的选区快照（锚点 A）：浮条 COPY/THOUGHT 动作绑定快照而非
+    // 实时 selection，THOUGHT 确认落库锚点 = 已落库锚点，同锚点 upsert
+    // 命中原记录，不产生「A 划线 + B 想法」第二条标记
+    var committedSelection by remember { mutableStateOf<ReaderSelectionUi?>(null) }
     // ===== v1 书签/笔记弹层链路状态（已不可达，Task 5 物理清理）=====
     // 浮条枚举重命名移除书签/笔记分支后 bookmarkDraft/markingDraft 永不
     // 置位，下方对应弹层组合不再构成可达路径；仅保留待 Task 5 契约收敛
@@ -159,6 +170,8 @@ fun ReaderRoute(
     // 现读现判护栏落失效/失败分支）
     LaunchedEffect(uiState.pageVersion) {
         selection = null
+        selectionFrozen = false
+        committedSelection = null
         pendingSelection = null
         bookmarkDraft = null
         markingDraft = null
@@ -174,18 +187,24 @@ fun ReaderRoute(
     val clipboardScope = rememberCoroutineScope()
     val onSelectionMenuAction: (ReaderSelectionMenuAction, ReaderSelectionUi) -> Unit =
         { action, sel ->
+            // 动作绑定落库时快照（锚点 A）而非实时 selection：THOUGHT 确认
+            // 以原始锚点落库，同锚点 upsert 命中已落划线记录；快照缺失时
+            // 兜底退回实时选区（冻结后实时选区本不应再变）
+            val target = committedSelection ?: sel
             when (action) {
                 ReaderSelectionMenuAction.COPY -> {
                     clipboardScope.launch {
                         clipboard.setClipEntry(
-                            ClipEntry(ClipData.newPlainText("text", sel.selectedText))
+                            ClipEntry(ClipData.newPlainText("text", target.selectedText))
                         )
                         Toast.makeText(context, "已复制", Toast.LENGTH_SHORT).show()
                     }
                     selection = null
+                    selectionFrozen = false
+                    committedSelection = null
                 }
 
-                ReaderSelectionMenuAction.THOUGHT -> thoughtSelection = sel
+                ReaderSelectionMenuAction.THOUGHT -> thoughtSelection = target
 
                 ReaderSelectionMenuAction.DELETE -> {
                     // 松手场景无 markingId（端口 saveMarking 只回 Boolean），
@@ -195,13 +214,19 @@ fun ReaderRoute(
             }
         }
 
-    // 松手即存（v2 设计 §3.5/§4）：选词/调界松手即落划线（thought=false，
-    // 同锚点原地更新），浮条照常展示、动作不依赖落库结果。两类不请求落库：
-    // 端口未注册（降级宿主，长按选择与复制仍可用）；含标题选区（§3.4
-    // 不落划线静默忽略，浮条本就只留复制键）——均无提示，不做假死路径。
-    // 落库失败 toast「保存失败」，浮条保留（划线未落，删除键本就置灰，
-    // 写想法仍可重试或复制）
+    // 松手即存（v2 设计 §3.5/§4）：长按手势内松手（含拖拽延伸）触发落划线
+    // （thought=false，同锚点原地更新；把手调界松手不上抛本回调），浮条
+    // 照常展示、动作不依赖落库结果。落库发起即冻结：置 selectionFrozen 并
+    // 捕获提交快照 committedSelection——调界仅发生在落库前，落库后再拖把手
+    // 会让 THOUGHT 以漂移锚点落库、upsert 不命中产生第二条标记；哪怕落库
+    // 失败也保持冻结（失败已有 toast，再调整同样漂移，冻结是安全侧）。
+    // 两类不请求落库：端口未注册（降级宿主，长按选择与复制仍可用）；含
+    // 标题选区（§3.4 不落划线静默忽略，浮条本就只留复制键）——均无提示，
+    // 不做假死路径。落库失败 toast「保存失败」，浮条保留（划线未落，删除
+    // 键本就置灰，写想法仍可重试或复制）
     val onSelectionCommitted: (ReaderSelectionUi) -> Unit = { sel ->
+        selectionFrozen = true
+        committedSelection = sel
         if (viewModel.selectionEnabled && !sel.includesTitle) {
             scope.launch {
                 if (!viewModel.saveMarking(sel, note = "", thought = false)) {
@@ -407,10 +432,20 @@ fun ReaderRoute(
             onRetry = { viewModel.attach(bookUrl) },
             selection = selection,
             selectionEnabled = viewModel.selectionEnabled,
+            // 落库冻结后把手停用（调界停用），选区与浮条保持只读展示
+            handlesEnabled = !selectionFrozen,
             // 松手场景恒禁用：标记 id 不可得（端口 saveMarking 只回 Boolean），
             // Task 6 点按场景携带快照命中 run 的 markingId 后启用
             deleteEnabled = false,
-            onSelectionChange = { selection = it },
+            onSelectionChange = { sel ->
+                selection = sel
+                // 清区路径（点外；复制经浮条分支）随行复位冻结与提交快照，
+                // 下一轮选区从可调界态开始
+                if (sel == null) {
+                    selectionFrozen = false
+                    committedSelection = null
+                }
+            },
             onSelectionCommitted = onSelectionCommitted,
             onSelectionMenuAction = onSelectionMenuAction,
         )
@@ -703,18 +738,21 @@ fun ReaderRoute(
  * 手势（规范 §16）：
  * - 操作条可见时：点/滑动正文任意处收起操作条；
  * - 操作条隐藏时：点中间 40% 唤出操作条，点其余区域下一页；
- * - 长按正文选词（震动反馈），拖拽延伸选区末端，松手落划线并弹出浮条
- *   （复制/写想法/删除；写想法/删除键按批注端口可用性与选区是否含标题行
- *   显隐，删除键按 [deleteEnabled] 置灰）；选区存在期间点按先清选区再按
- *   分区执行常规行为、水平滑动不翻页，把手拖拽调整端点（浮条随锚点重排）；
+ * - 长按正文选词（震动反馈），拖拽延伸选区末端，长按手势内松手（含拖拽
+ *   延伸）落划线并弹出浮条（复制/写想法/删除；写想法/删除键按批注端口
+ *   可用性与选区是否含标题行显隐，删除键按 [deleteEnabled] 置灰）；落库
+ *   后选区冻结（[handlesEnabled] = false，把手只读展示），调界仅发生在
+ *   落库前；选区存在期间点按先清选区再按分区执行常规行为、水平滑动不翻
+ *   页，把手拖拽调整端点（浮条随锚点重排）；
  * - 水平滑动翻页，判定对齐 View 版：触发距离读引擎 pageTouchSlop（AppConfig.pageTouchSlop 经端口）
  *   （完整版设置"翻页触发距离"，0 = 系统 slop，Compose 版只读不设），
  *   松手前反向回拖取消；无跟手移动，翻页整页立即替换。
  *
  * 选区状态由调用方持有（[selection] / [onSelectionChange]），翻页/重排
- * （pageVersion 推进）清空也由调用方承担；选词/调界松手（含手势取消）
- * 经 [onSelectionCommitted] 上抛一次触发落划线，浮条动作经
- * [onSelectionMenuAction] 上抛（选区随动作语义由调用方决定去留）。
+ * （pageVersion 推进）清空也由调用方承担；长按手势内松手（含拖拽延伸与
+ * 手势取消）经 [onSelectionCommitted] 上抛一次触发落划线（把手调界松手
+ * 不上抛），浮条动作经 [onSelectionMenuAction] 上抛（选区随动作语义由
+ * 调用方决定去留）。
  */
 @Composable
 internal fun ReaderScreen(
@@ -740,6 +778,7 @@ internal fun ReaderScreen(
     onRetry: () -> Unit,
     selection: ReaderSelectionUi?,
     selectionEnabled: Boolean,
+    handlesEnabled: Boolean,
     deleteEnabled: Boolean,
     onSelectionChange: (ReaderSelectionUi?) -> Unit,
     onSelectionCommitted: (ReaderSelectionUi) -> Unit,
@@ -939,6 +978,7 @@ internal fun ReaderScreen(
             ReaderSelectionOverlay(
                 snapshot = state.page,
                 selection = selection,
+                handlesEnabled = handlesEnabled,
                 onSelectionChange = onSelectionChange,
                 modifier = Modifier.matchParentSize(),
             )
