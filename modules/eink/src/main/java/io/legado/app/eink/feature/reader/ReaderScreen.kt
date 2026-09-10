@@ -101,15 +101,22 @@ private enum class ReaderStyleDialog { Fonts, Info, Margin }
 
 /**
  * 点按标记浮条状态（v2 Task 6）：命中 markingId + run 派生选区——浮条
- * 锚定（selectionRuns 行内区间 → x 复用）与 COPY/THOUGHT 动作、DELETE
- * 定位键共用此快照。
+ * 锚定（selectionRuns 行内区间 → x 复用）与 COPY/DELETE 动作、定位键共用
+ * [selection]；[commitSelection] 为「写想法」提交专用（原文覆写版，见
+ * [onMarkingTap]），防止跨行标记按行内截段落库时 upsert 不命中原记录。
  */
 @Stable
-private data class ReaderMarkingBar(val markingId: String, val selection: ReaderSelectionUi)
+private data class ReaderMarkingBar(
+    val markingId: String,
+    val selection: ReaderSelectionUi,
+    val commitSelection: ReaderSelectionUi,
+)
 
 /**
  * 点按想法浮窗状态（EDIT 模式）：note 预填 + 原文预览（宿主记录的完整
- * 选文，可跨行）+ run 派生选区（保存锚点），markingId 供删除键定位。
+ * 选文，可跨行）+ 提交选区（run 派生选区覆写完整原文，保存锚点；start/
+ * end/bodyStart/bodyEnd 保持点按位置作宿主窗口搜索提示值，见
+ * [onMarkingTap]），markingId 供删除键定位。
  */
 @Stable
 private data class ReaderMarkingThought(
@@ -188,8 +195,8 @@ fun ReaderRoute(
     // markingId 供删除键即时可用（松手场景无 id 的时序此处不存在）
     var markingBar by remember { mutableStateOf<ReaderMarkingBar?>(null) }
     // v2 点按想法浮窗（EDIT 模式）：点按命中想法标记（thought=true）直接开
-    // 浮窗——预填 findMarking 的 note、复制原文、删除即时可用；保存以 run
-    // 派生选区同锚点 upsert
+    // 浮窗——预填 findMarking 的 note、复制原文、删除即时可用；保存以完整
+    // 原文覆写的提交选区同锚点 upsert（见 onMarkingTap）
     var markingThought by remember { mutableStateOf<ReaderMarkingThought?>(null) }
     // pageVersion 推进 = 选区所在内容已被替换：选区、冻结态、提交快照、
     // 想法弹层与点按浮条/浮窗一并清空，浮层随内容变化关闭，不残留幽灵
@@ -282,7 +289,7 @@ fun ReaderRoute(
                     markingBar = null
                 }
 
-                ReaderSelectionMenuAction.THOUGHT -> thoughtSelection = bar.selection
+                ReaderSelectionMenuAction.THOUGHT -> thoughtSelection = bar.commitSelection
 
                 ReaderSelectionMenuAction.DELETE -> {
                     scope.launch {
@@ -319,15 +326,27 @@ fun ReaderRoute(
 
                 detail.thought -> {
                     markingBar = null
+                    // 提交选区以标记完整原文（findMarking detail，可跨行）覆写
+                    // run 行内截段：宿主 saveMarking 以 selectedText 在章节全文
+                    // 定位并按（chapterPosition, selectedText）同锚点 upsert，按
+                    // 截段提交会另锚一条新记录；copy 只改 selectedText，start/
+                    // end/bodyStart/bodyEnd 保持点按行内值——它们只是宿主窗口
+                    // 搜索的提示位（点按位置在标记内 → 命中原完整区间），不参
+                    // 与锚点匹配。单行标记两文本相同，行为不变。
                     markingThought = ReaderMarkingThought(
                         markingId = markingId,
                         note = detail.note,
                         selectedText = detail.selectedText,
-                        selection = tapped,
+                        selection = tapped.copy(selectedText = detail.selectedText),
                     )
                 }
 
-                else -> markingBar = ReaderMarkingBar(markingId, tapped)
+                else -> markingBar = ReaderMarkingBar(
+                    markingId = markingId,
+                    selection = tapped,
+                    // 同上：写想法提交用完整原文选区，COPY/浮条锚定仍用截段
+                    commitSelection = tapped.copy(selectedText = detail.selectedText),
+                )
             }
         }
     }
