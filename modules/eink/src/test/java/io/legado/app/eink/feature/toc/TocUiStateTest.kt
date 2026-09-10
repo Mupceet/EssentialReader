@@ -1,9 +1,12 @@
 package io.legado.app.eink.feature.toc
 
 import io.legado.app.eink.contract.ChapterUiModel
+import io.legado.app.eink.contract.JumpResolution
+import io.legado.app.eink.contract.PendingJumpConfirm
 import io.legado.app.eink.contract.TocBookUiModel
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -64,5 +67,21 @@ class TocUiStateTest {
             book = TocBookUiModel(bookUrl = "u", name = "书", currentChapterIndex = 7, isLocal = false),
         )
         assertEquals(7, state.currentChapterIndex)
+    }
+
+    @Test
+    fun `书签状态默认隐藏不可用且无确认`() {
+        val s = TocUiState()
+        assertEquals(TocTab.Chapters, s.selectedTab)
+        assertTrue(s.bookmarks.isEmpty())
+        assertFalse(s.marksAvailable)
+        assertNull(s.pendingJump)
+    }
+
+    @Test
+    fun `确认弹层状态可置入`() {
+        val confirm = PendingJumpConfirm("msg", JumpResolution.Located(1, 2))
+        val s = TocUiState(pendingJump = confirm)
+        assertEquals(confirm, s.pendingJump)
     }
 }
