@@ -180,6 +180,8 @@ internal class ReaderChapterPager(
                 chapterPageCount = pages.size,
                 chapterSize = ReadBook.chapterSize,
             ),
+            // Task 9 接 EInkBookmarkState 真值
+            bookmarkBadge = false,
         )
     }
 

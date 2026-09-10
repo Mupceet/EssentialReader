@@ -21,7 +21,11 @@ class ReaderDecorationSpanTest {
     fun `装饰区间换算为 x 跨度`() {
         val l = line("abcdef", "gh", positions = intArrayOf(0, 6))
         // 字符 2..7（[start,end) 半开区间，跨两段）：右缘 = x[1] + 1 字符
-        val span = decorationSpanX(l, ReaderDecorationRun(2, 7, underlineMode = 1, highlight = false), measure)
+        val span = decorationSpanX(
+            l,
+            ReaderDecorationRun(2, 7, underlineMode = 1, highlight = false, markingId = "m1"),
+            measure,
+        )
         assertEquals(20f, span!!.first)       // x[0] + 2 字符
         assertEquals(100f + 10f, span.second) // x[1] + 1 字符
     }
@@ -29,6 +33,6 @@ class ReaderDecorationSpanTest {
     @Test
     fun `区间越界返回 null`() {
         val l = line("abc", positions = intArrayOf(0))
-        assertNull(decorationSpanX(l, ReaderDecorationRun(2, 9, 1, false), measure))
+        assertNull(decorationSpanX(l, ReaderDecorationRun(2, 9, 1, false, "m1"), measure))
     }
 }

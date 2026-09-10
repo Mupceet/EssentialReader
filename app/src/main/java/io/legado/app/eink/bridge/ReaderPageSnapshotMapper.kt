@@ -28,7 +28,9 @@ import java.text.DecimalFormat
  *  - 图片元素自带最终布局矩形（缩放/居中已由分页器算好），槽位整框
  *    透传，模块按 fullLine 铺满即与引擎布局一致；
  *  - 划线/高亮样式（ReaderTextStyle.underline/backgroundArgb）折叠为行内
- *    装饰 run（相邻同款合并）；字体色标记不产生装饰，颜色一律不跨桥。
+ *    装饰 run（相邻且样式签名 + markingId 全等的段合并——run.markingId 是
+ *    模块点按命中的定位键，不同标记不并入同一 run）；字体色标记不产生
+ *    装饰，颜色一律不跨桥。
  *
  * 画笔规格只拷贝测量耦合参数（字号/字距/字体/可变字重）——快照坐标
  * 是引擎按这些参数测量的，模块必须按同值绘制才不错位；阴影/斜体等纯
@@ -44,6 +46,7 @@ internal object ReaderPageSnapshotMapper {
         paginationStyle: ReaderAndroidPaginationStyle,
         sessionBook: Book?,
         readProgress: String,
+        bookmarkBadge: Boolean = false,
     ): ReaderPageSnapshot =
         mapWithSpecs(
             page = page,
@@ -52,6 +55,7 @@ internal object ReaderPageSnapshotMapper {
             sdkInt = Build.VERSION.SDK_INT,
             sessionBook = sessionBook,
             readProgress = readProgress,
+            bookmarkBadge = bookmarkBadge,
             imageLoader = ::defaultImageLoader,
         )
 
@@ -63,6 +67,7 @@ internal object ReaderPageSnapshotMapper {
         sdkInt: Int,
         sessionBook: Book?,
         readProgress: String,
+        bookmarkBadge: Boolean = false,
         imageLoader: (Book, String) -> (Int, Int) -> Bitmap?,
     ): ReaderPageSnapshot {
         val lines = ArrayList<ReaderPageLine>()
@@ -98,6 +103,7 @@ internal object ReaderPageSnapshotMapper {
                     line.chapterPositions.add(element.chapterPosition)
                     line.underlineModes.add(element.style.underline?.mode ?: 0)
                     line.highlights.add(element.style.backgroundArgb != null)
+                    line.markingIds.add(element.markingId.orEmpty())
                 }
 
                 is ReaderElement.Image -> {
@@ -132,6 +138,7 @@ internal object ReaderPageSnapshotMapper {
             contentSpec = contentSpec,
             lines = lines,
             images = images,
+            bookmarkBadge = bookmarkBadge,
         )
     }
 
@@ -140,38 +147,50 @@ internal object ReaderPageSnapshotMapper {
         val chunks = ArrayList<String>()
         val xs = ArrayList<Float>()
         val chapterPositions = ArrayList<Int>()
-        // 与 chunks 平行的逐段装饰签名（underline.mode；backgroundArgb 是否非空）
+        // 与 chunks 平行的逐段装饰签名（underline.mode；backgroundArgb 是否非空；
+        // markingId 归一后的标记身份——null 表示非用户标记来源，归一为空串）
         val underlineModes = ArrayList<Int>()
         val highlights = ArrayList<Boolean>()
+        val markingIds = ArrayList<String>()
         var top = 0f
         var bottom = 0f
         var baseY = 0f
         var isTitle = false
 
-        /** flush 时把相邻同签名段合并为行内装饰 run（行内拼接文本 UTF-16 索引）。 */
+        /** flush 时把相邻同签名段合并为行内装饰 run（行内拼接文本 UTF-16 索引）。
+         *  合并键 = (underlineMode, highlight, markingId) 三元组全等：
+         *  不同标记不并入同一 run（run.markingId 是点按命中的定位键）。 */
         private fun buildDecorations(): List<ReaderDecorationRun> {
             val runs = ArrayList<ReaderDecorationRun>()
             var runStart = -1
             var runMode = 0
             var runHighlight = false
+            var runMarkingId = ""
             var offset = 0
             for (i in chunks.indices) {
                 val mode = underlineModes[i]
                 val highlight = highlights[i]
-                val same = runStart >= 0 && mode == runMode && highlight == runHighlight
+                val markingId = markingIds[i]
+                val same = runStart >= 0 && mode == runMode && highlight == runHighlight &&
+                    markingId == runMarkingId
                 if (!same) {
                     // 无签名段（0, false）只负责截断前序 run，自身不成 run
                     if (runStart >= 0 && (runMode != 0 || runHighlight)) {
-                        runs.add(ReaderDecorationRun(runStart, offset, runMode, runHighlight))
+                        runs.add(
+                            ReaderDecorationRun(runStart, offset, runMode, runHighlight, runMarkingId)
+                        )
                     }
                     runStart = offset
                     runMode = mode
                     runHighlight = highlight
+                    runMarkingId = markingId
                 }
                 offset += chunks[i].length
             }
             if (runStart >= 0 && (runMode != 0 || runHighlight)) {
-                runs.add(ReaderDecorationRun(runStart, offset, runMode, runHighlight))
+                runs.add(
+                    ReaderDecorationRun(runStart, offset, runMode, runHighlight, runMarkingId)
+                )
             }
             return runs
         }

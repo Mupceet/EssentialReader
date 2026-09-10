@@ -44,6 +44,13 @@ class ReaderPageSnapshot(
 
     /** 图片槽位（本页全部插图，按行盒区域定位）。 */
     val images: List<ReaderImageSlot>,
+
+    /**
+     * 当前页是否带有书签角标（宿主 page.decoration.bookmarkBadge 原样
+     * 拷贝）。模块页角绘制角标，顶栏书签按钮的选中态据此推导——模块不
+     * 自持「当前页是否有书签」状态。
+     */
+    val bookmarkBadge: Boolean = false,
 )
 
 /**
@@ -144,8 +151,7 @@ class ReaderPaintSpec(
 )
 
 /**
- * 行内一段用户划线/高亮装饰。颜色不跨桥：模块按主题自涂
- * （下划线=主题前景黑，高亮=主题灰底）。
+ * 行内一段用户标记装饰。颜色不跨桥：模块按主题自涂（线=黑，高亮=灰底）。
  */
 @Stable
 class ReaderDecorationRun(
@@ -160,6 +166,14 @@ class ReaderDecorationRun(
      */
     val underlineMode: Int,
 
-    /** true = 背景高亮带。 */
+    /** true = 背景高亮带（TextProcessStyle.bgColor 非空的标记）。 */
     val highlight: Boolean,
+
+    /**
+     * 标记身份（宿主 book_marks.id，含宿主高亮规则等非用户标记来源的
+     * 合成 id）。点按命中 → 端口操作（findMarking/deleteMarking）的定位键。
+     * 宿主实现义务：装饰合并按 markingId + 样式签名分组，不同标记不并入
+     * 同一 run。
+     */
+    val markingId: String,
 )

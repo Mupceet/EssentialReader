@@ -76,6 +76,7 @@ class ReaderPageSnapshotMapperTest {
         height: Float = 50f,
         underlineMode: Int = 0,
         highlight: Boolean = false,
+        markingId: String? = null,
     ) = ReaderElement.Text(
         bounds = ReaderRect(x, top, x + 20f, top + height),
         baselinePx = baselinePx,
@@ -101,6 +102,7 @@ class ReaderPageSnapshotMapperTest {
         },
         selected = false,
         emphasized = emphasized,
+        markingId = markingId,
         chapterPosition = chapterPosition,
     )
 
@@ -137,11 +139,13 @@ class ReaderPageSnapshotMapperTest {
         end: Int,
         underlineMode: Int,
         highlight: Boolean,
+        markingId: String,
     ) {
         assertEquals(start, run.start)
         assertEquals(end, run.end)
         assertEquals(underlineMode, run.underlineMode)
         assertEquals(highlight, run.highlight)
+        assertEquals(markingId, run.markingId)
     }
 
     @Test
@@ -234,8 +238,64 @@ class ReaderPageSnapshotMapperTest {
 
         val runs = snapshot.lines.single().decorations
         assertEquals(2, runs.size)
-        assertDecorationRun(runs[0], start = 0, end = 6, underlineMode = 1, highlight = false)
-        assertDecorationRun(runs[1], start = 9, end = 12, underlineMode = 0, highlight = true)
+        // 无 markingId（宿主高亮规则等非用户标记来源）归一为空串
+        assertDecorationRun(runs[0], start = 0, end = 6, underlineMode = 1, highlight = false,
+            markingId = "")
+        assertDecorationRun(runs[1], start = 9, end = 12, underlineMode = 0, highlight = true,
+            markingId = "")
+    }
+
+    @Test
+    fun `不同markingId相邻同款划线不合并为同一run`() {
+        val snapshot = mapElements(
+            textElement(0f, 10f, "标记甲", chapterPosition = 0, height = 20f, baselinePx = 28f,
+                underlineMode = 1, markingId = "mark-a"),
+            textElement(60f, 10f, "标记乙", chapterPosition = 3, height = 20f, baselinePx = 28f,
+                underlineMode = 1, markingId = "mark-b"),
+            sdkInt = 34,
+        )
+
+        // 样式签名相同但标记身份不同：必须拆为两条 run（点按命中按 markingId 定位）
+        val runs = snapshot.lines.single().decorations
+        assertEquals(2, runs.size)
+        assertDecorationRun(runs[0], start = 0, end = 3, underlineMode = 1, highlight = false,
+            markingId = "mark-a")
+        assertDecorationRun(runs[1], start = 3, end = 6, underlineMode = 1, highlight = false,
+            markingId = "mark-b")
+    }
+
+    @Test
+    fun `相同markingId相邻同款划线合并为单run并携带该id`() {
+        val snapshot = mapElements(
+            textElement(0f, 10f, "同标", chapterPosition = 0, height = 20f, baselinePx = 28f,
+                underlineMode = 2, markingId = "test-marking"),
+            textElement(60f, 10f, "同款", chapterPosition = 2, height = 20f, baselinePx = 28f,
+                underlineMode = 2, markingId = "test-marking"),
+            sdkInt = 34,
+        )
+
+        val runs = snapshot.lines.single().decorations
+        assertEquals(1, runs.size)
+        assertDecorationRun(runs[0], start = 0, end = 4, underlineMode = 2, highlight = false,
+            markingId = "test-marking")
+    }
+
+    @Test
+    fun `不同markingId相邻高亮不合并`() {
+        val snapshot = mapElements(
+            textElement(0f, 10f, "亮甲", chapterPosition = 0, height = 20f, baselinePx = 28f,
+                highlight = true, markingId = "mark-a"),
+            textElement(60f, 10f, "亮乙", chapterPosition = 2, height = 20f, baselinePx = 28f,
+                highlight = true, markingId = "mark-b"),
+            sdkInt = 34,
+        )
+
+        val runs = snapshot.lines.single().decorations
+        assertEquals(2, runs.size)
+        assertDecorationRun(runs[0], start = 0, end = 2, underlineMode = 0, highlight = true,
+            markingId = "mark-a")
+        assertDecorationRun(runs[1], start = 2, end = 4, underlineMode = 0, highlight = true,
+            markingId = "mark-b")
     }
 
     @Test
@@ -346,6 +406,28 @@ class ReaderPageSnapshotMapperTest {
 
         assertEquals("第一章", snapshot.title)
         assertEquals("12.3%", snapshot.readProgress)
+    }
+
+    // ==== 书签角标布尔透传 ====
+
+    @Test
+    fun `快照书签角标默认false且显式传入时透传`() {
+        val base = mapElements(textElement(0f, 0f, "文"))
+        // 缺省构造：模块页角不画角标
+        assertFalse(base.bookmarkBadge)
+
+        val marked = ReaderPageSnapshotMapper.mapWithSpecs(
+            page = readerPage(listOf(textElement(0f, 0f, "文"))),
+            titleSpec = titleSpec,
+            contentSpec = contentSpec,
+            sdkInt = 30,
+            sessionBook = null,
+            readProgress = "0.0%",
+            imageLoader = { _, _ -> { _, _ -> null } },
+            bookmarkBadge = true,
+        )
+        // 宿主 page.decoration.bookmarkBadge 原样拷贝
+        assertTrue(marked.bookmarkBadge)
     }
 
     // ==== 进度文本公式（沿用旧 TextPage.readProgress）====
