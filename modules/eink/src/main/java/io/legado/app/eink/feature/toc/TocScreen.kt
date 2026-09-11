@@ -97,6 +97,18 @@ private val CurrentMarkHeight = 16.dp
 private val TocTabHeight = 44.dp
 
 /**
+ * 卡片左缩进：比章节头（[EInkSpacing.m]）多一档，卡片在视觉上"从属"于该
+ * 章节头（层级 + 关联感）；右缘保持 m，按压底色仍铺满整行（点击区域不缩）。
+ */
+private val CardStartPadding = EInkSpacing.l
+
+/** 卡片内块间距：首行元信息 ↔ 第一个内容块。 */
+private val CardBlockGap = EInkSpacing.s
+
+/** 正文级内容块（想法内容 / 书签笔记）与前一块的额外间距：把引用与想法拉开。 */
+private val CardBodyGap = EInkSpacing.s
+
+/**
  * 目录 Route — ViewModel 感知层。
  *
  * 列表为固定页分页（翻页按钮与上下滑动手势一致），
@@ -884,8 +896,9 @@ private fun MarkCard(
             .then(press.modifier)
             .background(colors.containerColor)
             .einkClickable(role = Role.Button, onClick = onClick)
-            .padding(horizontal = EInkSpacing.m, vertical = EInkSpacing.s),
-        verticalArrangement = Arrangement.spacedBy(4.dp),
+            // 左缩进多一档（卡片从属于章节头）；点击区域与底色仍是整行
+            .padding(start = CardStartPadding, end = EInkSpacing.m, top = EInkSpacing.s, bottom = EInkSpacing.s),
+        verticalArrangement = Arrangement.spacedBy(CardBlockGap),
     ) {
         content(primary, secondary, meta)
     }
@@ -945,6 +958,8 @@ private fun BookmarkCard(
         if (bookmark.content.isNotBlank()) {
             EInkText(
                 text = bookmark.content,
+                // 与前一块（页面摘录）再拉开一档：两者语气不同（摘录 vs 自己的笔记）
+                modifier = Modifier.padding(top = CardBodyGap),
                 style = EInkTheme.typography.bodyMedium,
                 color = secondary,
                 maxLines = 3,
@@ -979,6 +994,8 @@ private fun MarkingCard(
         if (marking.thought && marking.note.isNotBlank()) {
             EInkText(
                 text = marking.note,
+                // 与引用态划线再拉开一档：引用是"别人的原文"，想法是自己写的
+                modifier = Modifier.padding(top = CardBodyGap),
                 style = EInkTheme.typography.bodyLarge,
                 color = primary,
                 maxLines = 6,
