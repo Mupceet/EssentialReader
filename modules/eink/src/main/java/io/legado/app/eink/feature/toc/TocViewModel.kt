@@ -11,6 +11,7 @@ import io.legado.app.eink.contract.MarkingUiModel
 import io.legado.app.eink.contract.PendingJumpConfirm
 import io.legado.app.eink.contract.TocBookUiModel
 import io.legado.app.eink.contract.TocFetchResult
+import io.legado.app.eink.session.ReaderSessionCache
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -114,21 +115,37 @@ class TocViewModel(application: Application) : AndroidViewModel(application) {
                 _uiState.update { it.copy(isLoading = false, error = "书籍不存在") }
                 return@launch
             }
-            // 书解析成功：登记 marks 能力并订阅书签/笔记流（独立 launch，不阻塞目录加载）
-            _uiState.update { it.copy(marksAvailable = marksEngine != null) }
-            marksEngine?.let { marks ->
-                viewModelScope.launch {
-                    marks.observeBookmarks(book.bookUrl).collect { list ->
-                        _uiState.update { it.copy(bookmarks = list) }
-                    }
+            // 阅读会话预热命中（进阅读页首章出页后已预热）：直读快照——目录/书签/
+            // 笔记首帧即完整，不再等 Room 流往返与章节查询；随后跟会话流跟进更新。
+            // 未命中（从详情页直接进目录、换源后旧会话已停、降级宿主）走原有自加载。
+            val warm = ReaderSessionCache.snapshot()?.takeIf { it.bookUrl == bookUrl }
+            if (warm != null) {
+                _uiState.update {
+                    it.copy(
+                        marksAvailable = warm.marksAvailable,
+                        bookmarks = warm.bookmarks,
+                        markings = warm.markings,
+                    )
                 }
-                viewModelScope.launch {
-                    marks.observeMarkings(book.bookUrl).collect { list ->
-                        _uiState.update { it.copy(markings = list) }
+                observeSession(bookUrl)
+            } else {
+                // 书解析成功：登记 marks 能力并订阅书签/笔记流（独立 launch，不阻塞目录加载）
+                _uiState.update { it.copy(marksAvailable = marksEngine != null) }
+                marksEngine?.let { marks ->
+                    viewModelScope.launch {
+                        marks.observeBookmarks(book.bookUrl).collect { list ->
+                            _uiState.update { it.copy(bookmarks = list) }
+                        }
+                    }
+                    viewModelScope.launch {
+                        marks.observeMarkings(book.bookUrl).collect { list ->
+                            _uiState.update { it.copy(markings = list) }
+                        }
                     }
                 }
             }
-            var chapters = engine.loadChapters(bookUrl)
+            // 章节：预热命中直接用快照（未就绪为 null → 按原路径查库）
+            var chapters = warm?.chapters ?: engine.loadChapters(bookUrl)
             if (chapters.isEmpty() && !book.isLocal) {
                 // 目录缺失（未阅读过的新书）：从书源拉取入库
                 when (val result = engine.fetchChaptersFromSource(bookUrl)) {
@@ -158,6 +175,27 @@ class TocViewModel(application: Application) : AndroidViewModel(application) {
                 )
             }
             refreshCacheFiles()
+        }
+    }
+
+    /**
+     * 跟进会话缓存：阅读会话的订阅持续推送（书签/笔记增删、目录就绪），
+     * 这里只应用**同一本书**的快照；会话结束（退出阅读/换书）后流变 null，
+     * 保留既有状态不再更新。
+     */
+    private fun observeSession(bookUrl: String) {
+        viewModelScope.launch {
+            ReaderSessionCache.session.collect { snapshot ->
+                if (snapshot == null || snapshot.bookUrl != bookUrl) return@collect
+                _uiState.update {
+                    it.copy(
+                        marksAvailable = snapshot.marksAvailable,
+                        bookmarks = snapshot.bookmarks,
+                        markings = snapshot.markings,
+                        chapters = snapshot.chapters ?: it.chapters,
+                    )
+                }
+            }
         }
     }
 

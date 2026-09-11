@@ -22,6 +22,7 @@ import io.legado.app.eink.contract.ReaderStyleCatalog
 import io.legado.app.eink.contract.ReaderStyleParamIds as Ids
 import io.legado.app.eink.contract.ReaderTextStyle
 import io.legado.app.eink.feature.reader.selection.ReaderSelectionUi
+import io.legado.app.eink.session.ReaderSessionCache
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -910,6 +911,11 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application),
                 )
             }
             updateTipInfo()
+            // 会话预热（切片 1）：**首章出页之后**再预热当前会话书的目录/书签/
+            // 笔记（目录页读它即可首帧完整）。放在出页之后是为了不与用户正在
+            // 等待的首屏分页抢 I/O（宿主"相邻章等当前章装载完成"同一条教训）；
+            // 幂等启动，退出阅读（本 VM 销毁）或换书时由 stop 收尾。
+            loadedBookUrl?.let { ReaderSessionCache.start(it) }
         }
         success?.invoke()
     }
@@ -943,6 +949,9 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application),
     override fun onCleared() {
         super.onCleared()
         stopAutoPlay()
+        // 会话缓存随阅读条目一起退场（本 VM 按导航条目作用域：目录/换源压栈时
+        // 条目仍在、缓存仍在；条目被 pop/替换时清理订阅，不常驻）
+        loadedBookUrl?.let { ReaderSessionCache.stop(it) }
         if (engine.isRegistered(this)) {
             // 落库阅读进度（更新 durChapterTime，书架按最后阅读排序据此置顶）
             engine.saveReadingProgress()
