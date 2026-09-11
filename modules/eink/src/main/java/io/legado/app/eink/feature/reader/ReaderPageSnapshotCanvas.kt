@@ -30,8 +30,8 @@ import io.legado.app.eink.feature.reader.selection.decorationSpanX
  * 阅读页绘制层（模块自持）。
  *
  * 绘制宿主映射来的 [ReaderPageSnapshot]：行 chunk 按预计算 x 坐标画字，
- * 图片槽位按铺满/等比居中画位图。装饰（用户划线/高亮）按三遍绘制：
- * 高亮带垫在正文之下 → 正文/图片 → 下划线压在正文之上。排版本身由引擎
+ * 图片槽位按铺满/等比居中画位图。装饰按三遍绘制：底色层（用户高亮带 +
+ * 页面书签折角）垫在正文之下 → 正文/图片 → 下划线压在正文之上。排版本身由引擎
  * （宿主 ChapterProvider）完成，这里不做二次排版 —— 结果与 View 版
  * ContentTextView 一致。
  *
@@ -53,7 +53,10 @@ internal fun ReaderPageSnapshotCanvas(
 ) {
     val themeTextColorArgb = EInkTheme.colorScheme.onBackground.toArgb()
     val themeHighlightArgb = EInkTheme.colorScheme.secondaryContainer.toArgb()
-    val themePrimaryArgb = EInkTheme.colorScheme.primary.toArgb()
+    // 书签折角用选区底色灰：折角画在正文之下（同划线底色的画法），而
+    // selectionContainer 是四套灰阶板下都有值的实灰——高对比板
+    // secondaryContainer 为纯白，与页面底色同值会直接看不见（见 EInkColors）
+    val themeBadgeArgb = EInkTheme.colorScheme.selectionContainer.toArgb()
     val imageAntiAlias = EInkEngineRegistry.globalSettings.useAntiAlias
     // 页眉预留高度（px）：书签角标贴其下缘（正文顶缘）起画——宿主
     // ReaderBookmarkBadge 同位（topPx = contentTopPx）
@@ -70,11 +73,14 @@ internal fun ReaderPageSnapshotCanvas(
             titlePaint.applySpec(snapshot.titleSpec, themeTextColorArgb)
             contentPaint.applySpec(snapshot.contentSpec, themeTextColorArgb)
 
-            // 1) 高亮带（正文之下）：secondaryContainer 实灰。与选区高亮带
-            //    同一 token（ReaderSelectionOverlay 先例）——E-Ink 禁 alpha
-            //    混灰（残影），surfaceVariant 在高对比灰阶板下与背景同值
-            //    不可见；secondaryContainer 在灰阶板下为可辨实灰，高分板下
-            //    亦与背景同值（装饰随选区带同一既定取舍：最大对比档不做灰底）。
+            // 1) 正文之下的底色层（高亮带 + 书签折角）：都必须在文字之前
+            //    画——底色垫在文字下，拉长/加宽都不遮字。
+
+            // 1a) 高亮带：secondaryContainer 实灰。与选区高亮带同一 token
+            //     （ReaderSelectionOverlay 先例）——E-Ink 禁 alpha 混灰
+            //     （残影），surfaceVariant 在高对比灰阶板下与背景同值
+            //     不可见；secondaryContainer 在灰阶板下为可辨实灰，高分板下
+            //     亦与背景同值（装饰随选区带同一既定取舍：最大对比档不做灰底）。
             highlightPaint.color = themeHighlightArgb
             for (line in snapshot.lines) {
                 for (run in line.decorations) {
@@ -85,6 +91,31 @@ internal fun ReaderPageSnapshotCanvas(
                         span.first, line.top, span.second, line.bottom, highlightPaint,
                     )
                 }
+            }
+
+            // 1b) 页面书签折角（v2 Task 9，设计 §4/§6）：当前页带书签时在
+            //     页眉避让区右缘画一枚底色灰实心折角（16dp 宽 × 64dp 长，
+            //     底缘中央内切缺口），贴正文顶缘、右缩进 6dp——宿主
+            //     ReaderBookmarkBadge 同位（topPx = contentTopPx）。
+            //     长度取自真机反馈「角标有点小」：24dp→64dp（默认字号下约
+            //     2.8 行）；因为折角改画在正文之下（对齐划线底色的既定画法），
+            //     拉长只是多垫一块灰底，不会像前景折角那样盖住首行文字
+            //     （真机反馈「变高就会遮盖正文」）。零动画，随页快照直切。
+            if (snapshot.bookmarkBadge) {
+                val badgeWidth = 16.dp.toPx()
+                val badgeHeight = 64.dp.toPx()
+                val right = size.width - 6f * density
+                val top = headerExtentPx
+                val notch = badgeHeight * 0.25f
+                val ribbon = Path().apply {
+                    moveTo(right - badgeWidth, top)
+                    lineTo(right, top)
+                    lineTo(right, top + badgeHeight)
+                    lineTo(right - badgeWidth / 2f, top + badgeHeight - notch)
+                    lineTo(right - badgeWidth, top + badgeHeight)
+                    close()
+                }
+                drawPath(ribbon, Color(themeBadgeArgb))
             }
 
             // 2) 文本与图片（既有逻辑不变）
@@ -136,27 +167,6 @@ internal fun ReaderPageSnapshotCanvas(
                         else -> drawSolidLine(span.first, span.second, y, strokeWidth, themeTextColorArgb)
                     }
                 }
-            }
-
-            // 4) 页面书签角标（v2 Task 9，设计 §4/§6）：当前页带书签时在页眉
-            //    避让区右缘画一枚实心书签折角（主题 primary，16×24dp，底缘
-            //    中央内切缺口），贴正文顶缘、右缩进 6dp——宿主 ReaderBookmarkBadge
-            //    同位（topPx = contentTopPx）。零动画，随页快照直切
-            if (snapshot.bookmarkBadge) {
-                val badgeWidth = 16.dp.toPx()
-                val badgeHeight = 24.dp.toPx()
-                val right = size.width - 6f * density
-                val top = headerExtentPx
-                val notch = badgeHeight * 0.25f
-                val ribbon = Path().apply {
-                    moveTo(right - badgeWidth, top)
-                    lineTo(right, top)
-                    lineTo(right, top + badgeHeight)
-                    lineTo(right - badgeWidth / 2f, top + badgeHeight - notch)
-                    lineTo(right - badgeWidth, top + badgeHeight)
-                    close()
-                }
-                drawPath(ribbon, Color(themePrimaryArgb))
             }
         }
     }
