@@ -120,9 +120,9 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application),
     }
 
     /**
-     * 批注端口可用性：决定选择浮条「写想法/删除」键显隐——未注册
+     * 批注端口可用性：决定选区操作条「画线/想法/删除」键显隐——未注册
      * [EInkEngineRegistry.selectionEngine] 的宿主为合法降级态，
-     * 长按选择整体不启用（无选词/无触觉/无浮条），下拉书签与顶栏书签钮
+     * 长按选择整体不启用（无选词/无触觉/无操作条），下拉书签与顶栏书签钮
      * 隐藏，不做假死路径。
      */
     val selectionEnabled: Boolean
@@ -536,17 +536,18 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application),
     // ==================== 选区批注 ====================
 
     /**
-     * 保存划线/想法（v2 松手即存与想法弹层确认共用入口）：[thought] = true
+     * 保存划线/想法（v2.1：选区操作条选「画线」与想法弹层确认共用入口）：
+     * [thought] = true
      * 为想法（宿主写 underlineMode=2 虚线），false 为划线（underlineMode=1
-     * 实线）；[note] 为想法内容（划线恒空串）。同锚点落库为原地更新
-     * （SaveMarkingUseCase.save），松手划线经想法弹层确认即转换为想法。
+     * 实线，固定纯黑）；[note] 为想法内容（划线恒空串）。同锚点落库为原地
+     * 更新（SaveMarkingUseCase.save），划线经想法弹层确认即转换为想法。
      * 宿主落库 book_marks 后自行触发当前章重排（保持页内位置）并经
      * onContentUpdated 推送带装饰的新快照（pageVersion 随之推进，Route
-     * 效应清选区收尾）——模块不请求刷新。false = 端口未注册（降级宿主）
-     * 或落库失败。
+     * 效应在装饰真的在页上时清选区收尾，选中带续显不闪断）——模块不请求
+     * 刷新。false = 端口未注册（降级宿主）或落库失败。
      *
-     * 注意端口只回 Boolean、不返回落库标记的 markingId：松手浮条的删除
-     * 因此不可用（置灰），删除走 Task 6 点按场景（快照命中 run 携带 id）
+     * 注意端口只回 Boolean、不返回落库标记的 markingId：删除必须在能拿到
+     * id 的入口进行（点按标记操作条，或选区操作条按快照命中 run 解析 id）
      * 的 [deleteMarking]。
      */
     suspend fun saveMarking(sel: ReaderSelectionUi, note: String, thought: Boolean): Boolean {
@@ -564,8 +565,8 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application),
     }
 
     /**
-     * 删除标记（Task 6 点按场景消费；松手场景无 markingId，浮条删除键
-     * 置灰不可达本方法）。false = 端口未注册或删除失败。
+     * 删除标记（点按标记操作条与「选区已落在标记上」的选区操作条消费；
+     * markingId 现成，无落库时序）。false = 端口未注册或删除失败。
      */
     suspend fun deleteMarking(markingId: String): Boolean {
         val port = EInkEngineRegistry.selectionEngine ?: return false

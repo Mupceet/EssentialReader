@@ -7,8 +7,8 @@ import androidx.compose.runtime.Stable
  * book_marks，提供页面级书签 toggle。模块不复制这些规则。
  *
  * 可选端口（同 [EInkEngineRegistry.appUpdateEngine] 先例）：注册表缺失本端口
- * 时，模块降级——长按选择整体不启用（松手无动作、无浮条，选择交互无可用
- * 出路），下拉书签与顶栏书签钮隐藏，不做假死路径。
+ * 时，模块降级——长按选择整体不启用（松手无动作、无操作条，选择交互无
+ * 可用出路），下拉书签与顶栏书签钮隐藏，不做假死路径。
  */
 interface ReaderSelectionEngine {
 
@@ -16,7 +16,8 @@ interface ReaderSelectionEngine {
      * 保存标记（同锚点 upsert，创建/写想法/编辑想法复用）。
      * [ReaderSelectionCommit.thought] = false → 划线（实线，note 空串）；
      * true → 想法（虚线 + note）。虚线颜色取宿主默认，样式由宿主桥写入
-     * TextProcessStyle（underlineMode 1/2）。
+     * TextProcessStyle（underlineMode 1/2；颜色固定纯黑，eink 与完整模式
+     * 显示一致）。
      * 宿主落库后自行触发当前章重排（保持页内位置），新快照经
      * onContentUpdated 携带装饰推送——模块不请求刷新。
      * false = 落库失败（模块提示「保存失败」并恢复现场）。

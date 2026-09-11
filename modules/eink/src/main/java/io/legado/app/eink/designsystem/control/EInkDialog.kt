@@ -6,6 +6,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -51,6 +52,10 @@ import io.legado.app.eink.designsystem.theme.EInkTheme
  * IME 避让（DS §20 Dialog / §21 输入）：根 Box 自带 imePadding——弹框自身
  * 上抬到键盘上方；无输入场景 ime 插图为 0，无行为变化。宿主阅读区不响应
  * ime 插图（见 readerSystemBarInsets），故输入型弹框打开键盘不会引起正文重排。
+ *
+ * 定位：[contentAlignment] 默认居中；输入型弹框可传 `TopCenter` + [panelPadding]
+ * 把卡片固定到顶部（键盘弹出时输入区不被顶走，符合墨水屏长文输入习惯）。
+ * 背板（点击层）铺满全屏，不受 [panelPadding] 影响。
  */
 @Composable
 fun EInkDialog(
@@ -62,6 +67,8 @@ fun EInkDialog(
     onClose: (() -> Unit)? = null,
     onBackdropClick: (() -> Unit)? = null,
     showActions: Boolean = true,
+    contentAlignment: Alignment = Alignment.Center,
+    panelPadding: PaddingValues = PaddingValues(0.dp),
     content: @Composable () -> Unit,
 ) {
     // 系统返回 = 逐级回退的 onDismiss：组合期注册、收起随组合注销；
@@ -79,11 +86,12 @@ fun EInkDialog(
                 onClickLabel = "关闭",
                 onClick = onBackdropClick ?: onDismiss
             ),
-        contentAlignment = Alignment.Center
+        contentAlignment = contentAlignment
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth(0.86f)
+                .padding(panelPadding)
                 .background(EInkTheme.colorScheme.surface, shape = EInkShapes.medium)
                 .border(1.dp, EInkTheme.colorScheme.outline, EInkShapes.medium)
                 // 消费面板内空白处点击，避免透传到点击层误关

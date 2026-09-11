@@ -81,6 +81,65 @@ fun selectionOfDecoration(
     )
 }
 
+/**
+ * 章内区间 [bodyStart, bodyEnd) 是否已有用户标记装饰渲染到本页。
+ *
+ * 判据按**章内区间**相交（行内 run 经 [chapterPositionOf] 口径换算），不依赖
+ * 行下标——宿主重排后行下标可能漂移，行下标判据会漏判。空串 `markingId`
+ * （宿主高亮规则等非用户标记来源）与标题行（无正文语义、不落划线）不计。
+ *
+ * 用途：[pendingPreviewAfterPageVersion] 判断「松手落划线的预览可以退场了」——
+ * 只有正式装饰真的在页上，预览才让位，避免真机上「线先消失、再出现」的闪断。
+ */
+fun markingRenderedForRange(
+    page: ReaderPageSnapshot,
+    bodyStart: Int,
+    bodyEnd: Int,
+): Boolean {
+    if (bodyStart >= bodyEnd) return false
+    for (line in page.lines) {
+        if (line.isTitle) continue
+        val lineStart = line.chapterPositions.firstOrNull() ?: continue
+        for (run in line.decorations) {
+            if (run.markingId.isEmpty()) continue
+            if (lineStart + run.end > bodyStart && lineStart + run.start < bodyEnd) return true
+        }
+    }
+    return false
+}
+
+/**
+ * 选区（行内几何）覆盖到的用户标记 id：取首个与选区跨行区间相交、且
+ * `markingId` 非空的装饰 run（空串 = 宿主高亮规则等非用户标记来源）。
+ * null = 选区上没有标记。
+ *
+ * 用途：选区操作条的动作集分派——新区间给「复制/画线/想法」，已有标记的
+ * 区间给「复制/想法/删除」（想法进入编辑、删除按 id 即时可用），与点按
+ * 已有标记的链路同一语义。
+ */
+fun markingIdForSelection(
+    page: ReaderPageSnapshot,
+    selection: ReaderSelectionUi,
+): String? {
+    val start = selection.startHit
+    val end = selection.endHit
+    if (start.lineIndex > end.lineIndex) return null
+    for (index in start.lineIndex..end.lineIndex) {
+        val line = page.lines.getOrNull(index) ?: continue
+        // 标题行无正文语义、不落划线
+        if (line.isTitle) continue
+        val textLength = lineText(line).length
+        if (textLength == 0) continue
+        val from = if (index == start.lineIndex) start.charIndex.coerceIn(0, textLength) else 0
+        val to = if (index == end.lineIndex) end.charIndex.coerceIn(0, textLength) else textLength
+        if (from >= to) continue
+        line.decorations
+            .firstOrNull { it.markingId.isNotEmpty() && it.start < to && it.end > from }
+            ?.let { return it.markingId }
+    }
+    return null
+}
+
 /** 命中测试：y 按行盒定行（含容差半行高），x 按前缀宽度定最近字符。 */
 fun hitTest(
     snapshot: ReaderPageSnapshot,
@@ -290,11 +349,24 @@ internal fun charX(line: ReaderPageLine, charIndex: Int, measure: (String) -> Fl
     return x
 }
 
-/** 把手锚点：首 run 左上（起始把手）与末 run 右上（末端把手）。 */
-fun handleAnchor(runs: List<SelectionRun>): Pair<Pair<Float, Float>, Pair<Float, Float>>? {
+/**
+ * 把手锚点：x + 行盒上下沿。竖条贯穿 [top, bottom]（手柄高度 = 文本行高，
+ * 对齐完整模式 ReaderCanvasSurface 的 pin 手柄），下沿之下挂圆点。
+ */
+data class SelectionHandleAnchor(
+    val x: Float,
+    val top: Float,
+    val bottom: Float,
+)
+
+/** 首 run 左缘（起始把手）与末 run 右缘（末端把手）的锚点。 */
+fun handleAnchors(
+    runs: List<SelectionRun>,
+): Pair<SelectionHandleAnchor, SelectionHandleAnchor>? {
     val first = runs.firstOrNull() ?: return null
     val last = runs.lastOrNull() ?: return null
-    return (first.left to first.top) to (last.right to last.top)
+    return SelectionHandleAnchor(first.left, first.top, first.bottom) to
+        SelectionHandleAnchor(last.right, last.top, last.bottom)
 }
 
 // ==================== 跨页续选会话（v2 Task 8） ====================

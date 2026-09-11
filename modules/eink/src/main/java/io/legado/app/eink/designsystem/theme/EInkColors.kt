@@ -97,6 +97,19 @@ internal interface EInkPalette {
 
     /** 持久选中容器上的内容色。 */
     val selectedContent: Color
+
+    /**
+     * 文本选区底色（长按选择的选中带）。
+     *
+     * 语义独立于 [selected]：后者是小面积**反色实心**控件（Tab/开关），
+     * 而选区底色是铺在正文之下的**浅填充**，正文笔迹必须仍然压在其上可读。
+     * 高对比板为此破例引入一档实灰（纯黑/纯白无法表达「选中」），
+     * 不用 alpha 混灰（E-Ink 残影）。
+     *
+     * 具体档位取**中浅灰**（日间 #AAAAAA / 夜间 #555555）：再浅（gray100）
+     * 在真机白底上几乎看不出选中（实测反馈「灰底太浅」），再深则压住正文。
+     */
+    val selectionContainer: Color
 }
 
 /**
@@ -163,6 +176,9 @@ object EInkColors {
         override val divider = EInkGrayscale.gray300
         override val selected = primary
         override val selectedContent = onPrimary
+
+        // 高对比板的唯一灰：选区必须与白底可区分（纯白填充 = 无选中感）
+        override val selectionContainer = Gray10
     }
 
     /**
@@ -194,6 +210,7 @@ object EInkColors {
         override val divider = EInkGrayscale.gray300
         override val selected = primary
         override val selectedContent = onPrimary
+        override val selectionContainer = Gray10
     }
 
     /**
@@ -225,6 +242,7 @@ object EInkColors {
         override val divider = EInkGrayscale.gray500
         override val selected = primary
         override val selectedContent = onPrimary
+        override val selectionContainer = Gray05
     }
 
     /**
@@ -254,5 +272,6 @@ object EInkColors {
         override val divider = EInkGrayscale.gray500
         override val selected = primary
         override val selectedContent = onPrimary
+        override val selectionContainer = Gray05
     }
 }

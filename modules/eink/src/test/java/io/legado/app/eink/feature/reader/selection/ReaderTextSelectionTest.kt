@@ -157,17 +157,77 @@ class ReaderTextSelectionTest {
     }
 
     @Test
-    fun `把手锚点取首带左上与末带右上`() {
+    fun `把手锚点取首带左缘与末带右缘且高度取行盒`() {
         val snap = snapshot(
             line("abcdef", positions = intArrayOf(0), top = 30f, bottom = 70f),
             line("ghijkl", positions = intArrayOf(6), top = 80f, bottom = 120f),
         )
         val sel = buildSelection(snap, ReaderTextHit(0, 3), ReaderTextHit(1, 2))!!
         val runs = selectionRuns(snap, sel, measure, measure)
-        val (startAnchor, endAnchor) = handleAnchor(runs)!!
-        assertEquals(30f to 30f, startAnchor)
-        assertEquals(20f to 80f, endAnchor)
-        assertNull(handleAnchor(emptyList()))
+        val (startAnchor, endAnchor) = handleAnchors(runs)!!
+        // 竖条贯穿行盒（手柄高度 = 文本行高），x 取首带左缘/末带右缘
+        assertEquals(SelectionHandleAnchor(x = 30f, top = 30f, bottom = 70f), startAnchor)
+        assertEquals(SelectionHandleAnchor(x = 20f, top = 80f, bottom = 120f), endAnchor)
+        assertNull(handleAnchors(emptyList()))
+    }
+
+    @Test
+    fun `拖动末端把手越过起始端时固定端不跟随`() {
+        val snap = snapshot(line("abcdefghij", positions = intArrayOf(0)))
+        var sel = buildSelection(snap, ReaderTextHit(0, 2), ReaderTextHit(0, 8))!!
+        // 右把手往左拖越过起始端：被拖端换到起始侧，固定端（原起始 2）留在原处
+        var hit = ReaderTextHit(0, 1)
+        var isStart = false
+        sel = moveEndpoint(snap, sel, isStart, hit)
+        assertEquals(ReaderTextHit(0, 1), sel.startHit)
+        assertEquals(ReaderTextHit(0, 2), sel.endHit)
+        assertTrue(draggingEndpointIsStart(sel, hit))
+        isStart = draggingEndpointIsStart(sel, hit)
+        // 继续往左拖：固定端仍在 2（旧实现会把固定端当成被拖端，塌到上一帧手指位）
+        hit = ReaderTextHit(0, 0)
+        sel = moveEndpoint(snap, sel, isStart, hit)
+        assertEquals(ReaderTextHit(0, 0), sel.startHit)
+        assertEquals(ReaderTextHit(0, 2), sel.endHit)
+    }
+
+    @Test
+    fun `拖动起始把手越过末端时固定端不跟随`() {
+        val snap = snapshot(line("abcdefghij", positions = intArrayOf(0)))
+        var sel = buildSelection(snap, ReaderTextHit(0, 2), ReaderTextHit(0, 5))!!
+        // 左把手往右拖越过末端：固定端（原末端 5）留在原处
+        var hit = ReaderTextHit(0, 7)
+        sel = moveEndpoint(snap, sel, isStart = true, hit)
+        assertEquals(ReaderTextHit(0, 5), sel.startHit)
+        assertEquals(ReaderTextHit(0, 7), sel.endHit)
+        assertFalse(draggingEndpointIsStart(sel, hit))
+        val isStart = draggingEndpointIsStart(sel, hit)
+        hit = ReaderTextHit(0, 9)
+        sel = moveEndpoint(snap, sel, isStart, hit)
+        assertEquals(ReaderTextHit(0, 5), sel.startHit)
+        assertEquals(ReaderTextHit(0, 9), sel.endHit)
+    }
+
+    @Test
+    fun `选区命中标记返回覆盖字符的markingId`() {
+        val snap = snapshot(
+            line(
+                "第一段落", positions = intArrayOf(0),
+                decorations = listOf(decorationRun(2, 4, "m1")),
+            ),
+            line("续行", positions = intArrayOf(4)),
+        )
+        // 跨行选区与首行装饰相交 → 取该标记 id
+        val spanning = buildSelection(snap, ReaderTextHit(0, 2), ReaderTextHit(1, 1))!!
+        assertEquals("m1", markingIdForSelection(snap, spanning))
+        // 与装饰无交叠（选区在标记之前）→ null
+        val before = buildSelection(snap, ReaderTextHit(0, 0), ReaderTextHit(0, 2))!!
+        assertNull(markingIdForSelection(snap, before))
+        // 空串 markingId（宿主高亮规则）不算用户标记
+        val ruleOnly = snapshot(
+            line("abcdef", positions = intArrayOf(0), decorations = listOf(decorationRun(0, 6, ""))),
+        )
+        val inside = buildSelection(ruleOnly, ReaderTextHit(0, 1), ReaderTextHit(0, 4))!!
+        assertNull(markingIdForSelection(ruleOnly, inside))
     }
 
     @Test

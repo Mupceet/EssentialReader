@@ -1,5 +1,6 @@
 package io.legado.app.eink.bridge
 
+import android.os.SystemClock
 import io.legado.app.constant.AppLog
 import io.legado.app.data.entities.Bookmark
 import io.legado.app.data.repository.BookmarkRepository
@@ -15,6 +16,7 @@ import io.legado.app.utils.GSON
 import io.legado.app.utils.fromJsonObject
 import kotlin.coroutines.cancellation.CancellationException
 import kotlin.math.abs
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import org.koin.core.component.KoinComponent
@@ -24,12 +26,22 @@ import org.koin.core.component.inject
 private const val CONTEXT_CHARS = 48
 private const val CONTEXT_SEARCH_WINDOW = 256
 
-/** eink 笔记固定色：宿主划线渲染的回退默认（灰绿），eink 页面按主题黑绘制。 */
-private val EINK_MARKING_COLOR: Int = 0xFF63C37D.toInt()
+/** 等待章节语义正文就绪的上限（宿主重排在途时窗口短暂为空）。 */
+private const val CONTENT_WAIT_TIMEOUT_MILLIS = 1_500L
+
+/** 等待正文就绪的轮询间隔。 */
+private const val CONTENT_WAIT_POLL_MILLIS = 50L
+
+/**
+ * eink 笔记固定色：纯黑。eink 页面本就按主题黑绘制，落库色取同值后
+ * 完整模式（宿主）里的同一条标记也是黑实线，两模式显示一致——
+ * 用户选「画线」得到的即「黑色实线」这一承诺不因查看模式而变。
+ */
+private val EINK_MARKING_COLOR: Int = 0xFF000000.toInt()
 
 /**
  * eink 笔记固定样式（无样式配置——既定产品决策）：划线实线（underlineMode=1）、
- * 想法虚线（underlineMode=2）；颜色为宿主渲染回退默认，eink 页面按主题黑绘制。
+ * 想法虚线（underlineMode=2）；颜色固定纯黑（见 [EINK_MARKING_COLOR]）。
  */
 internal fun einkMarkingStyle(thought: Boolean): TextProcessStyle =
     TextProcessStyle(
@@ -39,7 +51,8 @@ internal fun einkMarkingStyle(thought: Boolean): TextProcessStyle =
 
 /**
  * 在章节全文中定位选中文本：窗口口径基于 MarkingDelegate.selectionContext；
- * 按契约改为两级搜索（先提示位精确后窗口回搜），找不到返回 -1
+ * 按契约两级搜索（先提示位精确后窗口回搜），仍不命中时最后做一次
+ * **全文唯一命中**兜底（见 [uniqueOccurrence]），找不到返回 -1
  * （不发散到 expectedStart）。
  */
 internal fun locateInContent(content: String, expectedStart: Int, text: String): Int {
@@ -53,7 +66,18 @@ internal fun locateInContent(content: String, expectedStart: Int, text: String):
     val windowStart = (clamped - backWindow).coerceAtLeast(0)
     content.indexOf(text, windowStart).takeIf { it >= 0 && it <= clamped + CONTEXT_SEARCH_WINDOW }
         ?.let { return it }
-    return -1
+    // 兜底：提示位漂移超出回搜窗口（宿主重排/内容微调后模块仍持旧页坐标）时，
+    // 只要选中文本在全文**唯一**出现就仍是无歧义锚点；0 次或多次命中保持
+    // 「选区失效从严」返回 -1，不猜位置
+    return uniqueOccurrence(content, text)
+}
+
+/** [text] 在 [content] 中唯一出现的位置；0 次或多次命中返回 -1。 */
+internal fun uniqueOccurrence(content: String, text: String): Int {
+    if (text.isEmpty()) return -1
+    val first = content.indexOf(text)
+    if (first < 0) return -1
+    return if (content.indexOf(text, first + 1) < 0) first else -1
 }
 
 /** 选区前后各取 [CONTEXT_CHARS] 字符（钳制边界）。 */
@@ -92,16 +116,47 @@ internal object ReaderSelectionEngineImpl : ReaderSelectionEngine, KoinComponent
             ?.takeIf { it.chapter.index == chapterIndex }
             ?.source?.semanticContent
 
+    /**
+     * 有界等待当前章语义正文就绪：宿主重排（[ReaderEngineImpl.relayout] →
+     * `clearTextChapter` → 异步 `loadContent`）期间内容窗口会短暂为空，用户在
+     * 这段窗口内保存会被误判为「选区失效」。等内容重新发布后再取，超时仍无
+     * 内容才按失败处理。
+     */
+    private suspend fun awaitSemanticContent(
+        chapterIndex: Int,
+        timeoutMillis: Long = CONTENT_WAIT_TIMEOUT_MILLIS,
+    ): String? {
+        val deadline = SystemClock.elapsedRealtime() + timeoutMillis
+        while (true) {
+            semanticContent(chapterIndex)?.let { return it }
+            if (SystemClock.elapsedRealtime() >= deadline) return null
+            delay(CONTENT_WAIT_POLL_MILLIS)
+        }
+    }
+
     /** 当前窗口标题（标记 chapterName，宿主同款口径）。 */
     private fun displayTitle(): String =
         ReadBook.readerChapterInputWindow.current?.displayTitle.orEmpty()
 
     override suspend fun saveMarking(commit: ReaderSelectionCommit): Boolean {
-        val book = ReadBook.book ?: return false
-        val content = semanticContent(commit.chapterIndex) ?: return false
+        val book = ReadBook.book ?: run {
+            AppLog.put("eink saveMarking: 无会话书")
+            return false
+        }
+        val content = awaitSemanticContent(commit.chapterIndex) ?: run {
+            AppLog.put("eink saveMarking: 章节内容未就绪 chapter=${commit.chapterIndex}")
+            return false
+        }
         val located = locateInContent(content, commit.start, commit.selectedText)
         // 选区失效从严：标记是文本锚点，定位不到即视为失效，不回退提示位
-        if (located < 0) return false
+        if (located < 0) {
+            AppLog.put(
+                "eink saveMarking: 选区定位失败 chapter=${commit.chapterIndex} " +
+                    "start=${commit.start} len=${commit.selectedText.length} " +
+                    "text=${commit.selectedText.take(24)}"
+            )
+            return false
+        }
         val (before, after) = extractContext(content, located, commit.selectedText.length)
         return try {
             saveMarkingUseCase.save(

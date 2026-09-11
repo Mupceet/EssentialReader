@@ -46,6 +46,32 @@ class ReaderSelectionEngineImplTest {
     }
 
     @Test
+    fun `提示位漂移超窗口但全文唯一命中时仍可定位`() {
+        // 选区文本在全文唯一（带段首标记），提示位被钳到文末、回搜窗口也够不到
+        val text = "第0段" + "一二三"
+        val textStart = content.indexOf(text)
+        val farHint = content.length
+        assertEquals(textStart, locateInContent(content, farHint, text))
+    }
+
+    @Test
+    fun `全文多次命中且都在窗口外时不猜位置`() {
+        // 两次命中都落在「提示位前看 256」与「回搜 256」之外：无歧义可循 → 从严 -1
+        val filler = "甲".repeat(400)
+        val text = "乙丙丁"
+        val doubled = filler + text + filler + text + filler
+        assertEquals(-1, locateInContent(doubled, 0, text))
+    }
+
+    @Test
+    fun `uniqueOccurrence 只在唯一命中时给位置`() {
+        assertEquals(2, uniqueOccurrence("abcdef", "cd"))
+        assertEquals(-1, uniqueOccurrence("abcabc", "abc"))
+        assertEquals(-1, uniqueOccurrence("abc", "zz"))
+        assertEquals(-1, uniqueOccurrence("abc", ""))
+    }
+
+    @Test
     fun `上下文各取 48 字符并钳制边界`() {
         val start = 0
         val length = 10
@@ -58,7 +84,8 @@ class ReaderSelectionEngineImplTest {
     fun `eink 划线样式为实线`() {
         val style = einkMarkingStyle(thought = false)
         assertEquals(1, style.underlineMode)
-        assertEquals(0xFF63C37D.toInt(), style.underlineColor)
+        // 纯黑：eink 页面按主题黑绘制，落库色同值 → 完整模式显示一致
+        assertEquals(0xFF000000.toInt(), style.underlineColor)
         assertEquals(null, style.bgColor)
     }
 
@@ -66,7 +93,7 @@ class ReaderSelectionEngineImplTest {
     fun `eink 想法样式为虚线`() {
         val style = einkMarkingStyle(thought = true)
         assertEquals(2, style.underlineMode)
-        assertEquals(0xFF63C37D.toInt(), style.underlineColor)
+        assertEquals(0xFF000000.toInt(), style.underlineColor)
         assertEquals(null, style.bgColor)
     }
 }

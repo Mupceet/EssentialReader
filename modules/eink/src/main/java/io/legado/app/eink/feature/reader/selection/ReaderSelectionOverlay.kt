@@ -5,52 +5,55 @@ import android.os.SystemClock
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.offset
-import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import io.legado.app.eink.contract.ReaderPageSnapshot
-import io.legado.app.eink.designsystem.control.EInkButton
 import io.legado.app.eink.designsystem.theme.EInkTheme
 import io.legado.app.eink.feature.reader.applySpec
-import kotlin.math.roundToInt
-
-/**
- * 选择浮条菜单动作（v2 三键）：
- * - [COPY] 复制：选文落剪贴板；
- * - [THOUGHT] 写想法：想法弹层，确认后 saveMarking(thought=true)；
- * - [DELETE] 删除：deleteMarking（点按场景携带 markingId，Task 6 接线；
- *   松手场景无 id，删除键置灰不可达）。
- */
-enum class ReaderSelectionMenuAction { COPY, THOUGHT, DELETE }
 
 /** 把手热区半径（dp，对齐宿主 28f*density）。 */
 internal val SelectionHandleTouchRadiusDp = 28.dp
 
+/** 把手竖条宽度（dp，对齐完整模式 SelectionHandleStrokeWidth）。 */
+private val SelectionHandleStrokeDp = 2.dp
+
+/** 把手圆点半径（dp，对齐完整模式 SelectionHandleRadius）。 */
+private val SelectionHandleRadiusDp = 7.dp
+
+/** 选中带圆角（dp）——小圆角对齐 DS 尺度，墨水屏大圆角易发糊。 */
+private val SelectionBandCornerDp = 2.dp
+
 /**
- * 选区覆盖层：实线下划线预览（与落库后的划线渲染同形，所见即所得）+ 首末把手。
+ * 选区覆盖层：灰色选中带（文本下方填充）+ 首末 pin 把手。
  *
  * 分两层绘制——
- * - 下划线预览（zIndex(-1f)）：垫在页画布**下方**，对选区 runs 逐行画基线下
- *   12% 行盒高的实线（主题 onBackground、1.5f·density），与画布正式装饰
- *   下划线同一公式与规格，拖拽调界随 runs 重建逐帧重绘；
+ * - 选中带（zIndex(-1f)）：垫在页画布**下方**，对选区 runs 逐行铺主题
+ *   [io.legado.app.eink.designsystem.theme.EInkColorScheme.selectionContainer]
+ *   填充矩形（行盒高 × 行内区间宽，2dp 圆角）——正文笔迹压在带上仍然可读，
+ *   观感即「选中的文字铺了灰底」；拖拽调界随 runs 重建逐帧重绘；
  * - 把手 + 指针独占（zIndex(1f)）：压在正文上方。pointerInput 只在按下
  *   即命中把手时消费指针、独占本次拖拽；否则不消费任何事件直接返回，
  *   下层点按/翻页/长按检测器照常工作（空白处点击 = 清选区由 Screen 承担；
- *   浮条菜单以 zIndex(2f) 组合在本层之上，把手热区不吞菜单键点击）。
+ *   操作条以 zIndex(2f) 组合在本层之上，把手热区不吞操作键点击）。
+ *
+ * 把手几何对齐完整模式 ReaderCanvasSurface 的 pin 手柄：竖条贯穿行盒
+ * [top, bottom]（**手柄高度 = 文本行高**），竖条下沿外挂一个圆点；抓取
+ * 热区以圆点为心、半径 [SelectionHandleTouchRadiusDp]。
  *
  * 拖拽循环内经 rememberUpdatedState 读实时把手位/选区/页快照/测量闭包：
  * 不以 selection/snapshot 为 pointerInput key——每次端点替换或续选会话翻页
@@ -64,8 +67,9 @@ internal val SelectionHandleTouchRadiusDp = 28.dp
  * 按越出边归属把手侧，offPageHandleIsStart——会话内反向拖出页缘的双向
  * 翻页依赖此归属），端点进带并持续按住超系统长按时值经 [onFlipRequest]
  * 上抛一次；一次按住只触发一次，拖出触发带重新武装（FlipTrigger）。
- * 拖拽松手经 [onHandleRelease] 上抛提交（Route 侧合成会话最终选区后走
- * 落库 + 冻结 + 浮条链路；无会话时即提交页内选区）。
+ * 抓取瞬间经 [onHandleDragStart] 上抛（Screen 收操作条——调界期间操作条
+ * 离场），拖拽松手经 [onHandleRelease] 上抛（Route 侧合成会话最终选区，
+ * 不落库：落库由用户在操作条上选「画线/想法」触发）。
  *
  * [handlesEnabled] = false（落库冻结）时把手转只读展示：选区与把手保持
  * 绘制，但不进入抓取、不消费任何事件，按下落回下层检测器（点按照常清
@@ -79,15 +83,17 @@ internal fun ReaderSelectionOverlay(
     handlesEnabled: Boolean,
     onSelectionChange: (ReaderSelectionUi?) -> Unit,
     onFlipRequest: (Int) -> Unit,
+    onHandleDragStart: () -> Unit,
     onHandleRelease: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     if (snapshot == null || selection == null) return
     val themeForeground = EInkTheme.colorScheme.onBackground
+    val selectionBand = EInkTheme.colorScheme.selectionContainer
     val density = LocalDensity.current
-    // 与画布正式装饰下划线同规格（1.5f·density，见 ReaderPageSnapshotCanvas）
-    val underlineStrokePx = 1.5f * density.density
-    val handleRadiusPx = with(density) { 4.dp.toPx() }
+    val handleStrokePx = with(density) { SelectionHandleStrokeDp.toPx() }
+    val handleRadiusPx = with(density) { SelectionHandleRadiusDp.toPx() }
+    val bandCornerPx = with(density) { SelectionBandCornerDp.toPx() }
     val touchRadiusPx = with(density) { SelectionHandleTouchRadiusDp.toPx() }
 
     // 与页画布同规格的测量闭包（applySpec 幂等，重复设置无害）
@@ -110,7 +116,7 @@ internal fun ReaderSelectionOverlay(
     val runs = remember(selection, snapshot) {
         selectionRuns(snapshot, selection, measureTitle, measureContent)
     }
-    val anchors = remember(runs) { handleAnchor(runs) }
+    val anchors = remember(runs) { handleAnchors(runs) }
     // 拖拽循环内读实时值：按下时刻的把手位/选区/页快照/测量闭包不冻结
     // （见类 KDoc——续选会话翻页推进 pageVersion 后新快照实时生效）
     val currentAnchors by rememberUpdatedState(anchors)
@@ -119,17 +125,17 @@ internal fun ReaderSelectionOverlay(
     val currentMeasureContent by rememberUpdatedState(measureContent)
     val currentHandlesEnabled by rememberUpdatedState(handlesEnabled)
 
-    // 实线下划线预览：垫在页画布下方，与落库后的划线渲染同形（见类 KDoc）。
-    // y 取基线下 12% 行盒高——与画布正式装饰下划线同一公式，baseY 按行取自快照
+    // 灰色选中带：垫在页画布下方（正文笔迹压在带上，见类 KDoc）
     Canvas(modifier = modifier.zIndex(-1f)) {
         for (run in runs) {
-            val line = snapshot.lines.getOrNull(run.lineIndex) ?: continue
-            val y = line.baseY + (line.bottom - line.top) * 0.12f
-            drawLine(
-                color = themeForeground,
-                start = Offset(run.left, y),
-                end = Offset(run.right, y),
-                strokeWidth = underlineStrokePx,
+            drawRoundRect(
+                color = selectionBand,
+                topLeft = Offset(run.left, run.top),
+                size = Size(
+                    (run.right - run.left).coerceAtLeast(0f),
+                    (run.bottom - run.top).coerceAtLeast(0f),
+                ),
+                cornerRadius = CornerRadius(bandCornerPx),
             )
         }
     }
@@ -147,9 +153,15 @@ internal fun ReaderSelectionOverlay(
                     if (!currentHandlesEnabled) return@awaitEachGesture
                     val grab = grabHandle(currentAnchors, down.position, touchRadiusPx)
                         ?: return@awaitEachGesture
+                    // 抓取即上抛：Screen 收操作条（调界期间操作条离场，
+                    // 松手后由 onHandleRelease 路径恢复）
+                    onHandleDragStart()
                     // 页顶/页底按住翻页触发状态机：每次按住一个，入带计时
                     // 超长按时值上抛一次，出带重新武装
                     val flipTrigger = FlipTrigger(viewConfiguration.longPressTimeoutMillis)
+                    // 被拖端点侧别：抓取时按命中把手定，之后每帧按归一化结果
+                    // 刷新（端点可越过对方，越过即换侧——见 draggingEndpointIsStart）
+                    var draggingStart = grab
                     while (true) {
                         val event = awaitPointerEvent()
                         val change = event.changes.firstOrNull { it.id == down.id } ?: break
@@ -169,7 +181,9 @@ internal fun ReaderSelectionOverlay(
                         // sel 非空由本组合入口早退保证（selection == null 不组合），
                         // 无需判空；hit/snapshot 真可空（拖出文本区/页快照换页瞬间）
                         if (snapshotNow != null && hit != null) {
-                            onSelectionChange(moveEndpoint(snapshotNow, sel, grab, hit))
+                            val moved = moveEndpoint(snapshotNow, sel, draggingStart, hit)
+                            onSelectionChange(moved)
+                            draggingStart = draggingEndpointIsStart(moved, hit)
                         }
                         // 页顶/页底按住翻页（v2 Task 8）：非空命中按抓取把手侧
                         // 判触发带（现状不变）；空命中（拖出文本行盒）按越出边
@@ -198,35 +212,48 @@ internal fun ReaderSelectionOverlay(
     ) {
         if (anchors != null) {
             val (startAnchor, endAnchor) = anchors
-            drawHandle(startAnchor, handleRadiusPx, themeForeground)
-            drawHandle(endAnchor, handleRadiusPx, themeForeground)
+            drawPinHandle(startAnchor, handleStrokePx, handleRadiusPx, themeForeground)
+            drawPinHandle(endAnchor, handleStrokePx, handleRadiusPx, themeForeground)
         }
     }
 }
 
-/** 把手：竖线 + 末端圆（宿主样式）。 */
-private fun DrawScope.drawHandle(
-    anchor: Pair<Float, Float>,
+/**
+ * pin 把手（完整模式同款）：竖条贯穿行盒（手柄高度 = 文本行高），行盒下沿
+ * 外挂一个描边圆点；圆点圆心即抓取热区中心（见 [grabHandle]）。
+ */
+private fun DrawScope.drawPinHandle(
+    anchor: SelectionHandleAnchor,
+    strokeWidth: Float,
     radius: Float,
     color: Color,
 ) {
-    val (x, top) = anchor
-    drawLine(color, Offset(x, top), Offset(x, top + radius * 4f), strokeWidth = radius / 2f)
-    drawCircle(color, radius = radius, center = Offset(x, top + radius * 4f))
+    drawLine(
+        color = color,
+        start = Offset(anchor.x, anchor.top),
+        end = Offset(anchor.x, anchor.bottom),
+        strokeWidth = strokeWidth,
+        cap = StrokeCap.Round,
+    )
+    // 竖条止于行盒下沿，圆的顶端与竖条末端相切（完整模式同几何）
+    drawCircle(
+        color = color,
+        radius = radius,
+        center = Offset(anchor.x, anchor.bottom + radius),
+        style = Stroke(width = strokeWidth),
+    )
 }
 
 /** 命中首/末把手；true = 起始把手，false = 末端把手，null = 未命中。 */
 internal fun grabHandle(
-    anchors: Pair<Pair<Float, Float>, Pair<Float, Float>>?,
+    anchors: Pair<SelectionHandleAnchor, SelectionHandleAnchor>?,
     position: Offset,
     touchRadius: Float,
 ): Boolean? {
     if (anchors == null) return null
     val (startAnchor, endAnchor) = anchors
-    val distanceToStart = Offset(startAnchor.first, startAnchor.second + touchRadius)
-        .getDistanceTo(position)
-    val distanceToEnd = Offset(endAnchor.first, endAnchor.second + touchRadius)
-        .getDistanceTo(position)
+    val distanceToStart = Offset(startAnchor.x, startAnchor.bottom).getDistanceTo(position)
+    val distanceToEnd = Offset(endAnchor.x, endAnchor.bottom).getDistanceTo(position)
     return when {
         distanceToStart <= touchRadius -> true
         distanceToEnd <= touchRadius -> false
@@ -250,79 +277,14 @@ internal fun moveEndpoint(
     ) ?: selection
 
 /**
- * 选择浮条：横排动作键（复制/写想法/删除），锚在选区上方（放不下取下方），
- * 零动画直切。位置随选区把手锚点重算（把手拖拽期间浮条跟随重排）；x 跟随
- * 选区中心并钳制在画布内。写想法/删除为批注动作，按批注端口可用性与选区
- * 是否含标题行显隐（[showMarkingActions]——未注册端口时长按选择整体不启用
- * （无选词/无触觉/无浮条），下拉书签与顶栏书签钮隐藏；纯标题选区不落划线，
- * 浮条只留复制键）；删除键在标记落库确认并拿到
- * markingId 前禁用置灰（[deleteEnabled]——松手场景端口 saveMarking 只回
- * Boolean 无 id，恒为禁用；Task 6 点按场景经快照命中 run 携带 id 后启用）。
- * 按键取实心反白高对比形态（selected = true，titleMedium 16sp 加粗），
- * 不透明色块浮于正文之上，正文不透过按键（透明底会与正文视觉打架）。
- * 整体置于 zIndex(2f)：盖过把手独占层（zIndex(1f)），下方放置时菜单键
- * 落在把手 28dp 热区内也不被其 pointerInput 吞掉。
+ * 拖动端在新选区里的侧别：**拖动端 = 与本次命中位置一致的那一端**。
  *
- * @param canvasWidth 画布实测宽（调用方以 onSizeChanged 传入），浮条 x 钳制边界
- * @param deleteEnabled 删除键可用性（false = 置灰弱化、点击不响应）
+ * 端点允许越过对方（区间按 [normalizeHits] 归一），越过之后被拖端在归一化
+ * 区间里换到了另一侧——后续 move 必须跟着换侧，否则会把**固定端当成被拖端**
+ * 继续替换：手指继续往左拖，右边缘反而跟着手指跑，选区越拖越乱（真机反馈
+ * 「把手拖回另一端之前就错乱」）。拖动循环每帧用本函数刷新侧别。
  */
-@Composable
-internal fun ReaderSelectionMenu(
-    anchorLeft: Float,
-    anchorTop: Float,
-    anchorRight: Float,
-    anchorBottom: Float,
-    canvasWidth: Float,
-    showMarkingActions: Boolean,
-    deleteEnabled: Boolean,
-    onAction: (ReaderSelectionMenuAction) -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    val density = LocalDensity.current
-    val itemWidthDp = 72.dp
-    val itemCount = if (showMarkingActions) 3 else 1
-    val menuWidthPx = with(density) { (itemWidthDp * itemCount).toPx() }
-    val menuHeightPx = with(density) { 48.dp.toPx() }
-    val gapPx = with(density) { 8.dp.toPx() }
-    // 位置：优先上方；x 跟随选区中心并钳制在画布内（画布极窄时上限取 0）
-    val x = ((anchorLeft + anchorRight) / 2f - menuWidthPx / 2f)
-        .coerceIn(0f, (canvasWidth - menuWidthPx).coerceAtLeast(0f))
-    val y = if (anchorTop - menuHeightPx - gapPx >= 0f) {
-        (anchorTop - menuHeightPx - gapPx).roundToInt()
-    } else {
-        (anchorBottom + gapPx).roundToInt()
-    }
-    Row(
-        modifier = modifier
-            // 压过把手独占层（zIndex(1f)）：下方放置（y = anchorBottom + gap）
-            // 时菜单键落在把手热区内，无此层把手 pointerInput 会先于菜单消费点击
-            .zIndex(2f)
-            .offset { IntOffset(x.roundToInt(), y) },
-    ) {
-        EInkButton(
-            text = "复制",
-            selected = true,
-            style = EInkTheme.typography.titleMedium,
-            onClick = { onAction(ReaderSelectionMenuAction.COPY) },
-            modifier = Modifier.width(itemWidthDp),
-        )
-        if (showMarkingActions) {
-            EInkButton(
-                text = "写想法",
-                selected = true,
-                style = EInkTheme.typography.titleMedium,
-                onClick = { onAction(ReaderSelectionMenuAction.THOUGHT) },
-                modifier = Modifier.width(itemWidthDp),
-            )
-            // 松手场景标记 id 不可得：置灰而非假装可用（点击无效果，见类 KDoc）
-            EInkButton(
-                text = "删除",
-                selected = true,
-                enabled = deleteEnabled,
-                style = EInkTheme.typography.titleMedium,
-                onClick = { onAction(ReaderSelectionMenuAction.DELETE) },
-                modifier = Modifier.width(itemWidthDp),
-            )
-        }
-    }
-}
+internal fun draggingEndpointIsStart(
+    selection: ReaderSelectionUi,
+    hit: ReaderTextHit,
+): Boolean = selection.startHit == hit

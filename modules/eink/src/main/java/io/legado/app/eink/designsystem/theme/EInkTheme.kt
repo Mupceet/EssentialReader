@@ -70,6 +70,9 @@ data class EInkColorScheme(
 
     /** 持久选中容器上的内容色。 */
     val selectedContent: Color,
+
+    /** 文本选区底色（长按选择的选中带；铺在正文之下，不反色）。 */
+    val selectionContainer: Color,
 )
 
 /**
@@ -149,6 +152,7 @@ private fun EInkPalette.toColorScheme(): EInkColorScheme = EInkColorScheme(
     divider = divider,
     selected = selected,
     selectedContent = selectedContent,
+    selectionContainer = selectionContainer,
 )
 
 /**
