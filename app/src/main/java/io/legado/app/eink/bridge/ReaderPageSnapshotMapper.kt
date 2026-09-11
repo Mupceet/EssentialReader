@@ -9,8 +9,10 @@ import io.legado.app.eink.contract.ReaderImageSlot
 import io.legado.app.eink.contract.ReaderPageLine
 import io.legado.app.eink.contract.ReaderPageSnapshot
 import io.legado.app.eink.contract.ReaderPaintSpec
+import io.legado.app.eink.contract.ReaderUnderlineGeometry
 import io.legado.app.feature.reader.core.model.ReaderElement
 import io.legado.app.feature.reader.core.model.ReaderPage
+import io.legado.app.feature.reader.core.model.ReaderUnderline
 import io.legado.app.feature.reader.platform.ReaderAndroidPaginationStyle
 import io.legado.app.model.ImageProvider
 import java.text.DecimalFormat
@@ -104,6 +106,8 @@ internal object ReaderPageSnapshotMapper {
                     line.underlineModes.add(element.style.underline?.mode ?: 0)
                     line.highlights.add(element.style.backgroundArgb != null)
                     line.markingIds.add(element.markingId.orEmpty())
+                    // 下划线几何透传给模块（宿主样式即唯一真源，见 ReaderUnderlineGeometry）
+                    line.underlines.add(element.style.underline?.toGeometry())
                 }
 
                 is ReaderElement.Image -> {
@@ -152,6 +156,8 @@ internal object ReaderPageSnapshotMapper {
         val underlineModes = ArrayList<Int>()
         val highlights = ArrayList<Boolean>()
         val markingIds = ArrayList<String>()
+        // 与 chunks 平行的宿主下划线几何（ReaderUnderline → 契约 ReaderUnderlineGeometry）
+        val underlines = ArrayList<ReaderUnderlineGeometry?>()
         var top = 0f
         var bottom = 0f
         var baseY = 0f
@@ -166,30 +172,37 @@ internal object ReaderPageSnapshotMapper {
             var runMode = 0
             var runHighlight = false
             var runMarkingId = ""
+            var runUnderline: ReaderUnderlineGeometry? = null
             var offset = 0
             for (i in chunks.indices) {
                 val mode = underlineModes[i]
                 val highlight = highlights[i]
                 val markingId = markingIds[i]
+                val underline = underlines[i]
                 val same = runStart >= 0 && mode == runMode && highlight == runHighlight &&
-                    markingId == runMarkingId
+                    markingId == runMarkingId && underline == runUnderline
                 if (!same) {
                     // 无签名段（0, false）只负责截断前序 run，自身不成 run
                     if (runStart >= 0 && (runMode != 0 || runHighlight)) {
                         runs.add(
-                            ReaderDecorationRun(runStart, offset, runMode, runHighlight, runMarkingId)
+                            ReaderDecorationRun(
+                                runStart, offset, runMode, runHighlight, runMarkingId, runUnderline,
+                            )
                         )
                     }
                     runStart = offset
                     runMode = mode
                     runHighlight = highlight
                     runMarkingId = markingId
+                    runUnderline = underline
                 }
                 offset += chunks[i].length
             }
             if (runStart >= 0 && (runMode != 0 || runHighlight)) {
                 runs.add(
-                    ReaderDecorationRun(runStart, offset, runMode, runHighlight, runMarkingId)
+                    ReaderDecorationRun(
+                        runStart, offset, runMode, runHighlight, runMarkingId, runUnderline,
+                    )
                 )
             }
             return runs
@@ -266,4 +279,19 @@ internal fun Paint.copyPaintSpec(): ReaderPaintSpec = ReaderPaintSpec(
     letterSpacing = letterSpacing, // API 21
     typeface = typeface, // API 1
     fontVariationSettings = fontVariationSettings, // API 26 = minSdk
+)
+
+/**
+ * 宿主下划线样式 → 模块绘制几何（px）：字段一一对应，模块不再自拟公式。
+ * 完整模式画布用 `y = 行盒下沿 + offsetPx`，模块据此绘制即逐像素对齐
+ * （见 [ReaderUnderlineGeometry]）。
+ */
+internal fun ReaderUnderline.toGeometry(): ReaderUnderlineGeometry = ReaderUnderlineGeometry(
+    widthPx = widthPx,
+    offsetPx = offsetPx,
+    dashOnPx = dashOnPx,
+    dashOffPx = dashOffPx,
+    waveAmplitudePx = waveAmplitudePx,
+    waveLengthPx = waveLengthPx,
+    doubleLineGapPx = doubleLineGapPx,
 )

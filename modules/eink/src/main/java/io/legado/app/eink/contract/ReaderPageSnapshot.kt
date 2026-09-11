@@ -177,4 +177,39 @@ class ReaderDecorationRun(
      * 同一 run。
      */
     val markingId: String,
+
+    /**
+     * 下划线绘制几何（px，宿主 `ReaderUnderline` 同源透传；null = 宿主未提供，
+     * 模块按内置默认绘制）。
+     *
+     * 为什么透传而不是模块自算：完整模式的下划线 y = **行盒下沿 + offsetPx**，
+     * 线宽 / 虚线节距 / 波浪幅度波长 / 双线间距都来自宿主样式；模块若自拟
+     * 公式（早期为「基线下方 12% 行盒高」）会与宿主有明显落差——真机反馈
+     * 「eink 画的线离文本底部太近」。透传后两种模式逐像素对齐，宿主改样式
+     * 常量或高亮规则自带线宽也能如实呈现。
+     */
+    val underline: ReaderUnderlineGeometry? = null,
+)
+
+/**
+ * 下划线几何（px）：与宿主 `ReaderUnderline` 一一对应，模块不再自拟参数。
+ *
+ * 坐标口径与宿主画布一致——同一页快照里元素 bounds / 行盒都是同一像素空间，
+ * 因此 `y = line.bottom + offsetPx` 在两种模式下落在同一位置。
+ */
+data class ReaderUnderlineGeometry(
+    /** 线宽（宿主 TextProcessStyle.underlineWidth）。 */
+    val widthPx: Float,
+    /** 行盒下沿之下的偏移（宿主 TextProcessStyle.underlineOffset；可负）。 */
+    val offsetPx: Float,
+    /** 虚线墨长。 */
+    val dashOnPx: Float,
+    /** 虚线空长。 */
+    val dashOffPx: Float,
+    /** 波浪幅度（±）。 */
+    val waveAmplitudePx: Float,
+    /** 波浪半波长（宿主 createWavePath 的 quad 段长）。 */
+    val waveLengthPx: Float,
+    /** 双线第二根相对第一根的额外间距（宿主再叠加一个线宽）。 */
+    val doubleLineGapPx: Float,
 )

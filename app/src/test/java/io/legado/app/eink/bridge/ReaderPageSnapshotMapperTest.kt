@@ -5,6 +5,7 @@ import android.graphics.Bitmap
 import io.legado.app.data.entities.Book
 import io.legado.app.eink.contract.ReaderDecorationRun
 import io.legado.app.eink.contract.ReaderPaintSpec
+import io.legado.app.eink.contract.ReaderUnderlineGeometry
 import io.legado.app.feature.reader.core.model.ReaderElement
 import io.legado.app.feature.reader.core.model.ReaderPage
 import io.legado.app.feature.reader.core.model.ReaderPageId
@@ -77,6 +78,8 @@ class ReaderPageSnapshotMapperTest {
         underlineMode: Int = 0,
         highlight: Boolean = false,
         markingId: String? = null,
+        underlineWidthPx: Float = 1f,
+        underlineOffsetPx: Float = 2f,
     ) = ReaderElement.Text(
         bounds = ReaderRect(x, top, x + 20f, top + height),
         baselinePx = baselinePx,
@@ -90,8 +93,8 @@ class ReaderPageSnapshotMapperTest {
                     ReaderUnderline(
                         mode = underlineMode,
                         colorArgb = 0xFF000000.toInt(),
-                        widthPx = 1f,
-                        offsetPx = 2f,
+                        widthPx = underlineWidthPx,
+                        offsetPx = underlineOffsetPx,
                     )
                 } else {
                     null
@@ -146,6 +149,39 @@ class ReaderPageSnapshotMapperTest {
         assertEquals(underlineMode, run.underlineMode)
         assertEquals(highlight, run.highlight)
         assertEquals(markingId, run.markingId)
+    }
+
+    @Test
+    fun `下划线几何按宿主样式逐段透传且不同几何不并入同一run`() {
+        val snapshot = mapElements(
+            textElement(
+                0f, 0f, "选中", underlineMode = 1, markingId = "mark-a",
+                underlineWidthPx = 1f, underlineOffsetPx = 2f,
+            ),
+            textElement(
+                20f, 0f, "另一段", underlineMode = 1, markingId = "mark-b",
+                underlineWidthPx = 0.5f, underlineOffsetPx = 4f,
+            ),
+        )
+        val runs = snapshot.lines[0].decorations
+        // 几何不同 → 不并入同一 run（模块逐段按宿主几何绘制）
+        assertEquals(2, runs.size)
+        assertDecorationRun(
+            runs[0], start = 0, end = 2, underlineMode = 1, highlight = false,
+            markingId = "mark-a",
+        )
+        assertDecorationRun(
+            runs[1], start = 2, end = 5, underlineMode = 1, highlight = false,
+            markingId = "mark-b",
+        )
+        // 宿主线宽/偏移原样透传：模块按 y = 行盒下沿 + offsetPx 绘制，与完整模式一致
+        val first = runs[0].underline
+        val second = runs[1].underline
+        assertEquals(1f, first!!.widthPx, 0.001f)
+        assertEquals(2f, first.offsetPx, 0.001f)
+        assertEquals(0.5f, second!!.widthPx, 0.001f)
+        assertEquals(4f, second.offsetPx, 0.001f)
+        assertTrue(first != second)
     }
 
     @Test

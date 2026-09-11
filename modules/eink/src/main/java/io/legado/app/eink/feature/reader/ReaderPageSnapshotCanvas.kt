@@ -98,23 +98,37 @@ internal fun ReaderPageSnapshotCanvas(
                 drawImageSlot(nativeCanvas, slot, imagePaint)
             }
 
-            // 3) 下划线（正文之上）：主题前景黑，y 在基线下方按行盒高度偏移；
+            // 3) 下划线（正文之上）：**几何全部取宿主导入的 run.underline**
+            //    （y = 行盒下沿 + offsetPx、线宽/虚线节距/波浪/双线间距同源），
+            //    与完整模式逐像素对齐；宿主未提供（旧宿主/缺省）时回落到
+            //    EInkUnderlineDefaults（= 宿主 TextProcessStyle 默认几何）。
             //    模式 1 实线 / 2 虚线 / 3 波浪 / 4 双线原生绘制，5（SVG 花色）
             //    及未知值降级实线（与 contract 透传约定一致）
-            val strokeWidth = 1.5f * density
             for (line in snapshot.lines) {
                 for (run in line.decorations) {
                     if (run.underlineMode == 0) continue
                     val span = decorationSpanX(line, run) { contentPaint.measureText(it) } ?: continue
-                    val y = line.baseY + (line.bottom - line.top) * 0.12f
+                    val geometry = run.underline
+                    val strokeWidth = geometry?.widthPx ?: EInkUnderlineDefaults.widthPx(density)
+                    val y = line.bottom + (geometry?.offsetPx ?: EInkUnderlineDefaults.offsetPx(density))
                     when (run.underlineMode) {
-                        2 -> drawDashedLine(span.first, span.second, y, strokeWidth, themeTextColorArgb)
-                        3 -> drawWaveLine(span.first, span.second, y, strokeWidth, themeTextColorArgb)
+                        2 -> drawDashedLine(
+                            span.first, span.second, y, strokeWidth, themeTextColorArgb,
+                            dashOnPx = geometry?.dashOnPx,
+                            dashOffPx = geometry?.dashOffPx,
+                        )
+                        3 -> drawWaveLine(
+                            span.first, span.second, y, strokeWidth, themeTextColorArgb,
+                            waveLengthPx = geometry?.waveLengthPx,
+                            waveAmplitudePx = geometry?.waveAmplitudePx,
+                        )
                         4 -> {
-                            // 双线：副线在主线下方 2.5×线宽（宿主双线间距量级）
+                            // 双线：副线 = 主线 + 宿主间距 + 线宽（与宿主同公式）
                             drawSolidLine(span.first, span.second, y, strokeWidth, themeTextColorArgb)
                             drawSolidLine(
-                                span.first, span.second, y + strokeWidth * 2.5f,
+                                span.first, span.second,
+                                y + (geometry?.doubleLineGapPx
+                                    ?: EInkUnderlineDefaults.doubleLineGapPx(density)) + strokeWidth,
                                 strokeWidth, themeTextColorArgb,
                             )
                         }
@@ -148,6 +162,24 @@ internal fun ReaderPageSnapshotCanvas(
     }
 }
 
+/**
+ * 模块内置下划线几何默认（dp→px）：**仅在宿主未透传几何时使用**（旧宿主 /
+ * 契约缺省）。取值对齐宿主默认——`TextProcessStyle.underlineWidth = 1dp`、
+ * `underlineOffset = 2dp`，虚线 8/5dp、波浪 12/3dp、双线间距 3dp
+ * （LegacyReaderStyleRangeMapper / ReaderPageDecorationDrawCache 常量）。
+ * 正常路径下几何由 [io.legado.app.eink.contract.ReaderUnderlineGeometry]
+ * 逐段透传，两种模式逐像素一致。
+ */
+internal object EInkUnderlineDefaults {
+    fun widthPx(density: Float): Float = 1f * density
+    fun offsetPx(density: Float): Float = 2f * density
+    fun dashOnPx(density: Float): Float = 8f * density
+    fun dashOffPx(density: Float): Float = 5f * density
+    fun waveAmplitudePx(density: Float): Float = 3f * density
+    fun waveLengthPx(density: Float): Float = 12f * density
+    fun doubleLineGapPx(density: Float): Float = 3f * density
+}
+
 /** 实线（Compose drawLine，方头）。零长区间画不出可见笔迹，安全。 */
 private fun DrawScope.drawSolidLine(
     left: Float,
@@ -164,13 +196,15 @@ private fun DrawScope.drawSolidLine(
     )
 }
 
-/** 虚线：dashPathEffect 8dp 墨 / 5dp 空（宿主 LegacyReaderStyleRangeMapper 默认）。 */
+/** 虚线：宿主未提供节距时用 8dp 墨 / 5dp 空（宿主 LegacyReaderStyleRangeMapper 默认）。 */
 private fun DrawScope.drawDashedLine(
     left: Float,
     right: Float,
     y: Float,
     strokeWidth: Float,
     colorArgb: Int,
+    dashOnPx: Float? = null,
+    dashOffPx: Float? = null,
 ) {
     val path = Path().apply {
         moveTo(left, y)
@@ -183,8 +217,8 @@ private fun DrawScope.drawDashedLine(
             width = strokeWidth,
             pathEffect = PathEffect.dashPathEffect(
                 floatArrayOf(
-                    (8f * density).coerceAtLeast(0.1f),
-                    (5f * density).coerceAtLeast(0.1f),
+                    (dashOnPx ?: EInkUnderlineDefaults.dashOnPx(density)).coerceAtLeast(0.1f),
+                    (dashOffPx ?: EInkUnderlineDefaults.dashOffPx(density)).coerceAtLeast(0.1f),
                 )
             ),
         ),
@@ -202,9 +236,12 @@ private fun DrawScope.drawWaveLine(
     y: Float,
     strokeWidth: Float,
     colorArgb: Int,
+    waveLengthPx: Float? = null,
+    waveAmplitudePx: Float? = null,
 ) {
-    val wavelength = (12f * density).coerceAtLeast(0.1f)
-    val amplitude = 3f * density
+    val wavelength = (waveLengthPx ?: EInkUnderlineDefaults.waveLengthPx(density))
+        .coerceAtLeast(0.1f)
+    val amplitude = waveAmplitudePx ?: EInkUnderlineDefaults.waveAmplitudePx(density)
     val path = Path().apply {
         moveTo(left, y)
         var x = left
