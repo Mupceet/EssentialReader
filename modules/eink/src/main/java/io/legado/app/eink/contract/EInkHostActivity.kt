@@ -9,13 +9,14 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.background
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
@@ -27,7 +28,8 @@ import kotlinx.coroutines.launch
 
 /**
  * E-Ink 单 Activity 入口模板基类——宿主差异的全部剩余面 = 两个抽象钩子
- * （[onInstallEngines] 与 [onExitToFullMode]）。
+ * （[onInstallEngines] 与 [onExitToFullMode]）加一个可选字体钩子
+ * （[uiFontFamily]，默认跟随平台默认字体）。
  *
  * 遵循 E-Ink Design System 规范 §54: 推荐单 Activity 架构，所有 E-Ink
  * 屏幕通过 Compose 状态路由（[EInkApp]）管理。
@@ -40,7 +42,7 @@ import kotlinx.coroutines.launch
  * onCreate
  *  ├─ 启动清理                  ← IO 协程：deleteBooksNotInBookshelf()
  *  ├─ 直达最近阅读解析          ← defaultToRead 开启时 lastReadBookUrl()
- *  └─ setContent ─► EInkTheme(isSystemInDarkTheme()) { EInkRoot }
+ *  └─ setContent ─► EInkTheme(深浅 State, uiFontFamily()) { EInkRoot }
  *                        └─ EInkApp 初始栈：[书架] 或 [书架, 阅读页]
  *
  * 系统按键 ─► onKeyDown/onKeyUp ─► keyEventHub.dispatch ─► 活跃屏幕处理器
@@ -56,9 +58,12 @@ import kotlinx.coroutines.launch
  *    Configuration（写入方在其落盘中立即可见，recreate 入口后生效）；
  *  - 初始导航值（直达最近阅读）在组合外同步解析。
  *
- * 黑白主题完全跟随系统深浅色——不消费宿主主题模式设置，无任何主题钩子；
- * 入口 Manifest 需声明 uiMode configChanges（不重建），系统深浅切换经
- * LocalConfiguration 更新驱动 [isSystemInDarkTheme] 重组。
+ * 黑白主题完全跟随系统深浅色——不消费宿主主题模式设置、无配色钩子；
+ * 唯一的主题入口是可选 UI 字体钩子 [uiFontFamily]（外观全局字体的注入点）。
+ * 入口 Manifest 需声明 uiMode configChanges（不重建）；深浅切换由
+ * [onConfigurationChanged] 以下发的 newConfig 推进深浅 State 驱动主题重组，
+ * 不能依赖 LocalConfiguration——入口包装冻结了 resources 配置，
+ * [isSystemInDarkTheme] 一类经它读取的链路随包装失效（见其 KDoc）。
  *
  * 根布局职责（纯 Foundation，无 Material3）:
  *  - Edge-to-Edge：窗口始终延伸到系统栏后方，系统栏避让由各界面自行用
@@ -67,6 +72,21 @@ import kotlinx.coroutines.launch
  *  - 系统栏图标颜色跟随主题背景亮度（浅底黑图标 / 深底白图标）。
  */
 abstract class EInkHostActivity : ComponentActivity() {
+
+    /**
+     * 系统当前深浅色（true = 深色）。组合内读取驱动 [EInkTheme] 重组，
+     * 由 [onConfigurationChanged] 以下发的 newConfig 推进——不读
+     * `resources.configuration`：入口包装冻结了该配置（见其 KDoc）。
+     */
+    private val systemDarkTheme = mutableStateOf(false)
+
+    /**
+     * 系统当前深浅色快照，供宿主钩子读取（如退出完整模式前的网关深浅色
+     * 补偿）。同样不要改读 `resources.configuration`：使用中切换系统
+     * 深浅后它是旧值。
+     */
+    protected val isSystemDarkTheme: Boolean
+        get() = systemDarkTheme.value
 
     /**
      * 宿主引擎装配：把各端口实现注册进 [EInkEngineRegistry]
@@ -93,6 +113,21 @@ abstract class EInkHostActivity : ComponentActivity() {
     protected abstract fun onExitToFullMode(context: Context)
 
     /**
+     * E-Ink 界面全局 UI 字体（可选宿主钩子③，默认 null = 平台默认字体，
+     * 即跟随系统字体替换）。
+     *
+     * 消费范围：[EInkTheme] 下全部 Compose 文字（排版系统 15 个样式统一
+     * 挂载）；**不含** Canvas 直绘文本——无封面的文字占位封面与阅读页
+     * 快照走各自字体链，不受本钩子影响。
+     *
+     * 在组合内调用：宿主可订阅自身状态流（如外观设置网关）实现换字
+     * 实时重组生效，也可只读一次依赖入口 recreate 生效。加载自定义字体
+     * 文件的开销由宿主自管（建议复用宿主既有缓存，避免逐组合重复加载）。
+     */
+    @Composable
+    protected open fun uiFontFamily(): FontFamily? = null
+
+    /**
      * attach 期编排：先装配端口（必须早于下方 fontScale 的端口读取），
      * 再按 GlobalSettings.fontScaleSetting 包装字体缩放 Context。
      */
@@ -109,6 +144,9 @@ abstract class EInkHostActivity : ComponentActivity() {
     final override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        // 系统深浅 State 以入口时的实际配置初始化（首次渲染即正确，
+        // 不等首次配置回调）
+        systemDarkTheme.value = resolveEInkDarkTheme(resources.configuration.uiMode)
         // 清理未加书架的隐藏行（详情页预取、未加架阅读都会落这类行）
         lifecycleScope.launch(Dispatchers.IO) {
             EInkEngineRegistry.bookshelfEngine.deleteBooksNotInBookshelf()
@@ -124,13 +162,32 @@ abstract class EInkHostActivity : ComponentActivity() {
         // 与首帧组合并行，阅读页 attach 时直接消费
         lastReadBookUrl?.let { EInkEngineRegistry.readerEngine.prefetchOpen(it) }
         setContent {
-            EInkTheme(darkTheme = isSystemInDarkTheme()) {
+            EInkTheme(
+                darkTheme = systemDarkTheme.value,
+                fontFamily = uiFontFamily(),
+            ) {
                 EInkRoot(
                     initialReaderBookUrl = lastReadBookUrl,
                     exitToFullMode = ::onExitToFullMode,
                 )
             }
         }
+    }
+
+    /**
+     * 系统配置变化（uiMode 在 Manifest configChanges 中声明 → 不重建，
+     * 由此处接收框架下发的 newConfig）。
+     *
+     * 深浅色为何显式推进 State 而不用 [isSystemInDarkTheme]/LocalConfiguration：
+     * 入口在 attachBaseContext 经 createConfigurationContext 包装 Context
+     * （应用内字体缩放），传入的全量 Configuration 被冻结，
+     * resources/LocalConfiguration 不随后续系统配置切换更新——真机实证为
+     * 「使用中切换系统深浅主题不生效，仅冷启动正确」。改由下发的
+     * newConfig 驱动 [systemDarkTheme]，重组与系统实际深浅严格同步。
+     */
+    override fun onConfigurationChanged(newConfig: Configuration) {
+        super.onConfigurationChanged(newConfig)
+        systemDarkTheme.value = resolveEInkDarkTheme(newConfig.uiMode)
     }
 
     /**
@@ -178,6 +235,16 @@ abstract class EInkHostActivity : ComponentActivity() {
  */
 internal fun resolveEInkFontScale(fontScaleSetting: Int, systemFontScale: Float): Float =
     (fontScaleSetting / 10f).takeIf { it in 0.8f..1.6f } ?: systemFontScale
+
+/**
+ * [EInkHostActivity] 的系统深浅色纯函数。
+ *
+ * @param uiMode `Configuration.uiMode` 原值。
+ * @return night 掩码位为 `UI_MODE_NIGHT_YES` 视为深色，其余
+ *   （NO / UNDEFINED）一律视为浅色。
+ */
+internal fun resolveEInkDarkTheme(uiMode: Int): Boolean =
+    (uiMode and Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES
 
 /**
  * 根布局：铺主题背景 + 系统栏图标外观随底色亮度切换 + 承载 [EInkApp]。

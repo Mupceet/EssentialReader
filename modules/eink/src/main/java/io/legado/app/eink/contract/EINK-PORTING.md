@@ -31,7 +31,8 @@ manifest merge 直接失败，且 `tools:overrideLibrary` 不可行（涉及数�
 :modules:eink（模块 = 可整体复制的 E-Ink Compose 应用核心，零引擎依赖）
 ├─ contract/                        ★ 移植契约（本手册与接入面 README 在此）
 │    EInkEngineRegistry（装配）+ EInkHostActivity（入口模板基类，宿主只
-│    实现 onInstallEngines/onExitToFullMode 两钩子）+
+│    实现 onInstallEngines/onExitToFullMode 两钩子，另有可选 UI 字体钩子
+│    uiFontFamily）+
 │    GlobalSettings（模块全部设置项的唯一出入口）+ BookshelfEngine +
 │    SearchEngine + TocEngine + BookDetailEngine + ChangeSourceEngine +
 │    CoverEngine + ReaderEngine（各端口及其伴生回调/结果类型）+
@@ -45,7 +46,7 @@ manifest merge 直接失败，且 `tools:overrideLibrary` 不可行（涉及数�
 └─ build.gradle.kts                 AGP 9 形态（AGP < 9 宿主按 §2 步骤 3b 改）
 
 app/.../eink/（宿主 = 入口子类 + 桥接层，移植时按目标引擎重写）
-├─ EinkMainActivity.kt              入口子类（两钩子，约 30 行）
+├─ EinkMainActivity.kt              入口子类（两钩子 + 可选字体钩子，约 50 行）
 └─ bridge/                          ★ 唯一需要重写的部分：端口实现 + 快照映射
      EInkBridge.kt          装配入口（Registry.install + 设置快照对齐）
      BookshelfEngineImpl / SearchEngineImpl / TocEngineImpl /
@@ -84,7 +85,9 @@ app/.../eink/（宿主 = 入口子类 + 桥接层，移植时按目标引擎重�
    （`GlobalSettings.useDefaultCover` 的快照状态语义需要）。
 5. **编写宿主入口与桥接层**：入口写一个 `EInkHostActivity` 子类（实现
    `onInstallEngines()` 与 `onExitToFullMode(context)` 两钩子）；`bridge/`
-   九个文件按 §3 差异表适配引擎调用。
+   九个文件按 §3 差异表适配引擎调用。可选覆写 `uiFontFamily()` 为 E-Ink
+   界面提供全局 UI 字体（默认 null = 平台默认字体；组合内调用，可订阅
+   宿主状态流实时生效），不覆写不影响移植。
 6. **Manifest**：注册入口（无桌面图标，由分流点进入）：
    ```xml
    <activity

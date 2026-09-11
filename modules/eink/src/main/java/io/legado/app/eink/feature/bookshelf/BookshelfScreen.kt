@@ -97,11 +97,12 @@ internal fun bookshelfGridTitleHeight(
  *
  * 字体缩放只放大 sp、不改 dp：行高钉死常量时，放大文字即被竖向截断
  * （钉死 90dp 时按系统非线性缩放曲线约 1.35x 起四行实需超出内容框，
- * 1.6x 达约 102dp）。行高随缩放伸缩后，与文字列等高的封面一并放大；
- * 列内 xxs 垂直内边距（2dp×2）由基础封面高 120dp 的余量吸收——注意
- * Android 的 sp→dp 走非线性曲线（Compose 复刻系统查表插值，fontScale
- * ≥ 1.03 生效），不是线性放大，换算必须经真实 [Density]（同宿主），
- * 不可线性外推。
+ * 1.6x 达约 102dp）。行高随缩放伸缩后，与文字列等高的封面一并放大。
+ * 行距/内边距必须计入：排版阶梯重排后信息行为 bodyMedium(24sp)，
+ * 四行实需在默认倍率已近 120dp，旧「靠封面高余量吸收」的策略在放大
+ * 倍率下破功——注意 Android 的 sp→dp 走非线性曲线（Compose 复刻系统
+ * 查表插值，fontScale ≥ 1.03 生效），不是线性放大，换算必须经真实
+ * [Density]（同宿主），不可线性外推。
  *
  * 所有条目共用同一行高（不逐条实测）：固定页项数分页
  * （EInkListPagerState）依赖条目等高保证"页内项全部完整展示"，逐条
@@ -110,8 +111,8 @@ internal fun bookshelfGridTitleHeight(
  * 单点解析后下发），并作为列表分页状态的几何键（行高变化后分页
  * 重建重测）。
  *
- * 纯函数不读主题：typography 经 CompositionLocal 下发、组合外不可用，
- * 三种行高由调用方（HomeRoute 组合内）传入。
+ * 纯函数不读主题：typography/spacing 经 CompositionLocal 下发、组合外
+ * 不可用，行高与间距由调用方（HomeRoute 组合内）传入。
  */
 internal fun bookshelfListRowHeight(
     density: Density,
@@ -119,12 +120,18 @@ internal fun bookshelfListRowHeight(
     authorLineHeight: TextUnit,
     chapterLineHeight: TextUnit,
     showLatestChapter: Boolean,
+    rowSpacing: Dp,
+    verticalPadding: Dp,
 ): Dp = with(density) {
     val titleHeight = titleLineHeight.toDp()
     val authorRowHeight = maxOf(EInkInfoRowIconSize, authorLineHeight.toDp())
     val chapterRowHeight = maxOf(EInkInfoRowIconSize, chapterLineHeight.toDp())
+    // 行数-1 个行距间隙（spacedBy）+ 上下内边距：均为 dp 不随字体缩放，
+    // 但行高抬档后同样占位，漏计即大倍率下底部截断
+    val gapCount = if (showLatestChapter) 3 else 2
     val textHeight = titleHeight + authorRowHeight + chapterRowHeight +
-        if (showLatestChapter) chapterRowHeight else 0.dp
+        (if (showLatestChapter) chapterRowHeight else 0.dp) +
+        rowSpacing * gapCount + verticalPadding * 2
     maxOf(EInkListCoverHeight, textHeight)
 }
 
@@ -366,9 +373,8 @@ private fun BookGridItem(
                 )
             }
         }
-        // E-Ink 固定使用 14sp/16sp 紧凑标题并居中；titleSmallFont/titleCenter
-        // 按设计主动忽略，避免字体放大或破坏现有网格观感
-        val titleStyle = EInkTheme.typography.bodySmall
+
+        val titleStyle = EInkTheme.typography.titleSmall
         val titleMaxLines = style.titleMaxLines.coerceIn(1, 5)
         val titleHeight = bookshelfGridTitleHeight(
             density = LocalDensity.current,
@@ -473,14 +479,14 @@ private fun BookListItem(
             EInkInfoRow(
                 iconRes = R.drawable.eink_ic_author,
                 text = book.displayAuthor,
-                style = EInkTheme.typography.bodySmall
+                style = EInkTheme.typography.bodyMedium
             )
             // 当前进度章节（同 View 版 iv_read / ic_history）
             book.currentChapterTitle?.let { title ->
                 EInkInfoRow(
                     iconRes = R.drawable.eink_ic_history,
                     text = title,
-                    style = EInkTheme.typography.labelMedium
+                    style = EInkTheme.typography.bodyMedium
                 )
             }
             // 最新章节（同 View 版 iv_last / ic_book_last；宿主开关门控）
@@ -489,7 +495,7 @@ private fun BookListItem(
                     EInkInfoRow(
                         iconRes = R.drawable.eink_ic_book_last,
                         text = title,
-                        style = EInkTheme.typography.labelMedium
+                        style = EInkTheme.typography.bodyMedium
                     )
                 }
             }

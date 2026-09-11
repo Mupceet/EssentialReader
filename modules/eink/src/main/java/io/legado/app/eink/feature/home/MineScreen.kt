@@ -266,7 +266,7 @@ private fun MineEntry(
         verticalAlignment = Alignment.CenterVertically
     ) {
         Column(modifier = Modifier.weight(1f)) {
-            EInkText(text = label, style = EInkTheme.typography.bodyLarge)
+            EInkText(text = label, style = EInkTheme.typography.titleMedium)
             if (sublabel != null) {
                 EInkText(
                     text = sublabel,
@@ -279,7 +279,7 @@ private fun MineEntry(
         Spacer(modifier = Modifier.padding(start = EInkSpacing.s))
         EInkText(
             text = ">",
-            style = EInkTheme.typography.titleMedium,
+            style = EInkTheme.typography.titleLarge,
             color = EInkTheme.colorScheme.onSurfaceVariant
         )
     }
@@ -306,7 +306,7 @@ private fun MineToggleRow(
         Column(modifier = Modifier.weight(1f)) {
             EInkText(
                 text = label,
-                style = EInkTheme.typography.bodyLarge
+                style = EInkTheme.typography.titleMedium
             )
             EInkText(
                 text = description,

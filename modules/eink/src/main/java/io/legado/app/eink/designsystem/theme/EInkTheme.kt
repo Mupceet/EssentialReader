@@ -11,6 +11,7 @@ import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalCursorBlinkEnabled
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontFamily
 import io.legado.app.eink.designsystem.interaction.NoIndication
 import io.legado.app.eink.designsystem.theme.EInkTheme.colorScheme
 import io.legado.app.eink.designsystem.theme.EInkTheme.contentColor
@@ -220,12 +221,16 @@ object EInkTheme {
  *
  * @param colorVariant The color scheme variant to use (HighContrast or Grayscale)
  * @param darkTheme Whether to use dark theme colors
+ * @param fontFamily 宿主提供的全局 UI 字体（如完整模式「外观 → 字体」的自定义
+ *   字体族）；null = 平台默认字体（跟随系统字体替换）。挂载到排版系统全部
+ *   样式上；Canvas 直绘文本（文字占位封面、阅读页快照）不在此消费范围。
  * @param content The content to theme
  */
 @Composable
 fun EInkTheme(
     colorVariant: EInkColorVariant = EInkColorVariant.HighContrast,
     darkTheme: Boolean = isSystemInDarkTheme(),
+    fontFamily: FontFamily? = null,
     content: @Composable () -> Unit,
 ) {
     // Remembered: scheme resolution allocates a new instance per call, and
@@ -234,7 +239,9 @@ fun EInkTheme(
     val colorScheme = remember(colorVariant, darkTheme) {
         resolveColorScheme(colorVariant, darkTheme)
     }
-    val typography = DefaultTypography
+    // 排版系统随宿主字体族派生：字体切换（含 null ↔ 非-null）才重建实例，
+    // 其余重组复用同一份
+    val typography = remember(fontFamily) { createTypographySystem(fontFamily) }
 
     CompositionLocalProvider(
         LocalEInkColorScheme provides colorScheme,
@@ -253,30 +260,34 @@ fun EInkTheme(
 }
 
 /**
- * The single shared default typography system, derived from [EInkTypography].
+ * Derives the theme typography system from [EInkTypography], attaching
+ * [fontFamily]（宿主全局 UI 字体，null = 平台默认字体）to every style.
  *
- * Constructed once and reused across recompositions (the underlying
- * [EInkTypography] singleton is immutable). This replaces the previous
- * per-call `createTypographySystem()` factory.
+ * 15 个样式现均不携带 fontFamily，整体挂载不会覆盖任何按样式定制的字体；
+ * 若未来引入按样式字体族，需改为逐样式合并而非整体覆盖。
+ * internal 供单测断言挂载与回落行为。
  */
-private val DefaultTypography: EInkTypographySystem = with(EInkTypography) {
-    EInkTypographySystem(
-        displayLarge = displayLarge,
-        displayMedium = displayMedium,
-        displaySmall = displaySmall,
-        headlineLarge = headlineLarge,
-        headlineMedium = headlineMedium,
-        headlineSmall = headlineSmall,
-        titleLarge = titleLarge,
-        titleMedium = titleMedium,
-        titleSmall = titleSmall,
-        bodyLarge = bodyLarge,
-        bodyMedium = bodyMedium,
-        bodySmall = bodySmall,
-        labelLarge = labelLarge,
-        labelMedium = labelMedium,
-        labelSmall = labelSmall,
-    )
+internal fun createTypographySystem(fontFamily: FontFamily?): EInkTypographySystem {
+    val resolved = fontFamily ?: FontFamily.Default
+    return with(EInkTypography) {
+        EInkTypographySystem(
+            displayLarge = displayLarge.copy(fontFamily = resolved),
+            displayMedium = displayMedium.copy(fontFamily = resolved),
+            displaySmall = displaySmall.copy(fontFamily = resolved),
+            headlineLarge = headlineLarge.copy(fontFamily = resolved),
+            headlineMedium = headlineMedium.copy(fontFamily = resolved),
+            headlineSmall = headlineSmall.copy(fontFamily = resolved),
+            titleLarge = titleLarge.copy(fontFamily = resolved),
+            titleMedium = titleMedium.copy(fontFamily = resolved),
+            titleSmall = titleSmall.copy(fontFamily = resolved),
+            bodyLarge = bodyLarge.copy(fontFamily = resolved),
+            bodyMedium = bodyMedium.copy(fontFamily = resolved),
+            bodySmall = bodySmall.copy(fontFamily = resolved),
+            labelLarge = labelLarge.copy(fontFamily = resolved),
+            labelMedium = labelMedium.copy(fontFamily = resolved),
+            labelSmall = labelSmall.copy(fontFamily = resolved),
+        )
+    }
 }
 
 // ---------------------------------------------------------------------
@@ -297,8 +308,9 @@ val LocalEInkColorScheme = staticCompositionLocalOf<EInkColorScheme> {
 /**
  * Holds the active [EInkTypographySystem].
  *
- * Static local for the same reason as [LocalEInkColorScheme]: the value is a
- * singleton that never changes within a session.
+ * Static local: reads skip per-scope subscription tracking（同
+ * [LocalEInkColorScheme] 的理由）；值仅随宿主 UI 字体切换变化（罕见），
+ * 变化即整树重组一次，墨水屏上等价于一次全刷，可接受。
  */
 val LocalEInkTypography = staticCompositionLocalOf<EInkTypographySystem> {
     error("No EInkTypography provided. Wrap your content in EInkTheme { ... }.")

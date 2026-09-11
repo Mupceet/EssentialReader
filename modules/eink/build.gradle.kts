@@ -92,8 +92,14 @@ afterEvaluate {
                 artifactId = "eink"
                 // 0.1.0 = 旧栈（AGP8.13/K2.3）构建、develop 宿主在用；
                 // 0.2.0 = 本仓主栈（AGP9/K2.4/Java21）构建，跨栈消费核对 §0；
-                // 0.3.0 = 契约破坏性变更（移除 setTextBold/textBold 端口）
-                version = "0.3.0"
+                // 0.3.0 = 契约破坏性变更（移除 setTextBold/textBold 端口）；
+                // 0.4.0 = 新增可选宿主 UI 字体钩子（EInkTheme.fontFamily /
+                //         EInkHostActivity.uiFontFamily）+ 系统深浅色改
+                //         onConfigurationChanged 推进 State（修复使用中切换
+                //         不生效）+ 排版阶梯重排与界面样式对位（body 18/16/14
+                //         统一 Normal，title/label 抬档；列表行高计入行距
+                //         内边距并随阶梯自适应）
+                version = "0.4.0"
             }
         }
     }

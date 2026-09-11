@@ -60,7 +60,7 @@ fun EInkButton(
     selected: Boolean = false,
     bordered: Boolean = true,
     height: Dp? = 48.dp,
-    style: TextStyle = EInkTheme.typography.labelLarge,
+    style: TextStyle = EInkTheme.typography.bodyMedium,
     role: Role = Role.Button,
     onClickLabel: String? = null,
     contentPadding: PaddingValues = PaddingValues(0.dp),

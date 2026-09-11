@@ -296,7 +296,7 @@ internal fun BookDetailScreen(
                                 // 书名
                                 EInkText(
                                     text = book.name,
-                                    style = EInkTheme.typography.headlineMedium,
+                                    style = EInkTheme.typography.headlineLarge,
                                     textAlign = TextAlign.Center,
                                     maxLines = 2,
                                     overflow = TextOverflow.Ellipsis,
@@ -305,7 +305,7 @@ internal fun BookDetailScreen(
                                 // 作者
                                 EInkText(
                                     text = book.displayAuthor,
-                                    style = EInkTheme.typography.labelLarge,
+                                    style = EInkTheme.typography.titleSmall,
                                     color = EInkTheme.colorScheme.onSurfaceVariant,
                                     textAlign = TextAlign.Center,
                                     maxLines = 1,
@@ -409,7 +409,7 @@ private fun ChapterRows(
             EInkInfoRow(
                 iconRes = R.drawable.eink_ic_book_last,
                 text = it,
-                style = EInkTheme.typography.labelSmall,
+                style = EInkTheme.typography.titleSmall,
                 modifier = Modifier.padding(top = EInkSpacing.s)
             )
         }
@@ -417,7 +417,7 @@ private fun ChapterRows(
             EInkInfoRow(
                 iconRes = R.drawable.eink_ic_history,
                 text = it,
-                style = EInkTheme.typography.labelSmall,
+                style = EInkTheme.typography.titleSmall,
                 modifier = Modifier.padding(top = EInkSpacing.s)
             )
         }

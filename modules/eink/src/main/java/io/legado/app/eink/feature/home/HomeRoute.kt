@@ -38,6 +38,7 @@ import io.legado.app.eink.designsystem.pager.rememberEInkGridPagerState
 import io.legado.app.eink.designsystem.pager.rememberEInkListPagerState
 import io.legado.app.eink.designsystem.refresh.EInkRefreshIntent
 import io.legado.app.eink.designsystem.refresh.LocalEInkRefreshController
+import io.legado.app.eink.designsystem.theme.EInkSpacing
 import io.legado.app.eink.designsystem.theme.EInkTheme
 import io.legado.app.eink.feature.bookshelf.BookshelfScreen
 import io.legado.app.eink.feature.bookshelf.BookshelfStylePanel
@@ -113,14 +114,18 @@ fun HomeRoute(
 
     // 列表封面尺寸单点解析（同网格格宽约定：显示与预取共用同一 Dp 值，
     // 封面缓存键逐字节一致）：行高取基础封面高与字体缩放下文字实需高的
-    // 较大值（bookshelfListRowHeight KDoc），宽按 66:90 等比随行高伸缩
+    // 较大值（bookshelfListRowHeight KDoc），宽按 66:90 等比随行高伸缩。
+    // 三档行高必须与 BookListItem 实际渲染样式一致（作者/进度/最新章节
+    // 均为 bodyMedium）：失配会在大字体倍率下竖向截断
     val typography = EInkTheme.typography
     val listCoverHeight = bookshelfListRowHeight(
         density = LocalDensity.current,
         titleLineHeight = typography.titleMedium.lineHeight,
-        authorLineHeight = typography.bodySmall.lineHeight,
-        chapterLineHeight = typography.labelMedium.lineHeight,
-        showLatestChapter = uiState.style.showLatestChapter
+        authorLineHeight = typography.bodyMedium.lineHeight,
+        chapterLineHeight = typography.bodyMedium.lineHeight,
+        showLatestChapter = uiState.style.showLatestChapter,
+        rowSpacing = EInkSpacing.xs,
+        verticalPadding = EInkSpacing.xxs
     )
     val listCoverWidth = listCoverHeight * (EInkCoverWidth / EInkCoverHeight)
 

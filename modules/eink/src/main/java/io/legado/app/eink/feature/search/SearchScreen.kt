@@ -513,7 +513,7 @@ private fun HistoryList(
                                 else onSearch(keyword.word)
                             },
                             height = HistoryChipHeight,
-                            style = EInkTheme.typography.labelMedium,
+                            style = EInkTheme.typography.bodyMedium,
                             contentPadding = PaddingValues(horizontal = HistoryChipContentPadding),
                             onClickLabel = if (isDeleting) "删除此搜索记录" else null,
                             modifier = Modifier.widthIn(max = maxChipWidth),
