@@ -127,6 +127,13 @@
   阅读 `attach`（首次进入与返回共用入口）同样 `hideControls()` 作为兜底
   （重试/异常路径）；自动翻页若开着由 `hideControls` 重新起算倒计时，隐藏
   状态栏的沉浸语义（`hideStatusBar && !controlsVisible`）随之恢复。
+- 2026-09-11（用户提供素材，**顶栏书签钮改图标对**）：素材由用户给出
+  （Material Symbols `bookmark_add` / `bookmark_remove`，模块内落为
+  `eink_ic_bookmark_add` / `eink_ic_bookmark_remove`，path 原样转写、去源
+  tint 属性交给 `EInkOperationBarIcon` 统一着色）。未加书签显示「加」、
+  当前页已有书签显示「减」，即选中态只换素材、不复用无素材对时的实心色块
+  回落；原来的「书签」文本钮退役（真机反馈文本钮与相邻图标钮不齐）。端口
+  缺失时仍整颗不渲染（契约 §3.3 降级语义）。
   - **变高分页**（卡高随内容变化）：`EInkFlowPagerState` 下一页从「上一条
     完整展示完」处接着走（不裁半截、不漏条目），上一页弹回记录过的页首
     （往返位置确定），章节头与它的卡片同页；目录 Tab 仍是定高计数分页。

@@ -60,7 +60,7 @@ internal val ReaderBottomBarInset = BarHeight + 1.dp
 private const val MarginTickStep = 8
 
 // ====================================================================
-// 顶部操作条：换源 / 刷新 / 缓存 / 加书架或移出书架（切换钮）
+// 顶部操作条：书签 / 换源 / 刷新 / 缓存 / 加书架或移出书架（切换钮）
 // ====================================================================
 
 @Composable
@@ -87,16 +87,16 @@ internal fun ReaderTopBar(
         actions = {
             // 页面书签切换钮（v2 Task 9，设计 §4）：选中态 = 当前页快照
             // bookmarkBadge（模块不自持书签状态），点击 toggle 当前页书签。
-            // 模块无书签图标资产，按设计降级用文本钮；批注端口缺失时整颗
-            // 不渲染（契约 §3.3 降级语义）
+            // 素材对为 bookmark_add / bookmark_remove（未加书签显示「加」、
+            // 已加书签显示「减」），选中只换素材、配色保持白底；批注端口
+            // 缺失时整颗不渲染（契约 §3.3 降级语义）
             if (bookmarkEnabled) {
-                EInkButton(
-                    text = "书签",
-                    onClick = onToggleBookmark,
+                EInkOperationBarIcon(
+                    icon = painterResource(R.drawable.eink_ic_bookmark_add),
+                    selectedIcon = painterResource(R.drawable.eink_ic_bookmark_remove),
                     selected = bookmarkBadge,
-                    height = 40.dp,
-                    style = EInkTheme.typography.bodyMedium,
-                    onClickLabel = if (bookmarkBadge) "移除书签" else "添加书签",
+                    onClick = onToggleBookmark,
+                    contentDescription = if (bookmarkBadge) "移除书签" else "添加书签",
                 )
             }
             EInkOperationBarIcon(
