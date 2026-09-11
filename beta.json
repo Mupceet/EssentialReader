@@ -1,49 +1,49 @@
 {
-  "tag_name": "3.26.17-beta.6",
-  "name": "Pre-release 3.26.17-beta.6",
+  "tag_name": "3.26.17-beta.7",
+  "name": "Pre-release 3.26.17-beta.7",
   "body": "**此版本为测试版，会存在不稳定问题。**\n\n# 更新日志\n\n墨本阅读——开源阅读 legado 的墨水屏增强发行版：同一本书，两种读法。\n\n## 3.26.17-beta.6（预发布）\n\n本次更新为墨水屏阅读界面带来划线、想法与书签：\n\n### 新增\n\n* 长按选中文字即可划线：选中范围带灰底、两端出现可拖动的把手，松手后弹出「复制 / 想法 / 画线」操作条，划线默认为黑色实线\n* 长按选中文字后可直接写想法，顶部弹框自动拉起输入法；想法内容留空保存会自动变回纯划线\n* 点一下已经划好的线或想法，可以修改想法、删除标记或复制原文\n* 支持跨页续选：按住页顶或页底可把选区扩展到上一页/下一页，跨页划线一次完成\n* 页面书签：顶栏书签按钮（未加书签显示加号、已加书签显示减号）与阅读区下拉手势都能给当前页加/去书签，带书签的页面显示书签折角\n* 目录页在标题下新增「目录 / 书签 / 笔记」三个标签，书签与笔记按章节聚合展示，点卡片直接跳回书中位置；内容随阅读预先读取，打开即显示\n* 笔记支持一键导出为 Markdown 文件",
   "prerelease": true,
-  "created_at": "2026-09-11T12:02:49Z",
+  "created_at": "2026-09-11T16:59:54Z",
   "assets": [
     {
-      "browser_download_url": "https://github.com/Mupceet/EssentialReader/releases/download/3.26.17-beta.6/legado-3.26.17-beta.6-arm64-v8a.apk",
+      "browser_download_url": "https://github.com/Mupceet/EssentialReader/releases/download/3.26.17-beta.7/legado-3.26.17-beta.7-arm64-v8a.apk",
       "content_type": "application/vnd.android.package-archive",
-      "created_at": "2026-09-11T12:24:20Z",
+      "created_at": "2026-09-11T17:28:26Z",
       "download_count": 0,
-      "id": 557204209,
-      "name": "legado-3.26.17-beta.6-arm64-v8a.apk",
+      "id": 557688943,
+      "name": "legado-3.26.17-beta.7-arm64-v8a.apk",
       "state": "uploaded",
-      "url": "https://api.github.com/repos/Mupceet/EssentialReader/releases/assets/557204209"
+      "url": "https://api.github.com/repos/Mupceet/EssentialReader/releases/assets/557688943"
     },
     {
-      "browser_download_url": "https://github.com/Mupceet/EssentialReader/releases/download/3.26.17-beta.6/legado-3.26.17-beta.6-armeabi-v7a.apk",
+      "browser_download_url": "https://github.com/Mupceet/EssentialReader/releases/download/3.26.17-beta.7/legado-3.26.17-beta.7-armeabi-v7a.apk",
       "content_type": "application/vnd.android.package-archive",
-      "created_at": "2026-09-11T12:24:20Z",
+      "created_at": "2026-09-11T17:28:26Z",
       "download_count": 0,
-      "id": 557204207,
-      "name": "legado-3.26.17-beta.6-armeabi-v7a.apk",
+      "id": 557688940,
+      "name": "legado-3.26.17-beta.7-armeabi-v7a.apk",
       "state": "uploaded",
-      "url": "https://api.github.com/repos/Mupceet/EssentialReader/releases/assets/557204207"
+      "url": "https://api.github.com/repos/Mupceet/EssentialReader/releases/assets/557688940"
     },
     {
-      "browser_download_url": "https://github.com/Mupceet/EssentialReader/releases/download/3.26.17-beta.6/legado-3.26.17-beta.6.apk",
+      "browser_download_url": "https://github.com/Mupceet/EssentialReader/releases/download/3.26.17-beta.7/legado-3.26.17-beta.7.apk",
       "content_type": "application/vnd.android.package-archive",
-      "created_at": "2026-09-11T12:24:20Z",
+      "created_at": "2026-09-11T17:28:26Z",
       "download_count": 0,
-      "id": 557204206,
-      "name": "legado-3.26.17-beta.6.apk",
+      "id": 557688939,
+      "name": "legado-3.26.17-beta.7.apk",
       "state": "uploaded",
-      "url": "https://api.github.com/repos/Mupceet/EssentialReader/releases/assets/557204206"
+      "url": "https://api.github.com/repos/Mupceet/EssentialReader/releases/assets/557688939"
     },
     {
-      "browser_download_url": "https://github.com/Mupceet/EssentialReader/releases/download/3.26.17-beta.6/mapping.txt",
+      "browser_download_url": "https://github.com/Mupceet/EssentialReader/releases/download/3.26.17-beta.7/mapping.txt",
       "content_type": "text/plain",
-      "created_at": "2026-09-11T12:24:20Z",
+      "created_at": "2026-09-11T17:28:26Z",
       "download_count": 0,
-      "id": 557204208,
+      "id": 557688942,
       "name": "mapping.txt",
       "state": "uploaded",
-      "url": "https://api.github.com/repos/Mupceet/EssentialReader/releases/assets/557204208"
+      "url": "https://api.github.com/repos/Mupceet/EssentialReader/releases/assets/557688942"
     }
   ]
 }
