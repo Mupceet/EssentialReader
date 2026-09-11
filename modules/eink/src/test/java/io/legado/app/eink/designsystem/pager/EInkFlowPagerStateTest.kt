@@ -64,13 +64,51 @@ class EInkFlowPagerStateTest {
         state.pageUp()
         assertEquals(0, state.pageStart)
         assertFalse(state.canPageUp())
+    }
 
-        // 跳转（回到当前/去底部）：页首对齐目标条并清空历史
-        state.jumpToItem(index = 9, totalItems = 12)
-        assertEquals(9, state.pageStart)
-        assertTrue("跳转后仍可回退（退一条）", state.canPageUp())
-        state.pageUp()
-        assertEquals(8, state.pageStart)
+    @Test
+    fun `跳转后无历史时上一页按视口回退而非退一条目`() {
+        // 去底部 / 回到当前会清空页首历史栈：此时上一页必须按"页"退
+        // （真机反馈：跳转后翻页要点很多次才退一页）
+        assertEquals(
+            FlowPageUpPlan.VIEWPORT,
+            planFlowPageUp(
+                hasHistory = false,
+                pageStart = 42,
+                firstVisibleIndex = 42,
+                firstVisibleScrollOffset = 0,
+            ),
+        )
+        // 有历史页首 → 弹回历史页首（往返位置确定）
+        assertEquals(
+            FlowPageUpPlan.HISTORY,
+            planFlowPageUp(
+                hasHistory = true,
+                pageStart = 42,
+                firstVisibleIndex = 42,
+                firstVisibleScrollOffset = 0,
+            ),
+        )
+        // 已在列表开头 → 不动
+        assertEquals(
+            FlowPageUpPlan.NONE,
+            planFlowPageUp(
+                hasHistory = false,
+                pageStart = 0,
+                firstVisibleIndex = 0,
+                firstVisibleScrollOffset = 0,
+            ),
+        )
+        // 页首下标为 0 但停在半截（非对齐位置）→ 仍需回退对齐
+        assertEquals(
+            FlowPageUpPlan.VIEWPORT,
+            planFlowPageUp(
+                hasHistory = false,
+                pageStart = 0,
+                firstVisibleIndex = 0,
+                firstVisibleScrollOffset = 120,
+            ),
+        )
     }
 
     @Test

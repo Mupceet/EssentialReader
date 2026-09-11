@@ -2,6 +2,7 @@ package io.legado.app.eink.designsystem.pager
 
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
@@ -66,6 +67,39 @@ fun nextFlowPageStart(
  * 纯判定抽成 [nextFlowPageStart] 单测；滚动调度在无布局的测试 JVM 上
  * 安全跳过（同 [EInkListPagerState] 先例）。
  */
+/** 上一页取向（变高列表）。 */
+internal enum class FlowPageUpPlan {
+    /** 有记录过的页首：弹回上一页页首（往返位置确定）。 */
+    HISTORY,
+
+    /** 无历史（刚跳转过：去底部 / 回到当前）：按视口回退一页并对齐页首。 */
+    VIEWPORT,
+
+    /** 已在列表开头：不动。 */
+    NONE,
+}
+
+/**
+ * 上一页取向判定（纯函数，单测锚定）：
+ *
+ * 有历史页首 → [FlowPageUpPlan.HISTORY]；否则**按视口回退**——跳转（去底部 /
+ * 回到当前）会清空历史栈，此时若退一条目，用户要点很多次才退得动一页
+ * （真机反馈"到底部/回当前后翻页要翻很多次"）。变高列表上方未组合、没有
+ * 已测高度可用，视口回退 + 页首对齐是唯一稳定可行的"上一页"。
+ */
+internal fun planFlowPageUp(
+    hasHistory: Boolean,
+    pageStart: Int,
+    firstVisibleIndex: Int,
+    firstVisibleScrollOffset: Int,
+): FlowPageUpPlan = when {
+    hasHistory -> FlowPageUpPlan.HISTORY
+    pageStart <= 0 && firstVisibleIndex == 0 && firstVisibleScrollOffset == 0 ->
+        FlowPageUpPlan.NONE
+
+    else -> FlowPageUpPlan.VIEWPORT
+}
+
 @Stable
 class EInkFlowPagerState(val listState: LazyListState) {
 
@@ -94,18 +128,47 @@ class EInkFlowPagerState(val listState: LazyListState) {
         scrollToPageStart(next)
     }
 
-    /** 上一页：弹回记录过的页首；无历史（刚跳转过）时退一条。 */
+    /**
+     * 上一页：优先弹回记录过的页首；无历史（刚用去底部 / 回到当前跳转过）
+     * 时按视口回退一页并对齐页首——退一条目会让用户点很多次才退一页。
+     */
     suspend fun pageUp() {
         val previous = visited.lastOrNull()
-        if (previous != null) {
-            visited = visited.dropLast(1)
-            pageStart = previous
-            scrollToPageStart(previous)
+        when (
+            planFlowPageUp(
+                hasHistory = previous != null,
+                pageStart = pageStart,
+                firstVisibleIndex = listState.firstVisibleItemIndex,
+                firstVisibleScrollOffset = listState.firstVisibleItemScrollOffset,
+            )
+        ) {
+            FlowPageUpPlan.HISTORY -> {
+                visited = visited.dropLast(1)
+                pageStart = previous ?: 0
+                scrollToPageStart(pageStart)
+            }
+
+            FlowPageUpPlan.VIEWPORT -> pageUpByViewport()
+            FlowPageUpPlan.NONE -> Unit
+        }
+    }
+
+    /**
+     * 按视口回退一页：先 `scrollBy(-视口高)`，再把首个可见条目对齐到页首
+     * （去掉顶部半截 offset），得到与向下翻页同粒度的一页。
+     */
+    private suspend fun pageUpByViewport() {
+        val info = listState.layoutInfo
+        val viewport = info.viewportEndOffset - info.viewportStartOffset
+        if (viewport <= 0) return
+        try {
+            listState.scrollBy(-viewport.toFloat())
+        } catch (_: IndexOutOfBoundsException) {
             return
         }
-        if (pageStart <= 0) return
-        pageStart -= 1
-        scrollToPageStart(pageStart)
+        val first = listState.firstVisibleItemIndex
+        pageStart = first
+        scrollToPageStart(first)
     }
 
     /**
