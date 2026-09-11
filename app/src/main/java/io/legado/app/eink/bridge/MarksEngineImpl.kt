@@ -37,6 +37,19 @@ internal fun markingThought(styleJson: String?): Boolean =
 internal fun confirmJumpMessage(chapterName: String): String =
     "书签创建后目录可能已变化（$chapterName），仍要跳转吗？"
 
+/** 标记锚点（anchorJson → [TextProcessAnchor]；坏数据 null）。 */
+internal fun anchorOf(marking: BookMarking): TextProcessAnchor? =
+    GSON.fromJsonObject<TextProcessAnchor>(marking.anchorJson).getOrNull()
+
+/**
+ * 笔记列表按**章内正文本位置**升序（同位置按创建时间兜底）：卡片顺序与
+ * 正文阅读顺序一致——补记的划线不会因为创建时间晚而排到章末。DAO 只能按
+ * `chapterIndex, createdAt` 出库（位置在 anchorJson 里，SQL 排不了），
+ * 故在映射后排序（纯函数，单测锚定）。
+ */
+internal fun orderMarkingsByPosition(markings: List<MarkingUiModel>): List<MarkingUiModel> =
+    markings.sortedWith(compareBy({ it.chapterIndex }, { it.chapterPos }, { it.createdAt }))
+
 /** eink 书签/笔记端口实现：列表流 + 跳目标解析 + Markdown 导出。 */
 object MarksEngineImpl : MarksEngine, KoinComponent {
 
@@ -53,7 +66,9 @@ object MarksEngineImpl : MarksEngine, KoinComponent {
     override fun observeMarkings(bookUrl: String): Flow<List<MarkingUiModel>> =
         bookFlow(bookUrl) { book ->
             appDb.bookMarkingDao.flowByBook(book.name, book.author)
-                .map { list -> list.map { it.toUiModel() } }
+                // DAO 按 (chapterIndex, createdAt) 出库；卡要按「读到的先后」排，
+                // 故映射出锚点位置后再按正文本位置排序（同位置按创建时间兜底）
+                .map { list -> orderMarkingsByPosition(list.map { it.toUiModel() }) }
         }
 
     /** 解析书 → 无书发空列表，有书接 DAO 流；getBook 为一次性查询，每次重新收集才重解析书籍记录（换源替换后需重新进入页面触发新收集）。 */
@@ -72,16 +87,19 @@ object MarksEngineImpl : MarksEngine, KoinComponent {
         bookText = bookText, content = content,
     )
 
-    private fun BookMarking.toUiModel() = MarkingUiModel(
-        id = id,
-        chapterIndex = chapterIndex ?: 0,
-        chapterName = chapterName,
-        selectedText = GSON.fromJsonObject<TextProcessAnchor>(anchorJson).getOrNull()
-            ?.selectedText ?: "",
-        note = note,
-        thought = markingThought(styleJson),
-        createdAt = createdAt,
-    )
+    private fun BookMarking.toUiModel(): MarkingUiModel {
+        val anchor = anchorOf(this)
+        return MarkingUiModel(
+            id = id,
+            chapterIndex = chapterIndex ?: 0,
+            chapterName = chapterName,
+            chapterPos = anchor?.chapterPosition ?: 0,
+            selectedText = anchor?.selectedText ?: "",
+            note = note,
+            thought = markingThought(styleJson),
+            createdAt = createdAt,
+        )
+    }
 
     override suspend fun resolveBookmarkJump(bookmarkId: Long): JumpResolution {
         val bookmark = appDb.bookmarkDao.getById(bookmarkId)

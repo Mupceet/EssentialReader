@@ -86,6 +86,15 @@ internal interface EInkPalette {
     /** 次级内容色（元信息、辅助图标）：语义化包装，当前与 onSurfaceVariant 同值。 */
     val secondaryContent: Color
 
+    /**
+     * 三级内容色（**最弱的文字/图标**）：卡片首行时间、条数等"元信息"用。
+     *
+     * 与 [secondaryContent] 拉开一档实灰（规范 §4.1 语义列表里的
+     * `tertiaryContent`）：墨水屏上正文/划线/元信息必须靠**明度**分级，
+     * 元信息若与正文同色，会出现「卡片时间比章节头还重」的主次倒挂。
+     */
+    val tertiaryContent: Color
+
     /** 强边界色（2dp 重要交互边界，规范 §7 borderStrong）。 */
     val borderStrong: Color
 
@@ -169,6 +178,8 @@ object EInkColors {
         override val onError = PureWhite
         override val disabledContent = EInkGrayscale.gray300
         override val secondaryContent = PureBlack
+        // 元信息中灰：与纯黑正文拉开一档（高对比板唯一的中间档）
+        override val tertiaryContent = EInkGrayscale.gray500
         override val borderStrong = PureBlack
 
         // 分隔线不参与最大对比（规范 §11：1dp 结构线优先实灰），
@@ -206,6 +217,7 @@ object EInkColors {
         override val onError = PureWhite
         override val disabledContent = EInkGrayscale.gray300
         override val secondaryContent = PureBlack
+        override val tertiaryContent = EInkGrayscale.gray500
         override val borderStrong = PureBlack
         override val divider = EInkGrayscale.gray300
         override val selected = primary
@@ -236,6 +248,7 @@ object EInkColors {
         override val onError = PureBlack
         override val disabledContent = Gray10
         override val secondaryContent = PureWhite
+        override val tertiaryContent = EInkGrayscale.gray300
         override val borderStrong = PureWhite
 
         // 深色高分隔线对齐 DarkGrayscale（实灰，不做最大对比）
@@ -268,6 +281,7 @@ object EInkColors {
         override val onError = PureBlack
         override val disabledContent = Gray10
         override val secondaryContent = PureWhite
+        override val tertiaryContent = EInkGrayscale.gray300
         override val borderStrong = PureWhite
         override val divider = EInkGrayscale.gray500
         override val selected = primary

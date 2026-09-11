@@ -35,14 +35,6 @@ sealed interface EInkScreen {
      */
     data class Toc(val bookUrl: String, val fromReader: Boolean = false) : EInkScreen
 
-    /**
-     * 笔记页（划线+想法混合列表）。
-     *
-     * @param fromReader 是否自阅读页链路进入（经目录页）：跳转后 pop 回阅读页；
-     *   false = 预留（详情等入口），跳转后 replaceTop 进阅读页
-     */
-    data class Note(val bookUrl: String, val fromReader: Boolean = false) : EInkScreen
-
     /** 阅读器（复用 View 版 ReadBook/ChapterProvider 渲染引擎） */
     data class Reader(val bookUrl: String) : EInkScreen
 

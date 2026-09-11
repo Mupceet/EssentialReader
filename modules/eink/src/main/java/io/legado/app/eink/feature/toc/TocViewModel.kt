@@ -7,6 +7,7 @@ import io.legado.app.eink.contract.BookmarkUiModel
 import io.legado.app.eink.contract.ChapterUiModel
 import io.legado.app.eink.contract.EInkEngineRegistry
 import io.legado.app.eink.contract.JumpResolution
+import io.legado.app.eink.contract.MarkingUiModel
 import io.legado.app.eink.contract.PendingJumpConfirm
 import io.legado.app.eink.contract.TocBookUiModel
 import io.legado.app.eink.contract.TocFetchResult
@@ -33,12 +34,16 @@ data class TocUiState(
     /** 已缓存章节的文件名集合（未缓存章节显示图标，参考 View 版） */
     val cachedFileNames: Set<String> = emptySet(),
     val isLocalBook: Boolean = false,
-    /** 底部操作栏当前 Tab。 */
+    /** 当前 Tab（标题下三段切换：目录 / 书签 / 笔记）。 */
     val selectedTab: TocTab = TocTab.Chapters,
     /** 书签 Tab 列表（marksEngine 可用时由 observeBookmarks 维护）。 */
     val bookmarks: List<BookmarkUiModel> = emptyList(),
-    /** marksEngine 是否注册（false = 不渲染书签 Tab）。 */
+    /** 笔记 Tab 列表（划线 + 想法；marksEngine 可用时由 observeMarkings 维护）。 */
+    val markings: List<MarkingUiModel> = emptyList(),
+    /** marksEngine 是否注册（false = 不渲染书签/笔记 Tab）。 */
     val marksAvailable: Boolean = false,
+    /** 笔记导出进行中（导出入口置灰）。 */
+    val exporting: Boolean = false,
     /** 跳转确认弹层（null = 无）。 */
     val pendingJump: PendingJumpConfirm? = null,
 ) {
@@ -55,10 +60,17 @@ data class TocUiState(
 
     val isEmpty: Boolean
         get() = !isLoading && displayChapters.isEmpty()
+
+    /** 笔记 Tab 可导出：有笔记且不在导出中（导出入口置灰依据）。 */
+    val canExport: Boolean
+        get() = markings.isNotEmpty() && !exporting
 }
 
-/** 目录页底部操作栏 Tab（marksEngine 缺失时无 Tab，单列表现状）。 */
-enum class TocTab { Chapters, Bookmarks }
+/**
+ * 标题下三段切换（marksEngine 缺失时只剩目录，Tab 行整体不渲染）。
+ * 书签 / 笔记按章节聚合展示（见 [TocMarkRow]）。
+ */
+enum class TocTab { Chapters, Bookmarks, Notes }
 
 /**
  * 目录 ViewModel。
@@ -102,12 +114,17 @@ class TocViewModel(application: Application) : AndroidViewModel(application) {
                 _uiState.update { it.copy(isLoading = false, error = "书籍不存在") }
                 return@launch
             }
-            // 书解析成功：登记 marks 能力并订阅书签流（独立 launch，不阻塞目录加载）
+            // 书解析成功：登记 marks 能力并订阅书签/笔记流（独立 launch，不阻塞目录加载）
             _uiState.update { it.copy(marksAvailable = marksEngine != null) }
             marksEngine?.let { marks ->
                 viewModelScope.launch {
                     marks.observeBookmarks(book.bookUrl).collect { list ->
                         _uiState.update { it.copy(bookmarks = list) }
+                    }
+                }
+                viewModelScope.launch {
+                    marks.observeMarkings(book.bookUrl).collect { list ->
+                        _uiState.update { it.copy(markings = list) }
                     }
                 }
             }
@@ -197,6 +214,31 @@ class TocViewModel(application: Application) : AndroidViewModel(application) {
                 }
                 is JumpResolution.Failed -> _messages.tryEmit(r.message)
             }
+        }
+    }
+
+    /** 笔记点击：解析跳转（校验不 Match 时先本地重定位）三分支分派。 */
+    fun onMarkingClick(id: String) {
+        val marks = marksEngine ?: return
+        viewModelScope.launch {
+            when (val r = marks.resolveMarkingJump(id)) {
+                is JumpResolution.Located -> _jumpTarget.tryEmit(r)
+                is JumpResolution.NeedConfirm -> _uiState.update {
+                    it.copy(pendingJump = PendingJumpConfirm(r.message, r.fallback))
+                }
+                is JumpResolution.Failed -> _messages.tryEmit(r.message)
+            }
+        }
+    }
+
+    /** 笔记 Tab 导出 Markdown 到 SAF uri（结果经 messages 反馈）。 */
+    fun exportMarkdown(bookUrl: String, uri: String) {
+        val marks = marksEngine ?: return
+        viewModelScope.launch {
+            _uiState.update { it.copy(exporting = true) }
+            val ok = marks.exportMarkingsMarkdown(bookUrl, uri)
+            _uiState.update { it.copy(exporting = false) }
+            _messages.tryEmit(if (ok) "已导出" else "导出失败")
         }
     }
 

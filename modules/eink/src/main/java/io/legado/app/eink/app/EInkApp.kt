@@ -25,7 +25,6 @@ import io.legado.app.eink.feature.bookdetail.BookDetailRoute
 import io.legado.app.eink.feature.changesource.ChangeSourceRoute
 import io.legado.app.eink.feature.home.FontScaleSettingsRoute
 import io.legado.app.eink.feature.home.HomeRoute
-import io.legado.app.eink.feature.note.NoteRoute
 import io.legado.app.eink.feature.reader.ReaderRoute
 import io.legado.app.eink.feature.search.SearchRoute
 import io.legado.app.eink.feature.toc.TocRoute
@@ -192,14 +191,9 @@ fun EInkApp(
                                         controller.replaceTop(EInkScreen.Reader(bookUrl))
                                     }
                                 },
-                                // 笔记入口：携带同一来源链路（fromReader 跳转后 pop 回阅读页）
-                                onOpenNote = {
-                                    controller.navigate(
-                                        EInkScreen.Note(screen.bookUrl, screen.fromReader)
-                                    )
-                                },
                                 // 书签跳转：引擎动作已由 TocRoute 完成，此处只做导航
-                                //（fromReader 同 onOpenReader 的复用语义）
+                                //（书签 / 划线 / 想法同一条链路；fromReader 同
+                                // onOpenReader 的复用语义）
                                 onJumpToLocation = {
                                     if (screen.fromReader) {
                                         controller.pop()
@@ -207,32 +201,6 @@ fun EInkApp(
                                         controller.replaceTop(EInkScreen.Reader(screen.bookUrl))
                                     }
                                 }
-                            )
-                        }
-
-                        is EInkScreen.Note -> {
-                            NoteRoute(
-                                bookUrl = screen.bookUrl,
-                                onBack = { controller.pop() },
-                                // 划线/想法跳转：引擎动作（跳章/落进度）已由
-                                // NoteRoute 完成，此处只做导航
-                                onJumpToLocation = {
-                                    if (screen.fromReader) {
-                                        // Note 之下是目录页：连续两次 pop 弹出
-                                        // Note+Toc 回到下方既有阅读页（阅读页重新
-                                        // 挂载时按已跳转的进度落位；pop 同步操作
-                                        // 同一栈列表，同帧两次无旧栈问题）
-                                        controller.pop()
-                                        controller.pop()
-                                    } else {
-                                        // 预留链路（详情等路径，Note 之下同为
-                                        // fromReader=false 的目录页）：Note 出栈、
-                                        // 目录被阅读页替换，返回栈形态对齐目录页
-                                        // fromReader=false 的跳转结果
-                                        controller.pop()
-                                        controller.replaceTop(EInkScreen.Reader(screen.bookUrl))
-                                    }
-                                },
                             )
                         }
 

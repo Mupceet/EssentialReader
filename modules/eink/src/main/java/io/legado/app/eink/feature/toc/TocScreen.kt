@@ -3,6 +3,9 @@ package io.legado.app.eink.feature.toc
 import android.widget.Toast
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -12,12 +15,15 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -30,6 +36,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
@@ -48,6 +56,7 @@ import io.legado.app.eink.contract.BookmarkUiModel
 import io.legado.app.eink.contract.ChapterUiModel
 import io.legado.app.eink.contract.EInkEngineRegistry
 import io.legado.app.eink.contract.JumpResolution
+import io.legado.app.eink.contract.MarkingUiModel
 import io.legado.app.eink.designsystem.content.EInkLoading
 import io.legado.app.eink.designsystem.content.EInkText
 import io.legado.app.eink.designsystem.control.EInkDialog
@@ -56,10 +65,10 @@ import io.legado.app.eink.designsystem.interaction.einkClickable
 import io.legado.app.eink.designsystem.interaction.rememberImmediatePressState
 import io.legado.app.eink.designsystem.navigation.EInkOperationBar
 import io.legado.app.eink.designsystem.navigation.EInkOperationBarIcon
-import io.legado.app.eink.designsystem.navigation.EInkOperationTab
 import io.legado.app.eink.designsystem.navigation.EInkPageArrows
 import io.legado.app.eink.designsystem.navigation.EInkTopBar
 import io.legado.app.eink.designsystem.pager.EInkPageSwipe
+import io.legado.app.eink.designsystem.pager.rememberEInkFlowPagerState
 import io.legado.app.eink.designsystem.pager.rememberEInkListPagerState
 import io.legado.app.eink.designsystem.refresh.EInkRefreshIntent
 import io.legado.app.eink.designsystem.refresh.LocalEInkRefreshController
@@ -84,32 +93,59 @@ private val IconSize = 16.dp
 private val CurrentMarkWidth = 4.dp
 private val CurrentMarkHeight = 16.dp
 
+/** 标题下三段切换的段高（与顶栏动作按钮同档，触控目标 ≥44dp）。 */
+private val TocTabHeight = 44.dp
+
 /**
  * 目录 Route — ViewModel 感知层。
  *
  * 列表为固定页分页（翻页按钮与上下滑动手势一致），
  * 右侧滑动手柄支持快速定位；进入/切换排序时定位到当前阅读章节。
  *
- * 双 Tab（目录|书签，marksEngine 缺失时仅目录）：两个 Tab 各自独立
- * 分页状态；跳转目标（书签）由本层执行引擎动作（有会话即时跳章/
- * 无会话落进度）后交 [onJumpToLocation] 做纯导航。
+ * 三段（目录 / 书签 / 笔记，marksEngine 缺失时仅目录）：三个 Tab 各自独立
+ * 分页状态——目录为定高章节列表（计数分页 + 右侧快速滑动手柄），
+ * 书签/笔记为**按章节聚合的卡片列表**，卡片高度随内容变化，用变高分页
+ * （[rememberEInkFlowPagerState]）：每页从「上一条完整展示完」处接着走，
+ * 不裁半截、不漏条目，章节头与其卡片同页。跳转目标（书签 / 划线 / 想法）
+ * 由本层执行引擎动作（有会话即时跳章 / 无会话落进度）后交
+ * [onJumpToLocation] 做纯导航；笔记导出经 SAF 取 uri 交 ViewModel。
  */
 @Composable
 fun TocRoute(
     bookUrl: String,
     onBack: () -> Unit,
     onOpenReader: (String) -> Unit = {},
-    onOpenNote: () -> Unit = {},
     onJumpToLocation: (JumpResolution.Located) -> Unit = {},
     viewModel: TocViewModel = viewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val pager = rememberEInkListPagerState()
-    val pagerBookmarks = rememberEInkListPagerState()
+    val pagerBookmarks = rememberEInkFlowPagerState()
+    val pagerNotes = rememberEInkFlowPagerState()
     val scope = rememberCoroutineScope()
     val displayCount = uiState.displayChapters.size
-    val bookmarkCount = uiState.bookmarks.size
+    // 章节聚合行：Tab 渲染与分页共用同一份（下标口径一致）；
+    // keep-with-next = 章节头必须与它的卡片同页
+    val bookmarkRows = remember(uiState.bookmarks) { bookmarkRows(uiState.bookmarks) }
+    val markingRows = remember(uiState.markings) { markingRows(uiState.markings) }
+    val bookmarkKeepWithNext: (Int) -> Boolean = remember(bookmarkRows) {
+        { index -> bookmarkRows.getOrNull(index) is TocMarkRow.ChapterHeader }
+    }
+    val markingKeepWithNext: (Int) -> Boolean = remember(markingRows) {
+        { index -> markingRows.getOrNull(index) is TocMarkRow.ChapterHeader }
+    }
+
+    // 导出：SAF uri 回投；pendingExport 防 launcher 复用/重建结果误触发
+    var pendingExport by remember { mutableStateOf(false) }
+    val exportLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("text/markdown")
+    ) { uri ->
+        if (uri != null && pendingExport) {
+            viewModel.exportMarkdown(bookUrl, uri.toString())
+        }
+        pendingExport = false
+    }
 
     /** 当前阅读章节在当前展示顺序中的下标。 */
     fun displayIndexOfCurrent(): Int {
@@ -193,18 +229,44 @@ fun TocRoute(
         }
     }
 
-    // 书签 Tab 翻页动作（与目录 Tab 同一写法，分页状态各自独立）
+    // 书签 Tab 翻页动作（变高分页：页首按布局实测推进；分页状态独立）
     val bookmarkPageUp: () -> Unit = remember(pagerBookmarks, refresh, scope) {
         {
             scope.launch { pagerBookmarks.pageUp() }
             refresh.requestRefresh(EInkRefreshIntent.PageTurn)
         }
     }
-    val bookmarkPageDown: () -> Unit = remember(pagerBookmarks, bookmarkCount, refresh, scope) {
+    val bookmarkPageDown: () -> Unit =
+        remember(pagerBookmarks, bookmarkRows, bookmarkKeepWithNext, refresh, scope) {
+            {
+                scope.launch {
+                    pagerBookmarks.pageDown(bookmarkRows.size, bookmarkKeepWithNext)
+                }
+                refresh.requestRefresh(EInkRefreshIntent.PageTurn)
+            }
+        }
+
+    // 笔记 Tab 翻页动作（同上，分页状态与书签 Tab 独立）
+    val notePageUp: () -> Unit = remember(pagerNotes, refresh, scope) {
         {
-            scope.launch { pagerBookmarks.pageDown(bookmarkCount) }
+            scope.launch { pagerNotes.pageUp() }
             refresh.requestRefresh(EInkRefreshIntent.PageTurn)
         }
+    }
+    val notePageDown: () -> Unit =
+        remember(pagerNotes, markingRows, markingKeepWithNext, refresh, scope) {
+            {
+                scope.launch { pagerNotes.pageDown(markingRows.size, markingKeepWithNext) }
+                refresh.requestRefresh(EInkRefreshIntent.PageTurn)
+            }
+        }
+
+    // 数据原地变化（新增/删除标记、书签重排）后把页首拉回，列表缩短时收敛
+    LaunchedEffect(bookmarkRows.size) {
+        pagerBookmarks.realignToPageStart(bookmarkRows.size)
+    }
+    LaunchedEffect(markingRows.size) {
+        pagerNotes.realignToPageStart(markingRows.size)
     }
 
     // 翻页箭头槽：canPageUp/canPageDown 读取分页状态（pageStart 为
@@ -212,15 +274,26 @@ fun TocRoute(
     // 定位重组；收敛到槽内读取，翻页只重组箭头两个图标。按当前 Tab
     // 读对应分页器
     val pageArrows: @Composable () -> Unit = {
-        if (uiState.selectedTab == TocTab.Bookmarks) {
-            EInkPageArrows(
+        when (uiState.selectedTab) {
+            TocTab.Bookmarks -> EInkPageArrows(
                 pageUpEnabled = pagerBookmarks.canPageUp(),
-                pageDownEnabled = pagerBookmarks.canPageDown(bookmarkCount),
+                pageDownEnabled = pagerBookmarks.canPageDown(
+                    bookmarkRows.size, bookmarkKeepWithNext,
+                ),
                 onPageUp = bookmarkPageUp,
                 onPageDown = bookmarkPageDown,
             )
-        } else {
-            EInkPageArrows(
+
+            TocTab.Notes -> EInkPageArrows(
+                pageUpEnabled = pagerNotes.canPageUp(),
+                pageDownEnabled = pagerNotes.canPageDown(
+                    markingRows.size, markingKeepWithNext,
+                ),
+                onPageUp = notePageUp,
+                onPageDown = notePageDown,
+            )
+
+            TocTab.Chapters -> EInkPageArrows(
                 pageUpEnabled = pager.canPageUp(),
                 pageDownEnabled = pager.canPageDown(displayCount),
                 onPageUp = pageUp,
@@ -234,37 +307,52 @@ fun TocRoute(
         positioned = positioned,
         listState = pager.listState,
         bookmarkListState = pagerBookmarks.listState,
+        noteListState = pagerNotes.listState,
+        bookmarkRows = bookmarkRows,
+        markingRows = markingRows,
         pageArrows = pageArrows,
         onPageUp = pageUp,
         onPageDown = pageDown,
         onBookmarkPageUp = bookmarkPageUp,
         onBookmarkPageDown = bookmarkPageDown,
+        onNotePageUp = notePageUp,
+        onNotePageDown = notePageDown,
         onScrub = onScrub,
         onScrubEnd = onScrubEnd,
         onBack = onBack,
         // 回到当前/去底部按 Tab 分派（点击时读最新状态）：
-        // 书签 Tab「回到当前」= 定位到当前章首条书签
+        // 书签/笔记 Tab = 定位到当前阅读章的聚合头 / 列表末条
         onBackToCurrent = {
             scope.launch {
-                if (uiState.selectedTab == TocTab.Bookmarks) {
-                    if (uiState.bookmarks.isEmpty()) return@launch
-                    val index = uiState.bookmarks
-                        .indexOfFirst { it.chapterIndex >= uiState.currentChapterIndex }
-                        .coerceAtLeast(0)
-                    pagerBookmarks.jumpToItemAligned(index)
-                } else {
-                    pager.jumpToItemAligned(displayIndexOfCurrent())
+                when (uiState.selectedTab) {
+                    TocTab.Bookmarks -> pagerBookmarks.jumpToItem(
+                        currentChapterRowIndex(bookmarkRows, uiState.currentChapterIndex) ?: 0,
+                        bookmarkRows.size,
+                    )
+
+                    TocTab.Notes -> pagerNotes.jumpToItem(
+                        currentChapterRowIndex(markingRows, uiState.currentChapterIndex) ?: 0,
+                        markingRows.size,
+                    )
+
+                    TocTab.Chapters -> pager.jumpToItemAligned(displayIndexOfCurrent())
                 }
             }
         },
         onGoToBottom = {
             scope.launch {
-                if (uiState.selectedTab == TocTab.Bookmarks) {
-                    pagerBookmarks.jumpToItemAligned(
-                        (uiState.bookmarks.size - 1).coerceAtLeast(0)
+                when (uiState.selectedTab) {
+                    TocTab.Bookmarks -> pagerBookmarks.jumpToItem(
+                        bookmarkRows.lastIndex.coerceAtLeast(0),
+                        bookmarkRows.size,
                     )
-                } else {
-                    pager.jumpToItemAligned((displayCount - 1).coerceAtLeast(0))
+
+                    TocTab.Notes -> pagerNotes.jumpToItem(
+                        markingRows.lastIndex.coerceAtLeast(0),
+                        markingRows.size,
+                    )
+
+                    TocTab.Chapters -> pager.jumpToItemAligned((displayCount - 1).coerceAtLeast(0))
                 }
             }
         },
@@ -276,7 +364,11 @@ fun TocRoute(
         onToggleReverse = viewModel::toggleReverse,
         onTabSelect = viewModel::selectTab,
         onBookmarkClick = viewModel::onBookmarkClick,
-        onOpenNote = onOpenNote,
+        onMarkingClick = viewModel::onMarkingClick,
+        onExport = {
+            pendingExport = true
+            exportLauncher.launch("${uiState.book?.name.orEmpty()}-笔记.md")
+        },
         onConfirmJump = viewModel::confirmPendingJump,
         onDismissJump = viewModel::dismissPendingJump,
     )
@@ -285,10 +377,13 @@ fun TocRoute(
 /**
  * 无状态目录 Screen。
  *
- * 结构：顶栏（书名 + Tab 相关动作按钮：目录 Tab 为正/倒序、书签 Tab 为
- * 笔记入口）→ 内容区（目录 Tab：章节列表固定页分页 + 右侧快速滑动手柄；
- * 书签 Tab：书签列表固定页分页，无手柄）→ 底部操作栏（目录|书签 双 Tab +
- * 返回 / 回到当前 / 去底部 居左连续 + 翻页胶囊，统一 EInkOperationBar）。
+ * 结构：顶栏（书名 + Tab 相关动作按钮：目录 Tab 为正/倒序、笔记 Tab 为
+ * 导出）→ **标题下三段切换（目录 / 书签 / 笔记）** → 内容区
+ *（目录 Tab：章节列表定高计数分页 + 右侧快速滑动手柄；
+ *  书签 / 笔记 Tab：按章节聚合的卡片列表，**变高分页**
+ *  [io.legado.app.eink.designsystem.pager.EInkFlowPagerState]）→
+ * 底部操作栏（返回 / 回到当前 / 去底部 居左连续 + 翻页胶囊；Tab 已上移到
+ * 标题下，底栏不再放 Tab）。
  *
  * [pageArrows] 为翻页箭头槽：由承载层在其中读取分页状态并组合
  * [EInkPageArrows]，使翻页可用状态的读取收敛到箭头叶作用域。
@@ -302,11 +397,16 @@ internal fun TocScreen(
     positioned: Boolean,
     listState: LazyListState,
     bookmarkListState: LazyListState,
+    noteListState: LazyListState,
+    bookmarkRows: List<TocMarkRow>,
+    markingRows: List<TocMarkRow>,
     pageArrows: @Composable () -> Unit,
     onPageUp: () -> Unit,
     onPageDown: () -> Unit,
     onBookmarkPageUp: () -> Unit,
     onBookmarkPageDown: () -> Unit,
+    onNotePageUp: () -> Unit,
+    onNotePageDown: () -> Unit,
     onScrub: (Int) -> Unit,
     onScrubEnd: (Int) -> Unit,
     onBack: () -> Unit,
@@ -316,28 +416,29 @@ internal fun TocScreen(
     onToggleReverse: () -> Unit,
     onTabSelect: (TocTab) -> Unit,
     onBookmarkClick: (Long) -> Unit,
-    onOpenNote: () -> Unit,
+    onMarkingClick: (String) -> Unit,
+    onExport: () -> Unit,
     onConfirmJump: () -> Unit,
     onDismissJump: () -> Unit,
 ) {
+    // 降级宿主（marksEngine 缺失）：Tab 行不渲染，内容也强制回目录——
+    // 避免状态里残留的书签/笔记 Tab 形成无路可退的死屏
+    val tab = if (state.marksAvailable) state.selectedTab else TocTab.Chapters
     Box(modifier = Modifier.fillMaxSize()) {
         Column(modifier = Modifier.fillMaxSize()) {
             // 顶栏：书名居左，动作按钮随 Tab 切换（新规格：撑满顶栏高、贴右屏）
             EInkTopBar(
-                title = state.book?.name
-                    ?: if (state.selectedTab == TocTab.Bookmarks) "书签" else "目录",
+                // 书名缺失（极端态）时用当前 Tab 名兜底，与标题下三段一致
+                title = state.book?.name ?: when (tab) {
+                    TocTab.Chapters -> "目录"
+                    TocTab.Bookmarks -> "书签"
+                    TocTab.Notes -> "笔记"
+                },
                 actionsFillMax = true,
                 actions = {
-                    if (state.selectedTab == TocTab.Bookmarks) {
-                        // 书签 Tab：笔记入口（笔记页 Task 10 交付，本入口先行接线）
-                        EInkOperationBarIcon(
-                            icon = painterResource(R.drawable.eink_ic_note_entry),
-                            contentDescription = "笔记",
-                            onClick = onOpenNote,
-                        )
-                    } else {
+                    when (tab) {
                         // 目录 Tab：正/倒序按钮（图标随状态互换，asc/desc 成对素材）
-                        EInkOperationBarIcon(
+                        TocTab.Chapters -> EInkOperationBarIcon(
                             icon = painterResource(
                                 if (state.isReversed) R.drawable.eink_ic_toc_sort_desc
                                 else R.drawable.eink_ic_toc_sort_asc
@@ -345,19 +446,48 @@ internal fun TocScreen(
                             contentDescription = if (state.isReversed) "倒序" else "正序",
                             onClick = onToggleReverse,
                         )
+
+                        // 笔记 Tab：导出 Markdown（无笔记或导出中置灰）
+                        TocTab.Notes -> EInkOperationBarIcon(
+                            icon = painterResource(R.drawable.eink_ic_note_export),
+                            contentDescription = "导出笔记",
+                            enabled = state.canExport,
+                            onClick = onExport,
+                        )
+
+                        // 书签 Tab：无附加动作
+                        TocTab.Bookmarks -> Unit
                     }
                 }
             )
+            // 标题下三段切换：marksEngine 缺失（降级宿主）时整体不渲染，
+            // 只剩目录列表（契约 §3.3 降级语义，不留假死入口）
+            if (state.marksAvailable) {
+                TocTabRow(selected = tab, onSelect = onTabSelect)
+            }
             Box(modifier = Modifier.weight(1f)) {
                 when {
                     state.isLoading -> EInkLoading(modifier = Modifier.fillMaxSize())
                     state.error != null -> CenterMessage(state.error)
-                    state.selectedTab == TocTab.Bookmarks -> BookmarkListPane(
-                        state = state,
+                    tab == TocTab.Bookmarks -> MarksPane(
+                        rows = bookmarkRows,
                         listState = bookmarkListState,
+                        currentChapterIndex = state.currentChapterIndex,
+                        emptyText = "暂无书签\n阅读页下拉或点页角标添加",
                         onPageUp = onBookmarkPageUp,
                         onPageDown = onBookmarkPageDown,
                         onBookmarkClick = onBookmarkClick,
+                        onMarkingClick = onMarkingClick,
+                    )
+                    tab == TocTab.Notes -> MarksPane(
+                        rows = markingRows,
+                        listState = noteListState,
+                        currentChapterIndex = state.currentChapterIndex,
+                        emptyText = "暂无笔记\n选中正文后可画线或写想法",
+                        onPageUp = onNotePageUp,
+                        onPageDown = onNotePageDown,
+                        onBookmarkClick = onBookmarkClick,
+                        onMarkingClick = onMarkingClick,
                     )
                     state.isEmpty -> CenterMessage("无章节")
                     else -> Box(modifier = Modifier.fillMaxSize()) {
@@ -388,24 +518,12 @@ internal fun TocScreen(
                     }
                 }
             }
-            // 底部操作栏：目录|书签 双 Tab + 返回 / 回到当前 / 去底部 居左
-            // 连续 + 翻页胶囊（与其它界面统一的 EInkOperationBar）；
-            // marksEngine 缺失时无 Tab，单列表现状
+            // 底部操作栏：返回 / 回到当前 / 去底部 居左连续 + 翻页胶囊
+            // （Tab 已上移到标题下，底栏不带 Tab）
             EInkOperationBar(
-                tabs = if (state.marksAvailable) listOf(
-                    EInkOperationTab(
-                        icon = painterResource(R.drawable.eink_ic_toc_e),
-                        selectedIcon = painterResource(R.drawable.eink_ic_toc),
-                        contentDescription = "目录",
-                    ),
-                    EInkOperationTab(
-                        icon = painterResource(R.drawable.eink_ic_bookmark_e),
-                        selectedIcon = painterResource(R.drawable.eink_ic_bookmark_s),
-                        contentDescription = "书签",
-                    ),
-                ) else emptyList(),
-                selectedTabIndex = if (state.selectedTab == TocTab.Bookmarks) 1 else 0,
-                onTabSelect = { onTabSelect(if (it == 1) TocTab.Bookmarks else TocTab.Chapters) },
+                tabs = emptyList(),
+                selectedTabIndex = 0,
+                onTabSelect = {},
                 navigationIcon = {
                     EInkOperationBarIcon(
                         icon = painterResource(R.drawable.eink_ic_arrow_back),
@@ -555,23 +673,111 @@ private fun ChapterItem(
 
 
 // ====================================================================
-// 书签 Tab
+// 标题下三段切换
 // ====================================================================
 
 /**
- * 书签列表 pane：同款固定页分页（无滑动手柄），分页状态与目录列表
- * 各自独立（由承载层分别传入）。
+ * 标题下三段切换（目录 / 书签 / 笔记）：**一体化分段控件**——整组共用
+ * 一个 1dp 外框 + 2dp 小圆角，内部等宽三段、段间一条 1dp 实灰分隔线。
+ *
+ * 不用「三个各自带圆角边框的按钮」相邻排放：那样相邻两段之间会出现
+ * 双线 + 圆角缝（真机反馈"又有圆角边框又不重叠，相邻的难看"）。选中段
+ * 实心反白、按压瞬时反色、零动画（规范 §14/§35）。
  */
 @Composable
-private fun BookmarkListPane(
-    state: TocUiState,
+private fun TocTabRow(
+    selected: TocTab,
+    onSelect: (TocTab) -> Unit,
+) {
+    val scheme = EInkTheme.colorScheme
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .border(width = 1.dp, color = scheme.outline, shape = EInkShapes.small)
+            .clip(EInkShapes.small),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        TocTabItem(
+            text = "目录",
+            selected = selected == TocTab.Chapters,
+            modifier = Modifier.weight(1f),
+            onClick = { onSelect(TocTab.Chapters) },
+        )
+        TocTabDivider()
+        TocTabItem(
+            text = "书签",
+            selected = selected == TocTab.Bookmarks,
+            modifier = Modifier.weight(1f),
+            onClick = { onSelect(TocTab.Bookmarks) },
+        )
+        TocTabDivider()
+        TocTabItem(
+            text = "笔记",
+            selected = selected == TocTab.Notes,
+            modifier = Modifier.weight(1f),
+            onClick = { onSelect(TocTab.Notes) },
+        )
+    }
+}
+
+@Composable
+private fun TocTabItem(
+    text: String,
+    selected: Boolean,
+    modifier: Modifier,
+    onClick: () -> Unit,
+) {
+    val press = rememberImmediatePressState()
+    val colors = eInkActionColors(pressed = press.isPressed, selected = selected)
+    Box(
+        modifier = modifier
+            .height(TocTabHeight)
+            .then(press.modifier)
+            .background(colors.containerColor)
+            .einkClickable(role = Role.Tab, onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        EInkText(
+            text = text,
+            style = EInkTheme.typography.titleMedium,
+            color = colors.contentColor,
+        )
+    }
+}
+
+/** 段间分隔线：1dp 实灰（规范 §11），与外框不同色，相邻段不再出现双线。 */
+@Composable
+private fun TocTabDivider() {
+    Box(
+        modifier = Modifier
+            .width(1.dp)
+            .height(TocTabHeight)
+            .background(EInkTheme.colorScheme.divider),
+    )
+}
+
+// ====================================================================
+// 书签 / 笔记 Tab（按章节聚合的卡片列表）
+// ====================================================================
+
+/**
+ * 书签/笔记列表 pane：章节聚合头 + 卡片，**变高分页**（卡片高度随内容行数
+ * 变化，由承载层的 [io.legado.app.eink.designsystem.pager.EInkFlowPagerState]
+ * 按布局实测翻页）。两个 Tab 各自的列表状态与分页状态独立。
+ */
+@Composable
+private fun MarksPane(
+    rows: List<TocMarkRow>,
     listState: LazyListState,
+    currentChapterIndex: Int,
+    emptyText: String,
     onPageUp: () -> Unit,
     onPageDown: () -> Unit,
     onBookmarkClick: (Long) -> Unit,
+    onMarkingClick: (String) -> Unit,
 ) {
-    if (state.bookmarks.isEmpty()) {
-        CenterMessage("暂无书签\n阅读页下拉或点角标添加")
+    if (rows.isEmpty()) {
+        CenterMessage(emptyText)
         return
     }
     LazyColumn(
@@ -580,30 +786,98 @@ private fun BookmarkListPane(
         overscrollEffect = null,
         modifier = Modifier.fillMaxSize().EInkPageSwipe(onPageUp = onPageUp, onPageDown = onPageDown),
     ) {
-        itemsIndexed(state.bookmarks, key = { _, b -> b.id }) { _, bookmark ->
-            BookmarkItem(
-                bookmark = bookmark,
-                isCurrent = bookmark.chapterIndex == state.currentChapterIndex,
-                onClick = { onBookmarkClick(bookmark.id) },
-            )
+        items(rows, key = { it.rowKey() }) { row ->
+            when (row) {
+                is TocMarkRow.ChapterHeader -> MarkChapterHeader(
+                    header = row,
+                    isCurrent = row.chapterIndex == currentChapterIndex,
+                )
+
+                is TocMarkRow.Bookmark -> BookmarkCard(
+                    bookmark = row.bookmark,
+                    onClick = { onBookmarkClick(row.bookmark.id) },
+                )
+
+                is TocMarkRow.Marking -> MarkingCard(
+                    marking = row.marking,
+                    onClick = { onMarkingClick(row.marking.id) },
+                )
+            }
         }
     }
 }
 
+/** 列表项稳定键：章节头用章下标、卡片用各自 id（跨 Tab 前缀区分）。 */
+private fun TocMarkRow.rowKey(): String = when (this) {
+    is TocMarkRow.ChapterHeader -> "chapter:$chapterIndex"
+    is TocMarkRow.Bookmark -> "bookmark:${bookmark.id}"
+    is TocMarkRow.Marking -> "marking:${marking.id}"
+}
+
 /**
- * 书签条目：章节名 + 页面文本摘录 + 笔记文本（按压瞬时反色，规范 §35）。
- * 当前阅读章节为左侧实心标记 + 章名加粗（规范 §42 列表行持久选中，
- * additive inking）。
+ * 章节聚合头：章名 + 条目数。当前阅读章用左侧实心标记 + 章名加粗
+ * （规范 §42：长列表持久选中用 additive inking，不整行反色）；
+ * 底色用 surfaceVariant 与卡片区隔，翻页时一组头 + 卡片同页
+ * （承载层 keep-with-next）。
  */
 @Composable
-private fun BookmarkItem(
-    bookmark: BookmarkUiModel,
+private fun MarkChapterHeader(
+    header: TocMarkRow.ChapterHeader,
     isCurrent: Boolean,
+) {
+    val scheme = EInkTheme.colorScheme
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(scheme.surfaceVariant)
+            .padding(horizontal = EInkSpacing.m, vertical = EInkSpacing.s),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(EInkSpacing.s),
+    ) {
+        if (isCurrent) {
+            Box(
+                modifier = Modifier
+                    .size(width = CurrentMarkWidth, height = CurrentMarkHeight)
+                    .background(scheme.onSurface)
+            )
+        }
+        // 章节头 = 最强一级：正文色 + 加粗（墨水上"加黑"比换浅灰可靠）；
+        // 当前阅读章再加左侧实心标记区分
+        EInkText(
+            text = header.chapterName,
+            modifier = Modifier.weight(1f),
+            style = EInkTheme.typography.bodyLarge,
+            fontWeight = FontWeight.Bold,
+            color = scheme.onSurface,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+        // 条数与卡片首行同属元信息：最弱一级
+        EInkText(
+            text = "${header.itemCount} 条",
+            style = EInkTheme.typography.labelMedium,
+            color = scheme.tertiaryContent,
+        )
+    }
+}
+
+/**
+ * 卡片外壳：整卡可点（按压瞬时反色，规范 §35），内容经 [content] 拿到
+ * 当前配色——第一行图标 + 基础信息（**不再带章节名**，章名已在聚合头），
+ * 下面才是具体内容（高度随内容行数变化，翻页由变高分页保证完整展示）。
+ */
+@Composable
+private fun MarkCard(
     onClick: () -> Unit,
+    content: @Composable (primary: Color, secondary: Color, meta: Color) -> Unit,
 ) {
     val scheme = EInkTheme.colorScheme
     val press = rememberImmediatePressState()
     val colors = eInkActionColors(pressed = press.isPressed)
+    val primary = if (press.isPressed) colors.contentColor else scheme.onSurface
+    val secondary = if (press.isPressed) colors.contentColor else scheme.onSurfaceVariant
+    // 元信息（首行时间）最弱一级：按压时随整卡反色
+    val meta = if (press.isPressed) colors.contentColor else scheme.tertiaryContent
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -611,30 +885,60 @@ private fun BookmarkItem(
             .background(colors.containerColor)
             .einkClickable(role = Role.Button, onClick = onClick)
             .padding(horizontal = EInkSpacing.m, vertical = EInkSpacing.s),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(EInkSpacing.s)) {
-            if (isCurrent) {
-                Box(
-                    modifier = Modifier
-                        .size(width = CurrentMarkWidth, height = CurrentMarkHeight)
-                        .background(if (press.isPressed) scheme.surface else scheme.onSurface)
-                )
-            }
+        content(primary, secondary, meta)
+    }
+}
+
+/** 卡片第一行：小图标 + 基础信息（时间，最弱一级元信息色）；时间不可信时只留图标。 */
+@Composable
+private fun MarkCardHead(
+    iconRes: Int,
+    timeMillis: Long,
+    meta: Color,
+) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        Image(
+            painter = painterResource(iconRes),
+            contentDescription = null,
+            modifier = Modifier.size(IconSize),
+            colorFilter = ColorFilter.tint(meta),
+        )
+        formatMarkTime(timeMillis)?.let { time ->
             EInkText(
-                text = bookmark.chapterName,
+                text = time,
                 style = EInkTheme.typography.labelMedium,
-                color = scheme.onSurfaceVariant,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                fontWeight = if (isCurrent) FontWeight.Bold else null,
+                color = meta,
             )
         }
+    }
+}
+
+/**
+ * 书签卡：第一行 = 书签图标 + 时间；内容 = 页面摘录（正文级）+
+ * （完整模式编辑过的）书签笔记文本（次级色）。
+ */
+@Composable
+private fun BookmarkCard(
+    bookmark: BookmarkUiModel,
+    onClick: () -> Unit,
+) {
+    MarkCard(onClick = onClick) { primary, secondary, meta ->
+        MarkCardHead(
+            iconRes = R.drawable.eink_ic_bookmark_s,
+            timeMillis = bookmark.id,
+            meta = meta,
+        )
         if (bookmark.bookText.isNotBlank()) {
             EInkText(
                 text = bookmark.bookText,
                 style = EInkTheme.typography.bodyLarge,
-                color = if (press.isPressed) colors.contentColor else scheme.onSurface,
-                maxLines = 2,
+                color = primary,
+                maxLines = 3,
                 overflow = TextOverflow.Ellipsis,
             )
         }
@@ -642,11 +946,74 @@ private fun BookmarkItem(
             EInkText(
                 text = bookmark.content,
                 style = EInkTheme.typography.bodyMedium,
-                color = if (press.isPressed) colors.contentColor else scheme.onSurface,
-                maxLines = 2,
+                color = secondary,
+                maxLines = 3,
                 overflow = TextOverflow.Ellipsis,
             )
         }
+    }
+}
+
+/**
+ * 笔记卡：第一行 = 图标（划线 / 想法两种）+ 时间；内容 = 划线原文
+ * **引用态弱化**（左侧细线 + 次级色），想法再叠一行想法内容（正文级强调）。
+ */
+@Composable
+private fun MarkingCard(
+    marking: MarkingUiModel,
+    onClick: () -> Unit,
+) {
+    MarkCard(onClick = onClick) { primary, secondary, meta ->
+        MarkCardHead(
+            iconRes = if (marking.thought) {
+                R.drawable.eink_ic_selection_thought
+            } else {
+                R.drawable.eink_ic_selection_line
+            },
+            timeMillis = marking.createdAt,
+            meta = meta,
+        )
+        if (marking.selectedText.isNotBlank()) {
+            QuotedText(text = marking.selectedText, color = secondary)
+        }
+        if (marking.thought && marking.note.isNotBlank()) {
+            EInkText(
+                text = marking.note,
+                style = EInkTheme.typography.bodyLarge,
+                color = primary,
+                maxLines = 6,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+    }
+}
+
+/**
+ * 引用态文本：左侧 2dp 细线（随文本高度拉伸，[IntrinsicSize.Min] 让细线
+ * 与文本同高）+ 缩进，文字弱化（次级色）——划线原文比想法内容"退后一层"。
+ */
+@Composable
+private fun QuotedText(text: String, color: Color) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(IntrinsicSize.Min),
+        horizontalArrangement = Arrangement.spacedBy(EInkSpacing.s),
+    ) {
+        Box(
+            modifier = Modifier
+                .width(2.dp)
+                .fillMaxHeight()
+                .background(color)
+        )
+        EInkText(
+            text = text,
+            modifier = Modifier.weight(1f),
+            style = EInkTheme.typography.bodyMedium,
+            color = color,
+            maxLines = 3,
+            overflow = TextOverflow.Ellipsis,
+        )
     }
 }
 

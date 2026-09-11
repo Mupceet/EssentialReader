@@ -2,6 +2,7 @@ package io.legado.app.eink.feature.toc
 
 import io.legado.app.eink.contract.ChapterUiModel
 import io.legado.app.eink.contract.JumpResolution
+import io.legado.app.eink.contract.MarkingUiModel
 import io.legado.app.eink.contract.PendingJumpConfirm
 import io.legado.app.eink.contract.TocBookUiModel
 import org.junit.Assert.assertEquals
@@ -74,8 +75,21 @@ class TocUiStateTest {
         val s = TocUiState()
         assertEquals(TocTab.Chapters, s.selectedTab)
         assertTrue(s.bookmarks.isEmpty())
+        assertTrue(s.markings.isEmpty())
         assertFalse(s.marksAvailable)
         assertNull(s.pendingJump)
+        assertFalse(s.canExport)
+    }
+
+    @Test
+    fun `笔记可导出判定随列表与导出中状态变化`() {
+        val marking = MarkingUiModel(
+            id = "a", chapterIndex = 0, chapterName = "第一章",
+            selectedText = "文", note = "", thought = false, createdAt = 1L,
+        )
+        assertTrue(TocUiState(markings = listOf(marking)).canExport)
+        assertFalse(TocUiState(markings = listOf(marking), exporting = true).canExport)
+        assertFalse(TocUiState(exporting = true).canExport)
     }
 
     @Test

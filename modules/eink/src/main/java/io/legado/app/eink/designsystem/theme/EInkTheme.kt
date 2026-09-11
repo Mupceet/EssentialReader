@@ -59,6 +59,9 @@ data class EInkColorScheme(
     /** 次级内容色（元信息、辅助图标），语义上独立于 onSurfaceVariant（规范 §4.1）。 */
     val secondaryContent: Color,
 
+    /** 三级内容色（最弱文字/图标：卡片时间、条数等元信息，规范 §4.1）。 */
+    val tertiaryContent: Color,
+
     /** 强边界色：2dp 重要交互边界 / 焦点外框（规范 §7）。 */
     val borderStrong: Color,
 
@@ -148,6 +151,7 @@ private fun EInkPalette.toColorScheme(): EInkColorScheme = EInkColorScheme(
     onError = onError,
     disabledContent = disabledContent,
     secondaryContent = secondaryContent,
+    tertiaryContent = tertiaryContent,
     borderStrong = borderStrong,
     divider = divider,
     selected = selected,

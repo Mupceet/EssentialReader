@@ -108,7 +108,7 @@ object EInkEngineRegistry {
 
     /**
      * 书签/笔记端口——**可选**端口：未注册 = 宿主无书签/笔记列表能力，
-     * 目录页书签 Tab 与笔记页按 [MarksEngine] 接口 KDoc 的降级语义处理，
+     * 目录页书签 / 笔记 Tab 按 [MarksEngine] 接口 KDoc 的降级语义处理，
      * 不参与 install 必填校验。
      */
     val marksEngine: MarksEngine?
@@ -136,7 +136,7 @@ object EInkEngineRegistry {
      * @param selectionEngine 选区批注端口实现（可选，默认 null：
      *   宿主无批注落库能力时不传，阅读页按接口 KDoc 的降级语义处理）。
      * @param marksEngine 书签/笔记端口实现（可选，默认 null：
-     *   宿主无书签/笔记列表能力时不传，目录页书签 Tab 与笔记页按接口
+     *   宿主无书签/笔记列表能力时不传，目录页书签 / 笔记 Tab 按接口
      *   KDoc 的降级语义处理）。
      */
     fun install(

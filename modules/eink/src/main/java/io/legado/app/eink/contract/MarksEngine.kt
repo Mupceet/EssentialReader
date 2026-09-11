@@ -4,14 +4,14 @@ import io.legado.app.eink.arch.EInkImmutable
 import kotlinx.coroutines.flow.Flow
 
 /**
- * 书签/笔记端口：目录页书签 Tab 与笔记页的数据来源，含跳转目标解析
+ * 书签/笔记端口：目录页书签 / 笔记 Tab 的数据来源，含跳转目标解析
  * 与笔记导出。
  *
  * 列表按「书名+作者」跨源聚合（换源后仍可见）；跳转解析封装宿主的
  * 校验→本地重定位→确认三分支，模块不复制这些规则。
  *
  * 可选端口（同 [ReaderSelectionEngine] 先例）：注册表缺失本端口时，
- * 目录页不显示书签 Tab、笔记入口与 Note 路由不可达，不做假死路径。
+ * 目录页不显示书签 / 笔记 Tab（只剩目录），不做假死路径。
  */
 interface MarksEngine {
 
@@ -23,7 +23,12 @@ interface MarksEngine {
 
     /**
      * 订阅书籍的全部划线/想法（book_marks 表，跨源；按 chapterIndex、
-     * createdAt 升序）。宿主按 bookUrl 解析书籍失败返回空流。
+     * **章内正文本位置**升序，同位置按 createdAt）。宿主按 bookUrl 解析书籍
+     * 失败返回空流。
+     *
+     * 用正文本位置而非创建时间：笔记卡按「读到的先后」排列才与正文顺序一致
+     * （补记的划线若按创建时间会排在章末，与阅读顺序割裂）。位置取自锚点
+     * [TextProcessAnchor.chapterPosition]。
      */
     fun observeMarkings(bookUrl: String): Flow<List<MarkingUiModel>>
 
@@ -74,6 +79,11 @@ data class MarkingUiModel(
     val chapterIndex: Int,
     /** 章节标题（条目次级信息）。 */
     val chapterName: String,
+    /**
+     * 章内正文本位置（锚点 `TextProcessAnchor.chapterPosition`）：
+     * 笔记卡排序依据（宿主按此升序下发，模块按原序渲染分组）。
+     */
+    val chapterPos: Int = 0,
     /** 划线选中原文。 */
     val selectedText: String,
     /** 想法内容（划线为空串）。 */
