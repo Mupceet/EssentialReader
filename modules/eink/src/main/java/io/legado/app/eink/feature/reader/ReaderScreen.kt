@@ -727,11 +727,21 @@ fun ReaderRoute(
             // 换源后路由参数已失效（旧书行连同章节被删、新书换了 bookUrl），
             // 与 onOpenDetail 同一取值：优先会话书的当前 bookUrl。目录据此
             // 直接命中换源时已入库的新目录；二次换源也才能解析到当前书
-            onOpenToc = { onOpenToc(uiState.bookUrl.ifEmpty { bookUrl }) },
-            onChangeSource = { onChangeSource(uiState.bookUrl.ifEmpty { bookUrl }) },
+            // 离开阅读页的三个出口（目录 / 换源 / 详情）先收起操作条再导航：
+            // 回来时本就是干净阅读状态，不会在回程第一帧才收起而闪一下
+            //（真机反馈"回阅读界面时才开始消失"）
+            onOpenToc = {
+                viewModel.hideControls()
+                onOpenToc(uiState.bookUrl.ifEmpty { bookUrl })
+            },
+            onChangeSource = {
+                viewModel.hideControls()
+                onChangeSource(uiState.bookUrl.ifEmpty { bookUrl })
+            },
             onOpenDetail = {
                 // 换源后以引擎当前持有的书为准（bookUrl 与路由参数可能不同）
                 if (uiState.bookUrl.isNotEmpty()) {
+                    viewModel.hideControls()
                     onOpenDetail(uiState.bookName, uiState.bookAuthor, uiState.bookUrl)
                 }
             },

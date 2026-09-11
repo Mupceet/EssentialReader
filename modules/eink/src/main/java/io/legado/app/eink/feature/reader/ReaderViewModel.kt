@@ -169,6 +169,12 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application),
      */
     fun attach(bookUrl: String) {
         if (attachJob?.isActive == true) return
+        // 兜底：本方法在首次进入与从目录/换源界面返回时都会调用（见 KDoc），
+        // 正常路径上操作条已在"离开阅读页"的出口收起（ReaderRoute 的
+        // onOpenToc/onChangeSource/onOpenDetail），这里再收一次保证任何返回
+        // 路径（重试、异常路径）都落到干净阅读状态。首次进入本就是收起态；
+        // 自动翻页若开着，hideControls 会照常重新起算倒计时。
+        hideControls()
         attachJob = viewModelScope.launch(Dispatchers.IO) {
             engine.register(this@ReaderViewModel)
 
