@@ -603,6 +603,15 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application),
         return port.togglePageBookmark()
     }
 
+    /**
+     * 图片点击动作分派（段评气泡等）：转发引擎端口，脚本求值与弹层全部
+     * 在宿主侧完成（见 ReaderEngine.dispatchImageAction KDoc）；旧宿主的
+     * 默认实现为无操作（点按图片无响应，诚实降级）。
+     */
+    fun dispatchImageAction(action: String, source: String) {
+        engine.dispatchImageAction(action, source)
+    }
+
     // ==================== 排版参数 ====================
     // 均为绝对值 setter：档位滑条（含 ±1 按钮）直接设置目标档位，
     // 按目录钳制后写回快照；是否重排由目录 diff 路由（applyStyleChange）。

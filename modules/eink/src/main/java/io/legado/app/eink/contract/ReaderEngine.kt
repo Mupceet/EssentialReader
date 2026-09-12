@@ -370,6 +370,23 @@ interface ReaderEngine {
      */
     fun relayout()
 
+    // ---- 图片动作 ----
+
+    /**
+     * 分派图片点击动作：[action] 为宿主图片选项 `click` 键的书源 JS、
+     * [source] 为该图来源原样字符串（[ReaderImageSlot.action]/[ReaderImageSlot.source]
+     * 透传）。模块在点按命中带动作脚本的图片槽位时调用（段评气泡 →
+     * 书源 JS 调 `java.showBrowser` → 宿主弹半屏 WebView 评论页是典型用法）。
+     *
+     * 脚本求值、宿主「点击图片方式」设置语义与弹层展示全部在宿主侧
+     * 完成（Rhino 与书源上下文不跨桥）；主线程调用，宿主内部转异步。
+     *
+     * 默认实现 = 无操作——旧宿主上点按图片无任何响应（属诚实降级：
+     * 槽位已带 action 但宿主不执行）。默认宿主可见的现象与完整模式
+     * 「点击图片方式 = 禁用」一致。
+     */
+    fun dispatchImageAction(action: String, source: String) {}
+
     // ---- 触控与页眉页脚 ----
 
     /** 水平滑动手势判定为翻页的最小距离（px，0 = 使用系统 touch slop）。 */

@@ -1,5 +1,6 @@
 package io.legado.app.eink.feature.reader.selection
 
+import io.legado.app.eink.contract.ReaderImageSlot
 import io.legado.app.eink.contract.ReaderPageSnapshot
 
 /**
@@ -43,6 +44,27 @@ fun readerTapDispatch(
     hasSelection -> ReaderTapDispatch.DISMISS_SELECTION
     hasMarkingBar -> ReaderTapDispatch.DISMISS_MARKING_BAR
     else -> ReaderTapDispatch.ZONE_OR_MARKING_HIT
+}
+
+/**
+ * 点按命中的可交互图片槽位（带动作脚本的图片，段评气泡是典型用法）。
+ *
+ * 命中优先级在标记/分区行为之前：行内小图（气泡）的槽位矩形嵌在视觉
+ * 行内，文本命中按最近字符归位会把气泡上的点按误读成相邻文字，故图片
+ * 矩形优先判定。无动作脚本的图片不参与命中——普通插图点击无行为，回落
+ * 分区行为（与完整模式未携带 click 选项的图片点按穿透一致）。
+ *
+ * 命中后经 [io.legado.app.eink.contract.ReaderEngine.dispatchImageAction]
+ * 上抛宿主执行；模块不感知脚本内容。
+ */
+fun imageActionSlotAt(
+    page: ReaderPageSnapshot,
+    x: Float,
+    y: Float,
+): ReaderImageSlot? = page.images.firstOrNull { slot ->
+    slot.action != null &&
+        x >= slot.x0 && x <= slot.x1 &&
+        y >= slot.lineTop && y <= slot.lineBottom
 }
 
 /**

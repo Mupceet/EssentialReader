@@ -115,10 +115,11 @@ class ReaderPageSnapshotMapperTest {
         right: Float,
         bottom: Float,
         src: String = "img.png",
+        action: String? = null,
     ) = ReaderElement.Image(
         bounds = ReaderRect(left, top, right, bottom),
         source = src,
-        action = null,
+        action = action,
     )
 
     private fun mapElements(
@@ -396,6 +397,22 @@ class ReaderPageSnapshotMapperTest {
         val snapshot = mapElements(imageElement(0f, 0f, 40f, 40f))
 
         assertNull(snapshot.images[0].loader(20, 20))
+    }
+
+    @Test
+    fun `图片来源与动作脚本原样透传到槽位`() {
+        // 段评气泡用法：地址尾部携带 ,{...} 选项（click 键为动作脚本），
+        // 映射器不解析不裁剪，source/action 原样透传供点击分派
+        val src = "https://img.example/bubble.png,{\"style\":\"text\",\"click\":\"java.showBrowser('u')\"}"
+        val snapshot = mapElements(
+            imageElement(0f, 0f, 20f, 20f, src = src, action = "java.showBrowser('u')"),
+        )
+
+        val slot = snapshot.images[0]
+        assertEquals(src, slot.source)
+        assertEquals("java.showBrowser('u')", slot.action)
+        // 无动作脚本的普通插图 action 保持 null（不参与点按命中）
+        assertNull(mapElements(imageElement(40f, 0f, 60f, 20f)).images[0].action)
     }
 
     @Test

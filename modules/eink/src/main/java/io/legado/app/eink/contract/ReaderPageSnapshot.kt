@@ -39,7 +39,7 @@ class ReaderPageSnapshot(
     /** 正文行画笔规格（其余文本行使用）。 */
     val contentSpec: ReaderPaintSpec,
 
-    /** 文本行（非文本列如评论列不进入快照）。 */
+    /** 文本行（纯装饰性非文本元素不进入快照；图片经 [images] 槽位）。 */
     val lines: List<ReaderPageLine>,
 
     /** 图片槽位（本页全部插图，按行盒区域定位）。 */
@@ -104,6 +104,12 @@ class ReaderPageLine(
  * [loader] 由宿主闭包提供（含位图解析与异常吞并，失败返回 null）；
  * 铺满/等比居中的矩形数学在模块画布完成（需位图实际尺寸，仅绘制期
  * 可得）。
+ *
+ * [source]/[action] 为交互元数据（与几何测量无关）：书源可在正文图片
+ * 地址尾部携带 `,{"click":"…JS…"}` 选项——段评气泡即「行内小图 +
+ * click 脚本」的用法。点按命中带 [action] 的槽位时，模块经
+ * [ReaderEngine.dispatchImageAction] 上抛宿主执行（脚本求值与弹层
+ * 都是宿主能力）；无 [action] 的图片不参与点按命中。
  */
 class ReaderImageSlot(
     /** 行盒左边界（px）。 */
@@ -126,6 +132,18 @@ class ReaderImageSlot(
 
     /** 按目标尺寸解码位图；无法解码返回 null（模块渲染占位）。 */
     val loader: (width: Int, height: Int) -> Bitmap?,
+
+    /**
+     * 图片来源原样字符串（宿主排版元素 source 透传，含地址尾部可能的
+     * `,{...}` 选项——与完整模式点击分派注入 JS 的 result 绑定同值）。
+     */
+    val source: String = "",
+
+    /**
+     * 点击动作脚本（宿主图片选项 `click` 键透传；null/空 = 无点击语义，
+     * 槽位不参与点按命中）。
+     */
+    val action: String? = null,
 )
 
 /**

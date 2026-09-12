@@ -5,9 +5,9 @@ import android.content.Context
 import android.content.res.Configuration
 import android.os.Bundle
 import android.view.KeyEvent
-import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.appcompat.app.AppCompatActivity
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -30,6 +30,12 @@ import kotlinx.coroutines.launch
  * E-Ink 单 Activity 入口模板基类——宿主差异的全部剩余面 = 两个抽象钩子
  * （[onInstallEngines] 与 [onExitToFullMode]）加一个可选字体钩子
  * （[uiFontFamily]，默认跟随平台默认字体）。
+ *
+ * 基类为 [AppCompatActivity]（而非最小面 [androidx.activity.ComponentActivity]）：
+ * 宿主经端口（如 [EInkEngineRegistry.readerEngine] 的图片动作分派）弹
+ * DialogFragment 层（段评半屏 WebView 等）需要 Fragment 事务宿主——入口
+ * 即宿主 UI 弹层的唯一 Activity 宿主。模块自身仍不组合任何 Fragment/
+ * Material3 界面；宿主子类的主题须为 AppCompat 系（Material3 主题天然满足）。
  *
  * 遵循 E-Ink Design System 规范 §54: 推荐单 Activity 架构，所有 E-Ink
  * 屏幕通过 Compose 状态路由（[EInkApp]）管理。
@@ -71,7 +77,7 @@ import kotlinx.coroutines.launch
  *  - 铺设主题背景色（延伸到系统栏区域）；
  *  - 系统栏图标颜色跟随主题背景亮度（浅底黑图标 / 深底白图标）。
  */
-abstract class EInkHostActivity : ComponentActivity() {
+abstract class EInkHostActivity : AppCompatActivity() {
 
     /**
      * 系统当前深浅色（true = 深色）。组合内读取驱动 [EInkTheme] 重组，
