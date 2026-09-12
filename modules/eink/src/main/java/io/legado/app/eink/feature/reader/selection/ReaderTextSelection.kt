@@ -26,6 +26,37 @@ data class ReaderSelectionUi(
 /** 行内拼接文本。 */
 internal fun lineText(line: ReaderPageLine): String = line.chunks.joinToString("")
 
+/**
+ * 段首缩进长度：行首连续空白字符数（宿主 `paragraphIndent`，默认两个全角
+ * 空格，排版时作为**真实字符**排在段首，见 ReaderChapterBlockMeasurer
+ * 的 bodyIndentText / leadingIndentItems）。行首就是段首，故行首空白即缩进。
+ */
+internal fun leadingIndentLength(text: String): Int {
+    var index = 0
+    while (index < text.length && text[index].isWhitespace()) index++
+    return index
+}
+
+/**
+ * 墨迹区间：把段首缩进从绘制区间头部剔掉（null = 本行无处落墨）。
+ *
+ * 缩进在排版里是真实字符，跨段选择时会被整段包进选区/装饰区间；直接按
+ * 字符索引铺灰底、画下划线，段首那段空白也会被涂上（真机反馈「段首的空白
+ * 也有灰色背景及画线」）。这里只改**绘制起笔**：区间本身仍按字符索引保存
+ * 与落库（宿主数据、章内位置口径不变，选区文本与复制内容不变），
+ * [selectionRuns] 与 [decorationSpanX] 共用同一条规则，选区预览与落库后的
+ * 正式装饰不会出现一有一无的错位。
+ */
+internal fun inkRange(text: String, from: Int, to: Int): Pair<Int, Int>? {
+    val length = text.length
+    val start = from.coerceIn(0, length)
+    val end = to.coerceIn(start, length)
+    if (start >= end) return null
+    val indent = leadingIndentLength(text)
+    val ink = if (start < indent) indent else start
+    return if (ink >= end) null else ink to end
+}
+
 /** 行内字符偏移所在段下标；返回 chunk 下标到段内偏移。 */
 internal fun locateChunk(line: ReaderPageLine, charIndex: Int): Pair<Int, Int> {
     var remaining = charIndex
@@ -333,8 +364,11 @@ fun selectionRuns(
         val text = lineText(line)
         val from = if (index == start.lineIndex) start.charIndex else 0
         val to = if (index == end.lineIndex) end.charIndex else text.length
-        val left = charX(line, from, measure)
-        val right = charX(line, to, measure)
+        // 段首缩进不是可见墨迹：铺灰底从句首可见字符起笔（整行区间都是空白
+        // 时兜底按原区间，避免选区失去视觉反馈与操作条锚点）
+        val (inkFrom, inkTo) = inkRange(text, from, to) ?: (from to to)
+        val left = charX(line, inkFrom, measure)
+        val right = charX(line, inkTo, measure)
         runs += SelectionRun(index, left, right, line.top, line.bottom)
     }
     return runs

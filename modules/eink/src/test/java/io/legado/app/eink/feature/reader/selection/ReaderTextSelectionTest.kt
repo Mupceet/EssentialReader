@@ -157,6 +157,26 @@ class ReaderTextSelectionTest {
     }
 
     @Test
+    fun `跨段选区段首缩进不铺灰底`() {
+        // 段首缩进是排版字（默认两个全角空格）：选中整段时行首就是缩进，
+        // 但空白不该被铺灰底——首段与中间段的行内区间都从可见字符起笔
+        val snap = snapshot(
+            line("　　第一段", positions = intArrayOf(0), top = 30f, bottom = 70f),
+            line("上一段末行", positions = intArrayOf(5), top = 80f, bottom = 120f),
+            line("　　下一段", positions = intArrayOf(10), top = 130f, bottom = 170f),
+        )
+        val sel = buildSelection(snap, ReaderTextHit(0, 0), ReaderTextHit(2, 5))!!
+        val runs = selectionRuns(snap, sel, measure, measure)
+        assertEquals(3, runs.size)
+        // 行首两字符是缩进（0 + 2 × 10px）→ 从第 3 个字符起笔
+        assertEquals(20f, runs[0].left)
+        // 中间行整行都是正文：行首无缩进，照旧从行首起笔
+        assertEquals(0f, runs[1].left)
+        // 中间段的段首行同样跳过缩进
+        assertEquals(20f, runs[2].left)
+    }
+
+    @Test
     fun `把手锚点取首带左缘与末带右缘且高度取行盒`() {
         val snap = snapshot(
             line("abcdef", positions = intArrayOf(0), top = 30f, bottom = 70f),

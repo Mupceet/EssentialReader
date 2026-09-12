@@ -35,4 +35,19 @@ class ReaderDecorationSpanTest {
         val l = line("abc", positions = intArrayOf(0))
         assertNull(decorationSpanX(l, ReaderDecorationRun(2, 9, 1, false, "m1"), measure))
     }
+
+    @Test
+    fun `段首缩进空白不落墨迹`() {
+        // 行以段首缩进（两个全角空格）开头：run 覆盖整行时也从句首可见字符起笔
+        val l = line("　　正文", positions = intArrayOf(0))
+        val span = decorationSpanX(l, ReaderDecorationRun(0, 4, 1, false, "m1"), measure)
+        assertEquals(20f, span!!.first)
+        assertEquals(40f, span.second)
+    }
+
+    @Test
+    fun `标记只覆盖段首缩进时不画装饰`() {
+        val l = line("　　正文", positions = intArrayOf(0))
+        assertNull(decorationSpanX(l, ReaderDecorationRun(0, 2, 1, false, "m1"), measure))
+    }
 }
