@@ -244,8 +244,16 @@ fun buildSelection(
     for (index in start.lineIndex..end.lineIndex) {
         val line = snapshot.lines[index]
         if (line.isTitle) includesTitle = true
-        val from = if (index == start.lineIndex) start.charIndex else 0
-        val to = if (index == end.lineIndex) end.charIndex else lineText(line).length
+        // 端点行内下标一律**钳到行长**：命中可能来自上一页/上一版排版（翻页刷新
+        // 窗口内 selection 与 page 不同批更新），行下标还在但行长已变——直接
+        // substring 会 StringIndexOutOfBounds 崩掉（真机崩溃栈：
+        // buildSelection ← moveEndpoint ← 长按拖拽路径）。行下标越界仍在入口
+        // 返回 null（宁缺勿错），行内越界按行尾钳制（选区退化为到行尾，可继续用）。
+        val lineLength = lineText(line).length
+        val from = (if (index == start.lineIndex) start.charIndex else 0)
+            .coerceIn(0, lineLength)
+        val to = (if (index == end.lineIndex) end.charIndex else lineLength)
+            .coerceIn(from, lineLength)
         val piece = lineText(line).substring(from, to)
         if (index > start.lineIndex) {
             val prev = snapshot.lines[index - 1]
@@ -519,6 +527,42 @@ fun flipDirectionForPointer(
         !handleIsStart && y >= last.bottom -> 1
         else -> null
     }
+}
+
+/**
+ * 拖拽期的翻页方向（-1 上一页 / +1 下一页）：**以"该方向上选区还能不能更长"
+ * 为准**，不以把手侧为准。
+ *
+ * 为什么不能只看把手侧：跨页会话里被拖端会被吸附到**对侧**页边——下翻之后
+ * 结束端就贴在新页首行，这时它是"贴页顶的那一端"；按把手侧判（结束端只在
+ * 页底触发）会永远给不出上翻，真机表现为「N 页翻到 N+1 页后翻不回 N 页」。
+ *
+ * 规则：
+ *  - 无会话（单页选区）：沿用 [flipDirectionForPointer] 的把手侧判据；
+ *  - 有会话：被拖端进页顶带且**对侧端在页外（更前）** → 上翻；被拖端进页底带
+ *    且对侧端在页外（更后） → 下翻——继续同方向拖就是继续扩大选区；
+ *  - 对侧端仍在本页时退回把手侧判据（收缩/调界不误触翻页）。
+ */
+fun flipDirectionForDrag(
+    page: ReaderPageSnapshot,
+    session: ReaderSelectionSession?,
+    hit: ReaderTextHit?,
+    y: Float,
+    fallbackDraggingStart: Boolean,
+): Int? {
+    if (session == null) return flipDirectionForPointer(page, hit, y, fallbackDraggingStart)
+    val draggedIsStart = !session.draggingEnd
+    val otherPos = if (session.draggingEnd) session.startPos else session.endPos
+    val bodyFirst = page.lines.firstOrNull { !it.isTitle && lineText(it).isNotEmpty() }
+    val bodyLast = page.lines.lastOrNull { !it.isTitle && lineText(it).isNotEmpty() }
+    val atTop = hit?.let { it.lineIndex == 0 } ?: (page.lines.firstOrNull()?.let { y <= it.top } ?: false)
+    val atBottom = hit?.let { it.lineIndex == page.lines.lastIndex }
+        ?: (page.lines.lastOrNull()?.let { y >= it.bottom } ?: false)
+    val bodyStartPos = bodyFirst?.chapterPositions?.firstOrNull()
+    val bodyEndPos = bodyLast?.let { it.chapterPositions.first() + lineText(it).length }
+    if (atTop && bodyStartPos != null && otherPos < bodyStartPos) return -1
+    if (atBottom && bodyEndPos != null && otherPos > bodyEndPos) return 1
+    return flipDirectionForPointer(page, hit, y, draggedIsStart)
 }
 
 /**

@@ -80,8 +80,10 @@ private val SelectionBandCornerDp = 2.dp
 internal fun ReaderSelectionOverlay(
     snapshot: ReaderPageSnapshot?,
     selection: ReaderSelectionUi?,
+    session: ReaderSelectionSession?,
     handlesEnabled: Boolean,
     onSelectionChange: (ReaderSelectionUi?) -> Unit,
+    onDraggedHit: (ReaderTextHit) -> Unit,
     onFlipRequest: (Int) -> Unit,
     onHandleDragStart: () -> Unit,
     onHandleRelease: () -> Unit,
@@ -122,6 +124,7 @@ internal fun ReaderSelectionOverlay(
     val currentAnchors by rememberUpdatedState(anchors)
     val currentSelection by rememberUpdatedState(selection)
     val currentSnapshot by rememberUpdatedState(snapshot)
+    val currentSession by rememberUpdatedState(session)
     val currentMeasureContent by rememberUpdatedState(measureContent)
     val currentHandlesEnabled by rememberUpdatedState(handlesEnabled)
 
@@ -181,9 +184,17 @@ internal fun ReaderSelectionOverlay(
                         // sel 非空由本组合入口早退保证（selection == null 不组合），
                         // 无需判空；hit/snapshot 真可空（拖出文本区/页快照换页瞬间）
                         if (snapshotNow != null && hit != null) {
-                            val moved = moveEndpoint(snapshotNow, sel, draggingStart, hit)
-                            onSelectionChange(moved)
-                            draggingStart = draggingEndpointIsStart(moved, hit)
+                            // 手指原始命中先上抛：续选会话以章内位置为真值，由调用
+                            // 方按会话侧别换算端点（页内合成结果只服务单页选区）
+                            onDraggedHit(hit)
+                            // 会话中跳过页内合成：结果本来就被调用方忽略；更重要的是
+                            // 不能拿旧页命中与当前页拼选区——翻页刷新窗口里旧命中行内
+                            // 下标可能超出当前行长度（真机崩溃：buildSelection 越界）
+                            if (currentSession == null) {
+                                val moved = moveEndpoint(snapshotNow, sel, draggingStart, hit)
+                                onSelectionChange(moved)
+                                draggingStart = draggingEndpointIsStart(moved, hit)
+                            }
                         }
                         // 页顶/页底按住翻页（v2 Task 8）：非空命中按抓取把手侧
                         // 判触发带（现状不变）；空命中（拖出文本行盒）按越出边
@@ -199,8 +210,14 @@ internal fun ReaderSelectionOverlay(
                                     offPageHandleIsStart(snapshotNow, change.position.y)
                                         ?: grab
                             }
-                            val direction = flipDirectionForPointer(
-                                snapshotNow, hit, change.position.y, handleIsStart
+                            // 会话中按"该方向还能不能更长"判翻页（[flipDirectionForDrag]）
+                            // ——下翻后结束端贴在新页首行，只看把手侧就永远翻不回上一页
+                            val direction = flipDirectionForDrag(
+                                page = snapshotNow,
+                                session = currentSession,
+                                hit = hit,
+                                y = change.position.y,
+                                fallbackDraggingStart = handleIsStart,
                             )
                             flipTrigger.onDirection(
                                 direction, SystemClock.elapsedRealtime()

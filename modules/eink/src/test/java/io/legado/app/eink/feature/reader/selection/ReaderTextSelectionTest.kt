@@ -81,6 +81,16 @@ class ReaderTextSelectionTest {
     }
 
     @Test
+    fun `端点行内下标超出行长时按行尾钳制不崩溃`() {
+        // 翻页刷新窗口里的残留命中：行下标还在，但当前行只有 6 字（旧页新版本 11）
+        val snap = snapshot(line("abcdef", positions = intArrayOf(0)))
+        val sel = buildSelection(snap, ReaderTextHit(0, 1), ReaderTextHit(0, 11))!!
+        assertEquals("bcdef", sel.selectedText)
+        assertEquals(1, sel.bodyStart)
+        assertEquals(6, sel.bodyEnd)
+    }
+
+    @Test
     fun `含标题行选区标记 includesTitle 且正文区间取正文行`() {
         val snap = snapshot(
             line("标题", positions = intArrayOf(100), isTitle = true),
@@ -413,6 +423,68 @@ class ReaderTextSelectionTest {
         // 有命中时与 flipDirection 同判
         assertEquals(-1, flipDirectionForPointer(snap, ReaderTextHit(0, 3), 40f, handleIsStart = true))
         assertNull(flipDirectionForPointer(snap, ReaderTextHit(1, 0), 100f, handleIsStart = true))
+    }
+
+    @Test
+    fun `flipDirectionForDrag 会话中被拖端贴页顶且对侧端在页外给出上翻`() {
+        // 本页正文区间 [100, 120)
+        val page = snapshot(
+            line("aaaaaaaaaa", positions = intArrayOf(100), top = 0f, bottom = 40f),
+            line("bbbbbbbbbb", positions = intArrayOf(110), top = 45f, bottom = 85f),
+        )
+        // 下翻之后：结束端被吸附在本页首行（draggingEnd = true），起始端仍在上一页
+        val session = ReaderSelectionSession(
+            startPos = 50, endPos = 100, draggingEnd = true, includesTitle = false,
+        )
+        // 指尖贴页顶继续上拖 → 上翻（只看把手侧会得到 null，真机表现为「翻不回去」）
+        assertEquals(
+            -1,
+            flipDirectionForDrag(page, session, ReaderTextHit(0, 3), y = 10f, fallbackDraggingStart = false),
+        )
+        // 指针越出页顶（空命中）同样成立
+        assertEquals(-1, flipDirectionForDrag(page, session, null, y = -5f, fallbackDraggingStart = false))
+    }
+
+    @Test
+    fun `flipDirectionForDrag 对侧端仍在本页时不误触翻页`() {
+        val page = snapshot(
+            line("aaaaaaaaaa", positions = intArrayOf(100), top = 0f, bottom = 40f),
+            line("bbbbbbbbbb", positions = intArrayOf(110), top = 45f, bottom = 85f),
+        )
+        // 收缩调界：两端都在本页，拖结束端到页顶 —— 不判上翻
+        val session = ReaderSelectionSession(
+            startPos = 105, endPos = 118, draggingEnd = true, includesTitle = false,
+        )
+        assertNull(
+            flipDirectionForDrag(page, session, ReaderTextHit(0, 3), y = 10f, fallbackDraggingStart = false),
+        )
+    }
+
+    @Test
+    fun `flipDirectionForDrag 反向会话被拖端贴页底且对侧端在页外给出下翻`() {
+        val page = snapshot(
+            line("aaaaaaaaaa", positions = intArrayOf(100), top = 0f, bottom = 40f),
+            line("bbbbbbbbbb", positions = intArrayOf(110), top = 45f, bottom = 85f),
+        )
+        // 上翻之后：起始端被吸附在本页末行，结束端仍在下一页
+        val session = ReaderSelectionSession(
+            startPos = 110, endPos = 300, draggingEnd = false, includesTitle = false,
+        )
+        assertEquals(
+            1,
+            flipDirectionForDrag(page, session, ReaderTextHit(1, 5), y = 80f, fallbackDraggingStart = true),
+        )
+    }
+
+    @Test
+    fun `flipDirectionForDrag 无会话时沿用把手侧判据`() {
+        val page = snapshot(
+            line("aaaaaaaaaa", positions = intArrayOf(100), top = 0f, bottom = 40f),
+            line("bbbbbbbbbb", positions = intArrayOf(110), top = 45f, bottom = 85f),
+        )
+        assertEquals(-1, flipDirectionForDrag(page, null, ReaderTextHit(0, 3), 10f, fallbackDraggingStart = true))
+        assertNull(flipDirectionForDrag(page, null, ReaderTextHit(0, 3), 10f, fallbackDraggingStart = false))
+        assertEquals(1, flipDirectionForDrag(page, null, ReaderTextHit(1, 5), 80f, fallbackDraggingStart = false))
     }
 
     @Test
