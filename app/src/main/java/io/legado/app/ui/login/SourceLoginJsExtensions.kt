@@ -114,7 +114,9 @@ class SourceLoginJsExtensions(
                 url,
                 html,
                 preloadJs,
-                if (forceFullscreenBrowser) forcedFullscreenBrowserConfig(config) else config
+                if (forceFullscreenBrowser) forcedFullscreenBrowserConfig(config) else config,
+                // 墨水屏：与强制全屏同路径去过渡动画（窗口零动画 + 预置全屏态）
+                noTransition = forceFullscreenBrowser
             )
         )
     }

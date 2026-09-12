@@ -107,7 +107,8 @@ class BottomWebViewDialog() : BottomSheetDialogFragment(R.layout.dialog_web_view
         url: String,
         html: String? = null,
         preloadJs: String? = null,
-        config: String? = null
+        config: String? = null,
+        noTransition: Boolean = false
     ) : this() {
         arguments = Bundle().apply {
             putString("sourceKey", sourceKey)
@@ -116,8 +117,16 @@ class BottomWebViewDialog() : BottomSheetDialogFragment(R.layout.dialog_web_view
             putString("html", html)
             putString("preloadJs", preloadJs)
             putString("config", config)
+            putBoolean("noTransition", noTransition)
         }
     }
+
+    /**
+     * 无过渡动画呈现（墨水屏：连续动画即连续残影）。显示/消失两个来源
+     * 都要处理——见 [onStart] 的窗口动画清零与全屏态预置。
+     */
+    private val noTransition: Boolean
+        get() = arguments?.getBoolean("noTransition") ?: false
 
     private val binding by viewBinding(DialogWebViewBinding::bind)
     private val bottomSheet by lazy {
@@ -171,6 +180,15 @@ class BottomWebViewDialog() : BottomSheetDialogFragment(R.layout.dialog_web_view
     override fun onStart() {
         super.onStart()
         setLayout(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
+        if (noTransition) {
+            // 墨水屏去过渡动画，两个来源一并处理：
+            //  1. 窗口进出动画清零——显示与 dismiss 都走窗口动画，置 0 即时呈现/消失；
+            //  2. 布局前预置全屏态——settle 滑动发生在"布局后再改 state"，
+            //     此时 sheet 尚未完成首次布局，state 直接生效不动画（随后
+            //     setConfig 再设 EXPANDED 为幂等空操作）
+            dialog?.window?.setWindowAnimations(0)
+            behavior?.state = BottomSheetBehavior.STATE_EXPANDED
+        }
     }
 
     override fun show(manager: FragmentManager, tag: String?) {
