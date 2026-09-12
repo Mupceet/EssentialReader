@@ -1,5 +1,6 @@
 package io.legado.app.eink.bridge
 
+import io.legado.app.domain.model.BookContentProcessEngine
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
@@ -43,6 +44,32 @@ class ReaderSelectionEngineImplTest {
     @Test
     fun `找不到文本返回 -1`() {
         assertEquals(-1, locateInContent(content, 0, "不存在的文本"))
+    }
+
+    @Test
+    fun `锚点文本被逐行归一化掉段首缩进后仍可定位`() {
+        // 正文段首带全角缩进（部分书源正文自带）；存锚点时 normalizeProcessText
+        // 会逐行 trim 掉它，于是"编辑已有标记"提交回来的文本与正文不再逐字相等。
+        // 新建时模块传的是原文（能匹配），编辑时传这种归一化文本就会误判"选区失效"
+        // → 真机表现为"笔记能看见、点进去改想法保存失败"。
+        val raw = "第一段正文内容很长很长很长\n　　第二段正文内容也很长很长"
+        val stored = BookContentProcessEngine.normalizeProcessText(raw)
+        assertEquals("第一段正文内容很长很长很长\n第二段正文内容也很长很长", stored)
+        // 旧路径（逐字搜索 + 全文唯一兜底）在这种正文上必然失配——正是"保存失败"的来源
+        assertEquals(-1, locateInContent(raw, 0, stored))
+        assertEquals(0, locateSelectionInContent(raw, 0, stored))
+    }
+
+    @Test
+    fun `归一化兜底同样接受提示位漂移`() {
+        val filler = "前".repeat(400)
+        // 标记本身跨段落（带段首缩进），锚点文本已被逐行 trim
+        val marking = "目标段落开头\n　　目标段落续行内容"
+        val stored = BookContentProcessEngine.normalizeProcessText(marking)
+        val raw = filler + marking + "后".repeat(40)
+        val expected = filler.length
+        // 提示位给到正文末尾（远超窗口），仍应按就近命中纠偏
+        assertEquals(expected, locateSelectionInContent(raw, raw.length, stored))
     }
 
     @Test

@@ -6,12 +6,14 @@ import io.legado.app.data.entities.Bookmark
 import io.legado.app.data.repository.BookmarkRepository
 import io.legado.app.domain.gateway.BookMarkingGateway
 import io.legado.app.domain.model.TextProcessAnchor
+import io.legado.app.domain.model.BookContentProcessEngine
 import io.legado.app.domain.model.TextProcessStyle
 import io.legado.app.domain.usecase.SaveMarkingUseCase
 import io.legado.app.eink.contract.ReaderMarkingDetail
 import io.legado.app.eink.contract.ReaderSelectionCommit
 import io.legado.app.eink.contract.ReaderSelectionEngine
 import io.legado.app.model.ReadBook
+import io.legado.app.utils.MD5Utils
 import io.legado.app.utils.GSON
 import io.legado.app.utils.fromJsonObject
 import kotlin.coroutines.cancellation.CancellationException
@@ -78,6 +80,32 @@ internal fun uniqueOccurrence(content: String, text: String): Int {
     val first = content.indexOf(text)
     if (first < 0) return -1
     return if (content.indexOf(text, first + 1) < 0) first else -1
+}
+
+/**
+ * 选区定位（含**归一化兜底**）：先走 [locateInContent] 的逐字搜索，失配时改用
+ * 宿主渲染层的同一把尺 [BookContentProcessEngine.resolveRange]（按非空白字符
+ * 序列匹配 + 就近提示位）。
+ *
+ * 为什么需要兜底：存锚点时 `SaveMarkingUseCase` 会走
+ * [BookContentProcessEngine.normalizeProcessText]，它**逐行 trim**——部分书源
+ * 正文自带段首缩进（全角空格）会被裁掉；新建标记时模块提交的是原文（能逐字
+ * 命中），而**编辑已有标记**（点标记 → 想法 → 保存）提交的是宿主存回来的这份
+ * 文本，与正文不再逐字相等 → 逐字搜索与"全文唯一命中"全失配 → 上层报
+ * 「保存失败」（真机：笔记 Tab 里看得见、点进去改想法保存失败）。用渲染层同款
+ * 解析兜底后，「能画出来的标记就一定编辑得了」——两者用的是同一份锚点解析。
+ */
+internal fun locateSelectionInContent(content: String, expectedStart: Int, text: String): Int {
+    locateInContent(content, expectedStart, text).takeIf { it >= 0 }?.let { return it }
+    val normalized = BookContentProcessEngine.normalizeProcessText(text)
+    if (normalized.isEmpty()) return -1
+    val anchor = TextProcessAnchor(
+        chapterIndex = 0,
+        chapterPosition = expectedStart.coerceIn(0, content.length),
+        selectedText = normalized,
+        normalizedTextHash = MD5Utils.md5Encode(normalized),
+    )
+    return BookContentProcessEngine.resolveRange(content, anchor)?.first ?: -1
 }
 
 /** 选区前后各取 [CONTEXT_CHARS] 字符（钳制边界）。 */
@@ -147,7 +175,9 @@ internal object ReaderSelectionEngineImpl : ReaderSelectionEngine, KoinComponent
             AppLog.put("eink saveMarking: 章节内容未就绪 chapter=${commit.chapterIndex}")
             return false
         }
-        val located = locateInContent(content, commit.start, commit.selectedText)
+        // 归一化兜底：编辑已有标记时提交的是宿主存回的锚点文本（段首缩进等
+        // 已被逐行 trim），与正文不逐字相等，需走渲染层同款解析（见函数 KDoc）
+        val located = locateSelectionInContent(content, commit.start, commit.selectedText)
         // 选区失效从严：标记是文本锚点，定位不到即视为失效，不回退提示位
         if (located < 0) {
             AppLog.put(
