@@ -79,6 +79,8 @@ internal fun MineScreen(
     var autoRefresh by remember { mutableStateOf(globalSettings.autoRefreshBook) }
     var defaultToRead by remember { mutableStateOf(globalSettings.defaultToRead) }
     var volumeKeyPage by remember { mutableStateOf(globalSettings.volumeKeyPage) }
+    // 写路径 fire-and-forget（getter 不保证立即可见新值），本地乐观状态
+    var syncProgress by remember { mutableStateOf(globalSettings.syncReadingProgress) }
     val currentVersionName = remember(context) { context.readAppVersionName() }
     var updateCheck by remember { mutableStateOf<UpdateCheckState>(UpdateCheckState.Idle) }
     val scope = rememberCoroutineScope()
@@ -153,6 +155,19 @@ internal fun MineScreen(
                     checked = globalSettings.useDefaultCover,
                     onToggle = {
                         globalSettings.useDefaultCover = !globalSettings.useDefaultCover
+                    }
+                )
+            }
+            item { EInkHorizontalDivider() }
+            item {
+                MineToggleRow(
+                    label = "同步阅读进度",
+                    description = "进入/退出阅读时与 WebDAV 云端同步（与完整模式同键）",
+                    checked = syncProgress,
+                    onToggle = {
+                        val next = !syncProgress
+                        globalSettings.syncReadingProgress = next
+                        syncProgress = next
                     }
                 )
             }

@@ -120,4 +120,23 @@ interface GlobalSettings {
      * 须 recreate 入口 Activity 才生效（消费方负责 recreate）。
      */
     var fontScaleSetting: Int?
+
+    /**
+     * 云端进度同步总开关（转发宿主「同步阅读进度」键，与完整模式
+     * 「备份与恢复」页共享同一存储）。
+     *
+     * E-Ink 语义为「一键全开」：开关打开即完整双向同步——进书拉取
+     * （云端超前弹确认框）、退出/息屏比较后上传、网络恢复同步；宿主的
+     * 「同步增强」子键只作用于完整模式（有意分歧，见
+     * [ReaderSyncTrigger] KDoc 与本仓 bridge/ReaderProgressSyncer）。
+     *
+     * 可写（「我的」页开关）：fire-and-forget 写入；消费方（同步编排）
+     * 每次触发时实时读取，无一致性窗口。
+     *
+     * 默认实现 = 恒 false（宿主未实现同步能力时开关显示关闭，属诚实
+     * 降级——不假装在同步）。
+     */
+    var syncReadingProgress: Boolean
+        get() = false
+        set(value) {}
 }

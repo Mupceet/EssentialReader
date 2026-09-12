@@ -104,6 +104,9 @@
   `ReaderEngineCallback.onCloudProgressNewer(progress)`。旧宿主零改动即
   降级（无同步行为，本地进度不受影响）；要启用须复刻宿主
   syncBookProgress/syncBookProgressPlus 的门槛矩阵并走宿主进度网关。
+  本仓参照实现为「一键全开」：宿主 Plus 子键恒视为开（仅完整模式生效），
+  配套 `GlobalSettings.syncReadingProgress`（「我的」页开关，转发宿主
+  主键、带父子联动写入）。
 - **`ReaderPageSnapshot.kt`** — 排版产物页快照：宿主把引擎排版结果映射
   而来（渲染侧唯一职责），模块自持画布绘制。坐标原样拷贝、构建后
   不可变、画笔规格只含测量耦合参数。

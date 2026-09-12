@@ -40,6 +40,12 @@ private const val LOG_TAG = "EInkProgressSync"
  * - 云端超前的应用路径先过章节有效性 gate；
  * - 上传成功回写 book.syncTime 并落库（宿主 LoadDelegate.uploadBookProgress
  *   同构）。
+ *
+ * **一键全开（用户定案 2026-09-12）**：E-Ink 不区分宿主的「同步增强」
+ * 子键——主开关开即恒走完整双向行为（进书云端超前弹确认框、暂停先
+ * 比较后上传、网络恢复同步）；宿主 Plus 子键退化为仅完整模式生效。
+ * 这同时消除了宿主基础档「暂停盲上传」把云端更超前进度覆盖回旧值的
+ * 回退隐患（基础档暂停无条件 PUT；双向档先比较，云端超前即放弃）。
  */
 internal class ReaderProgressSyncer(
     private val getReadingProgress: GetReadingProgressUseCase,
@@ -105,14 +111,13 @@ internal class ReaderProgressSyncer(
 
     // ---- 触发点实现 ----
 
-    /** 进书装载完成：宿主 ReadBookLoadDelegate.loadDataCompleted 尾部同步位。 */
+    /** 进书装载完成：宿主 ReadBookLoadDelegate.loadDataCompleted 尾部同步位（一键全开档）。 */
     private fun syncOnEntered() {
         if (consumeChapterJumped()) {
             log("进书同步：目录跳章进入，抑制本次")
             return
         }
-        val settings = backupSettingsGateway.currentSettings
-        if (!settings.syncBookProgress) {
+        if (!backupSettingsGateway.currentSettings.syncBookProgress) {
             log("进书同步：同步开关关，跳过")
             return
         }
@@ -124,7 +129,6 @@ internal class ReaderProgressSyncer(
             log("进书同步：无会话书，跳过")
             return
         }
-        val plus = settings.syncBookProgressPlus
         scope.launch {
             val cloud = fetchCloudProgress(book)
             when (ReaderProgressSyncPolicy.relation(cloud, ReadBook.durChapterIndex, ReadBook.durChapterPos)) {
@@ -136,30 +140,22 @@ internal class ReaderProgressSyncer(
                         log("进书同步：云端章节越界（${cloud.durChapterIndex}/${book.simulatedTotalChapterNum()}），放弃")
                         return@launch
                     }
-                    if (plus) {
-                        log("进书同步：云端超前（第${cloud.durChapterIndex + 1}章），弹确认框")
-                        onCloudProgressNewer?.invoke(
-                            ReaderCloudProgress(cloud.durChapterIndex, cloud.durChapterPos)
-                        )
-                    } else {
-                        applyProgress(cloud)
-                        log("自动同步阅读进度成功《${book.name}》 ${cloud.durChapterTitle}")
-                    }
+                    log("进书同步：云端超前（第${cloud.durChapterIndex + 1}章），弹确认框")
+                    onCloudProgressNewer?.invoke(
+                        ReaderCloudProgress(cloud.durChapterIndex, cloud.durChapterPos)
+                    )
                 }
-                // 相等不动（宿主自动路径无 toast）；本地超前仅 Plus 上传
-                ProgressRelation.CloudMissing, ProgressRelation.LocalAhead ->
-                    if (plus) {
-                        log("进书同步：${if (cloud == null) "云端无进度" else "本地超前"}，上传")
-                        uploadCurrentProgress()
-                    } else {
-                        log("进书同步：${if (cloud == null) "云端无进度" else "本地超前"}，不上传（同步增强未开）")
-                    }
+                // 相等不动（宿主自动路径无 toast）
+                ProgressRelation.CloudMissing, ProgressRelation.LocalAhead -> {
+                    log("进书同步：${if (cloud == null) "云端无进度" else "本地超前"}，上传")
+                    uploadCurrentProgress()
+                }
                 ProgressRelation.Equal -> log("进书同步：进度一致，无操作")
             }
         }
     }
 
-    /** Activity 级暂停：宿主 ReadBookViewModel.handleOnPause 同步位。 */
+    /** Activity 级暂停：宿主 ReadBookViewModel.handleOnPause 同步位（一键全开档：先比较后上传）。 */
     private fun syncOnPaused() {
         // saveRead 无条件先行（宿主顺序：落库 → 同步）；同步+备份整段 DEBUG 跳过
         ReadBook.saveRead()
@@ -167,27 +163,21 @@ internal class ReaderProgressSyncer(
             log("暂停同步：DEBUG 构建跳过（宿主同位 gate），本地已落库")
             return
         }
-        val plus = backupSettingsGateway.currentSettings.syncBookProgressPlus
         scope.launch {
             val book = ReadBook.book ?: run {
                 log("暂停同步：无会话书，跳过")
                 return@launch
             }
-            if (plus) {
-                val cloud = fetchCloudProgress(book)
-                when (ReaderProgressSyncPolicy.relation(cloud, ReadBook.durChapterIndex, ReadBook.durChapterPos)) {
-                    // 云端超前：留给下次进书确认（宿主 onPause 无回调即放弃）；
-                    // 相等不动
-                    ProgressRelation.CloudMissing, ProgressRelation.LocalAhead -> {
-                        log("暂停同步：本地超前或无云端，上传")
-                        uploadCurrentProgress()
-                    }
-                    ProgressRelation.CloudAhead -> log("暂停同步：云端超前，放弃（留待进书确认）")
-                    ProgressRelation.Equal -> log("暂停同步：进度一致，不上传")
+            val cloud = fetchCloudProgress(book)
+            when (ReaderProgressSyncPolicy.relation(cloud, ReadBook.durChapterIndex, ReadBook.durChapterPos)) {
+                // 云端超前：留给下次进书确认（宿主 onPause 无回调即放弃）；
+                // 相等不动
+                ProgressRelation.CloudMissing, ProgressRelation.LocalAhead -> {
+                    log("暂停同步：本地超前或无云端，上传")
+                    uploadCurrentProgress()
                 }
-            } else {
-                log("暂停同步：直接上传当前进度")
-                uploadCurrentProgress()
+                ProgressRelation.CloudAhead -> log("暂停同步：云端超前，放弃（留待进书确认）")
+                ProgressRelation.Equal -> log("暂停同步：进度一致，不上传")
             }
             Backup.autoBack(appCtx)
             log("暂停同步：已触发自动备份")
@@ -204,9 +194,10 @@ internal class ReaderProgressSyncer(
         }
     }
 
-    /** 网络恢复：宿主 ReadBookViewModel.onNetworkChanged 位（Plus 专属）。 */
+    /** 网络恢复：宿主 ReadBookViewModel.onNetworkChanged 位（一键全开：主开关开即同步）。 */
     private fun syncOnNetworkAvailable() {
-        if (!backupSettingsGateway.currentSettings.syncBookProgressPlus) return
+        // Plus 恒开后主开关即唯一 gate（宿主 Plus 隐含主开关开的等价位）
+        if (!backupSettingsGateway.currentSettings.syncBookProgress) return
         if (!NetworkUtils.isAvailable()) return
         val book = ReadBook.book ?: return
         scope.launch {
@@ -283,19 +274,5 @@ internal class ReaderProgressSyncer(
         } else {
             log("上传进度未生效（未配置 WebDAV/开关关/网络不可用，UseCase 返回 null）")
         }
-    }
-
-    private fun applyProgress(cloud: ReadingProgress) {
-        val book = ReadBook.book ?: return
-        ReadBook.setProgress(
-            BookProgress(
-                name = book.name,
-                author = book.author,
-                durChapterIndex = cloud.durChapterIndex,
-                durChapterPos = cloud.durChapterPos,
-                durChapterTime = cloud.durChapterTime,
-                durChapterTitle = cloud.durChapterTitle,
-            )
-        )
     }
 }

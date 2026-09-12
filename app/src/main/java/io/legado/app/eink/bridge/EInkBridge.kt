@@ -75,7 +75,9 @@ internal val einkSettingsWriteScope =
  * CoverSettingsGateway 异步落盘——组合内读取订阅变化，切换后开关行与
  * 书架/详情可见封面立即重组；keepScreenOn（阅读菜单开关，E-Ink 自有
  * 偏好、完整模式无对应设置）为模块 EInkSettings 端口化后的遗留 SP 键，
- * 存默认 prefs 文件，不经设置网关。
+ * 存默认 prefs 文件，不经设置网关；syncReadingProgress（「我的」页
+ * 可写）经 BackupSettingsGateway 转发宿主「同步阅读进度」主键，写时
+ * 带宿主设置页同款父子联动。
  *
  * fontScaleSetting 例外地仍走 AppConfigStore 同步快照（护栏允许——
  * 禁的是 AppConfig/ui.config.*Config）：端口契约的 null = 未设置/跟随
@@ -95,6 +97,9 @@ private object GlobalSettingsImpl : GlobalSettings, KoinComponent {
     private val downloadCacheSettingsGateway: DownloadCacheSettingsGateway by inject()
 
     private val coverSettingsGateway: CoverSettingsGateway by inject()
+
+    private val backupSettingsGateway:
+            io.legado.app.domain.gateway.BackupSettingsGateway by inject()
 
     /** 封面开关快照状态（install 时与宿主设置对齐，防跨模式往返陈旧值）。 */
     private val useDefaultCoverState = mutableStateOf(false)
@@ -182,4 +187,19 @@ private object GlobalSettingsImpl : GlobalSettings, KoinComponent {
 
     override val useAntiAlias: Boolean
         get() = otherSettingsGateway.currentSettings.antiAlias
+
+    override var syncReadingProgress: Boolean
+        get() = backupSettingsGateway.currentSettings.syncBookProgress
+        set(value) {
+            einkSettingsWriteScope.launch {
+                backupSettingsGateway.update {
+                    it.copy(
+                        syncBookProgress = value,
+                        // 宿主设置页同款父子联动（BackupConfigViewModel）：
+                        // 主开关关闭时「同步增强」子键一并关闭
+                        syncBookProgressPlus = it.syncBookProgressPlus && value,
+                    )
+                }
+            }
+        }
 }

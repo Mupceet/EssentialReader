@@ -199,7 +199,9 @@ Java 17 / minSdk 21（按 §0 升 23）/ 无 Compose 无 Coil（图片栈 Glide�
   `onCloudProgressNewer(progress)` 默认成员，旧宿主零改动即降级（无
   同步行为，本地进度落库不受影响）。要启用须按 `ReaderSyncTrigger`
   KDoc 的门槛矩阵复刻宿主 syncBookProgress / syncBookProgressPlus 行为，
-  并走宿主自己的进度网关（本仓参照：`bridge/ReaderProgressSyncer`）。
+  并走宿主自己的进度网关（本仓参照：`bridge/ReaderProgressSyncer`，
+  实现「一键全开」——宿主 Plus 子键恒视为开、仅主开关生效；配套
+  `GlobalSettings.syncReadingProgress` 开关键，默认 false = 未实现）。
   同版本起 `setTextBold` / `textBold`
   已移除，加粗能力由字重参数（body.weight / title.weight，0/1/2 预设
   + 100..900 自定义）取代。另 `headerFooterTypefaces()` 返回页眉/页脚的有效字体（按

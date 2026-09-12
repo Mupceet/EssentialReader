@@ -82,6 +82,10 @@ sealed interface ReaderPrepareResult {
  * | BackupTimer      | 仅自动备份（上传被主开关拦下）                  | 上传 + 自动备份                         |
  *
  * 模块按生命周期节点触发；宿主在引擎侧执行全部判定与网络 IO。
+ *
+ * 注：矩阵描述的是宿主设置的通用语义。本仓 eink 实现为「一键全开」
+ * （2026-09-12 定案）——宿主「同步增强」子键恒视为开、仅主开关生效
+ * （见 bridge/ReaderProgressSyncer）；其它宿主可自选档位。
  */
 enum class ReaderSyncTrigger {
     /** 进书装载完成（宿主 loadDataCompleted 尾部同步位）。 */
