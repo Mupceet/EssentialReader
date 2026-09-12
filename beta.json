@@ -1,49 +1,49 @@
 {
-  "tag_name": "3.26.17-beta.7",
-  "name": "Pre-release 3.26.17-beta.7",
-  "body": "**此版本为测试版，会存在不稳定问题。**\n\n# 更新日志\n\n墨本阅读——开源阅读 legado 的墨水屏增强发行版：同一本书，两种读法。\n\n## 3.26.17-beta.6（预发布）\n\n本次更新为墨水屏阅读界面带来划线、想法与书签：\n\n### 新增\n\n* 长按选中文字即可划线：选中范围带灰底、两端出现可拖动的把手，松手后弹出「复制 / 想法 / 画线」操作条，划线默认为黑色实线\n* 长按选中文字后可直接写想法，顶部弹框自动拉起输入法；想法内容留空保存会自动变回纯划线\n* 点一下已经划好的线或想法，可以修改想法、删除标记或复制原文\n* 支持跨页续选：按住页顶或页底可把选区扩展到上一页/下一页，跨页划线一次完成\n* 页面书签：顶栏书签按钮（未加书签显示加号、已加书签显示减号）与阅读区下拉手势都能给当前页加/去书签，带书签的页面显示书签折角\n* 目录页在标题下新增「目录 / 书签 / 笔记」三个标签，书签与笔记按章节聚合展示，点卡片直接跳回书中位置；内容随阅读预先读取，打开即显示\n* 笔记支持一键导出为 Markdown 文件",
+  "tag_name": "3.26.17-beta.8",
+  "name": "Pre-release 3.26.17-beta.8",
+  "body": "**此版本为测试版，会存在不稳定问题。**\n\n# 更新日志\n\n墨本阅读——开源阅读 legado 的墨水屏增强发行版：同一本书，两种读法。\n\n## 3.26.17-beta.7（预发布）\n\n本次更新完善墨水屏阅读界面的划线、想法与书签，并修好一批实机反馈的问题：\n\n### 新增\n\n* 墨水屏界面接入「外观字体」设置：在设置里更换字体后，墨水屏的书架、目录、样式面板等界面文字同步生效\n\n### 优化\n\n* 墨水屏界面文字档位重排：正文、书名、按钮与列表信息的字号字重统一成一套阶梯，大字体倍率下书架列表行高不再被截断\n* 目录页顶部「目录 / 书签 / 笔记」改为无边框文字标签：选中项用黑色下划线标注、文字加粗，点按不再整块反色\n* 跨页续选更顺手：向下选到页底、向上翻回上一页都能接着扩选，手指往回收能收窄范围，越过起点后区间收成「移动端 → 起点」，与单页内反向拖动一致\n\n### 修复\n\n* 修复跨页选择时范围错乱、翻到下一页后翻不回上一页，以及拖动过程中闪退的问题\n* 修复从笔记列表点开一条笔记、修改想法后提示「保存失败」的问题\n* 修复跨段选择时段首缩进也被灰底和下划线覆盖的问题\n* 修复备份与恢复不包含划线笔记（book_marks）的问题\n* 修复阅读界面切换深色 / 浅色后不立即生效的问题",
   "prerelease": true,
-  "created_at": "2026-09-11T16:59:54Z",
+  "created_at": "2026-09-12T04:53:17Z",
   "assets": [
     {
-      "browser_download_url": "https://github.com/Mupceet/EssentialReader/releases/download/3.26.17-beta.7/legado-3.26.17-beta.7-arm64-v8a.apk",
+      "browser_download_url": "https://github.com/Mupceet/EssentialReader/releases/download/3.26.17-beta.8/legado-3.26.17-beta.8-arm64-v8a.apk",
       "content_type": "application/vnd.android.package-archive",
-      "created_at": "2026-09-11T17:28:26Z",
+      "created_at": "2026-09-12T05:28:54Z",
       "download_count": 0,
-      "id": 557688943,
-      "name": "legado-3.26.17-beta.7-arm64-v8a.apk",
+      "id": 558679902,
+      "name": "legado-3.26.17-beta.8-arm64-v8a.apk",
       "state": "uploaded",
-      "url": "https://api.github.com/repos/Mupceet/EssentialReader/releases/assets/557688943"
+      "url": "https://api.github.com/repos/Mupceet/EssentialReader/releases/assets/558679902"
     },
     {
-      "browser_download_url": "https://github.com/Mupceet/EssentialReader/releases/download/3.26.17-beta.7/legado-3.26.17-beta.7-armeabi-v7a.apk",
+      "browser_download_url": "https://github.com/Mupceet/EssentialReader/releases/download/3.26.17-beta.8/legado-3.26.17-beta.8-armeabi-v7a.apk",
       "content_type": "application/vnd.android.package-archive",
-      "created_at": "2026-09-11T17:28:26Z",
+      "created_at": "2026-09-12T05:28:54Z",
       "download_count": 0,
-      "id": 557688940,
-      "name": "legado-3.26.17-beta.7-armeabi-v7a.apk",
+      "id": 558679899,
+      "name": "legado-3.26.17-beta.8-armeabi-v7a.apk",
       "state": "uploaded",
-      "url": "https://api.github.com/repos/Mupceet/EssentialReader/releases/assets/557688940"
+      "url": "https://api.github.com/repos/Mupceet/EssentialReader/releases/assets/558679899"
     },
     {
-      "browser_download_url": "https://github.com/Mupceet/EssentialReader/releases/download/3.26.17-beta.7/legado-3.26.17-beta.7.apk",
+      "browser_download_url": "https://github.com/Mupceet/EssentialReader/releases/download/3.26.17-beta.8/legado-3.26.17-beta.8.apk",
       "content_type": "application/vnd.android.package-archive",
-      "created_at": "2026-09-11T17:28:26Z",
+      "created_at": "2026-09-12T05:28:54Z",
       "download_count": 0,
-      "id": 557688939,
-      "name": "legado-3.26.17-beta.7.apk",
+      "id": 558679900,
+      "name": "legado-3.26.17-beta.8.apk",
       "state": "uploaded",
-      "url": "https://api.github.com/repos/Mupceet/EssentialReader/releases/assets/557688939"
+      "url": "https://api.github.com/repos/Mupceet/EssentialReader/releases/assets/558679900"
     },
     {
-      "browser_download_url": "https://github.com/Mupceet/EssentialReader/releases/download/3.26.17-beta.7/mapping.txt",
+      "browser_download_url": "https://github.com/Mupceet/EssentialReader/releases/download/3.26.17-beta.8/mapping.txt",
       "content_type": "text/plain",
-      "created_at": "2026-09-11T17:28:26Z",
+      "created_at": "2026-09-12T05:28:54Z",
       "download_count": 0,
-      "id": 557688942,
+      "id": 558679901,
       "name": "mapping.txt",
       "state": "uploaded",
-      "url": "https://api.github.com/repos/Mupceet/EssentialReader/releases/assets/557688942"
+      "url": "https://api.github.com/repos/Mupceet/EssentialReader/releases/assets/558679901"
     }
   ]
 }
