@@ -3,7 +3,6 @@ package io.legado.app.eink.feature.toc
 import android.widget.Toast
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
@@ -36,7 +35,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.input.pointer.pointerInput
@@ -45,6 +46,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
@@ -95,6 +98,12 @@ private val CurrentMarkHeight = 16.dp
 
 /** 标题下三段切换的段高（与顶栏动作按钮同档，触控目标 ≥44dp）。 */
 private val TocTabHeight = 44.dp
+
+/** 选中下划线（black indicator，规范 §14）高度。 */
+private val TocTabIndicatorHeight = 3.dp
+
+/** Tab 行底结构线高度：1dp 实灰（规范 §11），给下方列表一个视觉起点。 */
+private val TocTabRuleHeight = 1.dp
 
 /**
  * 卡片左缩进：比章节头（[EInkSpacing.m]）多一档，卡片在视觉上"从属"于该
@@ -689,49 +698,76 @@ private fun ChapterItem(
 // ====================================================================
 
 /**
- * 标题下三段切换（目录 / 书签 / 笔记）：**一体化分段控件**——整组共用
- * 一个 1dp 外框 + 2dp 小圆角，内部等宽三段、段间一条 1dp 实灰分隔线。
+ * 标题下三段切换（目录 / 书签 / 笔记）：**无边框文字 Tab + 黑色下划线**。
  *
- * 不用「三个各自带圆角边框的按钮」相邻排放：那样相邻两段之间会出现
- * 双线 + 圆角缝（真机反馈"又有圆角边框又不重叠，相邻的难看"）。选中段
- * 实心反白、按压瞬时反色、零动画（规范 §14/§35）。
+ * 规范 §14「Tab: black indicator」：选中用黑色指示条表达，不用大面积反色。
+ * 旧版一体化分段控件（1dp 外框 + 内分隔线 + 选中段实心反白）真机反馈
+ * 「实现方式太重」，故整组去边框、去底色：三个 Tab 等宽，常态文字次级灰、
+ * 选中文字正文黑 + 2dp 黑色下划线（宽度随标签文字，长度贴合文字而非整段，
+ * 观感更轻）；按压仍是统一的反色反馈（§35），零动画。
+ *
+ * 行底留一条 1dp 实灰结构线（§11）给下方列表一个视觉起点——它不是按钮
+ * 边框，而是 Tab 行与内容之间的分界。选中下划线**贴在这条线的位置上**
+ * （下沿对齐行底，自然盖住那 1dp 灰线）：整行只读成一条线，选中段为黑，
+ * 其余为灰——下划线若漂在文字正下方，就会和结构线构成"两道分隔"的观感
+ * （真机反馈"离这个黑条太远，看起来变成了好几条分隔的感觉"）。
  */
 @Composable
 private fun TocTabRow(
     selected: TocTab,
     onSelect: (TocTab) -> Unit,
 ) {
-    val scheme = EInkTheme.colorScheme
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .border(width = 1.dp, color = scheme.outline, shape = EInkShapes.small)
-            .clip(EInkShapes.small),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        TocTabItem(
-            text = "目录",
-            selected = selected == TocTab.Chapters,
-            modifier = Modifier.weight(1f),
-            onClick = { onSelect(TocTab.Chapters) },
+    Box(modifier = Modifier.fillMaxWidth()) {
+        // 结构线先画：垫在 Tab 之下，选中下划线覆盖它
+        Box(
+            modifier = Modifier
+                .align(Alignment.BottomStart)
+                .fillMaxWidth()
+                .height(TocTabRuleHeight)
+                .background(EInkTheme.colorScheme.divider),
         )
-        TocTabDivider()
-        TocTabItem(
-            text = "书签",
-            selected = selected == TocTab.Bookmarks,
-            modifier = Modifier.weight(1f),
-            onClick = { onSelect(TocTab.Bookmarks) },
-        )
-        TocTabDivider()
-        TocTabItem(
-            text = "笔记",
-            selected = selected == TocTab.Notes,
-            modifier = Modifier.weight(1f),
-            onClick = { onSelect(TocTab.Notes) },
-        )
+        Row(modifier = Modifier.fillMaxWidth()) {
+            TocTabItem(
+                text = "目录",
+                selected = selected == TocTab.Chapters,
+                modifier = Modifier.weight(1f),
+                onClick = { onSelect(TocTab.Chapters) },
+            )
+            TocTabItem(
+                text = "书签",
+                selected = selected == TocTab.Bookmarks,
+                modifier = Modifier.weight(1f),
+                onClick = { onSelect(TocTab.Bookmarks) },
+            )
+            TocTabItem(
+                text = "笔记",
+                selected = selected == TocTab.Notes,
+                modifier = Modifier.weight(1f),
+                onClick = { onSelect(TocTab.Notes) },
+            )
+        }
     }
 }
 
+/**
+ * 单个文字 Tab：无边框、无底色、**按压无视觉反馈**，文字 + 其下 2dp 指示条。
+ *
+ * 选中不只是加一条黑线，文字本身也进选中态：正文黑 + 加粗（未选中为次级灰 +
+ * 常规字重）——与列表行持久选中的表达同源（§42：实心标记 + 标题加粗，
+ * additive inking 在墨水屏上比"去黑"可靠）。两个字重差在墨水屏上是一笔
+ * 明显的加黑，不必动字号，切换时行盒与基线都不变。
+ *
+ * 按压不反色（真机反馈"反色动作太大"）：规范 §13 的整块反色针对的是小面积
+ * 控件，这里一枚 Tab 横跨 1/3 屏宽、高 44dp，按压整块翻黑在墨水屏上过重；
+ * 点 Tab 的反馈由内容区即时整页切换承担（点按后当帧换列表，本身就是最强
+ * 反馈），所以这一类大组件只保留 Selected 的黑色下划线，不做 Pressed 态。
+ *
+ * 指示条**不进布局**：用文字自身的实测宽度在 `drawBehind` 里画（不占位、
+ * 不挤压文字），三个 Tab 的文字基线因此恒定对齐、切换不跳字。这里刻意
+ * 不用 `Modifier.width(IntrinsicSize.Min)`：CJK 的 min intrinsic 是"最短可
+ * 断行宽度"= 一个字宽，会把标签压成逐字竖排（真机反馈"文字是竖向的，
+ * 也看不到黑线"）。
+ */
 @Composable
 private fun TocTabItem(
     text: String,
@@ -739,33 +775,35 @@ private fun TocTabItem(
     modifier: Modifier,
     onClick: () -> Unit,
 ) {
-    val press = rememberImmediatePressState()
-    val colors = eInkActionColors(pressed = press.isPressed, selected = selected)
+    val scheme = EInkTheme.colorScheme
+    val contentColor = if (selected) scheme.onBackground else scheme.secondaryContent
+    val density = LocalDensity.current
+    val tabHeightPx = with(density) { TocTabHeight.toPx() }
+    val indicatorHeightPx = with(density) { TocTabIndicatorHeight.toPx() }
     Box(
         modifier = modifier
             .height(TocTabHeight)
-            .then(press.modifier)
-            .background(colors.containerColor)
+            .semantics { this.selected = selected }
             .einkClickable(role = Role.Tab, onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
         EInkText(
             text = text,
             style = EInkTheme.typography.titleMedium,
-            color = colors.contentColor,
+            fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
+            color = contentColor,
+            modifier = Modifier.drawBehind {
+                if (!selected) return@drawBehind
+                // 文字盒垂直居中 → 段底（行底结构线所在处）= 文字盒顶 + (段高 + 文字高)/2
+                val bottom = (tabHeightPx + size.height) / 2f
+                drawRect(
+                    color = scheme.onBackground,
+                    topLeft = Offset(0f, bottom - indicatorHeightPx),
+                    size = Size(size.width, indicatorHeightPx),
+                )
+            },
         )
     }
-}
-
-/** 段间分隔线：1dp 实灰（规范 §11），与外框不同色，相邻段不再出现双线。 */
-@Composable
-private fun TocTabDivider() {
-    Box(
-        modifier = Modifier
-            .width(1.dp)
-            .height(TocTabHeight)
-            .background(EInkTheme.colorScheme.divider),
-    )
 }
 
 // ====================================================================
