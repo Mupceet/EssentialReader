@@ -162,7 +162,7 @@ internal fun MineScreen(
             item {
                 MineToggleRow(
                     label = "同步阅读进度",
-                    description = "进入/退出阅读时与 WebDAV 云端同步（与完整模式同键）",
+                    description = "进入/退出阅读时与云端同步",
                     checked = syncProgress,
                     onToggle = {
                         val next = !syncProgress
