@@ -165,6 +165,9 @@ internal object TocEngineImpl : TocEngine {
         book.durChapterTitle = chapterTitle
         book.durChapterTime = System.currentTimeMillis()
         appDb.bookDao.update(book)
+        // 无会话路径的目录跳章：落库后新开阅读页，下一次进书同步被抑制
+        // （宿主 TOC 进入带 chapterChanged 同位）
+        ReaderEngineImpl.markProgressJumpedForTocJump()
     }
 
     /** 入缓存并淘汰超限旧项（多书会话残留；键序无意义，任意淘汰即可）。 */

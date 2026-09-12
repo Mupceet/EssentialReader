@@ -7,9 +7,13 @@ import io.legado.app.constant.BookType
 import io.legado.app.data.appDb
 import io.legado.app.data.entities.Book
 import io.legado.app.data.repository.ReadSettingsRepository
+import io.legado.app.domain.gateway.BackupSettingsGateway
 import io.legado.app.domain.gateway.ReadStyleGateway
+import io.legado.app.domain.usecase.GetReadingProgressUseCase
+import io.legado.app.domain.usecase.UploadReadingProgressUseCase
 import io.legado.app.eink.contract.BookHandle
 import io.legado.app.eink.contract.ReaderBookSnapshot
+import io.legado.app.eink.contract.ReaderCloudProgress
 import io.legado.app.eink.contract.ReaderEngine
 import io.legado.app.eink.contract.ReaderEngineCallback
 import io.legado.app.eink.contract.ReaderFontOption
@@ -18,6 +22,7 @@ import io.legado.app.eink.contract.ReaderHeaderFooterVisibility
 import io.legado.app.eink.contract.ReaderPageSnapshot
 import io.legado.app.eink.contract.ReaderPrepareResult
 import io.legado.app.eink.contract.ReaderStyleCatalog
+import io.legado.app.eink.contract.ReaderSyncTrigger
 import io.legado.app.eink.contract.ReaderTextStyle
 import io.legado.app.eink.contract.ReaderTipTypefaces
 import io.legado.app.help.book.BookHelp
@@ -82,6 +87,22 @@ internal object ReaderEngineImpl : ReaderEngine, KoinComponent {
 
     private val readStyleGateway: ReadStyleGateway by inject()
     private val readSettingsRepository: ReadSettingsRepository by inject()
+    private val getReadingProgressUseCase: GetReadingProgressUseCase by inject()
+    private val uploadReadingProgressUseCase: UploadReadingProgressUseCase by inject()
+    private val backupSettingsGateway: BackupSettingsGateway by inject()
+
+    private val progressSyncer by lazy {
+        ReaderProgressSyncer(
+            getReadingProgress = getReadingProgressUseCase,
+            uploadReadingProgress = uploadReadingProgressUseCase,
+            backupSettingsGateway = backupSettingsGateway,
+        )
+    }
+
+    /** 目录页无会话跳章落进度（TocEngineImpl 转发）：抑制下一次进书同步。 */
+    internal fun markProgressJumpedForTocJump() {
+        progressSyncer.markChapterJumped()
+    }
 
     private val chapterPager = ReaderChapterPager(
         onPagesReady = ::notifyPagesReady,
@@ -129,6 +150,8 @@ internal object ReaderEngineImpl : ReaderEngine, KoinComponent {
         // 返回时要靠热缓存即时恢复渲染（清了就会出现「加载中」再重排）；
         // 只取消在途分页，防止迟到的 commit 通知已销毁的回调
         chapterPager.cancelPending()
+        // 跳章抑制标记随会话注销清零（防跨会话残留误抑制下一次进书同步）
+        progressSyncer.resetChapterJumped()
     }
 
     override fun isRegistered(callback: ReaderEngineCallback): Boolean {
@@ -138,6 +161,18 @@ internal object ReaderEngineImpl : ReaderEngine, KoinComponent {
 
     override fun saveReadingProgress() {
         ReadBook.saveRead()
+    }
+
+    override fun syncCloudProgress(trigger: ReaderSyncTrigger) {
+        // 提示回调绑定到当前注册的模块回调（迟绑定：注册可能晚于触发）
+        progressSyncer.onCloudProgressNewer = { progress ->
+            cachedAdapter?.callback?.onCloudProgressNewer(progress)
+        }
+        progressSyncer.sync(trigger)
+    }
+
+    override fun applyCloudProgress(progress: ReaderCloudProgress) {
+        progressSyncer.applyCloudProgress(progress)
     }
 
     // ---- 会话只读状态 ----
@@ -318,6 +353,8 @@ internal object ReaderEngineImpl : ReaderEngine, KoinComponent {
 
     override fun jumpToPosition(chapterIndex: Int, chapterPos: Int): Boolean {
         if (ReadBook.book == null) return false
+        // 跳章是用户显式选点：抑制下一次进书同步（宿主 chapterChanged 同位）
+        progressSyncer.markChapterJumped()
         ReadBook.saveReadingAnchorBeforeChapterJump(chapterIndex, chapterPos)
         ReadBook.openChapter(chapterIndex, chapterPos)
         return true
@@ -590,7 +627,12 @@ internal object ReaderEngineImpl : ReaderEngine, KoinComponent {
 
         override fun notifyBookChanged() = callback.onNotifyBookChanged()
 
-        override fun sureNewProgress(progress: io.legado.app.data.entities.BookProgress) {}
+        override fun sureNewProgress(progress: io.legado.app.data.entities.BookProgress) {
+            // 宿主 ReadBook.CallBack 通道的云端超前通知：与同步编排同路转发
+            callback.onCloudProgressNewer(
+                ReaderCloudProgress(progress.durChapterIndex, progress.durChapterPos)
+            )
+        }
 
         // ---- ReaderRenderCallback（渲染轨）----
 
