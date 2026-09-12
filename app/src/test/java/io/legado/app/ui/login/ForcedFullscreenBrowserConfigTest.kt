@@ -27,7 +27,8 @@ class ForcedFullscreenBrowserConfigTest {
         assertFalse(config.getBoolean("shouldDimBackground"))
         assertEquals(true, config.getBoolean("skipCollapsed"))
         assertEquals(true, config.getBoolean("isHideable"))
-        assertEquals(5, config.length())
+        assertEquals(true, config.getBoolean("pageControls"))
+        assertEquals(6, config.length())
     }
 
     @Test
@@ -43,6 +44,7 @@ class ForcedFullscreenBrowserConfigTest {
         // 强制键胜出
         assertEquals(BottomSheetBehavior.STATE_EXPANDED, config.getInt("state"))
         assertFalse(config.getBoolean("shouldDimBackground"))
+        assertEquals(true, config.getBoolean("pageControls"))
         // 书源其余键原样保留
         assertEquals(0.6, config.getDouble("heightPercentage"), 0.0001)
         assertEquals(400, config.getInt("peekHeight"))
@@ -53,6 +55,6 @@ class ForcedFullscreenBrowserConfigTest {
         val config = JSONObject(forcedFullscreenBrowserConfig("not-a-json{"))
 
         assertEquals(BottomSheetBehavior.STATE_EXPANDED, config.getInt("state"))
-        assertEquals(5, config.length())
+        assertEquals(6, config.length())
     }
 }

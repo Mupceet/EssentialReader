@@ -133,7 +133,10 @@ class SourceLoginJsExtensions(
  *  - `shouldDimBackground` = false：全程无 dim——下滑关闭途中也不留
  *    脏背景；
  *  - `skipCollapsed` = true + `isHideable` = true：下滑越过全屏态直接
- *    关闭，不落回半屏收起态（墨水屏拖拽不可靠，收起态退出很费劲）。
+ *    关闭，不落回半屏收起态（墨水屏拖拽不可靠，收起态退出很费劲）；
+ *  - `pageControls` = true：底部悬浮「上一页 / 关闭 / 下一页」控制条
+ *    （见 BottomWebViewDialog.Config.pageControls）——WebView 触摸滚动
+ *    在墨水屏上不可靠，按钮步进滚动 + 显式关闭是主交互。
  *
  * 书源 config 的其余键（peekHeight、宽度等）原样保留；config 解析失败
  * 时退化为仅强制键（弹框自身的 config 解析对垃圾输入本就不生效，
@@ -148,5 +151,6 @@ internal fun forcedFullscreenBrowserConfig(sourceConfig: String?): String {
     merged.put("shouldDimBackground", false)
     merged.put("skipCollapsed", true)
     merged.put("isHideable", true)
+    merged.put("pageControls", true)
     return merged.toString()
 }
