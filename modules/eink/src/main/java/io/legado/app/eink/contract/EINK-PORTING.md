@@ -194,6 +194,12 @@ Java 17 / minSdk 21（按 §0 升 23）/ 无 Compose 无 Coil（图片栈 Glide�
   值域与宿主排版设置 UI 同源）+ 实现 `availableFonts()` /
   `setFontFolder(uri)`（字体文件夹枚举与 SAF 持久化授权，均 suspend、
   阻塞式，模块在 IO 上下文调用）。
+- **云端进度同步（0.4.0 起）**：`ReaderEngine` 新增 `syncCloudProgress
+  (trigger)` / `applyCloudProgress(progress)` 两个默认成员，回调新增
+  `onCloudProgressNewer(progress)` 默认成员，旧宿主零改动即降级（无
+  同步行为，本地进度落库不受影响）。要启用须按 `ReaderSyncTrigger`
+  KDoc 的门槛矩阵复刻宿主 syncBookProgress / syncBookProgressPlus 行为，
+  并走宿主自己的进度网关（本仓参照：`bridge/ReaderProgressSyncer`）。
   同版本起 `setTextBold` / `textBold`
   已移除，加粗能力由字重参数（body.weight / title.weight，0/1/2 预设
   + 100..900 自定义）取代。另 `headerFooterTypefaces()` 返回页眉/页脚的有效字体（按

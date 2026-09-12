@@ -98,6 +98,12 @@
   - `availableFonts(): List<ReaderFontOption>` — 字体文件夹枚举（suspend，阻塞式，调用方 IO 上下文）
   - `setFontFolder(uri: String)` — 持久化字体文件夹（suspend）
   - `headerFooterTypefaces(): ReaderTipTypefaces` — 页眉/页脚有效字体（设置→跟随正文→系统默认）
+- **云端进度同步（0.4.0 起）** — `ReaderEngine` 新增两个带默认实现的成员
+  + 回调一个默认成员：`syncCloudProgress(trigger)`（触发矩阵见
+  `ReaderSyncTrigger` KDoc）、`applyCloudProgress(progress)`、
+  `ReaderEngineCallback.onCloudProgressNewer(progress)`。旧宿主零改动即
+  降级（无同步行为，本地进度不受影响）；要启用须复刻宿主
+  syncBookProgress/syncBookProgressPlus 的门槛矩阵并走宿主进度网关。
 - **`ReaderPageSnapshot.kt`** — 排版产物页快照：宿主把引擎排版结果映射
   而来（渲染侧唯一职责），模块自持画布绘制。坐标原样拷贝、构建后
   不可变、画笔规格只含测量耦合参数。

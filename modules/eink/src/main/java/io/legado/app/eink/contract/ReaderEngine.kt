@@ -69,6 +69,50 @@ sealed interface ReaderPrepareResult {
 }
 
 /**
+ * 云端进度同步触发时机。同一同步核心按触发点套不同门槛，矩阵复刻宿主
+ * 「同步阅读进度 / 同步增强」两设置的行为（`ReadBookViewModel` /
+ * `ReadBookLoadDelegate` 文字阅读器路径为基准）：
+ *
+ * | 触发点            | 主开关关   | 主开关开·Plus 关                | 主开关开·Plus 开                       |
+ * |------------------|-----------|--------------------------------|---------------------------------------|
+ * | BookEntered      | 无操作     | 静默拉取：云端超前且章节有效→应用  | 云端超前→确认回调；缺失/本地超前→上传；相等→无 |
+ * | ReaderPaused     | 仅自动备份 | 上传 + 自动备份                 | 双向（云端超前则放弃）+ 自动备份          |
+ * | ReaderResumed    | 应用 Web 服务暂存进度（无开关 gate）           | 同左                                   |
+ * | NetworkAvailable | 无操作     | 无操作                          | 双向（云端超前→确认回调；否则上传）        |
+ * | BackupTimer      | 仅自动备份（上传被主开关拦下）                  | 上传 + 自动备份                         |
+ *
+ * 模块按生命周期节点触发；宿主在引擎侧执行全部判定与网络 IO。
+ */
+enum class ReaderSyncTrigger {
+    /** 进书装载完成（宿主 loadDataCompleted 尾部同步位）。 */
+    BookEntered,
+
+    /** 阅读页 Activity 级暂停：息屏 / 退后台 / 离开任务。 */
+    ReaderPaused,
+
+    /** 阅读页 Activity 级恢复：先应用 Web 服务暂存的热进度。 */
+    ReaderResumed,
+
+    /** 网络恢复（宿主 onNetworkChanged 位；模块侧已滤初始装载窗口）。 */
+    NetworkAvailable,
+
+    /** 周期进度备份计时到期（宿主 5 分钟自动任务；由阅读活动重置）。 */
+    BackupTimer,
+}
+
+/**
+ * 云端进度恢复所需的最小快照。宿主判定「云端比本地新」后经
+ * [ReaderEngineCallback.onCloudProgressNewer] 通知模块；用户确认后模块经
+ * [ReaderEngine.applyCloudProgress] 回传同值应用。
+ */
+data class ReaderCloudProgress(
+    /** 目标章节下标（0-based）。 */
+    val chapterIndex: Int,
+    /** 章内字符位置。 */
+    val chapterPos: Int,
+)
+
+/**
  * 阅读引擎 → 模块的事件回调。
  *
  * 宿主实现义务：把宿主阅读引擎的状态推送转发到当前注册的回调
@@ -116,6 +160,14 @@ interface ReaderEngineCallback {
 
     /** 书籍记录被引擎侧变更（换源、重定向替换），模块应刷新书籍展示。 */
     fun onNotifyBookChanged()
+
+    /**
+     * 云端进度比本地新（章节下标或章内位置超前），等待用户确认恢复。
+     * 确认动作经 [ReaderEngine.applyCloudProgress] 回传；用户放弃则不调，
+     * 本地进度保持。默认实现 = 丢弃（宿主不支持同步确认时云端进度不应用，
+     * 属诚实降级：不弹框、不覆盖本地）。
+     */
+    fun onCloudProgressNewer(progress: ReaderCloudProgress) {}
 }
 
 /**
@@ -136,6 +188,8 @@ interface ReaderEngineCallback {
  *        └─ onContentUpdated ─► 新页快照
  * 换源/重定向替换后 ─► reloadBook(handle)     全量重建会话
  * 离开阅读 ─► saveReadingProgress() + unregister(callback)
+ * 云端进度同步 ─► syncCloudProgress(trigger) ─► 云端超前 ─► onCloudProgressNewer
+ *                                          └─► 用户确认 ─► applyCloudProgress
  * ```
  *
  * 职责边界：模块阅读页 VM 保留全部界面编排（菜单状态、翻页交互、调参
@@ -172,6 +226,28 @@ interface ReaderEngine {
      * 「最近阅读时间」，它是书架排序依据。
      */
     fun saveReadingProgress()
+
+    // ---- 云端进度同步（可选能力，默认实现 = 不支持）----
+
+    /**
+     * 云端进度同步入口。模块在阅读页生命周期节点按 [ReaderSyncTrigger]
+     * 触发；宿主按自身「同步阅读进度 / 同步增强」设置与
+     * [ReaderSyncTrigger] KDoc 的门槛矩阵执行：拉取后引擎侧应用时界面经
+     * 既有的内容更新回调刷新；云端超前需确认时经
+     * [ReaderEngineCallback.onCloudProgressNewer] 通知模块。
+     *
+     * 非 suspend、主线程调用，宿主内部自行转异步；同步行为对调用方静默
+     * （失败仅入宿主日志，无 toast——与宿主自动路径一致）。
+     * 默认实现 = 宿主不支持（无同步行为；本地进度落库不受影响）。
+     */
+    fun syncCloudProgress(trigger: ReaderSyncTrigger) {}
+
+    /**
+     * 用户确认恢复云端进度（[ReaderEngineCallback.onCloudProgressNewer]
+     * 的确认动作）：宿主把会话进度应用到目标章节位置并触发内容重载。
+     * 默认无实现。
+     */
+    fun applyCloudProgress(progress: ReaderCloudProgress) {}
 
     // ---- 会话只读状态 ----
 
