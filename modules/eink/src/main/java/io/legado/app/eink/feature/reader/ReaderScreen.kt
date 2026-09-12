@@ -638,15 +638,18 @@ fun ReaderRoute(
         }
         lifecycleOwner.lifecycle.addObserver(observer)
         viewModel.onReaderShown()
-        // 组合晚于 ON_RESUME（首帧在 RESUMED 态组合）时补发恢复位；
-        // onDispose 不补发暂停位——应用内离开阅读目的地（目录/换源）时
-        // Activity 未暂停，不发生上传（宿主 MainNavGraph observer 同形）
+        // 组合晚于 ON_RESUME（首帧在 RESUMED 态组合）时补发恢复位
         if (lifecycleOwner.lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) {
             viewModel.onActivityResumed()
         }
         onDispose {
-            lifecycleOwner.lifecycle.removeObserver(observer)
+            // 宿主同形（MainNavGraph onDispose→pauseReader）：阅读组合卸载
+            // （退出阅读/去目录/换源）补一次暂停同步上传——宿主 NavDisplay
+            // 在应用内导航时同样卸载阅读路由并补发 pause；真实 ON_PAUSE 已
+            // 处理过则 VM 侧幂等跳过
+            viewModel.onReaderDisposed()
             viewModel.onReaderHidden()
+            lifecycleOwner.lifecycle.removeObserver(observer)
         }
     }
 

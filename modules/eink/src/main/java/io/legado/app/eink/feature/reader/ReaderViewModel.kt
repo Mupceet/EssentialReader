@@ -186,6 +186,12 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application),
         // 路径（重试、异常路径）都落到干净阅读状态。首次进入本就是收起态；
         // 自动翻页若开着，hideControls 会照常重新起算倒计时。
         hideControls()
+        // 重挂载（返回自目录/换源）补恢复位：宿主路由重组 initData 回调里
+        // resumeReader 同形——应用 Web 暂存进度 + 重挂网络监听（组合卸载时
+        // 已随补发 pause 注销）。首次进入与 observer 初始恢复位重复触发，
+        // 两边均幂等
+        engine.syncCloudProgress(ReaderSyncTrigger.ReaderResumed)
+        registerNetworkWatcher()
         // 新会话首次装载：武装进书同步并进入初始装载窗口（网络恢复同步在
         // 窗口内静默，避免与进书同步竞态——宿主 justInitData 同位）。重挂载
         // （目录/换源返回）不重新武装：宿主 InitData 仅每 VM 一次
@@ -998,18 +1004,32 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application),
 
     // ==================== 云端进度同步（宿主同步阅读进度/同步增强迁移位）====================
 
+    /** Activity 是否处于 RESUMED（宿主 readerResumeState 同位：防卸载补发与真实 ON_PAUSE 双触发）。 */
+    private var activityResumedMark = false
+
     /** Activity 级恢复（ON_RESUME）：引擎应用 Web 暂存进度；注册网络监听。 */
     fun onActivityResumed() {
+        activityResumedMark = true
         engine.syncCloudProgress(ReaderSyncTrigger.ReaderResumed)
         registerNetworkWatcher()
     }
 
     /** Activity 级暂停（ON_PAUSE）：取消周期备份、同步/上传进度、关初始窗口、停网络监听。 */
     fun onActivityPaused() {
+        activityResumedMark = false
         progressBackupJob?.cancel()
         engine.syncCloudProgress(ReaderSyncTrigger.ReaderPaused)
         syncGate.onPaused()
         unregisterNetworkWatcher()
+    }
+
+    /**
+     * 阅读组合卸载（应用内退出阅读/去目录/换源均触发；宿主 MainNavGraph
+     * onDispose→pauseReader 同形）。Activity 仍在 RESUMED 态时补一次暂停
+     * 同步（上传进度）；真实 ON_PAUSE 已处理过则幂等跳过。
+     */
+    fun onReaderDisposed() {
+        if (activityResumedMark) onActivityPaused()
     }
 
     /** 用户确认恢复云端进度。 */

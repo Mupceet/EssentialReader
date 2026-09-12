@@ -602,7 +602,7 @@ internal const val PROGRESS_BACKUP_INTERVAL_MS = 5 * 60 * 1000L
         }
 ```
 
-注意：`onDispose` **不**触发 `onActivityPaused()`——应用内离开阅读目的地（目录/换源）时宿主同形（reader 组合卸载但 Activity 未暂停，不发生上传；宿主 MainNavGraph observer 同样只在 ON_PAUSE 走同步）。`Lifecycle.State` 需补 import `androidx.lifecycle.Lifecycle`（若未导入）。
+注意（2026-09-12 勘误，真机反馈修复）：初版此处写「`onDispose` 不触发 `onActivityPaused()`——应用内导航宿主同形不发生上传」，**判断有误**。宿主 `MainNavGraph` 在阅读路由 `onDispose` 里显式调用 `pauseReader()`（`MainNavGraph.kt:765`），而 NavDisplay 在应用内导航（去目录/换源）时同样卸载阅读路由——即宿主每次阅读组合卸载都会补发一次 pause → 上传进度 + 自动备份。修正：eink onDispose 调 `viewModel.onReaderDisposed()`（VM 内 `activityResumedMark` 防与真实 ON_PAUSE 双触发，宿主 readerResumeState 同位），并在 `attach()` 重挂载时补恢复位（ReaderResumed + 重挂网络监听，宿主重组 initData 回调 resumeReader 同形）。表现为：退出阅读/去目录/换源均触发一次上传，与宿主一致。
 
 2）`showRemoveConfirm` 对话框块之后追加：
 
@@ -1199,7 +1199,7 @@ Expected: 无输出。
 
 - [x] **Step 5: 交付说明与后续设计入口**
 
-交付说明须包含：修改职责范围、与宿主矩阵的等价性取舍（TTS gate 跳过、`onDispose` 不触发 pause 同步、BackupTimer 前置 saveRead）、已跑验证、未验证风险（真机清单 6 项）。后续设计阶段入口：手动同步入口、eink「我的」设置镜像（跨模式同键）、宿主「pause 后 VM 销毁丢上传」旧账、暂停触发密度节流（墨水屏息屏常态）。
+交付说明须包含：修改职责范围、与宿主矩阵的等价性取舍（TTS gate 跳过、onDispose 补发 pause 同步【勘误修正，见 Task 2 Step 6】、BackupTimer 前置 saveRead）、已跑验证、未验证风险（真机清单 6 项）。后续设计阶段入口：手动同步入口、eink「我的」设置镜像（跨模式同键）、宿主「pause 后 VM 销毁丢上传」旧账、暂停触发密度节流（墨水屏息屏常态）。
 
 ---
 
