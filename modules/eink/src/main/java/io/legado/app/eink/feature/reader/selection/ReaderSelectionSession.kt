@@ -19,6 +19,11 @@ import androidx.compose.runtime.Stable
  *   对端时自动交换两端并在 [draggingEnd] 上跟着翻面（端点越界合法，选区只
  *   是换个方向），之后继续拖动仍作用在手指那一端；
  * - [draggingEnd]：手指拖着的是 [endPos] 侧（true）还是 [startPos] 侧；
+ * - [lastFlipForward]：最近一次翻页方向（true = 翻下一页）。它只决定页变后
+ *   被拖端**吸附哪条边**（下翻吸新页首行 = 与来页的接缝、上翻吸新页末行），
+ *   **不改 [draggingEnd]**——手指从抓起那一刻拖的就是同一端，全程不变；翻页
+ *   改侧会让"固定端"变成远端，反向拖拽时区间越拖越远（真机反馈：从 N 页 X
+ *   出发翻到 N+1 再翻回 N 后拖到 X-10，期望 [X-10, X]，实际 [X-10, N+1 末]）；
  * - [includesTitle]：建立会话时选区是否含标题——§3.4 含标题不落划线的门禁
  *   依据（会话期间 capture 只收正文，标题不可达）；
  * - [segments]：翻页时刻捕获的各页文本段，仅供跨页 `selectedText` 拼接
@@ -30,6 +35,7 @@ data class ReaderSelectionSession(
     val endPos: Int,
     val draggingEnd: Boolean,
     val includesTitle: Boolean,
+    val lastFlipForward: Boolean = true,
     val segments: List<ReaderSelectionSegment> = emptyList(),
 ) {
     init {
@@ -57,16 +63,14 @@ data class ReaderSelectionSession(
         copy(segments = segments)
 
     /**
-     * 翻页时按**本次翻页方向**重置被拖端（只换侧，不动两端点的值）。
+     * 记录本次翻页方向（只改 [lastFlipForward]，**不动被拖端**、不动端点值）。
      *
-     * 翻下一页（[forward] = true）说明手指在页底拖结束端；翻上一页说明手指在
-     * 页顶拖起始端。会话内双向翻页（先下翻、再往回拖出页顶，或反之）必须每翻
-     * 一次写一次——少写这一笔会让翻页边吸附落到**另一端**：反向翻页时把结束端
-     * 吸到上一页首行，整段区间塌回上一页，表现为「向前翻页只选中翻页后的内容」
-     * （真机反馈，重构时丢过这条）。
+     * 页变效应据此把**被拖端**吸附到"与来页的接缝"那一边：下翻（[forward] = true）
+     * 吸新页首行、上翻吸新页末行。被拖端全程不变——手指拖的始终是同一端，
+     * 翻页改侧会让固定端漂到远端，反向拖拽时区间越拖越远。
      */
-    fun withFlipDirection(forward: Boolean): ReaderSelectionSession =
-        copy(draggingEnd = forward)
+    fun withFlip(forward: Boolean): ReaderSelectionSession =
+        copy(lastFlipForward = forward)
 
     companion object {
         /**

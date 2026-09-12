@@ -68,22 +68,41 @@ class ReaderSelectionSessionTest {
     }
 
     @Test
-    fun `每次翻页按方向重置被拖端且不动端点值`() {
-        // 会话内双向：先下翻（拖结束端），再反向拖出页顶（改拖起始端）
-        val forward = session(start = 10, end = 30).withFlipDirection(forward = true)
+    fun `翻页只记录方向不改被拖端与端点值`() {
+        // 手指抓起后全程拖同一端：翻页方向只决定吸附哪条边，不换侧
+        val forward = session(start = 10, end = 30).withFlip(forward = true)
         assertTrue(forward.draggingEnd)
+        assertTrue(forward.lastFlipForward)
         assertEquals(10, forward.startPos)
         assertEquals(30, forward.endPos)
 
-        val backward = forward.withFlipDirection(forward = false)
-        assertFalse(backward.draggingEnd)
-        // 只换侧、不动值——否则翻页边吸附会落到另一端（真机反馈的那条）
+        val backward = forward.withFlip(forward = false)
+        assertTrue(backward.draggingEnd)
+        assertFalse(backward.lastFlipForward)
         assertEquals(10, backward.startPos)
         assertEquals(30, backward.endPos)
-        // 换侧后继续拖动作用在起始端
-        val extended = backward.moveDragged(4)
-        assertEquals(4, extended.startPos)
-        assertEquals(30, extended.endPos)
+    }
+
+    @Test
+    fun `下翻再翻回后拖过起点区间收敛到起点侧`() {
+        // 真机场景：N 页 X 处起选 → 下翻到 N+1 选到底 → 拖回页顶翻回 N →
+        // 继续拖到 X-10：期望 [X-10, X]（与页内反向拖动一致），而不是拖到 N+1 那一头
+        var s = session(start = 100, end = 120)                       // X = 100
+        s = s.withFlip(forward = true)                                // 下翻
+        s = s.moveDragged(200)                                        // 吸附 N+1 首行（接缝）
+        assertEquals(100, s.startPos)                                 // 固定端仍是 X
+        s = s.moveDragged(260)                                        // 在 N+1 拖到底
+        assertEquals(260, s.endPos)
+        s = s.withFlip(forward = false)                               // 拖回页顶翻回 N
+        s = s.moveDragged(199)                                        // 吸附 N 末行（接缝）
+        assertEquals(100, s.startPos)
+        assertEquals(199, s.endPos)
+        s = s.moveDragged(101)                                        // 往回收
+        assertEquals(101, s.endPos)
+        s = s.moveDragged(90)                                         // 越过起点 X
+        assertEquals(90, s.startPos)
+        assertEquals(100, s.endPos)
+        assertFalse(s.draggingEnd)
     }
 
     @Test

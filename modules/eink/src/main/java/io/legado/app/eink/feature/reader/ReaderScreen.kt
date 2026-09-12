@@ -237,9 +237,10 @@ fun ReaderRoute(
         val sessionNow = selectionSession
         if (sessionNow != null) {
             uiState.page?.let { page ->
-                // 被拖端的手势侧别与会话的 draggingEnd 同义：拖 end（下翻）时
-                // 吸附新页首行首字符，拖 start（上翻）时吸附新页末行末字符
-                val edgeHit = flipEdgeHit(page, handleIsStart = !sessionNow.draggingEnd)
+                // 吸附边按**本次翻页方向**定（与来页的接缝那一侧）：下翻吸新页首行
+                // 首字符、上翻吸新页末行末字符。注意与被拖端无关——反向续拖时手指
+                // 拖的还是原来那一端，接缝边才是选区该接着长的方向
+                val edgeHit = flipEdgeHit(page, handleIsStart = !sessionNow.lastFlipForward)
                 val edgePos = edgeHit?.let { hit ->
                     page.lines.getOrNull(hit.lineIndex)
                         ?.let { line -> chapterPositionOf(line, hit.charIndex) }
@@ -412,9 +413,9 @@ fun ReaderRoute(
             if (moved) {
                 val base = selectionSession
                     ?: ReaderSelectionSession.from(visual, draggingEnd = direction > 0)
-                // 被拖端按本次翻页方向重置（会话内双向翻页必须跟着换侧，见
-                // ReaderSelectionSession.withFlipDirection）
-                val session = base.withFlipDirection(forward = direction > 0)
+                // 只记录翻页方向（决定页变后被拖端吸附哪条边），不改被拖端——
+                // 手指拖的始终是同一端，翻页改侧会让固定端漂到远端（见 withFlip）
+                val session = base.withFlip(forward = direction > 0)
                 val range = flipCaptureRange(page, direction, session.startPos, session.endPos)
                 val segment = range?.let { captureSegment(page, it.first, it.second) }
                 selectionSession = session.withSegments(
@@ -1126,6 +1127,10 @@ internal fun ReaderScreen(
         // 会在拖拽中途重启、打断手势（覆盖层同理由，见 ReaderSelectionOverlay）
         val currentPage by rememberUpdatedState(state.page)
         val currentSelection by rememberUpdatedState(selection)
+        // 续选会话同样是跨手势存活的实时值：不包 State 会在手势开始时被捕获成
+        // null 并一直用，翻页判据退化成"只看把手侧"——真机表现为"手柄能往回翻，
+        // 同一个手势里（不抬手）翻不回去"
+        val currentSession by rememberUpdatedState(session)
         // controlsVisible/error 同理：长按检测器不以之为 key——键在手势中途
         // 翻转会重启检测器，onDragEnd/onDragCancel 均不执行，松手落划线丢失
         // 而选区留在屏上（僵死选区）；长按守卫改读 State 实时值
@@ -1392,7 +1397,7 @@ internal fun ReaderScreen(
                                     // 本来就被忽略；更要紧的是**不能再拿旧页命中与当前页
                                     // 拼选区**——翻页刷新窗口里旧命中行内下标可能超出
                                     // 当前行长度（真机崩溃：buildSelection substring 越界）
-                                    if (session == null) {
+                                    if (currentSession == null) {
                                         // 长按拖拽延伸默认拖末端；端点越过起点后换侧
                                         // （见 draggingEndpointIsStart——固定端不跟随）
                                         val moved = moveEndpoint(page, sel, dragMovesStart, hit)
@@ -1426,7 +1431,7 @@ internal fun ReaderScreen(
                                 // 首行，只看把手侧永远翻不回上一页
                                 val direction = flipDirectionForDrag(
                                     page = page,
-                                    session = session,
+                                    session = currentSession,
                                     hit = hit,
                                     y = change.position.y,
                                     fallbackDraggingStart = draggingStart,
