@@ -359,6 +359,10 @@ class TTSReadAloudService : BaseReadAloudService(), KoinComponent {
             LogUtils.d(TAG, "onStart nowSpeak:$nowSpeak pageIndex:$pageIndex utteranceId:$s")
             utteranceStartPos = paragraphStartPos
             utteranceStartReadAloudNumber = readAloudNumber
+            if (isChapterTitleAt(nowSpeak)) {
+                upMediaMetadata(showContent = true)
+                return
+            }
             readerReadAloudChapter?.let {
                 if (contentList[nowSpeak].matches(AppPattern.notReadAloudRegex)) {
                     nextParagraph(naturalCompletion = true)
@@ -395,6 +399,7 @@ class TTSReadAloudService : BaseReadAloudService(), KoinComponent {
             super.onRangeStart(utteranceId, start, end, frame)
             if (!isCurrentUtterance(utteranceId)) return
             paragraphStartPos = utteranceStartPos + start
+            if (isChapterTitleAt(nowSpeak)) return
             // 正在朗读的精确章内位置（段起点 + 段内偏移），保持 readAloudNumber 的"段起点"语义不被污染
             val position = currentRangePosition(utteranceStartReadAloudNumber, start)
             updateReadAloudProgressSnapshot(position)
@@ -449,7 +454,7 @@ class TTSReadAloudService : BaseReadAloudService(), KoinComponent {
                 }
             } while (contentList[nowSpeak].matches(AppPattern.notReadAloudRegex))
             // 页内切段不引入换行符，累加会漂移，用段落绝对位置重算
-            paragraphChapterPositionAt(nowSpeak)?.let { readAloudNumber = it }
+            readAloudNumber = paragraphChapterPositionAt(nowSpeak) ?: 0
             return true
         }
 

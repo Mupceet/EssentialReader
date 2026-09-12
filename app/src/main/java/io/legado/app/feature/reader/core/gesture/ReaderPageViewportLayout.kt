@@ -55,6 +55,14 @@ class ReaderPageViewportLayout private constructor(
                     window.next?.let {
                         ReaderPagePlacement(it, scrollOffsetPx + current.scrollExtentPx)
                     },
+                    window.next?.let { next ->
+                        window.nextPlus?.let { following ->
+                            ReaderPagePlacement(
+                                following,
+                                scrollOffsetPx + current.scrollExtentPx + next.scrollExtentPx,
+                            )
+                        }
+                    },
                 ),
             )
         }

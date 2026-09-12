@@ -46,6 +46,22 @@ class CryptoCompatibilityTest {
     }
 
     @Test
+    fun `base64 缺失填充字符与 Hutool 宽容解码一致`() {
+        // base64ToByteArray 委托 cn.hutool.core.codec.Base64.decode，允许省略 "=" 填充、url-safe(-/_)与空白。
+        // 回归：beta.17 引入 kotlin.io.encoding.Base64(严格填充) 后，这类输入在 bookSource 的
+        // aesBase64DecodeToString / decode() 解密时抛 "The padding option is set to PRESENT..."，
+        // 导致获取目录失败。这里验证已恢复 Hutool 宽容行为。
+        assertEquals("test", String("dGVzdA".base64ToByteArray()))          // 缺 "=="
+        assertEquals("a", String("YQ".base64ToByteArray()))                  // 缺 "=="
+        assertEquals("abcd", String("YWJjZA".base64ToByteArray()))           // 缺 "=="
+        assertEquals("test", String("dGVzdA==".base64ToByteArray()))         // 有效填充不受影响
+        assertTrue(
+            byteArrayOf(0xfb.toByte(), 0x8f.toByte(), 0xbb.toByte(), 0xb4.toByte())
+                .contentEquals("-4-7tA".base64ToByteArray())                 // url-safe 缺填充
+        )
+    }
+
+    @Test
     fun `AES ECB 加密解密往返`() {
         val key = "1234567890123456".toByteArray()
         val data = "hello legado".toByteArray()

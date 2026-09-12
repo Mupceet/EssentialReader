@@ -2,6 +2,7 @@ package io.legado.app.feature.reader.core.transition
 
 import io.legado.app.feature.reader.core.model.ReaderElement
 import io.legado.app.feature.reader.core.model.ReaderPage
+import io.legado.app.feature.reader.core.transition.ReaderScrollPolicy.apply
 
 enum class ReaderScrollCrossing { PREVIOUS, NEXT }
 
@@ -22,7 +23,7 @@ object ReaderScrollPolicy {
      * Click paging keeps one visible text row for context, matching ScrollPageDelegate.
      * Non-inline image pages and empty pages move by one full viewport.
      *
-     * "保留一行"的基准是三页合成可视内容（对照旧 getCurVisiblePage）：页底已露出下一页
+     * "保留一行"的基准是连续的相邻页合成内容（对照旧 getCurVisiblePage）：页底已露出下一页
      * 行、或页顶已露出上一页行时，目标行在邻页里，步距自然跨过页边界（跨页折算由
      * [apply] 在动画帧内完成），而不是停在当前页边缘。
      */
@@ -32,6 +33,7 @@ object ReaderScrollPolicy {
         direction: ReaderTurnDirection,
         previous: ReaderPage? = null,
         next: ReaderPage? = null,
+        nextPlus: ReaderPage? = null,
     ): Float {
         val viewport = (page.contentBottomPx - page.contentTopPx).coerceAtLeast(1f)
         data class Row(val element: ReaderElement, val stackOffset: Float)
@@ -46,7 +48,12 @@ object ReaderScrollPolicy {
             }
             previous?.let { collect(it, -it.scrollExtentPx) }
             collect(page, 0f)
-            next?.let { collect(it, page.scrollExtentPx) }
+            next?.let { nextPage ->
+                collect(nextPage, page.scrollExtentPx)
+                nextPlus?.let { following ->
+                    collect(following, page.scrollExtentPx + nextPage.scrollExtentPx)
+                }
+            }
         }
         val text = visible.filter { it.element is ReaderElement.Text }
         if (text.isEmpty() ||

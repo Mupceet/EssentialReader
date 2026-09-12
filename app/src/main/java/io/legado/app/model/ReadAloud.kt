@@ -174,7 +174,7 @@ object ReadAloud {
     }
 
     fun stop(context: Context) {
-        if (BaseReadAloudService.isRun) {
+        if (BaseReadAloudService.requestStop()) {
             val intent = Intent(context, aloudClass)
             intent.action = IntentAction.stop
             context.startForegroundServiceCompat(intent)

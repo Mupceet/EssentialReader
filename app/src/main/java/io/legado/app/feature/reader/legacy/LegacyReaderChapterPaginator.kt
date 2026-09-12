@@ -19,6 +19,7 @@ import io.legado.app.feature.reader.platform.AndroidReaderHtmlSourceResolver
 import io.legado.app.feature.reader.platform.AndroidReaderTextShaper
 import io.legado.app.feature.reader.platform.ReaderAndroidPaginationStyle
 import io.legado.app.feature.reader.platform.ReaderAndroidPaintFactory
+import io.legado.app.feature.reader.platform.ReaderPerfTrace
 import io.legado.app.help.book.BookContent
 import io.legado.app.help.config.ReadBookConfig
 import io.legado.app.model.ImageProvider
@@ -161,7 +162,8 @@ object LegacyReaderChapterPaginator {
             ),
             imageOptionsResolver = LegacyReaderImageOptionsResolver,
         )
-        val measured = measurer.measure(
+        val measured = ReaderPerfTrace.section("pagination.measure") {
+            measurer.measure(
             layoutSource,
             ReaderChapterMeasureStyle(
                 bodyStyle = bodyStyle,
@@ -189,12 +191,14 @@ object LegacyReaderChapterPaginator {
                 letterSpacingEm = bodyPaint.letterSpacing,
                 styleRanges = styleRanges,
             ),
-        )
+            )
+        }
         if (measured is ReaderChapterMeasureResult.Unsupported) {
             return LegacyReaderChapterPaginationResult.Unsupported(measured.reason)
         }
         val blocks = (measured as ReaderChapterMeasureResult.Success).blocks
-        val pages = ReaderPaginator.paginateBlocks(
+        val pages = ReaderPerfTrace.section("pagination.pages") {
+            ReaderPaginator.paginateBlocks(
             blocks = blocks,
             config = ReaderPaginationConfig(
                 chapterIndex = chapter.index,
@@ -225,7 +229,8 @@ object LegacyReaderChapterPaginator {
                 letterSpacingPx = bodyPaint.letterSpacing * bodyPaint.textSize,
                 revision = revision,
             ),
-        )
+            )
+        }
         return LegacyReaderChapterPaginationResult.Success(pages)
     }
 }

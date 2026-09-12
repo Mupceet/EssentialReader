@@ -51,6 +51,7 @@ import io.legado.app.feature.reader.legacy.collectLegacyReaderPaginationBatch
 import io.legado.app.feature.reader.legacy.failureReasonFor
 import io.legado.app.feature.reader.legacy.paginateLegacyReaderChapterSafely
 import io.legado.app.feature.reader.platform.ReaderAndroidPaginationStyle
+import io.legado.app.feature.reader.platform.ReaderPerfTrace
 import io.legado.app.help.TTS
 import io.legado.app.help.book.isOnLineTxt
 import io.legado.app.help.config.ReadBookConfig
@@ -96,6 +97,7 @@ import kotlinx.coroutines.Dispatchers.Main
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asSharedFlow
@@ -145,11 +147,16 @@ class ReadBookController(
     private val readerImageLoads = ConcurrentHashMap<String, Deferred<android.graphics.Bitmap?>>()
     private val readerImageGenerations = ConcurrentHashMap<String, Long>()
     private var readerImageLoadJob = SupervisorJob()
+    private val readerImageRefreshMutex = Mutex()
+    private var readerChapterInputPublishJob: Job? = null
 
-    private fun readerImageCacheKey(element: ReaderElement.Image): String =
+    private fun readerImageCacheKey(
+        element: ReaderElement.Image,
+        generation: Long = readerImageGenerations[element.source] ?: 0L,
+    ): String =
         ReaderImageCachePolicy.withGeneration(
             ReaderImageCachePolicy.key(element),
-            readerImageGenerations[element.source] ?: 0L,
+            generation,
         )
 
     fun cachedReaderImage(element: ReaderElement.Image): android.graphics.Bitmap? =
@@ -170,39 +177,53 @@ class ReadBookController(
             }
     }
 
-    private fun invalidateReaderImages(sources: Set<String>) {
-        if (sources.isEmpty()) return
-        sources.forEach { source ->
-            readerImageGenerations.compute(source) { _, current -> (current ?: 0L) + 1L }
+    /**
+     * Mirrors the old View reader's order: load the replacement first, then invalidate the
+     * affected pages. Publishing a new generation before its bitmaps exist showed a placeholder
+     * frame; cancelling the previous request could also leave that placeholder stuck.
+     */
+    private suspend fun replaceReaderImages(sources: Set<String>) =
+        readerImageRefreshMutex.withLock {
+            if (sources.isEmpty()) return@withLock
+            val targetGenerations = sources.associateWith { source ->
+                (readerImageGenerations[source] ?: 0L) + 1L
         }
-        readerImageCache.snapshot().keys
-            .filter { key ->
-                sources.any { source ->
-                    ReaderImageCachePolicy.belongsToSource(
-                        key,
-                        source
-                    )
+            val elementsBySource = directReaderPages
+                .asSequence()
+                .flatMap { page ->
+                    page.elements.asSequence().filterIsInstance<ReaderElement.Image>()
+                }
+                .filter { it.source in targetGenerations }
+                .distinctBy { element ->
+                    "${element.source}|${element.bounds.width.toInt()}|${element.bounds.height.toInt()}"
+                }
+                .groupBy(ReaderElement.Image::source)
+            val readySources = buildSet {
+                elementsBySource.forEach { (source, elements) ->
+                    val generation = targetGenerations.getValue(source)
+                    val allLoaded = elements.all { element ->
+                        loadReaderImage(element, readerImageCacheKey(element, generation))
+                            ?.takeUnless(ImageProvider::isErrorBitmap) != null
+                    }
+                    if (allLoaded) {
+                        add(source)
+                    } else {
+                        // The target generation has not been published, so retaining its error
+                        // placeholder would make a later refresh reuse it instead of retrying.
+                        elements.forEach { element ->
+                            readerImageCache.remove(readerImageCacheKey(element, generation))
+                        }
+                    }
                 }
             }
-            .forEach(readerImageCache::remove)
-        readerImageLoads.entries
-            .filter { (key, _) ->
-                sources.any { source ->
-                    ReaderImageCachePolicy.belongsToSource(
-                        key,
-                        source
-                    )
-                }
-            }
-            .forEach { (key, load) ->
-                if (readerImageLoads.remove(key, load)) {
-                    load.cancel()
-                }
+            if (readySources.isEmpty()) return@withLock
+            readySources.forEach { source ->
+                readerImageGenerations[source] = targetGenerations.getValue(source)
             }
         val revisionSalt = System.nanoTime()
         var changed = false
         directReaderPages = directReaderPages.map { page ->
-            if (page.elements.any { it is ReaderElement.Image && it.source in sources }) {
+            if (page.elements.any { it is ReaderElement.Image && it.source in readySources }) {
                 changed = true
                 page.copy(revision = page.revision xor revisionSalt)
             } else {
@@ -212,8 +233,12 @@ class ReadBookController(
         if (changed) directReaderPageIndex?.let(::publishDirectReaderWindow)
     }
 
-    private fun invalidateReaderImage(source: String) = invalidateReaderImages(setOf(source))
-
+    /**
+     * Theme-style selection path, mirroring the legacy View's `[1, 2, 5]`: re-fetch the inline
+     * images of the current window, then reload the chapter so the new style's colors and page
+     * geometry replace the old ones. [replaceReaderImages] publishes the replacement bitmaps
+     * before the affected pages are invalidated, so no placeholder frame is shown.
+     */
     private fun refreshInlineImagesThenReload() {
         val sources = _readerPageWindow.value
             .let { window ->
@@ -229,21 +254,25 @@ class ReadBookController(
             .filterIsInstance<ReaderElement.Image>()
             .map(ReaderElement.Image::source)
             .toSet()
-        if (sources.isEmpty()) {
-            if (viewModel.isInitFinish) ReadBook.loadContent(resetPageOffset = false)
-            return
-        }
         activity.lifecycleScope.launch {
-            viewModel.refreshImageFiles(sources)
-            invalidateReaderImages(sources)
+            if (sources.isNotEmpty()) {
+                replaceReaderImages(viewModel.refreshImageFiles(sources))
+            }
             if (viewModel.isInitFinish) ReadBook.loadContent(resetPageOffset = false)
         }
     }
 
     /** Android image capability used by the Compose Canvas renderer. */
     suspend fun loadReaderImage(element: ReaderElement.Image): android.graphics.Bitmap? {
-        cachedReaderImage(element)?.let { return it }
-        val key = readerImageCacheKey(element)
+        return loadReaderImage(element, readerImageCacheKey(element))
+    }
+
+    private suspend fun loadReaderImage(
+        element: ReaderElement.Image,
+        key: String,
+    ): android.graphics.Bitmap? {
+        readerImageCache.get(key)?.takeUnless(android.graphics.Bitmap::isRecycled)
+            ?.let { return it }
         val candidate = CoroutineScope(readerImageLoadJob + IO).async(start = CoroutineStart.LAZY) {
             readerImageCache.get(key)?.takeUnless(android.graphics.Bitmap::isRecycled) ?: ReadBook.book?.let { book ->
                 ImageProvider.getImage(
@@ -252,7 +281,7 @@ class ReadBookController(
                     width = element.bounds.width.toInt().coerceAtLeast(1),
                     height = element.bounds.height.toInt().coerceAtLeast(1),
                 ).takeUnless(android.graphics.Bitmap::isRecycled)?.also { bitmap ->
-                    if (readerImageCacheKey(element) == key) readerImageCache.put(key, bitmap)
+                    readerImageCache.put(key, bitmap)
                 }
             }
         }
@@ -317,7 +346,11 @@ class ReadBookController(
     private var composeImageClickAt = 0L
     private var composeImageDoubleClick = false
     private var directReaderLayoutJob: Job? = null
+    private var directReaderAdjacentLayoutJob: Job? = null
     private var directReaderLayoutKey: String? = null
+
+    /** 排版环境不含当前章身份；用它区分普通换章和主题/规则引起的整窗重排。 */
+    private var directReaderPaginationEnvironmentKey: String? = null
 
     /** Only chapter-window changes may reuse adjacent pages; a reflow invalidates their geometry. */
     private var directReaderMayReuseAdjacentPages = false
@@ -374,6 +407,8 @@ class ReadBookController(
         ReadBook.unregisterRender(this)
         directReaderLayoutJob?.cancel()
         directReaderLayoutJob = null
+        directReaderAdjacentLayoutJob?.cancel()
+        directReaderAdjacentLayoutJob = null
         readerImageLoads.values.forEach { it.cancel() }
         readerImageLoads.clear()
         readerImageCache.evictAll()
@@ -402,6 +437,7 @@ class ReadBookController(
     }
 
     fun onComposeRendererAttached() {
+        ReaderPerfTrace.marker("surface.attached")
         ReadBook.registerRender(this)
         publishReaderPageWindow()
     }
@@ -445,6 +481,8 @@ class ReadBookController(
 
     fun onComposeRendererDetached() {
         ReadBook.unregisterRender(this)
+        readerChapterInputPublishJob?.cancel()
+        readerChapterInputPublishJob = null
         cancelReaderImageLoadsExcept(emptySet())
         readerImageLoadJob.cancel()
         readerImageLoadJob = SupervisorJob()
@@ -644,7 +682,10 @@ class ReadBookController(
     private fun rebuildDirectReaderPages() {
         directReaderLayoutJob?.cancel()
         directReaderLayoutJob = null
+        directReaderAdjacentLayoutJob?.cancel()
+        directReaderAdjacentLayoutJob = null
         directReaderLayoutKey = null
+        directReaderPaginationEnvironmentKey = null
         directReaderMayReuseAdjacentPages = false
         ReadBook.clearReaderPagination()
         updateReaderPaginationError(null)
@@ -794,12 +835,19 @@ class ReadBookController(
     }
 
     override fun readerChapterInputChanged() {
-        pendingSearchNavigation?.let { navigation ->
-            ReadBook.readerChapterInputWindow.current
-                ?.takeIf { it.chapter.index == navigation.result.chapterIndex }
-                ?.let { resolveSearchNavigation(navigation, it) }
+        // Current/previous/next chapter inputs are published independently during opening.
+        // Coalesce that short burst so an arriving adjacent chapter does not repeatedly cancel
+        // the expensive current-chapter measurement before its first page can be committed.
+        readerChapterInputPublishJob?.cancel()
+        readerChapterInputPublishJob = activity.lifecycleScope.launch {
+            delay(80)
+            pendingSearchNavigation?.let { navigation ->
+                ReadBook.readerChapterInputWindow.current
+                    ?.takeIf { it.chapter.index == navigation.result.chapterIndex }
+                    ?.let { resolveSearchNavigation(navigation, it) }
+            }
+            publishReaderPageWindow()
         }
-        publishReaderPageWindow()
     }
 
     private fun resolveSearchNavigation(
@@ -879,22 +927,22 @@ class ReadBookController(
                 contentPaddingBottomPx = contentPadding.bottom,
             )
         }
-        val key = buildString {
-            chapters.forEach { candidate ->
-                append(LegacyReaderChapterLayoutIdentity(
-                    chapterIndex = candidate.chapter.index,
-                    chapterUrl = candidate.chapter.url,
-                    chapterBaseUrl = candidate.chapter.baseUrl,
-                    displayTitle = candidate.displayTitle,
-                    isVolume = candidate.chapter.isVolume,
-                    contentHash = candidate.contentHash,
-                    contentProcessesHash = candidate.contentProcessesHash,
-                    sourceHash = candidate.sourceHash,
-                    bookUrl = candidate.book.bookUrl,
-                    bookOrigin = candidate.book.origin,
-                    bookSourceHash = candidate.bookSourceHash,
-                )).append(',')
-            }
+        // 首屏只依赖当前章；相邻章异步到达不应重启当前章测量。环境身份则单独保存：
+        // 普通换章可复用相邻页，主题/高亮规则/排版参数变化必须废弃整窗旧页。
+        val chapterLayoutIdentity = LegacyReaderChapterLayoutIdentity(
+            chapterIndex = chapter.chapter.index,
+            chapterUrl = chapter.chapter.url,
+            chapterBaseUrl = chapter.chapter.baseUrl,
+            displayTitle = chapter.displayTitle,
+            isVolume = chapter.chapter.isVolume,
+            contentHash = chapter.contentHash,
+            contentProcessesHash = chapter.contentProcessesHash,
+            sourceHash = chapter.sourceHash,
+            bookUrl = chapter.book.bookUrl,
+            bookOrigin = chapter.book.origin,
+            bookSourceHash = chapter.bookSourceHash,
+        )
+        val paginationEnvironmentKey = buildString {
             append('|').append(width).append('x').append(height)
             append('|').append(contentPadding.left).append(',').append(contentPadding.top)
             append(',').append(contentPadding.right).append(',').append(contentPadding.bottom)
@@ -927,6 +975,7 @@ class ReadBookController(
             append('|').append(resolvedPaginationStyle.paragraphSpacing)
             append('|').append(ReadBookConfig.durConfig.highlightRules.hashCode())
         }
+        val key = "$chapterLayoutIdentity,$paginationEnvironmentKey"
         if (directReaderLayoutKey == key && directReaderPages.isNotEmpty()) {
             // upContent 语义是"按 durChapterPos 重新定位"（对照旧 View upContent 重绘）：
             // 朗读跨页走 moveToNextPage → upContent，只有重定位页面才会前进；缓存下标
@@ -937,6 +986,9 @@ class ReadBookController(
                 ReadBook.durChapterPos,
             ).also { directReaderPageIndex = it }
             publishDirectReaderWindow(index)
+            scheduleAdjacentReaderPagination(
+                key, chapter, chapters, width, height, contentPadding, resolvedPaginationStyle
+            )
             return true
         }
         // A neighboring chapter may already have a complete page set from the preceding
@@ -955,16 +1007,27 @@ class ReadBookController(
                 )
             }
         if (directReaderLayoutKey != key) {
+            val environmentChanged = directReaderPaginationEnvironmentKey != null &&
+                    directReaderPaginationEnvironmentKey != paginationEnvironmentKey
+            if (environmentChanged) {
+                // 当前章先提交、相邻章后台预排的两阶段策略只适用于同一排版环境。
+                // 主题/高亮规则变化后继续保留相邻旧页，会在翻到该章时先显示旧几何再跳变。
+                directReaderMayReuseAdjacentPages = false
+            }
             val paginationGeneration = ReadBook.readerPaginationGeneration
             directReaderLayoutJob?.cancel()
+            directReaderAdjacentLayoutJob?.cancel()
+            directReaderAdjacentLayoutJob = null
             directReaderLayoutKey = key
+            directReaderPaginationEnvironmentKey = paginationEnvironmentKey
             updateReaderPaginationError(null)
             ReadBook.clearReaderPagination()
             directReaderLayoutJob = activity.lifecycleScope.launch(IO) {
                 val highlightRules = HighlightRuleRepository()
                     .loadEnabled(ReadBookConfig.durConfig.name)
-                suspend fun paginate(candidate: ReaderChapterInput) =
-                    candidate.chapter.index to paginateLegacyReaderChapterSafely {
+                suspend fun paginate(candidate: ReaderChapterInput, phase: String) =
+                    candidate.chapter.index to ReaderPerfTrace.suspendSection("pagination.$phase") {
+                        paginateLegacyReaderChapterSafely {
                         LegacyReaderChapterPaginator.paginate(
                                 book = candidate.book,
                                 bookSource = candidate.bookSource,
@@ -982,8 +1045,10 @@ class ReadBookController(
                                 paginationStyle = resolvedPaginationStyle,
                                 highlightRules = highlightRules,
                             )
+                        }
                     }
-                val currentResult = paginate(chapter)
+
+                val currentResult = paginate(chapter, "current")
                 val currentBatch = collectLegacyReaderPaginationBatch(
                     currentChapterIndex = chapter.chapter.index,
                     results = listOf(currentResult),
@@ -997,28 +1062,76 @@ class ReadBookController(
                         paginationGeneration = paginationGeneration,
                         layoutComplete = chapters.size == 1 || !currentBatch.hasCurrentChapter,
                     )
-                }
-                if (!currentBatch.hasCurrentChapter || chapters.size == 1) return@launch
-                val adjacentResults = chapters
-                    .filterNot { it.chapter.index == chapter.chapter.index }
-                    .map { paginate(it) }
-                val completeBatch = collectLegacyReaderPaginationBatch(
-                    currentChapterIndex = chapter.chapter.index,
-                    results = adjacentResults + currentResult,
-                )
-                withContext(Main) {
-                    applyDirectReaderPaginationBatch(
-                        key = key,
-                        currentChapter = chapter,
-                        chapters = chapters,
-                        batch = completeBatch,
-                        paginationGeneration = paginationGeneration,
-                        layoutComplete = true,
-                    )
+                    if (currentBatch.hasCurrentChapter) {
+                        scheduleAdjacentReaderPagination(
+                            key,
+                            chapter,
+                            chapters,
+                            width,
+                            height,
+                            contentPadding,
+                            resolvedPaginationStyle
+                        )
+                    }
                 }
             }
         }
         return false
+    }
+
+    private fun scheduleAdjacentReaderPagination(
+        key: String,
+        current: ReaderChapterInput,
+        chapters: List<ReaderChapterInput>,
+        width: Int,
+        height: Int,
+        padding: ReaderPadding,
+        style: ReaderAndroidPaginationStyle,
+    ) {
+        if (directReaderLayoutKey != key) return
+        val missing = chapters.filter { candidate ->
+            candidate.chapter.index != current.chapter.index &&
+                    directReaderPages.none { it.id.chapterIndex == candidate.chapter.index && !it.isPlaceholder }
+        }
+        if (missing.isEmpty()) return
+        directReaderAdjacentLayoutJob?.cancel()
+        val generation = ReadBook.readerPaginationGeneration
+        directReaderAdjacentLayoutJob = activity.lifecycleScope.launch(IO) {
+            val rules = HighlightRuleRepository().loadEnabled(ReadBookConfig.durConfig.name)
+            val results = missing.map { candidate ->
+                candidate.chapter.index to ReaderPerfTrace.suspendSection("pagination.adjacent") {
+                    paginateLegacyReaderChapterSafely {
+                        LegacyReaderChapterPaginator.paginate(
+                            book = candidate.book,
+                            bookSource = candidate.bookSource,
+                            chapter = candidate.chapter,
+                            displayTitle = candidate.displayTitle,
+                            content = candidate.content,
+                            source = candidate.source,
+                            revision = 31L * key.hashCode() + candidate.chapter.index,
+                            viewportWidthPx = width,
+                            viewportHeightPx = height,
+                            contentPaddingLeftPx = padding.left,
+                            contentPaddingTopPx = padding.top,
+                            contentPaddingRightPx = padding.right,
+                            contentPaddingBottomPx = padding.bottom,
+                            paginationStyle = style,
+                            highlightRules = rules,
+                        )
+                    }
+                }
+            }
+            withContext(Main) {
+                applyDirectReaderPaginationBatch(
+                    key, current, chapters,
+                    collectLegacyReaderPaginationBatch(current.chapter.index, results),
+                    generation, layoutComplete = true,
+                )
+                if (directReaderAdjacentLayoutJob === coroutineContext[Job]) {
+                    directReaderAdjacentLayoutJob = null
+                }
+            }
+        }
     }
 
     private fun applyDirectReaderPaginationBatch(
@@ -1029,7 +1142,8 @@ class ReadBookController(
         paginationGeneration: Long,
         layoutComplete: Boolean,
     ) {
-        if (directReaderLayoutKey != key) return
+        ReaderPerfTrace.section("pagination.commit") {
+            if (directReaderLayoutKey != key) return@section
         if (layoutComplete) directReaderLayoutJob = null
         batch.unsupportedChapters.forEach { (chapterIndex, reason) ->
             AppLog.putDebug("Compose reader pagination unsupported: chapter=$chapterIndex reason=$reason")
@@ -1037,13 +1151,14 @@ class ReadBookController(
         updateReaderPaginationError(batch.failureReasonFor(currentChapter.chapter.index))
         val previousPages = directReaderPages.associateBy { it.id }
         val replacementChapterIndexes = batch.pages.mapTo(mutableSetOf()) { it.id.chapterIndex }
-        val retainedPages = if (directReaderMayReuseAdjacentPages) {
+            val retainedPages = if (directReaderMayReuseAdjacentPages ||
+                currentChapter.chapter.index !in replacementChapterIndexes
+            ) {
             directReaderPages.filterNot { it.id.chapterIndex in replacementChapterIndexes }
         } else {
             emptyList()
         }
-        val replacementPages =
-            batch.pages.takeIf { batch.hasCurrentChapter }.orEmpty().map { page ->
+            val replacementPages = batch.pages.map { page ->
             previousPages[page.id]?.takeIf(page::hasSameGeometryAs)?.let { previous ->
                 page.copy(layoutRevision = previous.layoutRevision)
             } ?: page
@@ -1085,6 +1200,7 @@ class ReadBookController(
             }
         )
         directReaderPageIndex?.let(::publishDirectReaderWindow)
+        }
     }
 
     fun onAppThemeChanged(isDarkTheme: Boolean) {
@@ -1094,6 +1210,13 @@ class ReadBookController(
         ) return
         val startedAt = System.nanoTime()
         val previous = ReadSessionState.isDarkThemeOverride
+        // ToggleDayNight installs the target override before DataStore publishes the app
+        // configuration, so a relayout started in that interval already uses the target
+        // colors. Restore the last applied mode briefly to obtain the source colors for
+        // any already-rendered pages, then apply the target mode atomically.
+        val sourceMode = appliedDarkTheme ?: previous
+        val modeChanged = appliedDarkTheme != null && appliedDarkTheme != isDarkTheme
+        if (sourceMode != null) ReadSessionState.isDarkThemeOverride = sourceMode
         val oldTextColor = ReadBookConfig.textColor
         val oldTitleColor = ReadBookConfig.resolvedTitleColor.takeIf { it != 0 } ?: oldTextColor
         val oldShadowColor = ReadBookConfig.textShadowColor
@@ -1126,6 +1249,13 @@ class ReadBookController(
         layoutController.viewport.value?.let { viewport ->
             updateComposeReaderBackground(viewport.widthPx, viewport.heightPx)
         }
+        // 旧 View 的日夜切换是重建整个阅读 Activity：`onDestroy` → `ReadBook.unregister()` →
+        // `ImageProvider.clear()`，重建后 `loadOrUpContent()` 重新加载正文。图片之所以会变，
+        // 是因为正文会被重新处理（替换规则 / 图片解码可以用 java.getThemeMode()、
+        // java.getThemeConfig() 产出与主题相关的图片），而不是因为清了解码缓存。
+        // Compose 不重建 Activity，这里走与样式方案切换相同的路径：
+        // 重下当前窗口图片 → 替换位图 → loadContent(false) 重新处理正文并重排。
+        if (modeChanged) refreshInlineImagesThenReload()
         upSystemUiVisibility()
         LogUtils.d(
             "ReadBookTheme",
@@ -1653,7 +1783,11 @@ class ReadBookController(
                         ConfigUpdateAction.UpdatePageSlopSquare,
                         ConfigUpdateAction.RefreshInlineImages -> Unit
 
-                        ConfigUpdateAction.ReloadContent -> if (!refreshInlineImages && viewModel.isInitFinish) {
+                        // 旧事件 5。带 RefreshInlineImages 的路径（样式方案/预设切换）由
+                        // refreshInlineImagesThenReload() 在图片替换完成后统一重载，避免两次重排。
+                        ConfigUpdateAction.ReloadContent -> if (
+                            !refreshInlineImages && viewModel.isInitFinish
+                        ) {
                             ReadBook.loadContent(resetPageOffset = false)
                         }
                         ConfigUpdateAction.RelayoutContent -> if (viewModel.isInitFinish) {
@@ -1707,7 +1841,13 @@ class ReadBookController(
                 _composeSelectionCancels.tryEmit(Unit)
             }
             is ReadBookEffect.MenuImageStyleChanged -> rebuildDirectReaderPages()
-            is ReadBookEffect.InvalidateReaderImage -> invalidateReaderImage(effect.source)
+            is ReadBookEffect.InvalidateReaderImage -> {
+                activity.lifecycleScope.launch { replaceReaderImages(setOf(effect.source)) }
+            }
+
+            is ReadBookEffect.InvalidateReaderImages -> {
+                activity.lifecycleScope.launch { replaceReaderImages(effect.sources) }
+            }
 
             // ── Simple Activity-API effects ──
             is ReadBookEffect.ShowToast -> activity.toastOnUi(effect.message)

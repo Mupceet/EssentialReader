@@ -18,6 +18,7 @@ node_modules/
 .kotlin/
 /.vscode/settings.json
 /.codex/skills
+/.workbuddy/
 /.debug-runs/
 __pycache__/
 *.py[cod]

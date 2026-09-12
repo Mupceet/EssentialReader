@@ -11,10 +11,15 @@ data class ReadAloudPlaybackCue(
     val characterId: String?,
     val emotion: String = "",
     val characterPerformance: CharacterPerformanceProfile? = null,
+    val isChapterTitle: Boolean = false,
 ) {
     init {
         require(chapterStart >= 0)
-        require(chapterEnd == chapterStart + text.length)
+        if (isChapterTitle) {
+            require(chapterStart == 0 && chapterEnd == 0)
+        } else {
+            require(chapterEnd == chapterStart + text.length)
+        }
     }
 }
 
@@ -38,11 +43,16 @@ class ReadAloudPlaybackQueue private constructor(
 ) {
 
     val isEmpty: Boolean get() = cues.isEmpty()
+    val leadingTitleCueCount: Int
+        get() = cues.indexOfFirst { !it.isChapterTitle }
+            .let { if (it < 0) cues.size else it }
 
     fun cursorAt(chapterPosition: Int): ReadAloudPlaybackCursor? {
-        if (cues.isEmpty()) return null
+        val bodyStartIndex = leadingTitleCueCount
+        if (bodyStartIndex >= cues.size) return null
         val position = chapterPosition.coerceAtLeast(0)
-        val containingIndex = cues.binarySearch { cue ->
+        val bodyCues = cues.subList(bodyStartIndex, cues.size)
+        val containingIndex = bodyCues.binarySearch { cue ->
             when {
                 cue.chapterEnd <= position -> -1
                 cue.chapterStart > position -> 1
@@ -52,11 +62,12 @@ class ReadAloudPlaybackQueue private constructor(
         val index = if (containingIndex >= 0) {
             containingIndex
         } else {
-            (-containingIndex - 1).coerceAtMost(cues.lastIndex)
+            (-containingIndex - 1).coerceAtMost(bodyCues.lastIndex)
         }
-        val cue = cues[index]
+        val cueIndex = bodyStartIndex + index
+        val cue = cues[cueIndex]
         return ReadAloudPlaybackCursor(
-            cueIndex = index,
+            cueIndex = cueIndex,
             offset = (position - cue.chapterStart).coerceIn(0, cue.text.length),
         )
     }
@@ -68,6 +79,23 @@ class ReadAloudPlaybackQueue private constructor(
     fun next(cursor: ReadAloudPlaybackCursor): ReadAloudPlaybackCursor? =
         (cursor.cueIndex + 1).takeIf { it in cues.indices }
             ?.let { ReadAloudPlaybackCursor(it, 0) }
+
+    fun withChapterTitle(title: String): ReadAloudPlaybackQueue {
+        val normalizedTitle = title.trim()
+        if (normalizedTitle.isEmpty() || isEmpty || cues.first().isChapterTitle) return this
+        val titleCue = ReadAloudPlaybackCue(
+            text = normalizedTitle,
+            chapterStart = 0,
+            chapterEnd = 0,
+            paragraphIndex = -1,
+            voice = null,
+            fallbackVoices = emptyList(),
+            roleType = SpeechRoleType.Narrator,
+            characterId = null,
+            isChapterTitle = true,
+        )
+        return ReadAloudPlaybackQueue(listOf(titleCue) + cues)
+    }
 
     companion object {
         val Empty = ReadAloudPlaybackQueue(emptyList())

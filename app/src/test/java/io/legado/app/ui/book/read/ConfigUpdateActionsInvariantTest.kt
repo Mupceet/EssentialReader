@@ -88,6 +88,14 @@ class ConfigUpdateActionsInvariantTest {
             // 阅读菜单外观
             "MenuTextColor",
             "MenuTextColorNight",
+            // 菜单强调色/容器色与菜单栏边框只被菜单读取（menuConfig 状态驱动），无正文副作用
+            "MenuAccentColor",
+            "MenuAccentColorNight",
+            "MenuContainerColor",
+            "MenuContainerColorNight",
+            "BorderWidth",
+            "BorderColor",
+            "BorderColorNight",
             "MenuIconShowText",
             "MenuIconStyle",
             "MenuIconItemsPerRow",

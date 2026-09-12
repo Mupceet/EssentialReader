@@ -35,6 +35,25 @@ class ReadAloudPlaybackQueueTest {
         assertNull(queue.next(ReadAloudPlaybackCursor(2, 0)))
     }
 
+    @Test
+    fun `chapter title is first playback cue but excluded from position lookup`() {
+        val titledQueue = queue.withChapterTitle(" 第 1 章 ")
+
+        assertEquals("第 1 章", titledQueue.cues.first().text)
+        assertEquals(true, titledQueue.cues.first().isChapterTitle)
+        assertEquals(1, titledQueue.leadingTitleCueCount)
+        assertEquals(ReadAloudPlaybackCursor(1, 0), titledQueue.cursorAt(10))
+        assertEquals(
+            ReadAloudPlaybackCursor(1, 0),
+            titledQueue.next(ReadAloudPlaybackCursor(0, 0)),
+        )
+    }
+
+    @Test
+    fun `empty playback queue does not become title-only queue`() {
+        assertEquals(true, ReadAloudPlaybackQueue.Empty.withChapterTitle("标题").isEmpty)
+    }
+
     private fun item(
         text: String,
         start: Int,

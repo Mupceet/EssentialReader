@@ -8,12 +8,12 @@ import io.legado.app.R
 import io.legado.app.constant.AppLog.putDebug
 import io.legado.app.data.entities.Book
 import io.legado.app.data.entities.BookSource
+import io.legado.app.domain.gateway.DownloadCacheSettingsGateway
+import io.legado.app.domain.gateway.OtherSettingsGateway
 import io.legado.app.exception.NoStackTraceException
 import io.legado.app.help.book.BookHelp
 import io.legado.app.help.book.isEpub
 import io.legado.app.help.book.isMobi
-import io.legado.app.domain.gateway.DownloadCacheSettingsGateway
-import io.legado.app.domain.gateway.OtherSettingsGateway
 import io.legado.app.help.book.isPdf
 import io.legado.app.model.localBook.EpubFile
 import io.legado.app.model.localBook.MobiFile
@@ -38,6 +38,9 @@ object ImageProvider {
     private val errorBitmap: Bitmap by lazy {
         BitmapFactory.decodeResource(appCtx.resources, R.drawable.image_loading_error)
     }
+
+    /** Lets renderers keep the last good frame when a refreshed file cannot be decoded. */
+    fun isErrorBitmap(bitmap: Bitmap): Boolean = bitmap === errorBitmap
 
     /**
      * 缓存bitmap LruCache实现

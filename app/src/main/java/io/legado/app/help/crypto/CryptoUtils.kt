@@ -28,12 +28,10 @@ internal fun String.hexToByteArray(): ByteArray {
 internal fun ByteArray.toBase64(): String = Base64.Default.encode(this)
 
 internal fun String.base64ToByteArray(): ByteArray {
-    val normalized = replace("\\s".toRegex(), "")
-    return try {
-        Base64.Default.decode(normalized)
-    } catch (e: IllegalArgumentException) {
-        Base64.UrlSafe.decode(normalized)
-    }
+    // Hutool Base64.decode 对缺失 "=" 填充、url-safe(-/_)、空白等输入宽容，与 beta.17 之前
+    // 应用内统一走 Hutool 解码的行为逐字节一致。Kotlin kotlin.io.encoding.Base64 为严格填充，
+    // 会对未对齐 4 倍数的输入抛 "The padding option is set to PRESENT..."(见书源取章名回归)。
+    return cn.hutool.core.codec.Base64.decode(replace("\\s".toRegex(), ""))
 }
 
 internal fun digest(algorithm: String, data: ByteArray): ByteArray =

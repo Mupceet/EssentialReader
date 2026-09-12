@@ -18,6 +18,7 @@ import io.legado.app.domain.usecase.ChangeBookSourceUseCase
 import io.legado.app.domain.usecase.GetReadingProgressUseCase
 import io.legado.app.domain.usecase.UploadReadingProgressUseCase
 import io.legado.app.exception.NoStackTraceException
+import io.legado.app.feature.reader.platform.ReaderPerfTrace
 import io.legado.app.help.book.BookHelp
 import io.legado.app.help.book.isLocal
 import io.legado.app.help.book.isLocalModified
@@ -110,26 +111,28 @@ class ReadBookLoadDelegate(
         success: (() -> Unit)? = null,
     ) {
         Coroutine.async(scope, Dispatchers.IO) {
-            host.syncReadPreferencesSnapshot()
-            ReadBook.inBookshelf = request.inBookshelf
-            ReadBook.chapterChanged = request.chapterChanged
-            val bookUrl = request.bookUrl
-            val book = initialBook ?: when {
-                bookUrl.isNullOrEmpty() -> bookRepository.getLastReadBook()
-                else -> bookRepository.getBook(bookUrl)
-            } ?: ReadBook.book
-            when {
-                book != null -> initBook(book)
-                else -> {
-                    ReadBook.upMsg(context.getString(R.string.no_book))
-                    AppLog.put("未找到书籍\nbookUrl:$bookUrl")
+            ReaderPerfTrace.suspendSection("open.init") {
+                host.syncReadPreferencesSnapshot()
+                ReadBook.inBookshelf = request.inBookshelf
+                ReadBook.chapterChanged = request.chapterChanged
+                val bookUrl = request.bookUrl
+                val book = initialBook ?: when {
+                    bookUrl.isNullOrEmpty() -> bookRepository.getLastReadBook()
+                    else -> bookRepository.getBook(bookUrl)
+                } ?: ReadBook.book
+                when {
+                    book != null -> initBook(book)
+                    else -> {
+                        ReadBook.upMsg(context.getString(R.string.no_book))
+                        AppLog.put("未找到书籍\nbookUrl:$bookUrl")
+                    }
                 }
-            }
-            val index = request.chapterIndex
-            val chapterPos = request.chapterPos
-            if (index >= 0 && chapterPos >= 0) {
-                ReadBook.saveCurrentBookProgress()
-                host.openChapter(index, chapterPos)
+                val index = request.chapterIndex
+                val chapterPos = request.chapterPos
+                if (index >= 0 && chapterPos >= 0) {
+                    ReadBook.saveCurrentBookProgress()
+                    host.openChapter(index, chapterPos)
+                }
             }
         }.onSuccess {
             success?.invoke()
@@ -143,7 +146,7 @@ class ReadBookLoadDelegate(
     }
 
     /** 换书/重装目录后重走开书流程。VM 的「模拟阅读切换」和目录权限回来后也调它。 */
-    suspend fun initBook(book: Book) {
+    suspend fun initBook(book: Book) = ReaderPerfTrace.suspendSection("open.book") {
         val isSameBook = ReadBook.book?.bookUrl == book.bookUrl
         if (isSameBook) {
             ReadBook.upData(book)
@@ -152,13 +155,13 @@ class ReadBookLoadDelegate(
         }
         host.setInitFinish()
         if (!book.isLocal && book.tocUrl.isEmpty() && !loadBookInfo(book)) {
-            return
+            return@suspendSection
         }
         if (book.isLocal && !checkLocalBookFileExist(book)) {
-            return
+            return@suspendSection
         }
         if ((ReadBook.chapterSize == 0 || book.isLocalModified()) && !loadChapterListAwait(book)) {
-            return
+            return@suspendSection
         }
         ReadBook.upMsg(null)
         host.checkReadRecordAlias(book)
@@ -197,7 +200,7 @@ class ReadBookLoadDelegate(
         }
         if (!book.isLocal && ReadBook.bookSource == null) {
             autoChangeSource(book.name, book.author)
-            return
+            return@suspendSection
         }
     }
 

@@ -114,24 +114,24 @@ class ReadStyleDelegate(
     fun deleteCurrentStyle() {
         if (!readStyleGateway.deleteCurrentStyle()) return
         host.updateState { it.copy(activeSheet = null) }
+        // 旧 View deleteDur = [1, 2, 5]。
         emitConfigUpdate(
             ConfigUpdateAction.UpdateBackground,
             ConfigUpdateAction.UpdateStyle,
             ConfigUpdateAction.ReloadContent,
-            ConfigUpdateAction.UpdatePageAnim,
         )
     }
 
     fun applyPresetTheme(presetIndex: Int) {
         if (!readStyleGateway.applyPreset(presetIndex)) return
+        // 旧 View 恢复预设 = [1, 2, 5]；Compose 另需 RefreshInlineImages（重拉书源图片）与
+        // UpdateSystemUi（状态栏图标随样式里的 darkStatusIcon 变化，Compose 不重建 Activity）。
         emitConfigUpdate(
             ConfigUpdateAction.UpdateBackground,
-            ConfigUpdateAction.UpdateBackgroundAlpha,
             ConfigUpdateAction.UpdateStyle,
             ConfigUpdateAction.UpdateSystemUi,
             ConfigUpdateAction.RefreshInlineImages,
             ConfigUpdateAction.ReloadContent,
-            ConfigUpdateAction.UpdatePageAnim,
         )
     }
 
@@ -167,11 +167,11 @@ class ReadStyleDelegate(
             val bytes = context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
                 ?: throw FileNotFoundException(uri.toString())
             readStyleGateway.importCurrentStyle(bytes)
+            // 旧 View 导入配置 = [1, 2, 5]。
             emitConfigUpdate(
                 ConfigUpdateAction.UpdateBackground,
                 ConfigUpdateAction.UpdateStyle,
                 ConfigUpdateAction.ReloadContent,
-                ConfigUpdateAction.UpdatePageAnim,
             )
             context.getString(R.string.success)
         }
@@ -320,7 +320,13 @@ class ReadStyleDelegate(
     fun toggleDayNight() {
         lastSwitchDayNightReminderTime = System.currentTimeMillis()
         resetDayNightReminderDismissal()
-        val nextMode = if (host.isNightTheme) "1" else "2"
+        // ThemeSettings reaches AppUiConfiguration through DataStore asynchronously. The
+        // legacy View changed this mode synchronously before calling upBg()/upStyle(). Do
+        // the same for the reader resolver, otherwise the immediately-started pagination
+        // captures the old text color while Compose has already switched its background.
+        val nextIsNight = !(ReadSessionState.isDarkThemeOverride ?: host.isNightTheme)
+        val nextMode = if (nextIsNight) "2" else "1"
+        ReadSessionState.isDarkThemeOverride = nextIsNight
         scope.launch {
             appShellSettingsGateway.update { it.copy(themeMode = nextMode) }
         }

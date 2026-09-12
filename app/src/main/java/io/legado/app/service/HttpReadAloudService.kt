@@ -238,7 +238,7 @@ class HttpReadAloudService : BaseReadAloudService(),
         }
         readAloudNumber += contentList[nowSpeak].length + 1 - paragraphStartPos
         // 页内切段不引入换行符，累加会漂移，用段落绝对位置重算
-        paragraphChapterPositionAt(nowSpeak + 1)?.let { readAloudNumber = it }
+        readAloudNumber = paragraphChapterPositionAt(nowSpeak + 1) ?: 0
         paragraphStartPos = 0
         if (nowSpeak < contentList.lastIndex) {
             nowSpeak++
@@ -416,12 +416,13 @@ class HttpReadAloudService : BaseReadAloudService(),
             chapterIndex = chapter.index,
             paragraphs = readAloudChapter.canonicalSpeechParagraphs(),
         )
-        val queue = runCatching { ReadAloudPlaybackQueue.from(plan) }
+        val queue = runCatching { ReadAloudPlaybackQueue.from(plan).withChapterTitle(displayTitle) }
             .getOrDefault(ReadAloudPlaybackQueue.Empty)
         val contentList = if (!queue.isEmpty) {
             queue.cues.map { it.text }
         } else {
-            readAloudChapter.paragraphs(readAloudSettings.readAloudByPage)
+            listOf(displayTitle.trim()).filter { it.isNotEmpty() } +
+                    readAloudChapter.paragraphs(readAloudSettings.readAloudByPage)
                 .map { it.text.replace(Regex("[袮祢꧁]"), " ") }
         }
         return PreDownloadChapter(displayTitle, queue, contentList)
@@ -1082,6 +1083,7 @@ class HttpReadAloudService : BaseReadAloudService(),
         playIndexJob?.cancel()
         if (readerReadAloudChapter == null) return
         playIndexJob = lifecycleScope.launch {
+            if (isChapterTitleAt(nowSpeak)) return@launch
             if (exoPlayer.duration <= 0) {
                 upTtsProgress(readAloudNumber + 1)
                 return@launch

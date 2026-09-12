@@ -590,19 +590,30 @@ private class TextMenuPositionProvider(
         val marginHorizontal = (16 * density).toInt()
         val marginVertical = (12 * density).toInt()
         val textMargin = (4 * density).toInt()
+        // ReaderCanvasSurface 的选择柄圆心挂在行底下 7dp，直径再占 14dp。
+        val cursorHandleClearance = (14 * density).toInt()
 
         val cardHeight = popupContentSize.height - shadowPadding * 2
         val isSpaceEnoughAtTop = startTopY > cardHeight + textMargin + marginVertical
+        // 仅阅读区域最顶部 10% 的选区优先在下方展开；其余位置遵循原本“有上方空间
+        // 就放上方”的策略，避免菜单在普通位置不必要地遮挡后文。
+        val preferBelowForTopSelection = startTopY < windowSize.height / 10
+        val isSpaceEnoughBelowSelection = windowSize.height - endBottomY >
+                cardHeight + textMargin + cursorHandleClearance + marginVertical
 
-        if (isSpaceEnoughAtTop) {
+        if (!preferBelowForTopSelection && isSpaceEnoughAtTop) {
             x = startX - shadowPadding
             y = startTopY - popupContentSize.height + shadowPadding - textMargin
-        } else if (windowSize.height - startBottomY > cardHeight + textMargin + marginVertical) {
+        } else if (isSpaceEnoughBelowSelection) {
             x = startX - shadowPadding
-            y = startBottomY + textMargin - shadowPadding
+            // 顶部选区没有空间放菜单时，必须避开整个选区及末端把手，不能只从首行下方弹出。
+            y = endBottomY + cursorHandleClearance + textMargin - shadowPadding
+        } else if (isSpaceEnoughAtTop) {
+            x = startX - shadowPadding
+            y = startTopY - popupContentSize.height + shadowPadding - textMargin
         } else {
             x = endX - shadowPadding
-            y = endBottomY + textMargin - shadowPadding
+            y = endBottomY + cursorHandleClearance + textMargin - shadowPadding
         }
 
         val minX = marginHorizontal - shadowPadding

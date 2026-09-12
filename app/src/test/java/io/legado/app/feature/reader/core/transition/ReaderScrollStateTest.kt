@@ -1,13 +1,11 @@
 package io.legado.app.feature.reader.core.transition
 
-import io.legado.app.feature.reader.core.model.ReaderPageId
 import io.legado.app.feature.reader.core.model.ReaderElement
 import io.legado.app.feature.reader.core.model.ReaderPage
+import io.legado.app.feature.reader.core.model.ReaderPageId
 import io.legado.app.feature.reader.core.model.ReaderRect
 import io.legado.app.feature.reader.core.model.ReaderTextStyle
-
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -135,6 +133,24 @@ class ReaderScrollStateTest {
 
         val withoutPrevious = ReaderScrollPolicy.pageStep(current, 10f, ReaderTurnDirection.PREVIOUS)
         assertEquals(50f, withoutPrevious, 0f)
+    }
+
+    @Test
+    fun tapStepUsesRowsAlreadyVisibleInNextPlusPage() {
+        val current = scrollPage(listOf(text(0f, 20f, 0)), extent = 20f)
+        val next = scrollPage(listOf(text(0f, 20f, 1)), extent = 20f)
+        val nextPlus = scrollPage(listOf(text(10f, 30f, 2)), extent = 80f)
+
+        val distance = ReaderScrollPolicy.pageStep(
+            page = current,
+            offsetPx = 0f,
+            direction = ReaderTurnDirection.NEXT,
+            next = next,
+            nextPlus = nextPlus,
+        )
+
+        // nextPlus 的文字在栈 y=60..80，点击下一页保留其首行，移动 50px。
+        assertEquals(-50f, distance, 0f)
     }
 
     private fun scrollPage(

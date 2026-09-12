@@ -946,6 +946,7 @@ sealed interface ReadBookEffect {
     // Page anim changed — Activity calls readView.upPageAnim() + ReadBook.loadContent(false)
     data object PageAnimChanged : ReadBookEffect
     data class InvalidateReaderImage(val source: String) : ReadBookEffect
+    data class InvalidateReaderImages(val sources: Set<String>) : ReadBookEffect
 
     // Download chapters — Activity calls CacheBook.start()
     data class DownloadChapters(val start: Int, val end: Int) : ReadBookEffect
@@ -1041,7 +1042,10 @@ sealed interface ConfigUpdateAction {
     data object UpdateBackgroundAlpha : ConfigUpdateAction
     data object UpdatePageSlopSquare : ConfigUpdateAction
 
-    /** Re-fetch inline images after a reading-theme preset changes its text colors. */
+    /**
+     * 仅样式方案/预设切换使用：重拉当前窗口的书源图片，随后重载正文。
+     * 单项颜色修改对齐旧 View，不带本动作——旧 View 只有事件 5（重跑书源规则），没有「删缓存重下」。
+     */
     data object RefreshInlineImages : ConfigUpdateAction
     data object ReloadContent : ConfigUpdateAction
     data object RelayoutContent : ConfigUpdateAction
@@ -1063,7 +1067,20 @@ private val HEADER_FOOTER_TIP_ACTIONS = setOf(
 
 /**
  * Typed config mutations replace direct writes to the legacy ReadBookConfig facade.
- * Each variant carries [actions] that describe which UI updates are needed.
+ *
+ * `actions` 复刻旧 View 的 `EventBus.UP_CONFIG` 事件码（`4c088448c^` 的
+ * `ReadBookActivity.observeLiveBus()` 翻译表）：0=UpdateSystemUi、1=UpdateBackground、
+ * 2=UpdateStyle、3=UpdateBackgroundAlpha、4=UpdatePageSlopSquare、5=ReloadContent、
+ * 6=UpdateContent、8=UpdateChapterStyle、9=InvalidateTextPage、10=UpdateLayout、
+ * 11=SubmitRenderTask。
+ *
+ * 除上述一一对应的动作外，只允许追加 Compose 渲染器必需项：
+ * - `RebuildWholeBookPageIndex`：整书页码估算（旧 View 没有这套机制）；
+ * - `UpdateWholeBookPageDemand`：页眉页脚 `{FullPageIndex}` 一类占位符的求值需求；
+ * - `RefreshInlineImages`：仅样式方案/预设切换使用；
+ * - `UpdateSystemUi`：样式方案切换后刷新状态栏图标（Compose 不重建 Activity）。
+ *
+ * 新增或修改成员前，先到旧 View 对应弹窗里查它发的事件码，不要凭感觉填。
  */
 @Immutable
 sealed interface ConfigUpdate {
@@ -1091,11 +1108,25 @@ sealed interface ConfigUpdate {
     data class TextBold(val value: Int) : ConfigUpdate {
         override val actions = setOf(ConfigUpdateAction.UpdateChapterStyle, ConfigUpdateAction.InvalidateTextPage, ConfigUpdateAction.UpdateContent)
     }
+
+    // 正文/强调色对应旧 View 的 [2, 6, 9, 11]（upStyle + upContent + invalidateTextPage +
+    // submitRenderTask）。旧 View 对这两项**不发事件 5**（loadContent），即不重新加载/解析正文，
+    // 只重绘已排好的页面；重绘由 invalidateTextPage/upContent 触发，故此处不带 ReloadContent。
     data class TextColor(val color: Int) : ConfigUpdate {
-        override val actions = setOf(ConfigUpdateAction.UpdateStyle, ConfigUpdateAction.ReloadContent, ConfigUpdateAction.InvalidateTextPage)
+        override val actions = setOf(
+            ConfigUpdateAction.UpdateStyle,
+            ConfigUpdateAction.UpdateContent,
+            ConfigUpdateAction.InvalidateTextPage,
+            ConfigUpdateAction.SubmitRenderTask,
+        )
     }
     data class TextAccentColor(val color: Int) : ConfigUpdate {
-        override val actions = setOf(ConfigUpdateAction.UpdateStyle, ConfigUpdateAction.ReloadContent, ConfigUpdateAction.InvalidateTextPage)
+        override val actions = setOf(
+            ConfigUpdateAction.UpdateStyle,
+            ConfigUpdateAction.UpdateContent,
+            ConfigUpdateAction.InvalidateTextPage,
+            ConfigUpdateAction.SubmitRenderTask,
+        )
     }
 
     // --- Title style ---
@@ -1126,23 +1157,45 @@ sealed interface ConfigUpdate {
     data class TitleBottomSpacing(val value: Int) : ConfigUpdate {
         override val actions = setOf(ConfigUpdateAction.UpdateChapterStyle, ConfigUpdateAction.ReloadContent)
     }
+
+    // 标题色对应旧 View 的 [8, 5]（ChapterProvider.upStyle + loadContent(false)）。这里的
+    // ReloadContent 就是旧事件 5：会重新加载正文并重排（章节正文缓存命中时是重新解析缓存内容，
+    // 缓存缺失时才重跑书源规则），与正文色只重绘的语义不同。
     data class TitleColor(val color: Int) : ConfigUpdate {
-        override val actions = setOf(ConfigUpdateAction.UpdateStyle, ConfigUpdateAction.ReloadContent, ConfigUpdateAction.InvalidateTextPage)
+        override val actions = setOf(
+            ConfigUpdateAction.UpdateChapterStyle,
+            ConfigUpdateAction.ReloadContent,
+        )
     }
     data class TitleColorNight(val color: Int) : ConfigUpdate {
-        override val actions = setOf(ConfigUpdateAction.UpdateStyle, ConfigUpdateAction.ReloadContent, ConfigUpdateAction.InvalidateTextPage)
+        override val actions = setOf(
+            ConfigUpdateAction.UpdateChapterStyle,
+            ConfigUpdateAction.ReloadContent,
+        )
     }
     data class TitleFont(val path: String) : ConfigUpdate {
         override val actions = setOf(ConfigUpdateAction.UpdateChapterStyle, ConfigUpdateAction.ReloadContent)
     }
+
+    // 旧 View 标题分段三项只发 [5]（不重建 ChapterProvider 样式快照，因为分段不改变字形/画笔）。
+    // Compose 另需 RebuildWholeBookPageIndex：分段会改变整书页码估算。
     data class TitleSegType(val value: Int) : ConfigUpdate {
-        override val actions = setOf(ConfigUpdateAction.UpdateChapterStyle, ConfigUpdateAction.ReloadContent)
+        override val actions = setOf(
+            ConfigUpdateAction.RebuildWholeBookPageIndex,
+            ConfigUpdateAction.ReloadContent,
+        )
     }
     data class TitleSegDistance(val value: Int) : ConfigUpdate {
-        override val actions = setOf(ConfigUpdateAction.UpdateChapterStyle, ConfigUpdateAction.ReloadContent)
+        override val actions = setOf(
+            ConfigUpdateAction.RebuildWholeBookPageIndex,
+            ConfigUpdateAction.ReloadContent,
+        )
     }
     data class TitleSegFlag(val value: String) : ConfigUpdate {
-        override val actions = setOf(ConfigUpdateAction.UpdateChapterStyle, ConfigUpdateAction.ReloadContent)
+        override val actions = setOf(
+            ConfigUpdateAction.RebuildWholeBookPageIndex,
+            ConfigUpdateAction.ReloadContent,
+        )
     }
 
     // --- Header / footer tips ---
@@ -1220,6 +1273,9 @@ sealed interface ConfigUpdate {
     }
 
     // --- Layout / style ---
+    // 旧 View 切样式方案 [1, 2, 5]；Compose 另需 RefreshInlineImages（重拉书源图片）与
+    // RebuildWholeBookPageIndex（整书页码）以及 UpdateSystemUi（状态栏图标随样式里的
+    // darkStatusIcon 变化，Compose 不重建 Activity）。
     data class StyleSelect(val index: Int) : ConfigUpdate {
         override val actions = setOf(
             ConfigUpdateAction.UpdateBackground,
@@ -1228,45 +1284,50 @@ sealed interface ConfigUpdate {
             ConfigUpdateAction.RebuildWholeBookPageIndex,
             ConfigUpdateAction.ReloadContent,
             ConfigUpdateAction.UpdateSystemUi,
-            ConfigUpdateAction.UpdatePageAnim
         )
     }
+
+    // 旧 View shareLayout = [1, 2, 5]。
     data class ShareLayout(val value: Boolean) : ConfigUpdate {
         override val actions = setOf(
             ConfigUpdateAction.UpdateBackground,
             ConfigUpdateAction.UpdateStyle,
             ConfigUpdateAction.RebuildWholeBookPageIndex,
             ConfigUpdateAction.ReloadContent,
-            ConfigUpdateAction.UpdatePageAnim
         )
     }
+
+    // 旧 View 换翻页动画：upPageAnim() + loadContent(false)（滚动/翻页模式的页高不同，故 Compose
+    // 另需重建整书页码索引）。
     data class PageAnim(val value: Int) : ConfigUpdate {
         override val actions = setOf(
-            ConfigUpdateAction.UpdateBackground,
             ConfigUpdateAction.UpdatePageAnim,
             ConfigUpdateAction.RebuildWholeBookPageIndex,
-            ConfigUpdateAction.ReloadContent
+            ConfigUpdateAction.ReloadContent,
         )
     }
 
     // --- Menu colors ---
+    // 菜单外观是 Compose 时代新增的项（旧 View 无对应事件码）。它们只被阅读菜单读取，菜单由
+    // menuConfig 状态反应式重组，因此不驱动正文渲染副作用。唯一例外是 MenuBgColor：状态栏图标
+    // 在菜单显示时按 resolvedMenuBgColor 取反色（ReadBookController:1303），故需 UpdateSystemUi。
     data class MenuBgColor(val color: Int) : ConfigUpdate {
-        override val actions = setOf(ConfigUpdateAction.UpdateBackground, ConfigUpdateAction.UpdateStyle, ConfigUpdateAction.ReloadContent, ConfigUpdateAction.UpdateSystemUi)
+        override val actions = setOf(ConfigUpdateAction.UpdateSystemUi)
     }
     data class MenuAccentColor(val color: Int) : ConfigUpdate {
-        override val actions = setOf(ConfigUpdateAction.UpdateBackground, ConfigUpdateAction.UpdateStyle, ConfigUpdateAction.ReloadContent)
+        override val actions = emptySet<ConfigUpdateAction>()
     }
     data class MenuContainerColor(val color: Int) : ConfigUpdate {
-        override val actions = setOf(ConfigUpdateAction.UpdateBackground, ConfigUpdateAction.UpdateStyle, ConfigUpdateAction.ReloadContent)
+        override val actions = emptySet<ConfigUpdateAction>()
     }
     data class MenuBgColorNight(val color: Int) : ConfigUpdate {
-        override val actions = setOf(ConfigUpdateAction.UpdateBackground, ConfigUpdateAction.UpdateStyle, ConfigUpdateAction.ReloadContent, ConfigUpdateAction.UpdateSystemUi)
+        override val actions = setOf(ConfigUpdateAction.UpdateSystemUi)
     }
     data class MenuAccentColorNight(val color: Int) : ConfigUpdate {
-        override val actions = setOf(ConfigUpdateAction.UpdateBackground, ConfigUpdateAction.UpdateStyle, ConfigUpdateAction.ReloadContent)
+        override val actions = emptySet<ConfigUpdateAction>()
     }
     data class MenuContainerColorNight(val color: Int) : ConfigUpdate {
-        override val actions = setOf(ConfigUpdateAction.UpdateBackground, ConfigUpdateAction.UpdateStyle, ConfigUpdateAction.ReloadContent)
+        override val actions = emptySet<ConfigUpdateAction>()
     }
     data class MenuTextColor(val color: Int) : ConfigUpdate {
         override val actions = emptySet<ConfigUpdateAction>()
@@ -1282,14 +1343,15 @@ sealed interface ConfigUpdate {
     }
 
     // --- Menu bar border ---
+    // 只画在菜单栏上（ReadBookMenuBar/ReadBookMenuBarTitle 直接读 menuConfig），无正文副作用。
     data class BorderWidth(val value: Int) : ConfigUpdate {
-        override val actions = setOf(ConfigUpdateAction.UpdateBackground, ConfigUpdateAction.UpdateStyle, ConfigUpdateAction.ReloadContent)
+        override val actions = emptySet<ConfigUpdateAction>()
     }
     data class BorderColor(val color: Int) : ConfigUpdate {
-        override val actions = setOf(ConfigUpdateAction.UpdateBackground, ConfigUpdateAction.UpdateStyle, ConfigUpdateAction.ReloadContent)
+        override val actions = emptySet<ConfigUpdateAction>()
     }
     data class BorderColorNight(val color: Int) : ConfigUpdate {
-        override val actions = setOf(ConfigUpdateAction.UpdateBackground, ConfigUpdateAction.UpdateStyle, ConfigUpdateAction.ReloadContent)
+        override val actions = emptySet<ConfigUpdateAction>()
     }
 
     // --- Shadow ---
@@ -1306,7 +1368,13 @@ sealed interface ConfigUpdate {
         override val actions = setOf(ConfigUpdateAction.UpdateChapterStyle, ConfigUpdateAction.ReloadContent)
     }
     data class ShadowColor(val color: Int) : ConfigUpdate {
-        override val actions = setOf(ConfigUpdateAction.UpdateStyle, ConfigUpdateAction.ReloadContent, ConfigUpdateAction.InvalidateTextPage)
+        // 旧 View S_COLOR = [2, 6, 9, 11]，与正文色同族（只重绘，不重载正文）。
+        override val actions = setOf(
+            ConfigUpdateAction.UpdateStyle,
+            ConfigUpdateAction.UpdateContent,
+            ConfigUpdateAction.InvalidateTextPage,
+            ConfigUpdateAction.SubmitRenderTask,
+        )
     }
 
     // --- Underline ---
@@ -1329,12 +1397,21 @@ sealed interface ConfigUpdate {
         override val actions = setOf(ConfigUpdateAction.UpdateContent, ConfigUpdateAction.UpdateChapterStyle, ConfigUpdateAction.UpdateLayout)
     }
     data class DottedRatio(val value: Float) : ConfigUpdate {
-        override val actions = setOf(ConfigUpdateAction.UpdateContent, ConfigUpdateAction.UpdateChapterStyle, ConfigUpdateAction.UpdateLayout)
+        // 旧 View dottedRatio = [6, 9, 11]（只重绘下划线）。
+        override val actions = setOf(
+            ConfigUpdateAction.UpdateContent,
+            ConfigUpdateAction.InvalidateTextPage,
+            ConfigUpdateAction.SubmitRenderTask,
+        )
     }
     data class UnderlineColor(val color: Int) : ConfigUpdate {
-        // 对齐兄弟项 Underline/DottedLine：改颜色要重绘已排好的 TextPage，
-        // 仅 UpdateStyle（readView.upStyle()）不会重画下划线。
-        override val actions = setOf(ConfigUpdateAction.UpdateContent, ConfigUpdateAction.InvalidateTextPage, ConfigUpdateAction.SubmitRenderTask)
+        // 旧 View U_COLOR 连发 [2] 与 [6, 9, 11]：改颜色既要重建画笔又要重绘已排好的 TextPage。
+        override val actions = setOf(
+            ConfigUpdateAction.UpdateStyle,
+            ConfigUpdateAction.UpdateContent,
+            ConfigUpdateAction.InvalidateTextPage,
+            ConfigUpdateAction.SubmitRenderTask,
+        )
     }
 
     // --- Body padding ---
@@ -1386,23 +1463,24 @@ sealed interface ConfigUpdate {
     }
 
     // --- Background / display ---
+    // 旧 View 换背景色/背景图只发 [1]（readView.upBg()，内部同时刷新 alpha）。
     data class BgStr(val value: String) : ConfigUpdate {
-        override val actions = setOf(ConfigUpdateAction.UpdateBackground, ConfigUpdateAction.UpdateBackgroundAlpha, ConfigUpdateAction.ReloadContent, ConfigUpdateAction.UpdateSystemUi)
+        override val actions = setOf(ConfigUpdateAction.UpdateBackground)
     }
     data class BgStrNight(val value: String) : ConfigUpdate {
-        override val actions = setOf(ConfigUpdateAction.UpdateBackground, ConfigUpdateAction.UpdateBackgroundAlpha, ConfigUpdateAction.ReloadContent, ConfigUpdateAction.UpdateSystemUi)
+        override val actions = setOf(ConfigUpdateAction.UpdateBackground)
     }
     data class BgStrEInk(val value: String) : ConfigUpdate {
-        override val actions = setOf(ConfigUpdateAction.UpdateBackground, ConfigUpdateAction.UpdateBackgroundAlpha, ConfigUpdateAction.ReloadContent, ConfigUpdateAction.UpdateSystemUi)
+        override val actions = setOf(ConfigUpdateAction.UpdateBackground)
     }
     data class BgType(val value: Int) : ConfigUpdate {
-        override val actions = setOf(ConfigUpdateAction.UpdateBackground, ConfigUpdateAction.UpdateBackgroundAlpha, ConfigUpdateAction.ReloadContent, ConfigUpdateAction.UpdateSystemUi)
+        override val actions = setOf(ConfigUpdateAction.UpdateBackground)
     }
     data class BgTypeNight(val value: Int) : ConfigUpdate {
-        override val actions = setOf(ConfigUpdateAction.UpdateBackground, ConfigUpdateAction.UpdateBackgroundAlpha, ConfigUpdateAction.ReloadContent, ConfigUpdateAction.UpdateSystemUi)
+        override val actions = setOf(ConfigUpdateAction.UpdateBackground)
     }
     data class BgTypeEInk(val value: Int) : ConfigUpdate {
-        override val actions = setOf(ConfigUpdateAction.UpdateBackground, ConfigUpdateAction.UpdateBackgroundAlpha, ConfigUpdateAction.ReloadContent, ConfigUpdateAction.UpdateSystemUi)
+        override val actions = setOf(ConfigUpdateAction.UpdateBackground)
     }
     data class BgAlpha(val value: Int) : ConfigUpdate {
         override val actions = setOf(ConfigUpdateAction.UpdateBackgroundAlpha)
@@ -1613,10 +1691,10 @@ sealed interface ConfigUpdate {
         override val actions = emptySet<ConfigUpdateAction>()
     }
     data class OptimizeRender(val value: Boolean) : ConfigUpdate {
+        // 旧 View optimizeRender：ChapterProvider.upStyle() + loadContent(false)。
         override val actions = setOf(
             ConfigUpdateAction.UpdateChapterStyle,
             ConfigUpdateAction.ReloadContent,
-            ConfigUpdateAction.SubmitRenderTask,
         )
     }
     data class ClickImgWay(val value: String) : ConfigUpdate {

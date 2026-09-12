@@ -25,6 +25,7 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.magnifier
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -165,6 +166,8 @@ import kotlin.math.sin
 // 把手圆挂在行底部下方、顶端圆周与竖线末端相切；圆区域在拖动命中时视作竖线的延伸。
 private val SelectionHandleRadius = 7.dp
 private val SelectionHandleStrokeWidth = 2.dp
+private const val SelectionHandleFadeOutMillis = 90
+private const val SelectionHandleFadeInMillis = 140
 
 @Composable
 fun ReaderCanvasSurface(
@@ -310,6 +313,14 @@ fun ReaderCanvasSurface(
         mutableLongStateOf(ReaderAutoPagePolicy.pageDurationMillis(autoReadSpeedSeconds))
     }
     var textSelection by remember { mutableStateOf<ReaderSelection?>(null) }
+    // API 28+ 的平台放大镜直接采样当前 Compose View；未指定 sourceCenter 时会立即隐藏。
+    // 采样点始终是正在移动的文字端点，而不是被把手遮挡的手指位置。
+    var selectionMagnifierSource by remember { mutableStateOf<Offset?>(null) }
+    // 拖动中的圆柄属于指针反馈，不属于吸附后的文字布局。二者分离后，端点跨行
+    // 可以更新竖线和选区，而圆柄仍沿手指的连续轨迹移动。
+    var selectionDragHandleCenter by remember { mutableStateOf<Offset?>(null) }
+    var selectionDragEndpoint by remember { mutableStateOf<ReaderSelectionEndpoint?>(null) }
+    val selectionHandleRadiusPx = with(LocalDensity.current) { SelectionHandleRadius.toPx() }
     val latestSelectionPausesAutoPage by rememberUpdatedState(textSelection != null)
     var selectionMenuVisible by remember { mutableStateOf(false) }
     var selectionLayoutRevision by remember { mutableLongStateOf(current.layoutRevision) }
@@ -339,6 +350,36 @@ fun ReaderCanvasSurface(
         } else {
             ReaderPageViewportLayout.paged(window)
         }
+    fun selectionEndpointBound(
+        selection: ReaderSelection,
+        endpoint: ReaderSelectionEndpoint,
+        window: ReaderPageWindow = currentPageWindow(),
+    ) = run {
+        val bounds = pageViewportLayout(window).selectionBounds(selection).map { it.bounds }
+        val visualStart = endpoint == selection.visualStartEndpoint()
+        if (visualStart) bounds.firstOrNull() else bounds.lastOrNull()
+    }
+
+    fun selectionCursorCenter(
+        selection: ReaderSelection,
+        endpoint: ReaderSelectionEndpoint,
+        window: ReaderPageWindow = currentPageWindow(),
+        draggedHandleCenter: Offset? = null,
+    ): Offset? {
+        val bound = selectionEndpointBound(selection, endpoint, window) ?: return null
+        val visualStart = endpoint == selection.visualStartEndpoint()
+        val logicalLineCenter = Offset(
+            x = if (visualStart) bound.left else bound.right,
+            y = (bound.top + bound.bottom) / 2f,
+        )
+        val logicalHandleCenter = Offset(
+            x = logicalLineCenter.x,
+            y = bound.bottom + selectionHandleRadiusPx,
+        )
+        // 拖动时竖线与圆柄作为一个整体平移，放大镜也采样平移后的竖线中段。
+        return logicalLineCenter + ((draggedHandleCenter
+            ?: logicalHandleCenter) - logicalHandleCenter)
+    }
     fun dismissSelectionMenu() {
         selectionMenuVisible = false
         latestDismissSelectionMenu()
@@ -355,6 +396,9 @@ fun ReaderCanvasSurface(
     fun clearSelectionForPageChange(origin: ReaderPageChangeOrigin) {
         if (textSelection != null && ReaderSelectionLifecyclePolicy.shouldClearForPageChange(origin)) {
             textSelection = null
+            selectionMagnifierSource = null
+            selectionDragHandleCenter = null
+            selectionDragEndpoint = null
             dismissSelectionMenu()
         }
     }
@@ -498,9 +542,14 @@ fun ReaderCanvasSurface(
     fun tapScrollPage(direction: ReaderTurnDirection) {
         val window = currentPageWindow()
         val page = window.current ?: return
-        // “保留一行”步距基于三页合成可视内容：页底露出的下一页行也是目标行候选。
+        // “保留一行”步距基于连续相邻页合成内容：短页叠加时，下下页的行也可能已露出。
         val distance = ReaderScrollPolicy.pageStep(
-            page, scrollOffset, direction, window.previous, window.next,
+            page = page,
+            offsetPx = scrollOffset,
+            direction = direction,
+            previous = window.previous,
+            next = window.next,
+            nextPlus = window.nextPlus,
         )
         pageMotionJob?.cancel()
         val steps = ReaderGestureSettingsPolicy.scrollPageAnimationSteps(latestNoAnimationScrollPage)
@@ -589,6 +638,9 @@ fun ReaderCanvasSurface(
     LaunchedEffect(externalSelectionCancels) {
         externalSelectionCancels.collect {
             textSelection = null
+            selectionMagnifierSource = null
+            selectionDragHandleCenter = null
+            selectionDragEndpoint = null
             selectionMenuVisible = false
         }
     }
@@ -627,6 +679,9 @@ fun ReaderCanvasSurface(
             ) && selection != null && !showSelectionMenu(selection, latestPages)
         ) {
             textSelection = null
+            selectionMagnifierSource = null
+            selectionDragHandleCenter = null
+            selectionDragEndpoint = null
             dismissSelectionMenu()
         }
     }
@@ -751,6 +806,8 @@ fun ReaderCanvasSurface(
         }
         .clipToBounds()
         .background(backgroundColor)
+        // Foundation 在 API 28 以下将其降级为 no-op；这里无需另建低版本的昂贵位图快照。
+        .magnifier(sourceCenter = { selectionMagnifierSource ?: Offset.Unspecified }, zoom = 1.2f)
         .pointerInput(transitionMode, current.widthPx, current.heightPx, configuredTouchSlopPx) {
             val pageTouchSlop = ReaderGestureSettingsPolicy.touchSlopPx(
                 viewConfiguration.touchSlop,
@@ -789,6 +846,8 @@ fun ReaderCanvasSurface(
                 var grabbingStart = false
                 var grabbingEnd = false
                 var grabbedEndpoint: ReaderSelectionEndpoint? = null
+                var handleGrabOffset = Offset.Zero
+                var handleHasMoved = false
                 var suppressTap = false
                 var pointerPosition = down.position
                 val downWindow = turnedWindow ?: currentPageWindow()
@@ -798,21 +857,60 @@ fun ReaderCanvasSurface(
                 val downPageY = downPlacement?.localY(down.position.y) ?: down.position.y
                 textSelection?.let { selection ->
                     val bounds = downSelectionLayout.selectionBounds(selection).map { it.bounds }
-                    val handleRadius = 28f * density
+                    // 命中点必须是实际绘制出来的圆心，不能仍以文字行底为中心。保留较大的
+                    // 28dp 热区，让圆下方的正文也能作为把手的触控区域，但坐标仍以圆心换算。
+                    val handleHitRadius = 28f * density
                     val start = bounds.firstOrNull()
                     val end = bounds.lastOrNull()
-                    grabbingStart =
-                        start != null && Offset(start.left, start.bottom).minus(down.position)
-                            .getDistance() <= handleRadius
-                    grabbingEnd = end != null && Offset(end.right, end.bottom).minus(down.position)
-                        .getDistance() <= handleRadius
-                    grabbedEndpoint = when {
-                        grabbingStart -> selection.visualStartEndpoint()
-                        grabbingEnd -> selection.visualEndEndpoint()
-                        else -> null
+                    val startCenter = start?.let {
+                        Offset(
+                            it.left,
+                            it.bottom + selectionHandleRadiusPx,
+                        )
                     }
+                    val endCenter = end?.let {
+                        Offset(
+                            it.right,
+                            it.bottom + selectionHandleRadiusPx,
+                        )
+                    }
+
+                    fun handleDistance(x: Float, top: Float, center: Offset): Float {
+                        // 竖线与圆视作同一个胶囊形手柄：求手指到“竖线顶端—圆心”
+                        // 中轴线的最短距离，再用统一热区判断。
+                        val nearestY = down.position.y.coerceIn(top, center.y)
+                        return Offset(x, nearestY).minus(down.position).getDistance()
+                    }
+
+                    val startDistance = if (start != null && startCenter != null) {
+                        handleDistance(start.left, start.top, startCenter)
+                    } else {
+                        Float.POSITIVE_INFINITY
+                    }
+                    val endDistance = if (end != null && endCenter != null) {
+                        handleDistance(end.right, end.top, endCenter)
+                    } else {
+                        Float.POSITIVE_INFINITY
+                    }
+                    when {
+                        startDistance <= endDistance && startDistance <= handleHitRadius -> {
+                            grabbingStart = true
+                            grabbedEndpoint = selection.visualStartEndpoint()
+                            handleGrabOffset = down.position - checkNotNull(startCenter)
+                        }
+
+                        endDistance <= handleHitRadius -> {
+                            grabbingEnd = true
+                            grabbedEndpoint = selection.visualEndEndpoint()
+                            handleGrabOffset = down.position - checkNotNull(endCenter)
+                        }
+                    }
+                    selectionDragEndpoint = grabbedEndpoint
+                    selectionDragHandleCenter = null
                     if (!grabbingStart && !grabbingEnd) {
                         textSelection = null
+                        selectionMagnifierSource = null
+                        selectionDragEndpoint = null
                         dismissSelectionMenu()
                         suppressTap = true
                     } else dismissSelectionMenu()
@@ -833,6 +931,10 @@ fun ReaderCanvasSurface(
                                 ReaderSelectionPolicy.startWord(page, down.position.x, downPageY)
                                     ?.let {
                                         textSelection = it
+                                        selectionMagnifierSource = selectionCursorCenter(
+                                            it,
+                                            ReaderSelectionEndpoint.FOCUS,
+                                        )
                                         if (latestSelectionHapticsEnabled) {
                                             hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
                                         }
@@ -863,34 +965,40 @@ fun ReaderCanvasSurface(
                         }
                         if (longPressed || grabbingStart || grabbingEnd) {
                             val selection = textSelection
-                            val placement =
-                                pageViewportLayout().pageAt(change.position.x, change.position.y)
+                            val movingEndpoint = grabbedEndpoint ?: ReaderSelectionEndpoint.FOCUS
+                            // PointerInput 会先派发一个与 DOWN 位置相同的事件。把手尚未移动时
+                            // 不能再用行底去 hit-test，否则该边界可能直接吸附到下一行。
+                            if (grabbedEndpoint != null && !handleHasMoved) {
+                                handleHasMoved = change.position != down.position
+                                if (!handleHasMoved) {
+                                    selectionMagnifierSource = selection?.let {
+                                        selectionCursorCenter(it, movingEndpoint)
+                                    }
+                                    change.consume()
+                                    continue
+                                }
+                            }
+                            if (grabbedEndpoint != null) {
+                                // 固定 DOWN 时手指相对圆心的二维偏移。跨字符、跨行后都不能
+                                // 用新的文字 bounds 重算，否则手指会从圆上滑到竖线上。
+                                selectionDragHandleCenter = change.position - handleGrabOffset
+                            }
+                            val draggedHandleCenter = selectionDragHandleCenter
+                            val cursorViewportX = draggedHandleCenter?.x ?: change.position.x
+                            val cursorViewportY = draggedHandleCenter?.let {
+                                it.y - selectionHandleRadiusPx
+                            } ?: change.position.y
+                            val placement = pageViewportLayout()
+                                .pageAt(cursorViewportX, cursorViewportY)
                             if (placement != null && selection != null) {
                                 val page = placement.page
-                                // 圆把手视作竖线的延伸：手指落在把手圆区域内时按本行底边命中，
-                                // 避免圆与下一行之间的间隙把手柄拖动吸到下一行。
-                                var viewportY = change.position.y
-                                if (grabbedEndpoint != null) {
-                                    val endpointBounds =
-                                        pageViewportLayout().selectionBounds(selection)
-                                            .map { it.bounds }
-                                    val anchorBound =
-                                        if (grabbingStart) endpointBounds.firstOrNull() else endpointBounds.lastOrNull()
-                                    if (anchorBound != null) {
-                                        val zoneBottom =
-                                            anchorBound.bottom + 2 * SelectionHandleRadius.toPx()
-                                        if (viewportY > anchorBound.bottom && viewportY <= zoneBottom) {
-                                            viewportY = anchorBound.bottom
-                                        }
-                                    }
-                                }
-                                val pageY = placement.localY(viewportY)
+                                val pageY = placement.localY(cursorViewportY)
                                 val hit =
-                                    ReaderSelectionPolicy.start(page, change.position.x, pageY)
+                                    ReaderSelectionPolicy.start(page, cursorViewportX, pageY)
                                         ?: if (grabbedEndpoint != null) {
                                             ReaderSelectionPolicy.snapToText(
                                                 page,
-                                                change.position.x,
+                                                cursorViewportX,
                                                 pageY
                                             )?.let {
                                                 ReaderSelection(
@@ -914,7 +1022,7 @@ fun ReaderCanvasSurface(
                                         else -> ReaderSelectionPolicy.extend(
                                             selection,
                                             page,
-                                            change.position.x,
+                                            cursorViewportX,
                                             pageY
                                         )
                                     }
@@ -924,6 +1032,17 @@ fun ReaderCanvasSurface(
                                             hapticFeedback.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                                         }
                                     }
+                                    selectionMagnifierSource = selectionCursorCenter(
+                                        updatedSelection,
+                                        movingEndpoint,
+                                        draggedHandleCenter = draggedHandleCenter,
+                                    )
+                                } else {
+                                    selectionMagnifierSource = selectionCursorCenter(
+                                        selection,
+                                        movingEndpoint,
+                                        draggedHandleCenter = draggedHandleCenter,
+                                    )
                                 }
                                 change.consume()
                             }
@@ -1036,6 +1155,8 @@ fun ReaderCanvasSurface(
                     }
                 } finally {
                     longPressJob.cancel()
+                    selectionDragHandleCenter = null
+                    selectionDragEndpoint = null
                     if (!released) {
                         bookmarkArmed = false
                         bookmarkOffset = 0f
@@ -1054,6 +1175,7 @@ fun ReaderCanvasSurface(
                 if (released) latestReaderInteraction()
                 if (longPressed || grabbingStart || grabbingEnd) {
                     val selection = textSelection
+                    selectionMagnifierSource = null
                     if (released && selection != null) {
                         val window = latestPages
                         showSelectionMenu(selection, window)
@@ -1267,6 +1389,35 @@ fun ReaderCanvasSurface(
         if (ReaderViewportLayerPolicy.usesFixedPageChrome(transitionMode)) {
             ReaderPageDecorationOverlay(current, Modifier.fillMaxSize())
         }
+        val hiddenHandleEndpoint = selectionDragEndpoint.takeIf {
+            selectionDragHandleCenter != null
+        }
+        val anchorHandleTargetAlpha =
+            if (hiddenHandleEndpoint == ReaderSelectionEndpoint.ANCHOR) 0f else 1f
+        val focusHandleTargetAlpha =
+            if (hiddenHandleEndpoint == ReaderSelectionEndpoint.FOCUS) 0f else 1f
+        val anchorHandleAlpha by animateFloatAsState(
+            targetValue = anchorHandleTargetAlpha,
+            animationSpec = tween(
+                if (anchorHandleTargetAlpha == 0f) {
+                    SelectionHandleFadeOutMillis
+                } else {
+                    SelectionHandleFadeInMillis
+                }
+            ),
+            label = "readerSelectionAnchorHandleAlpha",
+        )
+        val focusHandleAlpha by animateFloatAsState(
+            targetValue = focusHandleTargetAlpha,
+            animationSpec = tween(
+                if (focusHandleTargetAlpha == 0f) {
+                    SelectionHandleFadeOutMillis
+                } else {
+                    SelectionHandleFadeInMillis
+                }
+            ),
+            label = "readerSelectionFocusHandleAlpha",
+        )
         textSelection?.let { selection ->
             val bounds = pageViewportLayout(pages).selectionBounds(selection).map { it.bounds }
             val handleColor = selectionColor.copy(alpha = 1f)
@@ -1283,17 +1434,71 @@ fun ReaderCanvasSurface(
                     top = if (transitionMode == ReaderTransitionMode.SCROLL) current.contentTopPx else 0f,
                     bottom = if (transitionMode == ReaderTransitionMode.SCROLL) current.contentBottomPx else size.height,
                 ) {
-                    fun drawPinHandle(x: Float, top: Float, bottom: Float) {
+                    fun drawPinHandle(
+                        x: Float,
+                        top: Float,
+                        bottom: Float,
+                        endpoint: ReaderSelectionEndpoint,
+                    ) {
+                        val handleAlpha = when (endpoint) {
+                            ReaderSelectionEndpoint.ANCHOR -> anchorHandleAlpha
+                            ReaderSelectionEndpoint.FOCUS -> focusHandleAlpha
+                        }
+                        if (handleAlpha <= 0.001f) return
                         val lineWidth = SelectionHandleStrokeWidth.toPx()
                         val radius = SelectionHandleRadius.toPx()
-                        // 竖线止于行底部，圆的顶端圆周与竖线末端相切
-                        val center = Offset(x, bottom + radius)
-                        drawLine(handleColor, Offset(x, top), Offset(x, bottom), lineWidth, StrokeCap.Round)
-                        drawIntoCanvas { it.nativeCanvas.drawCircle(x, center.y, radius, handleShadowPaint) }
-                        drawCircle(handleColor, radius, center, style = Stroke(SelectionHandleStrokeWidth.toPx()))
+                        val logicalCenter = Offset(x, bottom + radius)
+                        val center = if (selectionDragEndpoint == endpoint) {
+                            selectionDragHandleCenter
+                        } else {
+                            null
+                        } ?: logicalCenter
+                        // 竖线和圆柄是同一个手柄：拖动时按相同向量整体平移，保持 DOWN
+                        // 时手指落在圆上的相对位置，而不是让竖线吸附后圆柄单独跳动。
+                        val dragDelta = center - logicalCenter
+                        val lineX = x + dragDelta.x
+                        val lineTop = top + dragDelta.y
+                        val lineBottom = bottom + dragDelta.y
+                        val animatedHandleColor = handleColor.copy(alpha = handleAlpha)
+                        drawLine(
+                            animatedHandleColor,
+                            Offset(lineX, lineTop),
+                            Offset(lineX, lineBottom),
+                            lineWidth,
+                            StrokeCap.Round,
+                        )
+                        drawIntoCanvas {
+                            handleShadowPaint.alpha = (handleAlpha * 255).roundToInt()
+                            it.nativeCanvas.drawCircle(
+                                center.x,
+                                center.y,
+                                radius,
+                                handleShadowPaint
+                            )
+                        }
+                        drawCircle(
+                            animatedHandleColor,
+                            radius,
+                            center,
+                            style = Stroke(SelectionHandleStrokeWidth.toPx()),
+                        )
                     }
-                    bounds.firstOrNull()?.let { rect -> drawPinHandle(rect.left, rect.top, rect.bottom) }
-                    bounds.lastOrNull()?.let { rect -> drawPinHandle(rect.right, rect.top, rect.bottom) }
+                    bounds.firstOrNull()?.let { rect ->
+                        drawPinHandle(
+                            rect.left,
+                            rect.top,
+                            rect.bottom,
+                            selection.visualStartEndpoint(),
+                        )
+                    }
+                    bounds.lastOrNull()?.let { rect ->
+                        drawPinHandle(
+                            rect.right,
+                            rect.top,
+                            rect.bottom,
+                            selection.visualEndEndpoint(),
+                        )
+                    }
                 }
             }
         }
@@ -1393,7 +1598,7 @@ private fun ScrollPageStack(
             .graphicsLayer { translationY = offsetYState.floatValue },
     ) {
         // draw 期快照读：页窗口（同步换窗的 pending）变化只重绘不重组；拖拽平移只更新
-        // graphicsLayer 变换，draw 块不执行。三页连排的 y 是栈坐标，整画布随层平移偏移。
+        // graphicsLayer 变换，draw 块不执行。相邻页的 y 是栈坐标，整画布随层平移偏移。
         val window = windowProvider()
         val current = window.current ?: return@Canvas
         val activeSelection = selectionProvider()
@@ -1419,7 +1624,12 @@ private fun ScrollPageStack(
         }
         window.previous?.let { drawOne(it, -it.scrollExtentPx) }
         drawOne(current, 0f)
-        window.next?.let { drawOne(it, current.scrollExtentPx) }
+        window.next?.let { next ->
+            drawOne(next, current.scrollExtentPx)
+            window.nextPlus?.let { following ->
+                drawOne(following, current.scrollExtentPx + next.scrollExtentPx)
+            }
+        }
     }
 }
 

@@ -2364,24 +2364,28 @@ class ReadBookViewModel(
      */
     fun refreshImages(sources: Set<String>) {
         if (sources.isEmpty()) return
-        execute {
-            refreshImageFiles(sources)
-        }.onFinally {
-            sources.forEach { source ->
-                _effects.tryEmit(ReadBookEffect.InvalidateReaderImage(source))
+        viewModelScope.launch {
+            val refreshed = refreshImageFiles(sources)
+            if (refreshed.isNotEmpty()) {
+                _effects.tryEmit(ReadBookEffect.InvalidateReaderImages(refreshed))
             }
-            ReadBook.loadContent(false)
         }
     }
 
     /** Performs the file-cache half of image refresh before a renderer redraws it. */
-    suspend fun refreshImageFiles(sources: Set<String>) = withContext(IO) {
-        val book = ReadBook.book ?: return@withContext
-        sources.forEach { source ->
-            val vFile = BookHelp.getImage(book, source)
-            ImageProvider.bitmapLruCache.remove(vFile.absolutePath)
-            vFile.delete()
-            ImageProvider.cacheImage(book, source, ReadBook.bookSource)
+    suspend fun refreshImageFiles(sources: Set<String>): Set<String> = withContext(IO) {
+        val book = ReadBook.book ?: return@withContext emptySet()
+        buildSet {
+            sources.forEach { source ->
+                val refreshed = runCatching {
+                    val vFile = BookHelp.getImage(book, source)
+                    ImageProvider.bitmapLruCache.remove(vFile.absolutePath)
+                    vFile.delete()
+                    ImageProvider.cacheImage(book, source, ReadBook.bookSource)
+                    vFile.isFile && vFile.length() > 0L
+                }.getOrDefault(false)
+                if (refreshed) add(source)
+            }
         }
     }
 

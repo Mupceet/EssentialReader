@@ -193,7 +193,7 @@ data class ReaderPageWindow(
     val previous: ReaderPage? = null,
     val current: ReaderPage? = null,
     val next: ReaderPage? = null,
-    /** 下下页：不参与绘制，供滚动渲染层提前预热绘制数据（对照 shutiao 的四页流）。 */
+    /** 下下页：滚动视口可露出它；分页模式仅将其作为预热页（对照 shutiao 的四页流）。 */
     val nextPlus: ReaderPage? = null,
 )
 
