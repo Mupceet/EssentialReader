@@ -631,11 +631,19 @@ fun ReaderRoute(
             when (event) {
                 Lifecycle.Event.ON_STOP -> viewModel.onReaderHidden()
                 Lifecycle.Event.ON_START -> viewModel.onReaderShown()
+                Lifecycle.Event.ON_PAUSE -> viewModel.onActivityPaused()
+                Lifecycle.Event.ON_RESUME -> viewModel.onActivityResumed()
                 else -> Unit
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
         viewModel.onReaderShown()
+        // 组合晚于 ON_RESUME（首帧在 RESUMED 态组合）时补发恢复位；
+        // onDispose 不补发暂停位——应用内离开阅读目的地（目录/换源）时
+        // Activity 未暂停，不发生上传（宿主 MainNavGraph observer 同形）
+        if (lifecycleOwner.lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) {
+            viewModel.onActivityResumed()
+        }
         onDispose {
             lifecycleOwner.lifecycle.removeObserver(observer)
             viewModel.onReaderHidden()
@@ -954,6 +962,20 @@ fun ReaderRoute(
             ) {
                 EInkText(
                     text = "确定要将《${uiState.bookName}》移出书架吗？",
+                    style = EInkTheme.typography.bodyMedium
+                )
+            }
+        }
+        // 云端进度恢复确认（宿主 ConfirmRestoreProgress 同义；文案对齐
+        // 宿主 restore_progress / found_cloud_progress）
+        uiState.cloudProgressPrompt?.let {
+            EInkDialog(
+                onDismiss = { viewModel.dismissCloudProgress() },
+                title = "恢复进度",
+                onConfirm = { viewModel.confirmCloudProgress() },
+            ) {
+                EInkText(
+                    text = "发现云端进度，是否恢复？",
                     style = EInkTheme.typography.bodyMedium
                 )
             }

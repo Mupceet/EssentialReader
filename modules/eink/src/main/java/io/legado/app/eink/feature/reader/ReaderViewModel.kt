@@ -3,6 +3,8 @@ package io.legado.app.eink.feature.reader
 import android.app.Application
 import android.content.Intent
 import android.content.IntentFilter
+import android.net.ConnectivityManager
+import android.net.Network
 import android.os.BatteryManager
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
@@ -11,6 +13,7 @@ import io.legado.app.eink.arch.UserMessage
 import io.legado.app.eink.contract.EInkEngineRegistry
 import io.legado.app.eink.contract.FallbackReaderStyleCatalog
 import io.legado.app.eink.contract.ReaderBookSnapshot
+import io.legado.app.eink.contract.ReaderCloudProgress
 import io.legado.app.eink.contract.ReaderEngineCallback
 import io.legado.app.eink.contract.ReaderFontOption
 import io.legado.app.eink.contract.ReaderFontSelection
@@ -20,6 +23,7 @@ import io.legado.app.eink.contract.ReaderPrepareResult
 import io.legado.app.eink.contract.ReaderSelectionCommit
 import io.legado.app.eink.contract.ReaderStyleCatalog
 import io.legado.app.eink.contract.ReaderStyleParamIds as Ids
+import io.legado.app.eink.contract.ReaderSyncTrigger
 import io.legado.app.eink.contract.ReaderTextStyle
 import io.legado.app.eink.feature.reader.selection.ReaderSelectionUi
 import io.legado.app.eink.session.ReaderSessionCache
@@ -83,6 +87,8 @@ data class ReaderUiState(
     val footerVisible: Boolean = true,
     val headerTime: String = "",
     val batteryPercent: Int = 100,
+    /** 云端进度恢复确认（非 null = 显示确认框；宿主 ConfirmRestoreProgress 同义）。 */
+    val cloudProgressPrompt: ReaderCloudProgress? = null,
 ) {
     /** 页码显示文本，如 "3/15" */
     val pageIndicator: String
@@ -161,6 +167,11 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application),
     private var lastViewHeight = 0
     private var relayoutJob: Job? = null
 
+    /** 云端同步触发门槛（进书武装 + 初始装载窗口，宿主 justInitData 同位）。 */
+    private val syncGate = ReaderSyncGate()
+    private var progressBackupJob: Job? = null
+    private var networkWatcher: ConnectivityManager.NetworkCallback? = null
+
     // ==================== 生命周期与加载 ====================
 
     /**
@@ -175,6 +186,10 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application),
         // 路径（重试、异常路径）都落到干净阅读状态。首次进入本就是收起态；
         // 自动翻页若开着，hideControls 会照常重新起算倒计时。
         hideControls()
+        // 新会话首次装载：武装进书同步并进入初始装载窗口（网络恢复同步在
+        // 窗口内静默，避免与进书同步竞态——宿主 justInitData 同位）。重挂载
+        // （目录/换源返回）不重新武装：宿主 InitData 仅每 VM 一次
+        if (loadedBookUrl == null) syncGate.onFreshEntryStarted()
         attachJob = viewModelScope.launch(Dispatchers.IO) {
             engine.register(this@ReaderViewModel)
 
@@ -219,6 +234,10 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application),
                     loadedBookUrl = book.bookUrl
                     syncBookState(book)
                     upContent()
+                    // 热缓存路径不经 loadContent：进书同步在此消费（一次性）
+                    if (syncGate.consumeEntrySync()) {
+                        engine.syncCloudProgress(ReaderSyncTrigger.BookEntered)
+                    }
                     engine.refreshToc()
                     return@launch
                 }
@@ -922,6 +941,8 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application),
             // 等待的首屏分页抢 I/O（宿主"相邻章等当前章装载完成"同一条教训）；
             // 幂等启动，退出阅读（本 VM 销毁）或换书时由 stop 收尾。
             loadedBookUrl?.let { ReaderSessionCache.start(it) }
+            // 阅读活动重置周期备份计时（宿主 startBackupJob 同位）
+            restartProgressBackupTimer()
         }
         success?.invoke()
     }
@@ -932,6 +953,10 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application),
 
     override fun onContentLoadFinish() {
         upContent()
+        // 新会话首次内容就绪：触发进书同步（一次性；宿主 loadDataCompleted 尾部位）
+        if (syncGate.consumeEntrySync()) {
+            engine.syncCloudProgress(ReaderSyncTrigger.BookEntered)
+        }
     }
 
     /** 排版异常（如内容为空、测量失败）：显示错误而不是停留在加载中。 */
@@ -952,9 +977,15 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application),
         }
     }
 
+    override fun onCloudProgressNewer(progress: ReaderCloudProgress) {
+        _uiState.update { it.copy(cloudProgressPrompt = progress) }
+    }
+
     override fun onCleared() {
         super.onCleared()
         stopAutoPlay()
+        progressBackupJob?.cancel()
+        unregisterNetworkWatcher()
         // 会话缓存随阅读条目一起退场（本 VM 按导航条目作用域：目录/换源压栈时
         // 条目仍在、缓存仍在；条目被 pop/替换时清理订阅，不常驻）
         loadedBookUrl?.let { ReaderSessionCache.stop(it) }
@@ -962,6 +993,71 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application),
             // 落库阅读进度（更新 durChapterTime，书架按最后阅读排序据此置顶）
             engine.saveReadingProgress()
             engine.unregister(this)
+        }
+    }
+
+    // ==================== 云端进度同步（宿主同步阅读进度/同步增强迁移位）====================
+
+    /** Activity 级恢复（ON_RESUME）：引擎应用 Web 暂存进度；注册网络监听。 */
+    fun onActivityResumed() {
+        engine.syncCloudProgress(ReaderSyncTrigger.ReaderResumed)
+        registerNetworkWatcher()
+    }
+
+    /** Activity 级暂停（ON_PAUSE）：取消周期备份、同步/上传进度、关初始窗口、停网络监听。 */
+    fun onActivityPaused() {
+        progressBackupJob?.cancel()
+        engine.syncCloudProgress(ReaderSyncTrigger.ReaderPaused)
+        syncGate.onPaused()
+        unregisterNetworkWatcher()
+    }
+
+    /** 用户确认恢复云端进度。 */
+    fun confirmCloudProgress() {
+        _uiState.value.cloudProgressPrompt?.let { prompt ->
+            _uiState.update { it.copy(cloudProgressPrompt = null) }
+            engine.applyCloudProgress(prompt)
+        }
+    }
+
+    /** 用户放弃恢复云端进度（保留本地进度）。 */
+    fun dismissCloudProgress() {
+        _uiState.update { it.copy(cloudProgressPrompt = null) }
+    }
+
+    /** 周期进度备份计时（宿主 startBackupJob 同位：阅读活动重置 5 分钟计时）。 */
+    private fun restartProgressBackupTimer() {
+        progressBackupJob?.cancel()
+        progressBackupJob = viewModelScope.launch(Dispatchers.IO) {
+            delay(PROGRESS_BACKUP_INTERVAL_MS)
+            engine.syncCloudProgress(ReaderSyncTrigger.BackupTimer)
+        }
+    }
+
+    /** 网络恢复监听（宿主 NetworkChangedListener 同位；minSdk 26 恒走 NetworkCallback）。 */
+    private fun registerNetworkWatcher() {
+        if (networkWatcher != null) return
+        val cm = getApplication<Application>()
+            .getSystemService(ConnectivityManager::class.java) ?: return
+        val watcher = object : ConnectivityManager.NetworkCallback() {
+            override fun onAvailable(network: Network) {
+                if (syncGate.allowNetworkSync()) {
+                    engine.syncCloudProgress(ReaderSyncTrigger.NetworkAvailable)
+                }
+            }
+        }
+        runCatching { cm.registerDefaultNetworkCallback(watcher) }
+            .onFailure { return }
+        networkWatcher = watcher
+    }
+
+    private fun unregisterNetworkWatcher() {
+        val watcher = networkWatcher ?: return
+        networkWatcher = null
+        runCatching {
+            getApplication<Application>()
+                .getSystemService(ConnectivityManager::class.java)
+                ?.unregisterNetworkCallback(watcher)
         }
     }
 }
@@ -983,6 +1079,9 @@ internal const val VIEW_SIZE_TIMEOUT_MS = 2000L
 
 /** 快速连续调参的重排合并窗口（毫秒）。 */
 internal const val RELAYOUT_DEBOUNCE_MS = 200L
+
+/** 周期进度备份间隔（毫秒），宿主 startBackupJob 同值。 */
+internal const val PROGRESS_BACKUP_INTERVAL_MS = 5 * 60 * 1000L
 
 /** 自动翻页间隔可调区间（秒），与宿主 autoReadSpeed（默认 10）一致。 */
 internal const val DEFAULT_AUTO_INTERVAL_SEC = 10
