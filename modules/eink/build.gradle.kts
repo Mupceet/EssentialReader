@@ -57,6 +57,10 @@ dependencies {
 
     // ViewModel + 协程（模块承载全部 E-Ink ViewModel）
     implementation(libs.bundles.coroutines)
+    // 入口基类 EInkHostActivity 为 AppCompatActivity（宿主 DialogFragment
+    // 弹层——段评半屏 WebView 等——的事务宿主，见其 KDoc）；模块自身
+    // 仍不组合任何 AppCompat UI
+    implementation(libs.appcompat.appcompat)
     // 与宿主同轨（catalog 2.11.0）。曾钉 2.9.4 以保 compileSdk 36 兼容
     // 下限，下限回到 37 后钉版失去意义
     implementation(libs.androidx.lifecycle.viewmodel.compose)
@@ -98,7 +102,11 @@ afterEvaluate {
                 //         onConfigurationChanged 推进 State（修复使用中切换
                 //         不生效）+ 排版阶梯重排与界面样式对位（body 18/16/14
                 //         统一 Normal，title/label 抬档；列表行高计入行距
-                //         内边距并随阶梯自适应）
+                //         内边距并随阶梯自适应）+ 段评查看：图片槽位带
+                //         source/action 交互元数据、ReaderEngine 新增
+                //         dispatchImageAction（默认无操作，旧宿主点按无响应）
+                //         且入口基类改 AppCompatActivity（源码级基类变更，
+                //         宿主子类须随 AAR 重编译）
                 version = "0.4.0"
             }
         }

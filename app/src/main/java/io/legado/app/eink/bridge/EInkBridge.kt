@@ -34,6 +34,24 @@ private const val KEY_READER_KEEP_SCREEN_ON = "einkReaderKeepScreenOn"
  */
 object EInkBridge {
 
+    /**
+     * 当前在前的 E-Ink 宿主 Activity（EinkMainActivity onStart/onStop 挂载）。
+     * 端口实现弹出宿主 UI 层（段评半屏 WebView 等 DialogFragment）的事务
+     * 宿主与生命周期作用域来源；无前台活动时（退后台/已销毁）相关分派
+     * 静默放弃。
+     */
+    private var hostActivity: androidx.appcompat.app.AppCompatActivity? = null
+
+    fun attachHostActivity(activity: androidx.appcompat.app.AppCompatActivity) {
+        hostActivity = activity
+    }
+
+    fun detachHostActivity(activity: androidx.appcompat.app.AppCompatActivity) {
+        if (hostActivity === activity) hostActivity = null
+    }
+
+    fun hostActivity(): androidx.appcompat.app.AppCompatActivity? = hostActivity
+
     fun install() {
         EInkEngineRegistry.install(
             globalSettings = GlobalSettingsImpl,

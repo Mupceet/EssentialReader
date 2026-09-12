@@ -35,6 +35,21 @@ class EInkMainActivity : EInkHostActivity() {
     override fun onInstallEngines() = EInkBridge.install()
 
     /**
+     * 挂载为端口弹层的宿主 Activity（段评半屏 WebView 等宿主 DialogFragment
+     * 的事务宿主与生命周期作用域；见 EInkBridge.attachHostActivity）。
+     * 基类 onCreate 为 final 编排，onStart/onStop 是可用的生命周期挂点。
+     */
+    override fun onStart() {
+        super.onStart()
+        EInkBridge.attachHostActivity(this)
+    }
+
+    override fun onStop() {
+        EInkBridge.detachHostActivity(this)
+        super.onStop()
+    }
+
+    /**
      * E-Ink 界面 UI 字体跟随宿主「外观 → 字体」（appFontPath）：复用
      * [rememberCustomFont] 的进程级缓存与异步加载（完整模式同一份缓存，
      * 跨模式往返首帧即命中）；字体文件加载完成前先以 null（平台默认）

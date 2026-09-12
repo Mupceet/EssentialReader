@@ -1,6 +1,7 @@
 package io.legado.app.eink.feature.reader.selection
 
 import io.legado.app.eink.contract.ReaderDecorationRun
+import io.legado.app.eink.contract.ReaderImageSlot
 import io.legado.app.eink.contract.ReaderPageLine
 import io.legado.app.eink.contract.ReaderPageSnapshot
 import io.legado.app.eink.contract.ReaderPaintSpec
@@ -28,11 +29,28 @@ private fun line(
     decorations = decorations,
 )
 
-private fun snapshot(vararg lines: ReaderPageLine) = ReaderPageSnapshot(
+private fun snapshot(
+    vararg lines: ReaderPageLine,
+    images: List<ReaderImageSlot> = emptyList(),
+) = ReaderPageSnapshot(
     title = "章", readProgress = "1/1",
     titleSpec = ReaderPaintSpec(20f, 0f, null, null),
     contentSpec = ReaderPaintSpec(20f, 0f, null, null),
-    lines = lines.toList(), images = emptyList(),
+    lines = lines.toList(), images = images,
+)
+
+private fun imageSlot(
+    x0: Float,
+    x1: Float,
+    lineTop: Float,
+    lineBottom: Float,
+    action: String? = null,
+    source: String = "img.png",
+) = ReaderImageSlot(
+    x0 = x0, x1 = x1, lineTop = lineTop, lineBottom = lineBottom,
+    lineHeight = lineBottom - lineTop, fullLine = true,
+    loader = { _, _ -> null },
+    source = source, action = action,
 )
 
 private fun decorationRun(start: Int, end: Int, markingId: String = "m1") =
@@ -195,5 +213,47 @@ class ReaderSelectionInteractionPolicyTest {
         // 无待确认提交 / 无页：清态（常规页变语义）
         assertNull(pendingPreviewAfterPageVersion(decorated, committed = null))
         assertNull(pendingPreviewAfterPageVersion(page = null, committed = committed))
+    }
+
+    @Test
+    fun `点按命中带动作脚本的图片槽位`() {
+        // 段评气泡：行内小图矩形嵌在文本行盒内，点按落在槽位矩形即命中
+        val page = snapshot(
+            line("正文文字", positions = intArrayOf(0, 1, 2, 3)),
+            images = listOf(
+                imageSlot(
+                    x0 = 400f, x1 = 440f, lineTop = 30f, lineBottom = 70f,
+                    action = "java.showBrowser('u')",
+                    source = "bubble.png,{\"click\":\"java.showBrowser('u')\"}",
+                ),
+            ),
+        )
+
+        val slot = imageActionSlotAt(page, 420f, 50f)
+        assertNotNull(slot)
+        assertEquals("java.showBrowser('u')", slot!!.action)
+        assertEquals("bubble.png,{\"click\":\"java.showBrowser('u')\"}", slot.source)
+        // 边界含端点（矩形闭区间）
+        assertNotNull(imageActionSlotAt(page, 400f, 30f))
+        assertNotNull(imageActionSlotAt(page, 440f, 70f))
+    }
+
+    @Test
+    fun `无动作脚本的图片与槽位外的点按不命中`() {
+        val page = snapshot(
+            line("正文文字", positions = intArrayOf(0, 1, 2, 3)),
+            images = listOf(
+                imageSlot(x0 = 400f, x1 = 440f, lineTop = 30f, lineBottom = 70f),
+                imageSlot(x0 = 500f, x1 = 540f, lineTop = 30f, lineBottom = 70f, action = "js"),
+            ),
+        )
+
+        // 普通插图（无 action）不参与命中——回落分区行为
+        assertNull(imageActionSlotAt(page, 420f, 50f))
+        // 槽位矩形外（相邻文字区/下一行）
+        assertNull(imageActionSlotAt(page, 510f, 100f))
+        assertNull(imageActionSlotAt(page, 200f, 50f))
+        // 带动作脚本的槽位照常命中
+        assertEquals("js", imageActionSlotAt(page, 520f, 50f)?.action)
     }
 }

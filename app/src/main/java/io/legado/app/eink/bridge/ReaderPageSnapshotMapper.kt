@@ -127,6 +127,10 @@ internal object ReaderPageSnapshotMapper {
                             } else {
                                 { _, _ -> null }
                             },
+                            // 交互元数据原样透传（点击动作分派用，见契约
+                            // ReaderImageSlot KDoc）；与几何测量无关
+                            source = element.source,
+                            action = element.action,
                         )
                     )
                 }

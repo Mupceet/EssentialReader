@@ -96,6 +96,9 @@ class BottomWebViewDialog() : BottomSheetDialogFragment(R.layout.dialog_web_view
 
     companion object {
         const val DEFAULT_JS_INJECT_URL = "https://legado-inject-js.internal"
+
+        /** 翻页控制条步长比例：视口高的 0.5。**/
+        const val PAGE_SCROLL_FACTOR = 0.5f
     }
 
     constructor(
@@ -104,7 +107,8 @@ class BottomWebViewDialog() : BottomSheetDialogFragment(R.layout.dialog_web_view
         url: String,
         html: String? = null,
         preloadJs: String? = null,
-        config: String? = null
+        config: String? = null,
+        noTransition: Boolean = false
     ) : this() {
         arguments = Bundle().apply {
             putString("sourceKey", sourceKey)
@@ -113,8 +117,16 @@ class BottomWebViewDialog() : BottomSheetDialogFragment(R.layout.dialog_web_view
             putString("html", html)
             putString("preloadJs", preloadJs)
             putString("config", config)
+            putBoolean("noTransition", noTransition)
         }
     }
+
+    /**
+     * 无过渡动画呈现（墨水屏：连续动画即连续残影）。显示/消失两个来源
+     * 都要处理——见 [onStart] 的窗口动画清零与全屏态预置。
+     */
+    private val noTransition: Boolean
+        get() = arguments?.getBoolean("noTransition") ?: false
 
     private val binding by viewBinding(DialogWebViewBinding::bind)
     private val bottomSheet by lazy {
@@ -155,6 +167,9 @@ class BottomWebViewDialog() : BottomSheetDialogFragment(R.layout.dialog_web_view
     private var needClearHistory = true
     private var isBasicJsInjected = false
 
+    /** 翻页控制条是否启用（[Config.pageControls]；全屏视频期间可见性另行隐藏）。 */
+    private var pageControlsEnabled = false
+
     override fun onAttach(context: Context) {
         super.onAttach(context)
         currentWebView = WebView(context)
@@ -165,6 +180,15 @@ class BottomWebViewDialog() : BottomSheetDialogFragment(R.layout.dialog_web_view
     override fun onStart() {
         super.onStart()
         setLayout(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
+        if (noTransition) {
+            // 墨水屏去过渡动画，两个来源一并处理：
+            //  1. 窗口进出动画清零——显示与 dismiss 都走窗口动画，置 0 即时呈现/消失；
+            //  2. 布局前预置全屏态——settle 滑动发生在"布局后再改 state"，
+            //     此时 sheet 尚未完成首次布局，state 直接生效不动画（随后
+            //     setConfig 再设 EXPANDED 为幂等空操作）
+            dialog?.window?.setWindowAnimations(0)
+            behavior?.state = BottomSheetBehavior.STATE_EXPANDED
+        }
     }
 
     override fun show(manager: FragmentManager, tag: String?) {
@@ -365,6 +389,27 @@ class BottomWebViewDialog() : BottomSheetDialogFragment(R.layout.dialog_web_view
                 currentWebView.setOnLongClickListener(null)
             }
         }
+
+        // 墨水屏翻页控制条（eink 分派路径强制开启；书源 config 亦可 opt-in）
+        config.pageControls?.let { enabled ->
+            pageControlsEnabled = enabled
+            binding.pageControlsBar.visibility = if (enabled) View.VISIBLE else View.GONE
+        }
+    }
+
+    /** 翻页控制条步长（px，视口高 × [PAGE_SCROLL_FACTOR]）。 */
+    private fun pageScrollStepPx(): Int =
+        (currentWebView.height * PAGE_SCROLL_FACTOR).toInt().coerceAtLeast(1)
+
+    /**
+     * 翻页控制条滚动：按步长即时跳转——墨水屏不做平滑滚动（连续动画
+     * 即连续残影）；目标位置按内容实际高度双向钳制，越界静默停边界。
+     */
+    private fun scrollWebViewBy(deltaPx: Int) {
+        val maxScroll = ((currentWebView.contentHeight * currentWebView.scale).toInt() -
+            currentWebView.height).coerceAtLeast(0)
+        val target = (currentWebView.scrollY + deltaPx).coerceIn(0, maxScroll)
+        currentWebView.scrollTo(0, target)
     }
 
     private fun setLongClickSaveImg() {
@@ -396,6 +441,11 @@ class BottomWebViewDialog() : BottomSheetDialogFragment(R.layout.dialog_web_view
         super.onViewCreated(view, savedInstanceState)
         view.setBackgroundColor(0)
         binding.webViewContainer.addView(currentWebView)
+        // 翻页控制条（见 Config.pageControls）：按步长滚动 + 显式关闭，
+        // 可见性由 setConfig 按配置应用，监听常挂无妨
+        binding.pageUp.setOnClickListener { scrollWebViewBy(-pageScrollStepPx()) }
+        binding.pageDown.setOnClickListener { scrollWebViewBy(pageScrollStepPx()) }
+        binding.pageClose.setOnClickListener { dismiss() }
         observeAppTheme()
         lifecycleScope.launch(IO) {
             val args = arguments
@@ -717,6 +767,15 @@ class BottomWebViewDialog() : BottomSheetDialogFragment(R.layout.dialog_web_view
         var dialogHeight: Int? = null,
         var longClickSaveImg: Boolean? = null,
         var scrollNoDraggable: Boolean? = null,
+
+        /**
+         * 墨水屏翻页控制条（eink 分派路径经
+         * `forcedFullscreenBrowserConfig` 强制开启；书源 config 亦可
+         * opt-in）：底部悬浮「上一页 / 关闭 / 下一页」三键。WebView
+         * 触摸滚动在墨水屏上不可靠，改按钮按视口一半步进滚动
+         * （50% 重叠保持上下文连续、无动画），关闭键直接 dismiss。
+         */
+        var pageControls: Boolean? = null,
     )
 
     inner class CustomWebChromeClient : WebChromeClient() {
@@ -724,6 +783,8 @@ class BottomWebViewDialog() : BottomSheetDialogFragment(R.layout.dialog_web_view
             originOrientation = activity?.requestedOrientation
             isFullScreen = true
             binding.webViewContainer.invisible()
+            // 全屏视频期间翻页控制条随内容层隐藏，退出视频再恢复
+            if (pageControlsEnabled) binding.pageControlsBar.invisible()
             binding.customWebView.addView(view)
             customWebViewCallback = callback
             behavior?.state = BottomSheetBehavior.STATE_EXPANDED
@@ -736,6 +797,7 @@ class BottomWebViewDialog() : BottomSheetDialogFragment(R.layout.dialog_web_view
             }
             isFullScreen = false
             binding.webViewContainer.visible()
+            if (pageControlsEnabled) binding.pageControlsBar.visible()
             binding.customWebView.removeAllViews()
             customWebViewCallback = null
         }

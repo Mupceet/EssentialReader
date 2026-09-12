@@ -102,6 +102,7 @@ import io.legado.app.eink.feature.reader.selection.flipDirectionForDrag
 import io.legado.app.eink.feature.reader.selection.flipEdgeHit
 import io.legado.app.eink.feature.reader.selection.handleAnchors
 import io.legado.app.eink.feature.reader.selection.hitTest
+import io.legado.app.eink.feature.reader.selection.imageActionSlotAt
 import io.legado.app.eink.feature.reader.selection.joinSegments
 import io.legado.app.eink.feature.reader.selection.markingIdForSelection
 import io.legado.app.eink.feature.reader.selection.markingThoughtFromNote
@@ -814,6 +815,9 @@ fun ReaderRoute(
             // 点按标记操作条外：只收操作条（吞掉本次点按，见 ReaderTapDispatch）
             onMarkingBarDismiss = { markingBar = null },
             onMarkingAction = onMarkingAction,
+            // 可交互图片点击（段评气泡）→ 宿主执行动作脚本（脚本求值与
+            // 弹层都在宿主侧，旧宿主默认无操作）
+            onImageAction = viewModel::dispatchImageAction,
         )
 
         // 面板/弹框外空白区一次性收起：直接回到干净阅读界面
@@ -1065,8 +1069,10 @@ fun ReaderRoute(
  * 手势（规范 §16）：
  * - 操作条可见时：点/滑动正文任意处收起操作条；
  * - 操作条隐藏时：点中间 40% 唤出操作条，点其余区域下一页；无选区点按
- *   命中已有标记（行内装饰 run 且 markingId 非空——空串为宿主高亮规则
- *   等非用户标记来源，视为未命中）改为上抛 [onMarkingTap]（划线/想法 →
+ *   命中带动作脚本的图片槽位（段评气泡）改为上抛 [onImageAction]（脚本
+ *   求值与弹层在宿主侧）；命中已有标记（行内装饰 run 且 markingId 非空
+ *   ——空串为宿主高亮规则等非用户标记来源，视为未命中）改为上抛
+ *   [onMarkingTap]（划线/想法 →
  *   同一操作条，想法键再开编辑更新弹框；标记失效静默回落分区行为；
  *   [selectionEnabled] = false
  *   降级宿主不启用）；浮层在场时点按只收它们并吞掉本次点按（选区经
@@ -1135,6 +1141,7 @@ internal fun ReaderScreen(
     onMarkingTap: (selection: ReaderSelectionUi, markingId: String, onMiss: () -> Unit) -> Unit,
     onMarkingBarDismiss: () -> Unit,
     onMarkingAction: (ReaderMarkingAction) -> Unit,
+    onImageAction: (action: String, source: String) -> Unit,
 ) {
     // 纯净阅读底色/字色随日/夜间主题（决策 B1/B2 修订：仍不读取
     // bgStrEInk / textColorEInk 等用户配色配置，颜色由主题统一下发）
@@ -1251,8 +1258,20 @@ internal fun ReaderScreen(
                             // 命中已有标记（装饰 run 覆盖命中字符且 markingId
                             // 非空——空串为宿主高亮规则等非用户标记来源，视为
                             // 未命中）→ 上抛查详情分浮条/浮窗；未命中或降级
-                            // 宿主（选择交互整体不启用）→ 原分区行为
+                            // 宿主（选择交互整体不启用）→ 原分区行为。
+                            // 可交互图片（段评气泡，带动作脚本）优先于标记与
+                            // 分区命中——行内小图矩形嵌在视觉行内，文本命中
+                            // 会把气泡点按误读成相邻文字（见 imageActionSlotAt）
                             val page = currentPage
+                            if (page != null) {
+                                imageActionSlotAt(page, offset.x, offset.y)?.let { slot ->
+                                    val action = slot.action
+                                    if (!action.isNullOrEmpty()) {
+                                        onImageAction(action, slot.source)
+                                        return@detectTapGestures
+                                    }
+                                }
+                            }
                             if (selectionEnabled && page != null) {
                                 val hit = hitTest(page, offset.x, offset.y, measureContent)
                                 if (hit != null) {
