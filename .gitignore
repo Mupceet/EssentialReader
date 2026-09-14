@@ -22,3 +22,4 @@ node_modules/
 /.debug-runs/
 __pycache__/
 *.py[cod]
+/tools/icon/out/
