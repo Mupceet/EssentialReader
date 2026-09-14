@@ -178,10 +178,14 @@ class ChangeSourceViewModel(application: Application) : AndroidViewModel(applica
     /**
      * 应用换源：宿主获取目录 → 迁移进度 → 替换记录 → 重载阅读会话。
      * 成功后由 UI 层 pop 返回阅读页（Route 层回调）。
+     *
+     * 选中即中止搜索（已到达结果保留）：换源成功即返回上一级，落选源
+     * 的搜索不再有意义；换源失败留在本页，可手动重新搜索。
      */
     fun changeTo(searchBook: ChangeSourceResultUiModel, onChanged: () -> Unit) {
         if (_uiState.value.isChanging) return
         val handle = bookHandle ?: return
+        stopSearch()
         changeJob = viewModelScope.launch(Dispatchers.IO) {
             _uiState.update { it.copy(isChanging = true) }
             try {
