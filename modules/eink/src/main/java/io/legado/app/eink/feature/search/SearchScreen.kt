@@ -198,9 +198,17 @@ fun SearchRoute(
         }
 
         // 历史删除/删除态切换都会重排行（条目变少、chip 加 ✕ 变宽）：把实际
-        // 滚动位置拉回当前页首；结果列表只增不减，沿用原实现不 realign
-        LaunchedEffect(historyRows, isResultListVisible) {
-            if (!isResultListVisible) pager.realignToPageStart(historyRows.size)
+        // 滚动位置拉回当前页首。结果列表同样需要：结果按批 merge+sort 全量
+        // 重排，已在书架的书（精确命中 + originsCount 上涨）会插到当前锚点
+        // 之上——LazyColumn 按 key 锚定，视口跟原首项走，新页首被顶出可视区
+        // 之上且 pageStart 未变（向上翻页箭头不可用），用户翻下去再翻回来才
+        // 能看到；realign 恢复"实际位置 = 页首"不变式（无漂移时为空操作）
+        LaunchedEffect(historyRows, uiState.results, isResultListVisible) {
+            if (isResultListVisible) {
+                pager.realignToPageStart(uiState.results.size)
+            } else {
+                pager.realignToPageStart(historyRows.size)
+            }
         }
 
         Column(
