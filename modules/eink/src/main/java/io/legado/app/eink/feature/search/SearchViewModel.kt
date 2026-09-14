@@ -237,6 +237,19 @@ class SearchViewModel(application: Application) : AndroidViewModel(application) 
         _uiState.update { it.copy(isSearching = false) }
     }
 
+    /**
+     * 挂起进行中的搜索（搜索页离开组合时调用）：剩余书源不再启动，
+     * 在途源结果照常合并；搜索中状态不变——挂起不是停止。
+     */
+    fun pauseSearch() {
+        searchSession.pauseSearch()
+    }
+
+    /** 恢复挂起的搜索（搜索页回到组合时调用）；无进行中搜索时为空操作。 */
+    fun resumeSearch() {
+        searchSession.resumeSearch()
+    }
+
     /** 清空搜索历史 */
     fun clearHistory() {
         viewModelScope.launch {

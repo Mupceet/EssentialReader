@@ -6,8 +6,10 @@ import kotlinx.coroutines.flow.Flow
  * 一次多书源搜索的会话句柄。
  *
  * 生命周期：模块在进入搜索时 [SearchEngine.createSearchSession]，会话
- * 期间可多次 [search]（新搜索应中断上一次进行中的源搜索），离开搜索页
- * 时 [close]。[close] 后宿主不得再向回调发事件。
+ * 期间可多次 [search]（新搜索应中断上一次进行中的源搜索）；搜索页
+ * 离开组合（如点击结果进详情页）时经 [pauseSearch] 挂起、回到组合时
+ * 经 [resumeSearch] 恢复；最终离开搜索页时 [close]。[close] 后宿主
+ * 不得再向回调发事件。
  */
 interface SearchSession {
 
@@ -24,6 +26,19 @@ interface SearchSession {
 
     /** 取消进行中的搜索（已发出的结果保留，回调收到 [SearchSessionCallback.onSearchCancel]）。 */
     fun cancelSearch()
+
+    /**
+     * 挂起进行中的搜索：剩余书源不再启动，已发出的结果保留；正在执行
+     * 的源搜索照常完成并继续经回调推送（不触发 [SearchSessionCallback]
+     * 的取消/结束事件，搜索仍视为进行中）。无进行中搜索时为空操作。
+     */
+    fun pauseSearch()
+
+    /**
+     * 恢复被 [pauseSearch] 挂起的搜索，继续剩余书源；未挂起或无进行中
+     * 搜索时为空操作。新一轮 [search] 总是从运行态开始（隐含恢复）。
+     */
+    fun resumeSearch()
 
     /** 结束会话，释放宿主侧资源。 */
     fun close()
@@ -85,6 +100,8 @@ interface SearchSessionCallback {
  *              └─ session.search(searchId, query)
  *                   └─ 回调事件时序见 [SearchSessionCallback]
  * 再次搜索 ─► session.search(新 searchId, 新 query)（旧源搜索被中断）
+ * 搜索页离开组合 ─► session.pauseSearch()（剩余书源不再启动）
+ * 搜索页回到组合 ─► session.resumeSearch()（继续剩余书源）
  * 离开页面 ─► session.close()
  * ```
  *

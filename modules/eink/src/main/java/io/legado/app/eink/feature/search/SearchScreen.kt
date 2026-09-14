@@ -19,6 +19,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -84,6 +85,14 @@ fun SearchRoute(
     val pager = rememberEInkListPagerState()
     val scope = rememberCoroutineScope()
     val keyboard = LocalSoftwareKeyboardController.current
+
+    // 搜索页离开组合（点击结果进详情等）即挂起剩余源搜索、回来恢复：
+    // 与主搜索页离开页面的引擎门控语义对齐，避免后台空跑剩余源；
+    // 在途源结果照常合并。首次进入无搜索，恢复为空操作。
+    DisposableEffect(Unit) {
+        viewModel.resumeSearch()
+        onDispose { viewModel.pauseSearch() }
+    }
 
     fun triggerSearch(key: String) {
         if (key.isBlank()) return

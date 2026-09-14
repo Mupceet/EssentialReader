@@ -109,10 +109,13 @@ internal object SearchEngineImpl : SearchEngine, KoinComponent {
 
         private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
         private val searchUseCase = SearchBooksUseCase(AppDbSearchGateway)
+        private val searchControl = BookSearchControl()
         private var searchJob: Job? = null
 
         override fun search(searchId: Long, query: String) {
             cancelSearch()
+            // 新一轮从运行态开始：清掉上一轮遗留的挂起门
+            searchControl.resume()
             searchJob = scope.launch {
                 try {
                     // 范围与匹配模式均沿用主搜索页的持久化 local_ui_status 键，
@@ -130,7 +133,7 @@ internal object SearchEngineImpl : SearchEngine, KoinComponent {
                                 concurrency = downloadCacheSettingsGateway.currentSettings.threadCount,
                                 types = null,
                             ),
-                            BookSearchControl(),
+                            searchControl,
                         )
                         .collect { event ->
                             when (event) {
@@ -165,6 +168,14 @@ internal object SearchEngineImpl : SearchEngine, KoinComponent {
         override fun cancelSearch() {
             searchJob?.cancel()
             searchJob = null
+        }
+
+        override fun pauseSearch() {
+            searchControl.pause()
+        }
+
+        override fun resumeSearch() {
+            searchControl.resume()
         }
 
         override fun close() {
