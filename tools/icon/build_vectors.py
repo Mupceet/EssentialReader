@@ -15,6 +15,7 @@ import xml.etree.ElementTree as ET
 
 BASE = os.path.dirname(os.path.abspath(__file__))
 OUT_DIR = os.path.join(BASE, "out")
+DAY, NIGHT = "drawable", "drawable-night"
 VISIBLE_RADIUS = 170.5  # 72/108 * 256
 PAIR = re.compile(r"(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)")
 SVG_NS = "{http://www.w3.org/2000/svg}"
@@ -58,25 +59,31 @@ def drawable_xml(paths):
         '</vector>\n'
     )
 
-# (输出文件名, 源 SVG, 选用 path 下标, fill 覆盖；None=沿用 SVG 内 fill)
+# (输出相对路径, 源 SVG, 选用 path 下标, fill 覆盖；None=沿用 SVG 内 fill，list=按下标)
+# 深色模式（drawable-night）黑白整体反转：底色由 values-night 提供（黑），前景色板反转
 JOBS = [
-    ("ic_launcher_foreground.xml", "muben-seal-filled.svg", [0, 1], None),
-    # monochrome 只取字画，系统按主题着色，强制不透明白
-    ("ic_launcher_foreground_m.xml", "muben-seal-filled.svg", [1], "#FFFFFFFF"),
-    ("ic_launcher_foreground_zhuwen.xml", "muben-seal-line.svg", [0], None),
+    (f"{DAY}/ic_launcher_foreground.xml", "muben-seal-filled.svg", [0, 1], None),
+    # monochrome 只取字画，系统按主题着色，强制不透明白；深浅皆用同一份遮罩，无 night 变体
+    (f"{DAY}/ic_launcher_foreground_m.xml", "muben-seal-filled.svg", [1], ["#FFFFFFFF"]),
+    (f"{DAY}/ic_launcher_foreground_zhuwen.xml", "muben-seal-line.svg", [0], None),
+    (f"{NIGHT}/ic_launcher_foreground.xml", "muben-seal-filled.svg", [0, 1],
+     ["#FFFFFFFF", "#FF000000"]),
+    (f"{NIGHT}/ic_launcher_foreground_zhuwen.xml", "muben-seal-line.svg", [0],
+     ["#FFFFFFFF"]),
 ]
 
 def main():
     os.makedirs(OUT_DIR, exist_ok=True)
-    for fname, svg, idx, fill_override in JOBS:
-        paths = load_paths(svg)
-        picked = [(d, fill_override or fill) for i, (d, fill) in enumerate(paths)
-                  if i in idx]
+    for rel, svg, idx, fill_override in JOBS:
+        sel = [(d, fill) for i, (d, fill) in enumerate(load_paths(svg)) if i in idx]
+        picked = [(d, fill_override[k] if fill_override else fill)
+                  for k, (d, fill) in enumerate(sel)]
         picked = center_paths(picked)
-        out_path = os.path.join(OUT_DIR, fname)
+        out_path = os.path.join(OUT_DIR, rel)
+        os.makedirs(os.path.dirname(out_path), exist_ok=True)
         with open(out_path, "w", encoding="utf-8") as f:
             f.write(drawable_xml(picked))
-        print(f"{fname}: paths={len(picked)}")
+        print(f"{rel}: paths={len(picked)}")
 
 if __name__ == "__main__":
     main()

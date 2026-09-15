@@ -66,9 +66,9 @@ RDP（eps 3.0）描回矢量 → SVG（512 视窗，evenodd 填充，纯折线 p
 
 | 层 | 资源 | 说明 |
 |---|---|---|
-| background | 纯白 | `@color/ic_launcher_background` = #FFFFFF（章体已画进前景，背景只做留白底） |
-| foreground | 白文矢量两条 path（黑章盘 + 白字） | 章体几何由 SVG 权威给出（外半径 150，已留呼吸边），转换仅居中不缩放 |
-| monochrome | 仅白文字画 | Android 13+ 主题图标，系统着色；章盘不参与（实底会盖住字画） |
+| background | 浅色 #FFFFFF / 深色 #000000（`values-night/colors.xml`） | 底色只做留白底，随系统深浅切换 |
+| foreground | 白文矢量两条 path（黑章盘 + 白字）；`drawable-night/` 夜变体黑白整体反转（白盘 + 黑字） | 章体几何由 SVG 权威给出（外半径 150，已留呼吸边），转换仅居中不缩放 |
+| monochrome | 仅白文字画 | Android 13+ 主题图标，系统着色；无 night 变体（遮罩与颜色无关），章盘不参与（实底会盖住字画） |
 
 朱文版经 `LauncherW` 别名（`@mipmap/launcherw`）接入：background 纯白 +
 foreground/monochrome = 圆环 + 字画矢量（圆环外缘 r150）。应用内换图标选「W」即切换到
@@ -84,7 +84,17 @@ foreground/monochrome = 圆环 + 字画矢量（圆环外缘 r150）。应用内
   弧线参数误当坐标。
 - 生成链在版本控制内：`tools/icon/make_icons.py` + `svg/` 源 + `build_vectors.py`。
 
-### 4.3 已排除的方案
+### 4.3 深浅模式自适应
+
+- `drawable-night/` 提供前景夜变体（黑白整体反转），`values-night/colors.xml` 把两个
+  图标底色转黑；启动器跟随**系统**深浅模式重新取资源——应用内阅读模式的深浅开关
+  不影响桌面图标；
+- monochrome 遮罩与颜色无关，无 night 变体；
+- debug 变体的 `values/colors.xml` 覆盖了底色且无 night 资源，debug 构建（棕底）恒为
+  浅色形态；
+- 老 ROM 启动器若不响应 uiMode 变更重取资源，保持浅色版不变（无害回退）。
+
+### 4.4 已排除的方案
 
 - 方形章（圆形蒙版下边框被裁残、观感差）→ 已改圆章；
 - 楷体直出（无金石味）→ 已换新魏 + 印化；
