@@ -35,23 +35,25 @@ import numpy as np
 SEAL_FONT = "C:/Windows/Fonts/STXINWEI.TTF"
 SEAL_RENDER = 2048  # 印化工序分辨率，描回矢量后缩到 512
 SEAL_LEVELS = {"无": 0, "轻": 1, "中": 2, "重": 3}
-SEAL_LEVEL = 1  # 已定档：轻（2026-09-14 拍板）
+SEAL_LEVEL = 2  # 已定档：单字墨配残破·中（2026-09-15 拍板；墨本双字版曾用轻档，可用 chars 参数回跑）
 
 def _blur(arr, r):
     img = Image.fromarray(arr)
     return np.asarray(img.filter(ImageFilter.GaussianBlur(r)))
 
-def seal_marks(zhuwen, level=SEAL_LEVEL):
-    """生成圆章字画掩码（True=字画）。zhuwen=False 白文（只有字），True 朱文（字+圆环栏）。"""
+def seal_marks(zhuwen, level=SEAL_LEVEL, chars=None):
+    """生成圆章字画掩码。chars=None 默认单字「墨」居中；墨本双字版传 (("墨", 0.28), ("本", 0.72))。"""
+    chars = chars or (("墨", 0.5),)
     n = SEAL_RENDER
     img = Image.new("L", (n, n), 0)
     d = ImageDraw.Draw(img)
-    ch_size = 0.35 if zhuwen else 0.37  # 朱文有圆环，字略收
+    # 单字占面更大；朱文有圆环，字略收
+    ch_size = 0.60 if len(chars) == 1 else (0.35 if zhuwen else 0.37)
     f = ImageFont.truetype(SEAL_FONT, int(n * ch_size))
     if zhuwen:  # 圆环边栏
         inset, sw = int(n * 0.022), int(n * 0.030)
         d.ellipse([inset, inset, n - inset, n - inset], outline=255, width=sw)
-    for ch, cy in (("墨", 0.28), ("本", 0.72)):
+    for ch, cy in chars:
         bb = d.textbbox((0, 0), ch, font=f)
         d.text((n / 2 - (bb[0] + bb[2]) / 2, n * cy - (bb[1] + bb[3]) / 2),
                ch, font=f, fill=255)
@@ -150,8 +152,8 @@ def trace_path(marks):
         parts.append(d)
     return "".join(parts)
 
-def seal_svg(zhuwen, level=SEAL_LEVEL):
-    marks = seal_marks(zhuwen, level)
+def seal_svg(zhuwen, level=SEAL_LEVEL, chars=None):
+    marks = seal_marks(zhuwen, level, chars)
     d = trace_path(marks)
     if zhuwen:  # 朱文：白底，黑字画
         return svg_doc(f'<path d="{d}" fill="{BLACK}" fill-rule="evenodd"/>', WHITE)
