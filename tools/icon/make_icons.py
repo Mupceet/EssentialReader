@@ -41,17 +41,24 @@ def _blur(arr, r):
     img = Image.fromarray(arr)
     return np.asarray(img.filter(ImageFilter.GaussianBlur(r)))
 
+# 章面（印体）几何，512 视窗口径；2048 工序时 ×4
+PLATE_R = 150   # 章体外半径：收进 66dp 安全区并留呼吸边，圆形/圆角矩形蒙版下都完整可见
+RING_W = 15     # 朱文圆环宽
+
 def seal_marks(zhuwen, level=SEAL_LEVEL, chars=None):
-    """生成圆章字画掩码。chars=None 默认单字「墨」居中；墨本双字版传 (("墨", 0.28), ("本", 0.72))。"""
+    """生成字画掩码（不含白文章底盘——底盘由 seal_svg 以矢量圆绘制）。
+    chars=None 默认单字「墨」居中；墨本双字版传 (("墨", 0.28), ("本", 0.72))。"""
     chars = chars or (("墨", 0.5),)
     n = SEAL_RENDER
     img = Image.new("L", (n, n), 0)
     d = ImageDraw.Draw(img)
-    # 单字占面更大；朱文有圆环，字略收
-    ch_size = 0.60 if len(chars) == 1 else (0.35 if zhuwen else 0.37)
+    # 字面随章体缩：占章面内径约 2/3；朱文有圆环再收一档（inner 为 512 口径）
+    inner = (PLATE_R - RING_W) * 2 if zhuwen else PLATE_R * 2
+    ch_size = 0.67 * inner / (S * 1.09) * (1 if len(chars) == 1 else 0.62)
     f = ImageFont.truetype(SEAL_FONT, int(n * ch_size))
     if zhuwen:  # 圆环边栏
-        inset, sw = int(n * 0.022), int(n * 0.030)
+        inset = int(n / 2 - PLATE_R * 4)
+        sw = int(RING_W * 4)
         d.ellipse([inset, inset, n - inset, n - inset], outline=255, width=sw)
     for ch, cy in chars:
         bb = d.textbbox((0, 0), ch, font=f)
@@ -153,12 +160,18 @@ def trace_path(marks):
     return "".join(parts)
 
 def seal_svg(zhuwen, level=SEAL_LEVEL, chars=None):
-    marks = seal_marks(zhuwen, level, chars)
-    d = trace_path(marks)
-    if zhuwen:  # 朱文：白底，黑字画
+    d = trace_path(seal_marks(zhuwen, level, chars))
+    if zhuwen:  # 朱文：白底，黑圆环 + 黑字
         return svg_doc(f'<path d="{d}" fill="{BLACK}" fill-rule="evenodd"/>', WHITE)
-    # 白文：黑底圆章，白字
-    body = (f'<circle cx="{S / 2}" cy="{S / 2}" r="{S / 2 - 6}" fill="{BLACK}"/>'
+    # 白文：白底 + 黑色章体圆盘（矢量随前景走，背景层不再承担定形）+ 白字
+    # 圆盘用折线多边形（与描回路径同构，坐标正则才能正确处理）
+    import math as _math
+    r = PLATE_R
+    seg = 72
+    pts = [f"{256 + r * _math.sin(2 * _math.pi * i / seg):.1f},"
+           f"{256 - r * _math.cos(2 * _math.pi * i / seg):.1f}" for i in range(seg)]
+    plate = "M" + "L".join(pts) + "Z"
+    body = (f'<path d="{plate}" fill="{BLACK}"/>'
             f'<path d="{d}" fill="{WHITE}" fill-rule="evenodd"/>')
     return svg_doc(body)
 
