@@ -283,7 +283,7 @@ jobs:
 
           shopt -s nullglob
           for f in *.apk; do
-            out="legado-${VERSIONL}"
+            out="moben-${VERSIONL}"
             if [[ "$f" == *arm64-v8a* ]]; then
               out="${out}-arm64-v8a"
             elif [[ "$f" == *armeabi-v7a* ]]; then
@@ -337,7 +337,7 @@ jobs:
           body: ${{ steps.gen_body.outputs.release_body }}
           prerelease: ${{ needs.prepare.outputs.is_release != 'true' }}
           files: |
-            artifacts/legado-${{ needs.prepare.outputs.versionL }}*.apk
+            artifacts/moben-${{ needs.prepare.outputs.versionL }}*.apk
             artifacts/mapping.txt
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
