@@ -13,6 +13,7 @@ import android.graphics.Paint
 import androidx.core.graphics.createBitmap
 import androidx.core.graphics.scale
 import android.graphics.ColorSpace
+import android.os.Build
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import java.io.FileInputStream
@@ -29,6 +30,15 @@ import androidx.core.graphics.get
 
 @Suppress("WeakerAccess", "MemberVisibilityCanBePrivate")
 object BitmapUtils {
+
+    /**
+     * `inPreferredColorSpace` 是 API 26 才有的入口；API 24/25 交给解码器默认的 sRGB。
+     */
+    private fun BitmapFactory.Options.applySrgbColorSpaceIfSupported() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            inPreferredColorSpace = ColorSpace.get(ColorSpace.Named.SRGB)
+        }
+    }
 
     /**
      * 从path中获取图片信息,在通过BitmapFactory.decodeFile(String path)方法将突破转成Bitmap时，
@@ -50,7 +60,7 @@ object BitmapUtils {
             op.inSampleSize = calculateInSampleSize(op, width, height)
             op.inJustDecodeBounds = false
             op.inPreferredConfig = Config.ARGB_8888
-            op.inPreferredColorSpace = ColorSpace.get(ColorSpace.Named.SRGB)
+            op.applySrgbColorSpaceIfSupported()
             BitmapFactory.decodeFileDescriptor(fis.fd, null, op)
         }
     }
@@ -93,7 +103,7 @@ object BitmapUtils {
             BitmapFactory.decodeFileDescriptor(fis.fd, null, opts)
             opts.inSampleSize = computeSampleSize(opts, -1, 128 * 128)
             opts.inJustDecodeBounds = false
-            opts.inPreferredColorSpace = ColorSpace.get(ColorSpace.Named.SRGB)
+            opts.applySrgbColorSpaceIfSupported()
             BitmapFactory.decodeFileDescriptor(fis.fd, null, opts)
         }
     }
@@ -124,7 +134,7 @@ object BitmapUtils {
         BitmapFactory.decodeResource(context.resources, resId, op) //获取尺寸信息
         op.inSampleSize = calculateInSampleSize(op, width, height)
         op.inJustDecodeBounds = false
-        op.inPreferredColorSpace = ColorSpace.get(ColorSpace.Named.SRGB)
+        op.applySrgbColorSpaceIfSupported()
         return BitmapFactory.decodeResource(context.resources, resId, op)
     }
 
@@ -152,7 +162,7 @@ object BitmapUtils {
             op.inSampleSize = calculateInSampleSize(op, width, height)
             inputStream = context.assets.open(fileNameInAssets)
             op.inJustDecodeBounds = false
-            op.inPreferredColorSpace = ColorSpace.get(ColorSpace.Named.SRGB)
+            op.applySrgbColorSpaceIfSupported()
             BitmapFactory.decodeStream(inputStream, null, op)
         }
     }

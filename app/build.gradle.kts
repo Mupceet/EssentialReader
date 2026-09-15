@@ -52,7 +52,9 @@ android {
 
     defaultConfig {
         applicationId = "io.legato.kazusa.eink"
-        minSdk = 26
+        // minSdk 24：当前依赖栈（compose material3 / navigation / webkit）声明的最低值即 24。
+        // 代码侧原先依赖 API 26 的调用已加兼容分支，由 Api24CompatTest 在 sdk=24 下回归。
+        minSdk = 24
         targetSdk = 37
         versionCode = versionProps["VERSION_CODE"]?.toString()?.toInt() ?: 33000
         versionName = System.getenv("APP_VERSION_NAME") ?: projectVersionName

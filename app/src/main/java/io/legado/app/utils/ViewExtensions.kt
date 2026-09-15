@@ -83,7 +83,8 @@ fun EditText.showSoftInput() = run {
 }
 
 fun View.disableAutoFill() = run {
-    this.importantForAutofill = IMPORTANT_FOR_AUTOFILL_NO_EXCLUDE_DESCENDANTS
+    // 常量会被内联，调用走 ViewCompat：API 26 以下是空实现，不会碰到 26 才有的 View 方法。
+    ViewCompat.setImportantForAutofill(this, IMPORTANT_FOR_AUTOFILL_NO_EXCLUDE_DESCENDANTS)
 }
 
 fun View.applyTint(

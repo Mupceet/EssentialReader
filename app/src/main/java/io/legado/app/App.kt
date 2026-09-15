@@ -285,9 +285,11 @@ class App : Application(), SingletonImageLoader.Factory {
     }
 
     /**
-     * 创建通知ID
+     * 创建通知渠道。渠道是 API 26 引入的：24/25 上由 NotificationCompat 直接投递，
+     * 这里必须提前返回，否则会碰到不存在的 NotificationChannel。
      */
     private fun createNotificationChannels() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
         val downloadChannel = NotificationChannel(
             channelIdDownload,
             getString(R.string.action_download),

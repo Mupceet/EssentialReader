@@ -11,7 +11,8 @@ android {
         }
     }
     defaultConfig {
-        minSdk = 26
+        // 跟随宿主 minSdk；库 minSdk 高于宿主会导致 manifest merge 失败。
+        minSdk = 24
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         consumerProguardFiles += file("consumer-rules.pro")
