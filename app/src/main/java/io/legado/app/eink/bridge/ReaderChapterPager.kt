@@ -451,6 +451,7 @@ internal class ReaderChapterPager(
             append(viewportWidth).append('x').append(viewportHeight).append('|')
             append(style.columnMode).append('|')
             append(style.isScroll).append('|')
+            append(style.excludeActionImages).append('|')
             append(style.textBottomJustify).append('|')
             append(style.pageUnderline).append('|')
             append(style.emphasisUnderlineStyle).append('|')
