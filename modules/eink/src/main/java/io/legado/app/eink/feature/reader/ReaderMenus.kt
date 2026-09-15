@@ -32,6 +32,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import io.legado.app.eink.R
 import io.legado.app.eink.contract.ReaderStyleCatalog
@@ -347,6 +348,7 @@ internal fun ReaderPanelContainer(
     title: String,
     onClose: () -> Unit,
     onBackdropClick: () -> Unit,
+    contentHorizontalPadding: Dp = EInkSpacing.m,
     content: @Composable () -> Unit,
 ) {
     BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
@@ -385,12 +387,17 @@ internal fun ReaderPanelContainer(
                 EInkCloseButton(onClose = onClose)
             }
             EInkHorizontalDivider()
+            // 内容横向内边距参数化：含满宽行（OptionRow 整行按压块）的面板
+            // 传 0 让行天然铺满，行组件自管内容内边距；其余面板维持 m
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
                     .heightIn(max = maxContentHeight)
                     .verticalScroll(rememberScrollState())
-                    .padding(horizontal = EInkSpacing.m, vertical = EInkSpacing.s),
+                    .padding(
+                        horizontal = contentHorizontalPadding,
+                        vertical = EInkSpacing.s,
+                    ),
             ) {
                 content()
             }
@@ -671,7 +678,7 @@ internal fun ReaderOtherPanel(
     ToggleRow(label = "保持屏幕常亮", checked = state.keepScreenOn, onToggle = onToggleKeepScreenOn)
     ToggleRow(label = "隐藏状态栏", checked = state.hideStatusBar, onToggle = onToggleHideStatusBar)
     ToggleRow(label = "显示段评气泡", checked = state.showReviewBubbles, onToggle = onToggleShowReviewBubbles)
-    OptionRow(label = "点击区域", onClick = onOpenTapZones)
+    OptionRow(label = "点击区域设置", onClick = onOpenTapZones)
 }
 
 // ====================================================================
@@ -704,11 +711,11 @@ internal fun ReaderTapZoneOverlay(
             .padding(EInkSpacing.m),
     ) {
         EInkText(
-            text = "点击区域",
+            text = "点击区域设置",
             style = EInkTheme.typography.titleMedium,
         )
         EInkText(
-            text = "点击格子切换上一页/下一页，中心固定为菜单；退出后生效",
+            text = "点击格子切换上一页/下一页，中心区为菜单。",
             style = EInkTheme.typography.bodySmall,
             modifier = Modifier.padding(top = EInkSpacing.xs),
         )
@@ -803,14 +810,16 @@ internal fun ReaderCachePanel(onCache: (Int) -> Unit) {
 // 通用行组件
 // ====================================================================
 
-/** 开关行：标签在左（纯展示），开/关块在右（EInkButton，开启实心）。 */
+/** 开关行：标签在左（纯展示），开/关块在右（EInkButton，开启实心）。
+ *  所在面板（其它）以 contentHorizontalPadding = 0 装载，行自管内边距：
+ *  标签左缘 16dp、开/关块右边框 24dp（m+s，与 OptionRow 箭头对齐）。 */
 @Composable
 internal fun ToggleRow(label: String, checked: Boolean, onToggle: () -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .height(48.dp)
-            .padding(end = EInkSpacing.s),
+            .padding(start = EInkSpacing.m, end = EInkSpacing.m + EInkSpacing.s),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         EInkText(
@@ -829,7 +838,12 @@ internal fun ToggleRow(label: String, checked: Boolean, onToggle: () -> Unit) {
     }
 }
 
-/** 选项行（整行点击，按压反色）。 */
+/**
+ * 选项行（整行点击，按压反色）：所在面板（其它/缓存）以
+ * contentHorizontalPadding = 0 装载，行天然铺满屏幕宽度——按压块与
+ * 点击区随之满宽；行内内容自管内边距：标签左缘对齐面板内容（m），
+ * 箭头右缘对齐开关行按钮边框（m+s，见 [ToggleRow]）。
+ */
 @Composable
 private fun OptionRow(label: String, onClick: () -> Unit) {
     val press = rememberImmediatePressState()
@@ -840,7 +854,8 @@ private fun OptionRow(label: String, onClick: () -> Unit) {
             .height(48.dp)
             .then(press.modifier)
             .background(colors.containerColor)
-            .einkClickable(role = Role.Button, onClick = onClick),
+            .einkClickable(role = Role.Button, onClick = onClick)
+            .padding(start = EInkSpacing.m, end = EInkSpacing.m + EInkSpacing.s),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         EInkText(

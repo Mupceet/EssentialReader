@@ -891,6 +891,9 @@ fun ReaderRoute(
                         title = "其它设置",
                         onClose = onClose,
                         onBackdropClick = dismissToCleanReading,
+                        // 含满宽行（点击区域设置 OptionRow）：横向内边距
+                        // 由行组件自管，按压块/点击区铺满屏幕宽度
+                        contentHorizontalPadding = 0.dp,
                     ) {
                         ReaderOtherPanel(
                             state = uiState,
@@ -905,6 +908,8 @@ fun ReaderRoute(
                         title = "缓存",
                         onClose = onClose,
                         onBackdropClick = dismissToCleanReading,
+                        // 缓存行同为满宽 OptionRow，同其它面板
+                        contentHorizontalPadding = 0.dp,
                     ) {
                         ReaderCachePanel(
                             onCache = { count ->
