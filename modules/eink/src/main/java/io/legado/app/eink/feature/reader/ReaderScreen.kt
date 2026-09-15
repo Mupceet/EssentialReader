@@ -15,10 +15,10 @@ import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
-import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -56,6 +56,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.ClipEntry
 import androidx.compose.ui.platform.LocalClipboard
@@ -1095,7 +1096,9 @@ fun ReaderRoute(
  *   （删除即时可用），点操作条外经 [onMarkingBarDismiss] 收取；
  * - 水平滑动翻页，判定对齐 View 版：触发距离读引擎 pageTouchSlop（AppConfig.pageTouchSlop 经端口）
  *   （完整版设置"翻页触发距离"，0 = 系统 slop，Compose 版只读不设），
- *   松手前反向回拖取消；无跟手移动，翻页整页立即替换。
+ *   松手前反向回拖取消；无跟手移动，翻页整页立即替换。与竖直下拉书签
+ *   （累计下拉 ≥ 80dp toggle 一次，须向下强竖直优势且无选区、操作条
+ *   收起、批注端口在位）经统一仲裁共存，判据见 ReaderDragArbitration。
  *
  * 选区状态由调用方持有（[selection] / [onSelectionChange]），翻页/重排
  * （pageVersion 推进）清空也由调用方承担；松手/抬手合成经
@@ -1289,23 +1292,92 @@ internal fun ReaderScreen(
                             zoneBehavior()
                         }
                     }
-                    .pointerInput(state.controlsVisible, selection != null) {
-                        // 水平滑动翻页，判定对齐 View 版：
-                        // - 触发距离 = 引擎 pageTouchSlop（px），0 = 系统 touch slop
-                        //   （该 slop 已由 detectHorizontalDragGestures 消费）；
-                        // - 松手前最后一次增量与滑动方向相反则取消（等价 View 版 isCancel）；
-                        // - 选区存在期间水平手势不翻页（端点调整只经把手拖拽）
-                        var dragAccum = 0f
-                        var lastDelta = 0f
-                        detectHorizontalDragGestures(
-                            onDragStart = {
-                                dragAccum = 0f
-                                lastDelta = 0f
-                            },
-                            onDragEnd = {
-                                if (state.controlsVisible) {
+                    .pointerInput(selectionEnabled) {
+                        // 水平翻页 × 竖直下拉书签统一仲裁（单一所有权，判据见
+                        // ReaderDragArbitration，对齐完整模式 ReaderCanvasSurface）。
+                        // 替代原两个独立检测器的先到先得竞争：竖直侧对方向与
+                        // 竖直优势均无门控，起手带下坠的横滑被其以 8dp 任意
+                        // 方向抖动整笔抢走后，书签触发不了（需净下拉 80dp）、
+                        // 翻页检测器已取消，整次滑动被吞。
+                        // - 书签认领：向下且 |Σy| > |Σx|×1.5 且当前可达（端口
+                        //   在位/操作条收起/无选区/无排版错误）；认领后主导性
+                        //   翻转即交接翻页并锁存（本次手势不再回书签）；
+                        // - 翻页认领：|Σx| ≥ 触摸 slop（与原独立横向检测器的
+                        //   认领时机一致）；触发距离 = 引擎 pageTouchSlop（px），
+                        //   0 = 系统 touch slop；松手前最后一次增量与滑动方向
+                        //   相反则取消（等价 View 版 isCancel）；选区存在期间
+                        //   水平手势不翻页（端点调整只经把手拖拽）；
+                        // - 超过 slop 或已认领的位移一律消费（压掉点按）；书签
+                        //   不可达（端口缺失等）时同样只吞并滑动不产生动作；
+                        // - 一次手势至多 toggle 一次书签，结束/取消复位。
+                        // 检测器不以 controls/selection/error 为 key（拖拽中途
+                        // 翻转状态不重启手势），实时值经 rememberUpdatedState 读取。
+                        val touchSlop = viewConfiguration.touchSlop
+                        val pullTriggerPx =
+                            ReaderDragArbitration.PULL_TRIGGER_DISTANCE_DP.dp.toPx()
+                        awaitEachGesture {
+                            val down = awaitFirstDown(requireUnconsumed = false)
+                            var totalX = 0f
+                            var totalY = 0f
+                            var arbitration = ReaderDragArbitrationState()
+                            var pullTriggered = false
+                            // 认领翻页瞬间的累计 Σx 记入行程，其后按事件增量
+                            // 累加；书签期横移同样计入——交接后无需重走触发距离
+                            var dragAccum = 0f
+                            var lastDelta = 0f
+                            var released = false
+                            while (true) {
+                                val event = awaitPointerEvent()
+                                val change = event.changes.firstOrNull { it.id == down.id }
+                                    ?: break
+                                // 他方消费（长按选择接管）或指针取消：本次手势
+                                // 整体作废，不翻页、不触发书签
+                                if (change.isConsumed) break
+                                if (!change.pressed) {
+                                    released = true
+                                    break
+                                }
+                                val delta = change.positionChange()
+                                if (delta.x != 0f) lastDelta = delta.x
+                                totalX += delta.x
+                                totalY += delta.y
+                                val pastSlop =
+                                    ReaderDragArbitration.isPastSlop(totalX, totalY, touchSlop)
+                                val next = ReaderDragArbitration.arbitrate(
+                                    arbitration,
+                                    totalX,
+                                    totalY,
+                                    touchSlop,
+                                    bookmarkReady = selectionEnabled &&
+                                        !currentControlsVisible && currentError == null &&
+                                        currentSelection == null,
+                                )
+                                val justClaimedHorizontal =
+                                    next.owner == ReaderDragOwner.HORIZONTAL &&
+                                        arbitration.owner != ReaderDragOwner.HORIZONTAL
+                                arbitration = next
+                                when (next.owner) {
+                                    ReaderDragOwner.PULL -> {
+                                        if (!pullTriggered && totalY >= pullTriggerPx) {
+                                            pullTriggered = true
+                                            onTogglePageBookmark()
+                                        }
+                                    }
+
+                                    ReaderDragOwner.HORIZONTAL ->
+                                        if (justClaimedHorizontal) dragAccum = totalX
+                                        else dragAccum += delta.x
+
+                                    ReaderDragOwner.PENDING -> Unit
+                                }
+                                if (pastSlop || next.owner != ReaderDragOwner.PENDING) {
+                                    change.consume()
+                                }
+                            }
+                            if (released && arbitration.owner == ReaderDragOwner.HORIZONTAL) {
+                                if (currentControlsVisible) {
                                     onCenterTap() // 收起操作条，不翻页
-                                } else if (selection == null) {
+                                } else if (currentSelection == null) {
                                     val slop =
                                         EInkEngineRegistry.readerEngine.pageTouchSlop.toFloat()
                                     when {
@@ -1314,56 +1386,6 @@ internal fun ReaderScreen(
                                         dragAccum > slop -> onPrevPage()
                                     }
                                 }
-                                dragAccum = 0f
-                                lastDelta = 0f
-                            },
-                            onDragCancel = {
-                                dragAccum = 0f
-                                lastDelta = 0f
-                            },
-                        ) { change, dragAmount ->
-                            change.consume()
-                            dragAccum += dragAmount
-                            if (dragAmount != 0f) lastDelta = dragAmount
-                        }
-                    }
-                    .pointerInput(selectionEnabled) {
-                        // 竖直下拉书签（v2 Task 9，设计 §4「阅读区竖直下拉」）：
-                        // 累计下拉 ≥ 80dp 且无选区、操作条收起、无排版错误、
-                        // 批注端口在位时 toggle 当前页书签一次；一次手势至多
-                        // 触发一次，结束/取消复位。与既有手势共存：横/竖触摸
-                        // slop 判定互斥（横向翻页检测器赢走的拖动会取消本检测
-                        // 器，反之亦然）；长按选择在位移超 slop 时即被取消，把
-                        // 手拖拽属选区场景（选区非空恒不触发）。端口缺失（降级
-                        // 宿主）恒不触发（no-op）。检测器不以 selection/controls
-                        // 为 key（拖拽中途翻转状态不重启手势），实时值经
-                        // rememberUpdatedState 读取
-                        val triggerThreshold = 80.dp.toPx()
-                        var dragAccum = 0f
-                        var triggered = false
-                        detectVerticalDragGestures(
-                            onDragStart = {
-                                dragAccum = 0f
-                                triggered = false
-                            },
-                            onDragEnd = {
-                                dragAccum = 0f
-                                triggered = false
-                            },
-                            onDragCancel = {
-                                dragAccum = 0f
-                                triggered = false
-                            },
-                        ) { change, dragAmount ->
-                            change.consume()
-                            if (triggered) return@detectVerticalDragGestures
-                            dragAccum += dragAmount
-                            if (dragAccum >= triggerThreshold && selectionEnabled &&
-                                !currentControlsVisible && currentError == null &&
-                                currentSelection == null
-                            ) {
-                                triggered = true
-                                onTogglePageBookmark()
                             }
                         }
                     }
