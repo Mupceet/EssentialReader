@@ -12,7 +12,8 @@ package io.legado.app.eink.contract
  *        │ 读（VM init / 按键时 / 入口 attach 期 / 组合内快照）
  *        ▼
  * 模块消费方（预缓存泵门槛、音量键判定、入口 Context 包装、
- *            图片画笔抗锯齿、书架自动刷新触发、阅读页状态栏收起…）
+ *            图片画笔抗锯齿、书架自动刷新触发、阅读页状态栏收起、
+ *            阅读页点击分区分发…）
  * ```
  *
  * 收录 E-Ink VM 编排与「我的」页/阅读菜单真正读写的键——含转发宿主
@@ -104,6 +105,28 @@ interface GlobalSettings {
      * 可写（阅读菜单开关）：fire-and-forget 写入 + 显式重排触发。
      */
     var showReviewBubbles: Boolean
+
+    /**
+     * 阅读页点击分区（3×3 九宫格简化版，完整模式「点击区域设置」的
+     * E-Ink 子集，见 [ReaderTapZoneGrid]）：中心格固定菜单不可改，
+     * 其余 8 格仅 上一页/下一页 两态。
+     *
+     * E-Ink 自有偏好，**不转发**完整模式 clickAction* 键：完整模式单格
+     * 可配 15 种动作，本键值域只有三种，转发会让两侧配置互相覆盖
+     * （eink 蒙层三值写回会静默清掉完整模式的 下一章/书签 等配置）。
+     * 嵌入式宿主以历史风格自有键落默认 prefs 文件，整键存 9 位编码
+     * （[ReaderTapZoneGrid.encode]）。
+     *
+     * 读取：阅读 VM 构造时装载进 UiState，点按分发实时消费；写入
+     * （点击区域蒙层退出时）：fire-and-forget 落盘 + 调用方同步更新
+     * UiState 快照——蒙层退出即生效，纯手势语义不触发重排。
+     *
+     * 默认分区 = 中心格菜单、其余格下一页。默认实现（旧宿主）getter
+     * 恒返回默认分区、写入丢弃：行为不回退，新设置不可持久化。
+     */
+    var readerTapZones: ReaderTapZoneGrid
+        get() = ReaderTapZoneGrid()
+        set(value) {}
 
     /**
      * 图片绘制抗锯齿（仅阅读页图片画笔消费；文字画笔恒抗锯齿不受
