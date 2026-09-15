@@ -75,6 +75,8 @@ data class ReaderChapterMeasureStyle(
     val bodyIndentText: String? = null,
     val imageLayoutMode: ReaderImageLayoutMode = ReaderImageLayoutMode.AUTO,
     val imageAvailableWidthPx: Float? = null,
+    /** true = 带 click 动作脚本的图片（段评气泡）不参与排版：不产出测量项，也不解析图片尺寸。 */
+    val excludeActionImages: Boolean = false,
 )
 
 sealed interface ReaderChapterMeasureResult {
@@ -238,13 +240,16 @@ class ReaderChapterBlockMeasurer(
                         }
                     }
                     is ReaderChapterInlineSource.Image -> {
+                        // 段评开关关闭：带动作脚本的行内图（段评气泡）整体不参与排版，
+                        // 且在图片尺寸解析之前跳过（不触发任何取图请求）
+                        val options = imageOptionsResolver.resolve(item.source)
+                        if (style.excludeActionImages && options?.action != null) return@forEach
                         // A broken image must not make the entire chapter disappear. The bitmap
                         // loader already supplies an error image; reserve stable line geometry
                         // until real dimensions are available.
                         val placeholderExtent = (lineHeight ?: baseStyle.fontSizePx).coerceAtLeast(1f)
                         val originalSize = imageDimensionsResolver.resolve(item.source)
                             ?: ReaderImageDimensions(placeholderExtent, placeholderExtent)
-                        val options = imageOptionsResolver.resolve(item.source)
                         val requestedWidth = options?.requestedWidthFraction?.let { fraction ->
                             style.imageAvailableWidthPx?.times(fraction)
                         } ?: options?.requestedWidthPx
@@ -304,11 +309,12 @@ class ReaderChapterBlockMeasurer(
                     )?.let { return it }
                 }
                 is ReaderChapterSourceBlock.Image -> {
+                    val options = imageOptionsResolver.resolve(block.source)
+                    if (style.excludeActionImages && options?.action != null) return@forEach
                     val placeholderExtent = (style.bodyLineHeightPx ?: style.bodyStyle.fontSizePx)
                         .coerceAtLeast(1f)
                     val originalSize = imageDimensionsResolver.resolve(block.source)
                         ?: ReaderImageDimensions(placeholderExtent, placeholderExtent)
-                    val options = imageOptionsResolver.resolve(block.source)
                     val requestedWidth = options?.requestedWidthFraction?.let { fraction ->
                         style.imageAvailableWidthPx?.times(fraction)
                     } ?: options?.requestedWidthPx
