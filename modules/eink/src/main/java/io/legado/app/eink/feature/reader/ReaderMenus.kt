@@ -1,6 +1,8 @@
 package io.legado.app.eink.feature.reader
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -8,17 +10,22 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -30,6 +37,8 @@ import io.legado.app.eink.R
 import io.legado.app.eink.contract.ReaderStyleCatalog
 import io.legado.app.eink.contract.ReaderStyleParamIds as Ids
 import io.legado.app.eink.contract.ReaderTextStyle
+import io.legado.app.eink.contract.ReaderTapZoneAction
+import io.legado.app.eink.contract.ReaderTapZoneGrid
 import io.legado.app.eink.designsystem.content.EInkHorizontalDivider
 import io.legado.app.eink.designsystem.content.EInkText
 import io.legado.app.eink.designsystem.control.EInkButton
@@ -42,6 +51,7 @@ import io.legado.app.eink.designsystem.interaction.einkClickable
 import io.legado.app.eink.designsystem.interaction.rememberImmediatePressState
 import io.legado.app.eink.designsystem.navigation.EInkOperationBarIcon
 import io.legado.app.eink.designsystem.navigation.EInkTopBar
+import io.legado.app.eink.designsystem.theme.EInkShapes
 import io.legado.app.eink.designsystem.theme.EInkSpacing
 import io.legado.app.eink.designsystem.theme.EInkTheme
 import kotlin.math.abs
@@ -656,11 +666,126 @@ internal fun ReaderOtherPanel(
     onToggleKeepScreenOn: () -> Unit,
     onToggleHideStatusBar: () -> Unit,
     onToggleShowReviewBubbles: () -> Unit,
+    onOpenTapZones: () -> Unit,
 ) {
     ToggleRow(label = "保持屏幕常亮", checked = state.keepScreenOn, onToggle = onToggleKeepScreenOn)
     ToggleRow(label = "隐藏状态栏", checked = state.hideStatusBar, onToggle = onToggleHideStatusBar)
     ToggleRow(label = "显示段评气泡", checked = state.showReviewBubbles, onToggle = onToggleShowReviewBubbles)
+    OptionRow(label = "点击区域", onClick = onOpenTapZones)
 }
+
+// ====================================================================
+// 点击区域蒙层（九宫格简化版）
+// ====================================================================
+
+/**
+ * 点击区域蒙层（完整模式「点击区域设置」的 E-Ink 简化版）：全屏覆盖
+ * 阅读界面（含操作条与面板），阅读手势（点按/滑动/长按）被整体遮挡；
+ * 中心格固定菜单不可改（静态展示），其余每格点击在 上一页/下一页 间
+ * 切换，返回键或「完成」退出并经 [onApply] 落盘生效（不分保存/放弃
+ * 路径，退出即生效）。
+ *
+ * 纯色不透明背景（E-Ink 半透明叠层会灰化拖影），可切格为描边
+ * [EInkButton]（height=null 由布局撑满），中心格为同规格静态描边盒。
+ */
+@Composable
+internal fun ReaderTapZoneOverlay(
+    initial: ReaderTapZoneGrid,
+    onApply: (ReaderTapZoneGrid) -> Unit,
+) {
+    var grid by remember { mutableStateOf(initial) }
+    val exit = { onApply(grid) }
+    BackHandler(onBack = exit)
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(EInkTheme.colorScheme.background)
+            .windowInsetsPadding(WindowInsets.safeDrawing)
+            .padding(EInkSpacing.m),
+    ) {
+        EInkText(
+            text = "点击区域",
+            style = EInkTheme.typography.titleMedium,
+        )
+        EInkText(
+            text = "点击格子切换上一页/下一页，中心固定为菜单；退出后生效",
+            style = EInkTheme.typography.bodySmall,
+            modifier = Modifier.padding(top = EInkSpacing.xs),
+        )
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxWidth()
+                .padding(vertical = EInkSpacing.m),
+        ) {
+            for (row in 0..2) {
+                Row(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth(),
+                ) {
+                    for (column in 0..2) {
+                        val cellIndex = row * 3 + column
+                        val action = grid.cells[cellIndex]
+                        if (cellIndex == ReaderTapZoneGrid.CENTER_INDEX) {
+                            // 中心格固定菜单：静态展示，同规格描边但不可点
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .fillMaxHeight()
+                                    .padding(EInkSpacing.xs)
+                                    .border(
+                                        width = 1.dp,
+                                        color = EInkTheme.colorScheme.outline,
+                                        shape = EInkShapes.small,
+                                    ),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                EInkText(
+                                    text = action.label(),
+                                    style = EInkTheme.typography.bodyMedium,
+                                )
+                            }
+                        } else {
+                            EInkButton(
+                                text = action.label(),
+                                onClick = { grid = grid.toggledPageAt(cellIndex) },
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .fillMaxHeight()
+                                    .padding(EInkSpacing.xs),
+                                height = null,
+                                style = EInkTheme.typography.bodyMedium,
+                                onClickLabel = "切换为${action.toggledPage().label()}",
+                            )
+                        }
+                    }
+                }
+            }
+        }
+        EInkButton(
+            text = "完成",
+            onClick = exit,
+            modifier = Modifier.fillMaxWidth(),
+            height = 48.dp,
+        )
+    }
+}
+
+/** 蒙层格子的动作文案（与完整模式点击区域动作名对齐）。 */
+private fun ReaderTapZoneAction.label(): String = when (this) {
+    ReaderTapZoneAction.MENU -> "菜单"
+    ReaderTapZoneAction.NEXT_PAGE -> "下一页"
+    ReaderTapZoneAction.PREVIOUS_PAGE -> "上一页"
+}
+
+/** 可切格点击后的对侧动作（中心格不经此路径）。 */
+private fun ReaderTapZoneAction.toggledPage(): ReaderTapZoneAction =
+    if (this == ReaderTapZoneAction.PREVIOUS_PAGE) {
+        ReaderTapZoneAction.NEXT_PAGE
+    } else {
+        ReaderTapZoneAction.PREVIOUS_PAGE
+    }
 
 // ====================================================================
 // 缓存面板

@@ -79,6 +79,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import io.legado.app.eink.contract.EInkEngineRegistry
 import io.legado.app.eink.contract.ReaderPageSnapshot
+import io.legado.app.eink.contract.ReaderTapZoneAction
+import io.legado.app.eink.contract.ReaderTapZoneGrid
 import io.legado.app.eink.designsystem.content.EInkText
 import io.legado.app.eink.designsystem.control.EInkDialog
 import io.legado.app.eink.designsystem.interaction.einkClickable
@@ -192,6 +194,10 @@ fun ReaderRoute(
     // 排版设置弹层（字体配置/信息配置/边距调整）：居中透明卡片，
     // 打开期间面板与操作条隐藏；返回键逐级回退到排版展开态
     var styleDialog by remember { mutableStateOf<ReaderStyleDialog?>(null) }
+    // 点击区域蒙层（九宫格简化版，其它面板入口）：全屏覆盖含操作条，
+    // 自持返回键（蒙层内 BackHandler 后组合优先于 Route 链）；退出即
+    // 落盘生效，面板状态保留——关闭后回到其它面板展开态
+    var tapZoneEditor by remember { mutableStateOf(false) }
     // 移出书架二次确认（顶栏切换钮在架态点击只打开确认框）
     var showRemoveConfirm by remember { mutableStateOf(false) }
 
@@ -891,6 +897,7 @@ fun ReaderRoute(
                             onToggleKeepScreenOn = viewModel::toggleKeepScreenOn,
                             onToggleHideStatusBar = viewModel::toggleHideStatusBar,
                             onToggleShowReviewBubbles = viewModel::toggleShowReviewBubbles,
+                            onOpenTapZones = { tapZoneEditor = true },
                         )
                     }
 
@@ -956,6 +963,19 @@ fun ReaderRoute(
                 onBackdropClick = dismissToCleanReading,
             )
             null -> Unit
+        }
+
+        // 点击区域蒙层（九宫格简化版）：全屏覆盖（面板/操作条/阅读手势
+        // 全部遮挡），退出即写自有偏好并更新分发快照——关闭后回到其它
+        // 面板展开态（panel 状态未动）
+        if (tapZoneEditor) {
+            ReaderTapZoneOverlay(
+                initial = uiState.tapZones,
+                onApply = { zones ->
+                    viewModel.applyTapZones(zones)
+                    tapZoneEditor = false
+                },
+            )
         }
 
         // 移出书架二次确认：确认后执行移出（后果与详情页一致——下次进
@@ -1070,7 +1090,9 @@ fun ReaderRoute(
  *
  * 手势（规范 §16）：
  * - 操作条可见时：点/滑动正文任意处收起操作条；
- * - 操作条隐藏时：点中间 40% 唤出操作条，点其余区域下一页；无选区点按
+ * - 操作条隐藏时：按点击分区（九宫格简化版，[state.tapZones]，中心格
+ *   固定唤操作条、其余格默认下一页；其它面板「点击区域」蒙层可在
+ *   上一页/下一页间改配）分发菜单/下一页/上一页；无选区点按
  *   命中带动作脚本的图片槽位（段评气泡）改为上抛 [onImageAction]（脚本
  *   求值与弹层在宿主侧）；命中已有标记（行内装饰 run 且 markingId 非空
  *   ——空串为宿主高亮规则等非用户标记来源，视为未命中）改为上抛
@@ -1172,6 +1194,9 @@ internal fun ReaderScreen(
         // 而选区留在屏上（僵死选区）；长按守卫改读 State 实时值
         val currentControlsVisible by rememberUpdatedState(state.controlsVisible)
         val currentError by rememberUpdatedState(state.error)
+        // 点击分区同样跨手势实时读：蒙层退出更新分区时不重启手势检测器
+        // （同上不以之为 pointerInput key，避免中途打断在途拖拽）
+        val currentTapZones by rememberUpdatedState(state.tapZones)
         // 与页画布同规格的测量闭包（applySpec 幂等，重复设置无害）：
         // 长按命中测试与浮条锚点按引擎同款字体度量
         val themeForeground = EInkTheme.colorScheme.onBackground
@@ -1248,14 +1273,19 @@ internal fun ReaderScreen(
                                 }
                                 ReaderTapDispatch.ZONE_OR_MARKING_HIT -> Unit
                             }
-                            // 分区行为：中央呼菜单/侧边翻页——标记未命中与
-                            // 标记失效静默回落时共用
+                            // 分区行为（九宫格简化版，完整模式「点击区域」
+                            // 的子集）：按格分发 菜单/下一页/上一页——标记
+                            // 未命中与标记失效静默回落时共用
                             val zoneBehavior = {
-                                val width = size.width
-                                if (offset.x in width * 0.3f..width * 0.7f) {
-                                    onCenterTap()
-                                } else {
-                                    onNextPage()
+                                when (
+                                    currentTapZones.actionAt(
+                                        offset.x, offset.y,
+                                        size.width.toFloat(), size.height.toFloat(),
+                                    )
+                                ) {
+                                    ReaderTapZoneAction.MENU -> onCenterTap()
+                                    ReaderTapZoneAction.NEXT_PAGE -> onNextPage()
+                                    ReaderTapZoneAction.PREVIOUS_PAGE -> onPrevPage()
                                 }
                             }
                             // 无选区点按（v2 Task 6，设计 §4「点已有标记」）：

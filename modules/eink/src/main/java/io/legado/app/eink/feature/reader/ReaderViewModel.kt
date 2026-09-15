@@ -24,6 +24,7 @@ import io.legado.app.eink.contract.ReaderSelectionCommit
 import io.legado.app.eink.contract.ReaderStyleCatalog
 import io.legado.app.eink.contract.ReaderStyleParamIds as Ids
 import io.legado.app.eink.contract.ReaderSyncTrigger
+import io.legado.app.eink.contract.ReaderTapZoneGrid
 import io.legado.app.eink.contract.ReaderTextStyle
 import io.legado.app.eink.feature.reader.selection.ReaderSelectionUi
 import io.legado.app.eink.session.ReaderSessionCache
@@ -78,6 +79,8 @@ data class ReaderUiState(
     val hideStatusBar: Boolean = false,
     /** 段评气泡参与排版（转发完整模式同键阅读设置；切换触发重排）。 */
     val showReviewBubbles: Boolean = true,
+    /** 阅读页点击分区（九宫格；点按分发的唯一依据，蒙层退出时更新）。 */
+    val tapZones: ReaderTapZoneGrid = ReaderTapZoneGrid(),
     val style: ReaderTextStyle = ReaderTextStyle(),
     /** 标题字号模式：true=随正文一致（titleSize==textSize 由 VM 保持），
      *  false=自定义；会话内显式切换，装载时按相等关系推导。 */
@@ -144,6 +147,7 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application),
                 keepScreenOn = EInkEngineRegistry.globalSettings.keepScreenOn,
                 hideStatusBar = EInkEngineRegistry.globalSettings.hideStatusBar,
                 showReviewBubbles = EInkEngineRegistry.globalSettings.showReviewBubbles,
+                tapZones = EInkEngineRegistry.globalSettings.readerTapZones,
                 // 与完整模式共用宿主 autoReadSpeed 配置（默认 10）
                 autoPlayIntervalSec = engine.autoReadIntervalSec
                     .coerceIn(MIN_AUTO_INTERVAL_SEC, MAX_AUTO_INTERVAL_SEC),
@@ -848,6 +852,15 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application),
         EInkEngineRegistry.globalSettings.showReviewBubbles = newValue
         _uiState.update { it.copy(showReviewBubbles = newValue) }
         scheduleRelayout()
+    }
+
+    /**
+     * 应用点击分区（点击区域蒙层退出时）：写入自有偏好 + 同步更新
+     * 分发快照，即时生效——纯手势语义，不触发重排。
+     */
+    fun applyTapZones(zones: ReaderTapZoneGrid) {
+        EInkEngineRegistry.globalSettings.readerTapZones = zones
+        _uiState.update { it.copy(tapZones = zones) }
     }
 
     /**
