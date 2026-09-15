@@ -92,6 +92,20 @@ interface GlobalSettings {
     var hideStatusBar: Boolean
 
     /**
+     * 段评气泡参与排版（转发宿主阅读设置键 showReviewBubbles，与完整模式
+     * 共享同一存储；默认 true）。
+     *
+     * false 时带 click 动作脚本的图片（段评气泡）不参与排版：不绘制、
+     * 不可点、不解析图片尺寸。切换需重排——调用方写后显式触发重排。
+     * 嵌入式宿主经设置网关 pending-overlay 内存同步可见（主线程写后
+     * 重排即可读到新值）；若宿主写入为纯异步可见（写后读 getter 拿到
+     * 旧值），排版最迟随下一次翻页的内容刷新对齐。
+     *
+     * 可写（阅读菜单开关）：fire-and-forget 写入 + 显式重排触发。
+     */
+    var showReviewBubbles: Boolean
+
+    /**
      * 图片绘制抗锯齿（仅阅读页图片画笔消费；文字画笔恒抗锯齿不受
      * 影响）。与灰阶控制立场存在张力，默认关闭。
      */
