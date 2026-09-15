@@ -9,6 +9,7 @@ import io.legado.app.domain.gateway.OtherSettingsGateway
 import io.legado.app.domain.gateway.ReadSettingsGateway
 import io.legado.app.eink.contract.EInkEngineRegistry
 import io.legado.app.eink.contract.GlobalSettings
+import io.legado.app.eink.contract.ReaderTapZoneGrid
 import io.legado.app.help.config.AppConfigStore
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -20,6 +21,9 @@ import splitties.init.appCtx
 
 /** [GlobalSettingsImpl.keepScreenOn] 的历史键（EInkSettings 时期逐字继承）。 */
 private const val KEY_READER_KEEP_SCREEN_ON = "einkReaderKeepScreenOn"
+
+/** [GlobalSettingsImpl.readerTapZones] 的自有键（9 位编码，见 ReaderTapZoneGrid）。 */
+private const val KEY_READER_TAP_ZONES = "einkReaderTapZones"
 
 /**
  * E-Ink 引擎桥接层装配入口。
@@ -91,9 +95,12 @@ internal val einkSettingsWriteScope =
  * changeSourceCheckAuthor 经 ChangeSourceSettingsGateway；
  * useDefaultCover（「我的」页可写）为本对象持有的 Compose 快照状态 +
  * CoverSettingsGateway 异步落盘——组合内读取订阅变化，切换后开关行与
- * 书架/详情可见封面立即重组；keepScreenOn（阅读菜单开关，E-Ink 自有
- * 偏好、完整模式无对应设置）为模块 EInkSettings 端口化后的遗留 SP 键，
- * 存默认 prefs 文件，不经设置网关；syncReadingProgress（「我的」页
+ * 书架/详情可见封面立即重组；keepScreenOn、readerTapZones（均为阅读
+ * 菜单设置、E-Ink 自有偏好、完整模式无对应设置——后者不转发完整模式
+ * clickAction* 键：值域只有三动作，转发会让两侧配置互相覆盖）走同一
+ * 默认 prefs 文件不经设置网关：keepScreenOn 为 EInkSettings 端口化的
+ * 历史键（键名逐字继承），readerTapZones 为新增自有键
+ * （9 位编码整键存取，见 ReaderTapZoneGrid）；syncReadingProgress（「我的」页
  * 可写）经 BackupSettingsGateway 转发宿主「同步阅读进度」主键，写时
  * 带宿主设置页同款父子联动。
  *
@@ -140,6 +147,14 @@ private object GlobalSettingsImpl : GlobalSettings, KoinComponent {
         get() = einkLegacyPrefs.getBoolean(KEY_READER_KEEP_SCREEN_ON, false)
         set(value) {
             einkLegacyPrefs.edit().putBoolean(KEY_READER_KEEP_SCREEN_ON, value).apply()
+        }
+
+    override var readerTapZones: ReaderTapZoneGrid
+        get() = ReaderTapZoneGrid.decodeOrDefault(
+            einkLegacyPrefs.getString(KEY_READER_TAP_ZONES, null)
+        )
+        set(value) {
+            einkLegacyPrefs.edit().putString(KEY_READER_TAP_ZONES, value.encode()).apply()
         }
 
     override val threadCount: Int

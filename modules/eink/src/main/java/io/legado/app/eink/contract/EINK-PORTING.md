@@ -214,7 +214,8 @@ Java 17 / minSdk 21（按 §0 升 23）/ 无 Compose 无 Coil（图片栈 Glide�
   各自 consumer 提供。
 - **SharedPreferences**：模块零自有存储——全部设置经 GlobalSettings
   端口，存储后端由宿主决定；E-Ink 自有偏好 `keepScreenOn` 以历史键
-  `einkReaderKeepScreenOn` 落宿主默认 prefs 文件。
+  `einkReaderKeepScreenOn`、`readerTapZones`（九宫格点击区域，9 位
+  编码整键）以 `einkReaderTapZones` 落宿主默认 prefs 文件。
 
 ## 5. 移植验证清单
 
