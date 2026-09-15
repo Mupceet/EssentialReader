@@ -655,9 +655,11 @@ internal fun ReaderOtherPanel(
     state: ReaderUiState,
     onToggleKeepScreenOn: () -> Unit,
     onToggleHideStatusBar: () -> Unit,
+    onToggleShowReviewBubbles: () -> Unit,
 ) {
     ToggleRow(label = "保持屏幕常亮", checked = state.keepScreenOn, onToggle = onToggleKeepScreenOn)
     ToggleRow(label = "隐藏状态栏", checked = state.hideStatusBar, onToggle = onToggleHideStatusBar)
+    ToggleRow(label = "段评气泡", checked = state.showReviewBubbles, onToggle = onToggleShowReviewBubbles)
 }
 
 // ====================================================================

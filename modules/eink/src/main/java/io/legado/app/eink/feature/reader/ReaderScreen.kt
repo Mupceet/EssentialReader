@@ -890,6 +890,7 @@ fun ReaderRoute(
                             state = uiState,
                             onToggleKeepScreenOn = viewModel::toggleKeepScreenOn,
                             onToggleHideStatusBar = viewModel::toggleHideStatusBar,
+                            onToggleShowReviewBubbles = viewModel::toggleShowReviewBubbles,
                         )
                     }
 

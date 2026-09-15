@@ -76,6 +76,8 @@ data class ReaderUiState(
     val keepScreenOn: Boolean = false,
     /** 隐藏状态栏（转发完整模式同键阅读设置；开启后页眉接管 时间/电量）。 */
     val hideStatusBar: Boolean = false,
+    /** 段评气泡参与排版（转发完整模式同键阅读设置；切换触发重排）。 */
+    val showReviewBubbles: Boolean = true,
     val style: ReaderTextStyle = ReaderTextStyle(),
     /** 标题字号模式：true=随正文一致（titleSize==textSize 由 VM 保持），
      *  false=自定义；会话内显式切换，装载时按相等关系推导。 */
@@ -141,6 +143,7 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application),
             ReaderUiState(
                 keepScreenOn = EInkEngineRegistry.globalSettings.keepScreenOn,
                 hideStatusBar = EInkEngineRegistry.globalSettings.hideStatusBar,
+                showReviewBubbles = EInkEngineRegistry.globalSettings.showReviewBubbles,
                 // 与完整模式共用宿主 autoReadSpeed 配置（默认 10）
                 autoPlayIntervalSec = engine.autoReadIntervalSec
                     .coerceIn(MIN_AUTO_INTERVAL_SEC, MAX_AUTO_INTERVAL_SEC),
@@ -833,6 +836,17 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application),
         updateTipInfo()
         // extent 随页眉显隐翻转，确定性触发重排（视口变化路径为常规触发，
         // 此处兜底状态栏高度小于分页器漂移阈值的设备）
+        scheduleRelayout()
+    }
+
+    /**
+     * 段评气泡参与排版（转发完整模式同键设置）：写入 + 乐观更新开关态，
+     * 再触发重排——测量层剔除带 click 动作脚本的图片，不再占断行/行高。
+     */
+    fun toggleShowReviewBubbles() {
+        val newValue = !EInkEngineRegistry.globalSettings.showReviewBubbles
+        EInkEngineRegistry.globalSettings.showReviewBubbles = newValue
+        _uiState.update { it.copy(showReviewBubbles = newValue) }
         scheduleRelayout()
     }
 
