@@ -1,49 +1,49 @@
 {
-  "tag_name": "3.26.17-beta.10",
-  "name": "Pre-release 3.26.17-beta.10",
-  "body": "**此版本为测试版，会存在不稳定问题。**\n\n# 更新日志\n\n墨本阅读——开源阅读 legado 的墨水屏增强发行版：同一本书，两种读法。\n\n## 3.26.17-beta（预发布）\n\n本次更新换上全新「墨本」圆章图标，并让多源搜索更省心：\n\n### 新增\n\n* 全新应用图标：「墨本」纯黑白圆章，桌面默认朱文印；应用内「换图标」可选白文印，Android 13+ 主题图标也一并换新\n\n### 优化\n\n* 多源搜索更省电：离开搜索页自动挂起剩余书源的搜索，返回自动接着搜\n* 换源选中结果后立即返回，其余书源的搜索同时中止，不用等落选源跑完\n\n### 修复\n\n* 修复个别书源执行 JS 脚本时闪退的问题\n* 修复搜索结果重排后页首未对齐、已收录条目升到顶部却看不见的问题",
+  "tag_name": "3.26.17-beta.11",
+  "name": "Pre-release 3.26.17-beta.11",
+  "body": "**此版本为测试版，会存在不稳定问题。**\n\n# 更新日志\n\n墨本阅读——开源阅读 legado 的墨水屏增强发行版：同一本书，两种读法。\n\n## 3.26.17-beta（预发布）\n\n本次更新换上全新「墨」圆章图标，并让多源搜索更省心，打磨阅读手势：\n\n### 新增\n\n* 全新应用图标：「墨」纯黑白圆章，桌面默认朱文印；应用内「换图标」可选白文印，Android 13+ 主题图标也一并换新\n\n### 优化\n\n* 多源搜索更省电：离开搜索页自动挂起剩余书源的搜索，返回自动接着搜\n* 换源选中结果后立即返回，其余书源的搜索同时中止，不用等落选源跑完\n\n### 修复\n\n* 修复阅读页手势不灵敏的问题",
   "prerelease": true,
-  "created_at": "2026-09-14T16:49:25Z",
+  "created_at": "2026-09-15T05:01:28Z",
   "assets": [
     {
-      "browser_download_url": "https://github.com/Mupceet/EssentialReader/releases/download/3.26.17-beta.10/legado-3.26.17-beta.10-arm64-v8a.apk",
-      "content_type": "application/vnd.android.package-archive",
-      "created_at": "2026-09-14T17:07:59Z",
-      "download_count": 0,
-      "id": 563840934,
-      "name": "legado-3.26.17-beta.10-arm64-v8a.apk",
-      "state": "uploaded",
-      "url": "https://api.github.com/repos/Mupceet/EssentialReader/releases/assets/563840934"
-    },
-    {
-      "browser_download_url": "https://github.com/Mupceet/EssentialReader/releases/download/3.26.17-beta.10/legado-3.26.17-beta.10-armeabi-v7a.apk",
-      "content_type": "application/vnd.android.package-archive",
-      "created_at": "2026-09-14T17:07:59Z",
-      "download_count": 0,
-      "id": 563840937,
-      "name": "legado-3.26.17-beta.10-armeabi-v7a.apk",
-      "state": "uploaded",
-      "url": "https://api.github.com/repos/Mupceet/EssentialReader/releases/assets/563840937"
-    },
-    {
-      "browser_download_url": "https://github.com/Mupceet/EssentialReader/releases/download/3.26.17-beta.10/legado-3.26.17-beta.10.apk",
-      "content_type": "application/vnd.android.package-archive",
-      "created_at": "2026-09-14T17:07:59Z",
-      "download_count": 0,
-      "id": 563840936,
-      "name": "legado-3.26.17-beta.10.apk",
-      "state": "uploaded",
-      "url": "https://api.github.com/repos/Mupceet/EssentialReader/releases/assets/563840936"
-    },
-    {
-      "browser_download_url": "https://github.com/Mupceet/EssentialReader/releases/download/3.26.17-beta.10/mapping.txt",
+      "browser_download_url": "https://github.com/Mupceet/EssentialReader/releases/download/3.26.17-beta.11/mapping.txt",
       "content_type": "text/plain",
-      "created_at": "2026-09-14T17:07:59Z",
+      "created_at": "2026-09-15T05:21:21Z",
       "download_count": 0,
-      "id": 563840935,
+      "id": 564963801,
       "name": "mapping.txt",
       "state": "uploaded",
-      "url": "https://api.github.com/repos/Mupceet/EssentialReader/releases/assets/563840935"
+      "url": "https://api.github.com/repos/Mupceet/EssentialReader/releases/assets/564963801"
+    },
+    {
+      "browser_download_url": "https://github.com/Mupceet/EssentialReader/releases/download/3.26.17-beta.11/moben-3.26.17-beta.11-arm64-v8a.apk",
+      "content_type": "application/vnd.android.package-archive",
+      "created_at": "2026-09-15T05:21:21Z",
+      "download_count": 0,
+      "id": 564963799,
+      "name": "moben-3.26.17-beta.11-arm64-v8a.apk",
+      "state": "uploaded",
+      "url": "https://api.github.com/repos/Mupceet/EssentialReader/releases/assets/564963799"
+    },
+    {
+      "browser_download_url": "https://github.com/Mupceet/EssentialReader/releases/download/3.26.17-beta.11/moben-3.26.17-beta.11-armeabi-v7a.apk",
+      "content_type": "application/vnd.android.package-archive",
+      "created_at": "2026-09-15T05:21:21Z",
+      "download_count": 0,
+      "id": 564963800,
+      "name": "moben-3.26.17-beta.11-armeabi-v7a.apk",
+      "state": "uploaded",
+      "url": "https://api.github.com/repos/Mupceet/EssentialReader/releases/assets/564963800"
+    },
+    {
+      "browser_download_url": "https://github.com/Mupceet/EssentialReader/releases/download/3.26.17-beta.11/moben-3.26.17-beta.11.apk",
+      "content_type": "application/vnd.android.package-archive",
+      "created_at": "2026-09-15T05:21:21Z",
+      "download_count": 0,
+      "id": 564963802,
+      "name": "moben-3.26.17-beta.11.apk",
+      "state": "uploaded",
+      "url": "https://api.github.com/repos/Mupceet/EssentialReader/releases/assets/564963802"
     }
   ]
 }
