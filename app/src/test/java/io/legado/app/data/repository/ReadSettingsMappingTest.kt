@@ -14,11 +14,11 @@ import kotlin.reflect.full.primaryConstructor
 class ReadSettingsMappingTest {
 
     @Test
-    fun `gateway 持久化映射覆盖 ReadSettings 全部 111 个字段`() {
+    fun `gateway 持久化映射覆盖 ReadSettings 全部 112 个字段`() {
         val actualKeys = ReadSettings().toGatewayPrefMap().keys
         val expectedKeys = ReadSettings().expectedGatewayPrefMap().keys
 
-        assertEquals(111, actualKeys.size)
+        assertEquals(112, actualKeys.size)
         assertEquals(expectedKeys, actualKeys)
     }
 
@@ -215,6 +215,7 @@ private fun readSettingsMappingSamples(): List<ReadSettings> {
         base.copy(readAloudDetachReminderEnabled = true),
         base.copy(selectText = false),
         base.copy(noAnimScrollPage = true),
+        base.copy(showReviewBubbles = false),
         base.copy(optimizeRender = true),
         base.copy(disableReturnKey = true),
         base.copy(showReadTitleAddition = false),
@@ -264,6 +265,7 @@ private fun ReadSettings.expectedGatewayPrefMap(): Map<String, Any?> = mapOf(
     PreferKey.selectText to selectText,
     PreferKey.noAnimScrollPage to noAnimScrollPage,
     PreferKey.clickImgWay to clickImgWay,
+    PreferKey.showReviewBubbles to showReviewBubbles,
     PreferKey.optimizeRender to optimizeRender,
     PreferKey.disableReturnKey to disableReturnKey,
     PreferKey.expandTextMenu to expandTextMenu,
