@@ -147,6 +147,7 @@ class ReaderChapterBlockMeasurer(
             }?.let { it.chapterPosition + bodyIndentText.length }
             var emittedContent = false
             var hasStandaloneImage = false
+            var droppedActionImage = false
             val inline = mutableListOf<ReaderMeasuredInlineItem>()
             fun flushInline(skipBlank: Boolean = false) {
                 if (inline.isEmpty()) return
@@ -243,7 +244,10 @@ class ReaderChapterBlockMeasurer(
                         // 段评开关关闭：带动作脚本的行内图（段评气泡）整体不参与排版，
                         // 且在图片尺寸解析之前跳过（不触发任何取图请求）
                         val options = imageOptionsResolver.resolve(item.source)
-                        if (style.excludeActionImages && options?.action != null) return@forEach
+                        if (style.excludeActionImages && options?.action != null) {
+                            droppedActionImage = true
+                            return@forEach
+                        }
                         // A broken image must not make the entire chapter disappear. The bitmap
                         // loader already supplies an error image; reserve stable line geometry
                         // until real dimensions are available.
@@ -295,7 +299,9 @@ class ReaderChapterBlockMeasurer(
                     is ReaderChapterInlineSource.BlankLine -> Unit
                 }
             }
-            flushInline(skipBlank = hasStandaloneImage)
+            // 被剔除的段评图视同独立图参与空白抑制：整行图片段自带的缩进/空白
+            // 填充不再残留为空行（与「图不存在」的排版等价）
+            flushInline(skipBlank = hasStandaloneImage || droppedActionImage)
             return null
         }
         source.blocks.forEach { block ->

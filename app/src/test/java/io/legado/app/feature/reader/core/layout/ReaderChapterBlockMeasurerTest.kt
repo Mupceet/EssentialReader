@@ -466,4 +466,49 @@ class ReaderChapterBlockMeasurerTest {
 
         assertTrue(result.blocks.isEmpty())
     }
+
+    @Test
+    fun excludeActionImagesSuppressesBlankPaddingLeftByDroppedImage() = runBlocking {
+        // 整行图片段自带缩进/空白填充（如「　　<img>」独立成段）：图被剔除后
+        // 残留的纯空白不得再排成一行空行——与「图不存在」的排版等价
+        val source = ReaderChapterSource(1, "", listOf(
+            ReaderChapterSourceBlock.Paragraph(listOf(
+                ReaderChapterInlineSource.Text("　　", 0),
+                ReaderChapterInlineSource.Image("banner.png,{\"click\":\"js\"}", 2),
+            ), 0),
+        ), 3)
+        val result = ReaderChapterBlockMeasurer(
+            bodyShaper = shaper,
+            titleShaper = shaper,
+            imageDimensionsResolver = { ReaderImageDimensions(12f, 12f) },
+            imageOptionsResolver = { ReaderImageOptions(action = "js") },
+        ).measure(source, style.copy(excludeActionImages = true)) as ReaderChapterMeasureResult.Success
+
+        assertTrue(result.blocks.isEmpty())
+    }
+
+    @Test
+    fun excludeActionImagesKeepsRealTextInParagraphWithDroppedImage() = runBlocking {
+        // 抑制只针对「全空白 + 被剔除图」的段；同段有正文时正文照常保留
+        val source = ReaderChapterSource(1, "", listOf(
+            ReaderChapterSourceBlock.Paragraph(listOf(
+                ReaderChapterInlineSource.Text("　　", 0),
+                ReaderChapterInlineSource.Image("badge.png,{\"click\":\"js\"}", 2),
+                ReaderChapterInlineSource.Text("正文", 3),
+            ), 0),
+        ), 5)
+        val result = ReaderChapterBlockMeasurer(
+            bodyShaper = shaper,
+            titleShaper = shaper,
+            imageDimensionsResolver = { ReaderImageDimensions(12f, 12f) },
+            imageOptionsResolver = { ReaderImageOptions(action = "js") },
+        ).measure(source, style.copy(excludeActionImages = true)) as ReaderChapterMeasureResult.Success
+
+        val paragraphs = result.blocks.filterIsInstance<ReaderMeasuredBlock.InlineParagraph>()
+        assertEquals(1, paragraphs.size)
+        val items = paragraphs.single().items
+        assertTrue(items.none { it is ReaderMeasuredInlineItem.Image })
+        assertEquals("　　正文", items.filterIsInstance<ReaderMeasuredInlineItem.Text>()
+            .joinToString("") { it.value })
+    }
 }
