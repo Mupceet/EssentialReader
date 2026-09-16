@@ -4,16 +4,16 @@ import android.graphics.Paint
 import android.graphics.Typeface
 import android.os.Build
 import android.text.TextPaint
+import androidx.core.net.toUri
 import io.legado.app.feature.reader.core.layout.GlyphClusters
 import io.legado.app.feature.reader.core.layout.ReaderFontBounds
 import io.legado.app.feature.reader.core.layout.ReaderFontLineMetrics
 import io.legado.app.feature.reader.core.layout.ReaderTextShaper
 import io.legado.app.feature.reader.core.layout.clusterGlyphs
 import io.legado.app.feature.reader.core.model.ReaderTextStyle
-import io.legado.app.utils.loadTypefaceOrNull
 import io.legado.app.utils.validFontLeading
-import splitties.init.appCtx
 import java.io.File
+import splitties.init.appCtx
 
 object ReaderAndroidPaintFactory {
     /** 进程级字体缓存：同一 path/weight/italic/family 只做一次磁盘读取与解析。 */
@@ -48,8 +48,16 @@ object ReaderAndroidPaintFactory {
     fun loadTypeface(path: String, weight: Int, italic: Boolean, family: String = "sans-serif"): Typeface {
         val key = "$path|$weight|$italic|$family"
         typefaceCache[key]?.let { return it }
-        val base = runCatching { loadTypefaceOrNull(appCtx, path) }.getOrNull()
-            ?: Typeface.create(family, Typeface.NORMAL)
+        val base = runCatching {
+            when {
+                path.startsWith("content://", ignoreCase = true) ->
+                    appCtx.contentResolver.openFileDescriptor(path.toUri(), "r")?.use {
+                        Typeface.Builder(it.fileDescriptor).build()
+                    }
+                path.isNotBlank() && File(path).isFile -> Typeface.Builder(File(path)).build()
+                else -> null
+            }
+        }.getOrNull() ?: Typeface.create(family, Typeface.NORMAL)
         val typeface = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
             Typeface.create(base, weight.coerceIn(1, 1000), italic)
         } else {

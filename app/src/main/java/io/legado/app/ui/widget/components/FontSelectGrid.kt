@@ -1,5 +1,6 @@
 package io.legado.app.ui.widget.components
 
+import android.graphics.Typeface
 import android.net.Uri
 import androidx.annotation.StringRes
 import androidx.compose.foundation.background
@@ -50,7 +51,6 @@ import io.legado.app.R
 import io.legado.app.domain.gateway.OtherSettingsGateway
 import io.legado.app.help.loadFontFiles
 import io.legado.app.ui.theme.LegadoTheme
-import io.legado.app.utils.loadTypefaceOrNull
 import io.legado.app.ui.theme.ProvideAppDensity
 import io.legado.app.utils.FileDoc
 import io.legado.app.utils.cnCompare
@@ -284,7 +284,14 @@ private fun rememberItemFontFamily(uri: Uri): State<FontFamily?> {
     return produceState<FontFamily?>(initialValue = null, uri) {
         val parsed = withContext(Dispatchers.IO) {
             runCatching {
-                loadTypefaceOrNull(context, uri.toString())?.let { FontFamily(it) }
+                val typeface: Typeface? = if (uri.scheme == "content") {
+                    context.contentResolver.openFileDescriptor(uri, "r")?.use {
+                        Typeface.Builder(it.fileDescriptor).build()
+                    }
+                } else {
+                    uri.path?.let { Typeface.createFromFile(it) }
+                }
+                typeface?.let { FontFamily(it) }
             }.onFailure { if (it is CancellationException) throw it }.getOrNull()
         }
         if (parsed != null) value = parsed

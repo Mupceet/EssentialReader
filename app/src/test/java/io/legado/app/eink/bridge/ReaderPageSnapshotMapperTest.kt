@@ -541,14 +541,4 @@ class ReaderPageSnapshotMapperTest {
         // fontVariationSettings：Robolectric 4.16 ShadowPaint 未实现 get/set
         // 往返，不做断言（属 shadow 能力限制）；阴影/斜体不在规格内（E-Ink 不渲染）。
     }
-
-    // API 24 没有 Paint#getFontVariationSettings，必须按"未设置"透传：
-    // 越界读会在低版本 Android 上抛 NoSuchMethodError。
-    @Test
-    @Config(sdk = [24])
-    fun `画笔规格在 API 24 不读可变字重`() {
-        val paint = android.text.TextPaint().apply { textSize = 42f }
-
-        assertNull(paint.copyPaintSpec().fontVariationSettings)
-    }
 }

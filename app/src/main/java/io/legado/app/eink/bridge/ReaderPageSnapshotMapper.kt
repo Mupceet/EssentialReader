@@ -275,19 +275,14 @@ internal object ReaderPageSnapshotMapper {
 
 /**
  * 引擎画笔 → 渲染规格（只拷贝测量耦合参数；color 由模块主题自涂，
- * 阴影/斜体/linearText 等纯视觉效果不跨桥）。除可变字重外这些 getter
- * 都在 API 21 以下；`fontVariationSettings` 是 API 26 才有的 getter，
- * API 24/25 按"未设置"处理（引擎本身也只在 API 28+ 设置 variation）。
+ * 阴影/斜体/linearText 等纯视觉效果不跨桥）。这些 getter 的 API 级别
+ * 均 ≤ 26（= :app minSdk），无需门控。
  */
 internal fun Paint.copyPaintSpec(): ReaderPaintSpec = ReaderPaintSpec(
     textSizePx = textSize, // API 1
     letterSpacing = letterSpacing, // API 21
     typeface = typeface, // API 1
-    fontVariationSettings = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-        fontVariationSettings
-    } else {
-        null
-    },
+    fontVariationSettings = fontVariationSettings, // API 26 = minSdk
 )
 
 /**

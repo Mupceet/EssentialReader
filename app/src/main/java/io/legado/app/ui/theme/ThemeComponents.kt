@@ -1,6 +1,8 @@
 package io.legado.app.ui.theme
 
 import android.content.Context
+import android.graphics.Typeface
+import android.net.Uri
 import android.util.LruCache
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.MaterialExpressiveTheme
@@ -19,7 +21,6 @@ import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import io.legado.app.domain.model.settings.customColors
-import io.legado.app.utils.loadTypefaceOrNull
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import top.yukonga.miuix.kmp.theme.ColorSchemeMode
@@ -52,7 +53,17 @@ fun rememberCustomFont(fontPath: String?): FontFamily? {
 private val customFontCache = LruCache<String, FontFamily>(4)
 
 private fun loadCustomFont(context: Context, fontPath: String): FontFamily? =
-    runCatching { loadTypefaceOrNull(context, fontPath)?.let(::FontFamily) }.getOrNull()
+    runCatching {
+        val uri = Uri.parse(fontPath)
+        val typeface = if (uri.scheme == "content") {
+            context.contentResolver.openFileDescriptor(uri, "r")?.use {
+                Typeface.Builder(it.fileDescriptor).build()
+            }
+        } else {
+            Typeface.createFromFile(uri.path)
+        }
+        typeface?.let(::FontFamily)
+    }.getOrNull()
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
