@@ -13,7 +13,7 @@ import java.lang.reflect.Proxy
 /**
  * 引擎端口注册表（service locator）：未注册访问抛指名异常、install
  * 后端口可达、重复 install 整体替换（keyEventHub 一并重置）、可选端口
- * （更新/选区/书签）未注册为 null。
+ * （更新/选区/书签/分组）未注册为 null。
  *
  * 端口桩经 JDK 动态代理生成（install 只存引用不调方法，桩方法返回
  * null 即可），避免为 8 个接口手写假实现。
@@ -134,6 +134,31 @@ class EInkEngineRegistryTest {
     fun `install 传入 marksEngine 后可取回`() {
         installDefaults(marksEngine = fakeMarksEngine)
         assertSame(fakeMarksEngine, EInkEngineRegistry.marksEngine)
+    }
+
+    /** 分组端口桩（代理生成，只做存取断言，方法不实际调用）。 */
+    private val fakeGroupEngine: BookshelfGroupEngine = stub()
+
+    @Test
+    fun `e_bookshelfGroupEngine 未注册时为 null 且不参与必填校验`() {
+        installDefaults() // 不传 bookshelfGroupEngine：install 正常完成即证明非必填
+        assertNull(EInkEngineRegistry.bookshelfGroupEngine)
+    }
+
+    @Test
+    fun `e_install 传入 bookshelfGroupEngine 后可取回`() {
+        EInkEngineRegistry.install(
+            globalSettings = stub(),
+            bookshelfEngine = stub(),
+            searchEngine = stub(),
+            tocEngine = stub(),
+            bookDetailEngine = stub(),
+            changeSourceEngine = stub(),
+            coverEngine = stub(),
+            readerEngine = stub(),
+            bookshelfGroupEngine = fakeGroupEngine,
+        )
+        assertSame(fakeGroupEngine, EInkEngineRegistry.bookshelfGroupEngine)
     }
 
     /** 装配全部必填端口（代理桩），可选端口仅透传 marksEngine（缺省不传）。 */
