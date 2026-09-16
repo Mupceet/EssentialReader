@@ -45,20 +45,6 @@ internal object BookshelfEngineImpl : BookshelfEngine, KoinComponent {
     private val downloadCacheSettingsGateway: DownloadCacheSettingsGateway by inject()
     private val bookshelfSettingsGateway: BookshelfSettingsGateway by inject()
 
-    /** [Book] → [BookshelfItemUiModel]：条目渲染字段的唯一抽取点。 */
-    private fun Book.toBookshelfItemUiModel() = BookshelfItemUiModel(
-        bookUrl = bookUrl,
-        name = name,
-        author = author,
-        displayAuthor = getRealAuthor(),
-        coverUrl = getDisplayCover(),
-        origin = origin,
-        currentChapterTitle = durChapterTitle,
-        latestChapterTitle = latestChapterTitle,
-        unreadCount = getUnreadChapterNum(),
-        hasNewChapter = lastCheckCount > 0,
-    )
-
     override fun observeShelf(): Flow<List<BookshelfItemUiModel>> =
         combine(
             appDb.bookDao.flowByGroup(BookGroup.IdAll),
@@ -157,7 +143,4 @@ internal object BookshelfEngineImpl : BookshelfEngine, KoinComponent {
     override suspend fun startCacheProcessJob() {
         CacheBook.startProcessJob(Dispatchers.IO)
     }
-
-    /** 排序键投影：设置流任意键变化不触发书架重排，仅排序键变化才重发。 */
-    private data class BookshelfSortKey(val sort: Int, val sortOrder: Int)
 }
