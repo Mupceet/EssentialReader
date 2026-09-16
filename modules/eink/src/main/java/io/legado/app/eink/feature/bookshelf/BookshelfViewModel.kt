@@ -6,12 +6,15 @@ import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import io.legado.app.eink.arch.UserMessage
+import io.legado.app.eink.contract.BookshelfGroupIds
+import io.legado.app.eink.contract.BookshelfGroupUiModel
 import io.legado.app.eink.contract.BookshelfItemUiModel
 import io.legado.app.eink.contract.BookshelfStyle
 import io.legado.app.eink.contract.BookshelfTocRefreshResult
 import io.legado.app.eink.contract.EInkEngineRegistry
 import io.legado.app.eink.util.onEachParallel
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -23,6 +26,9 @@ import kotlinx.coroutines.flow.asFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -47,6 +53,15 @@ data class BookshelfUiState(
 
     /** 书架显示样式快照（宿主设置投影，实时档）。 */
     val style: BookshelfStyle = BookshelfStyle(),
+
+    /** 分组选择模型（未注册分组端口时恒空，选择器不渲染）。 */
+    val groups: List<BookshelfGroupUiModel> = emptyList(),
+
+    /** 当前选中分组（[BookshelfGroupIds.ALL] = 全部平铺）。 */
+    val selectedGroupId: Long = BookshelfGroupIds.ALL,
+
+    /** 分组端口已注册（选择器可渲染）；false 时书架维持现状平铺。 */
+    val groupSelectorAvailable: Boolean = false,
 ) {
     val isEmpty: Boolean get() = books.isEmpty() && !isLoading
 }
@@ -81,6 +96,33 @@ class BookshelfViewModel(application: Application) : AndroidViewModel(applicatio
     // 面板提交即时生效
     private val styleState = BookshelfStyleState(engine.style, viewModelScope)
 
+    // 分组端口可选：未注册（旧宿主）时组流退化为空、选中恒「全部」，
+    // 书架维持现状平铺（诚实退化，不伪造空分组）
+    private val groupEngine get() = EInkEngineRegistry.bookshelfGroupEngine
+
+    /** 分组状态宿主（列表 + 选中乐观覆盖，见 [BookshelfGroupState]）。 */
+    internal val groupState = BookshelfGroupState(
+        savedSelected = groupEngine?.selectedGroup
+            ?: flowOf(BookshelfGroupIds.ALL),
+        groupsFlow = groupEngine?.observeGroups()
+            ?: flowOf(emptyList()),
+        scope = viewModelScope,
+    )
+
+    // 组内书流：选中「全部」走现状 observeShelf 路径（零行为变化）；
+    // 其余值（含未分组 -100、用户组）走分组端口。distinctUntilChanged
+    // 防止选中流重发同值导致 Room 重订阅
+    @OptIn(ExperimentalCoroutinesApi::class)
+    private val booksFlow = groupState.selected
+        .distinctUntilChanged()
+        .flatMapLatest { groupId ->
+            if (groupId == BookshelfGroupIds.ALL) {
+                engine.observeShelf()
+            } else {
+                groupEngine?.observeGroupBooks(groupId) ?: engine.observeShelf()
+            }
+        }
+
     // notShelf 行已在宿主查询内过滤，并由宿主物理删除；此处
     // 直接使用查询结果，与 View 版保持一致。
     // UiModel 映射放在宿主 bridge：只在 Room 发射（books 表变化）时执行
@@ -89,11 +131,16 @@ class BookshelfViewModel(application: Application) : AndroidViewModel(applicatio
     // 此处直接并入 UiState。
     val uiState: StateFlow<BookshelfUiState> =
         combine(
-            engine.observeShelf(),
+            combine(booksFlow, _isRefreshing, _updatingUrls) { books, refreshing, updating ->
+                Triple(books, refreshing, updating)
+            },
             styleState.style,
-            _isRefreshing,
-            _updatingUrls
-        ) { books, style, refreshing, updatingUrls ->
+            combine(groupState.groups, groupState.selected) { groups, selected ->
+                groups to selected
+            },
+        ) { frame, style, selection ->
+            val (books, refreshing, updatingUrls) = frame
+            val (groups, selectedGroupId) = selection
             BookshelfUiState(
                 books = books,
                 isLoading = false,
@@ -101,6 +148,9 @@ class BookshelfViewModel(application: Application) : AndroidViewModel(applicatio
                 updatingBookUrls = updatingUrls,
                 isGridLayout = style.isGridLayout,
                 style = style,
+                groups = groups,
+                selectedGroupId = selectedGroupId,
+                groupSelectorAvailable = groupEngine != null,
             )
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), BookshelfUiState())
 
@@ -111,6 +161,17 @@ class BookshelfViewModel(application: Application) : AndroidViewModel(applicatio
     fun updateStyle(style: BookshelfStyle) {
         styleState.submit(style)
         viewModelScope.launch { engine.setStyle(style) }
+    }
+
+    /** 切换分组：乐观置选中，宿主 saveTabPosition 异步落库。 */
+    fun selectGroup(groupId: Long) {
+        groupState.submit(groupId)
+        viewModelScope.launch { groupEngine?.setSelectedGroup(groupId) }
+    }
+
+    /** 排序模式 ▲▼：转发宿主 moveGroup（每击即写），乐观重排在面板层。 */
+    fun moveGroup(groupId: Long, up: Boolean) {
+        viewModelScope.launch { groupEngine?.moveGroup(groupId, up) }
     }
 
     private var refreshJob: Job? = null
