@@ -1,5 +1,6 @@
 package io.legado.app.ui.main.my
 
+import android.content.Intent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
@@ -21,6 +22,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ExitToApp
 import androidx.compose.material.icons.automirrored.filled.HelpOutline
 import androidx.compose.material.icons.automirrored.filled.LibraryBooks
+import androidx.compose.material.icons.automirrored.filled.MenuBook
 import androidx.compose.material.icons.automirrored.filled.Rule
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Bookmark
@@ -38,19 +40,23 @@ import androidx.compose.material.icons.filled.Web
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.legado.app.R
+import io.legado.app.eink.EInkMainActivity
 import io.legado.app.ui.book.bookmark.AllBookmarkActivity
 import io.legado.app.ui.book.toc.rule.TxtTocRuleActivity
 import io.legado.app.ui.dict.rule.DictRuleActivity
 import io.legado.app.ui.file.FileManageActivity
 import io.legado.app.ui.replace.ReplaceRuleActivity
 import io.legado.app.ui.theme.adaptiveContentPadding
+import io.legado.app.utils.startActivity
 import io.legado.app.ui.widget.components.AppScaffold
 import io.legado.app.ui.widget.components.SplicedColumnGroup
 import io.legado.app.ui.widget.components.button.series.SmallPlainButton
@@ -58,6 +64,7 @@ import io.legado.app.ui.widget.components.settingItem.ClickableSettingItem
 import io.legado.app.ui.widget.components.settingItem.SwitchSettingItem
 import io.legado.app.ui.widget.components.topbar.GlassMediumFlexibleTopAppBar
 import io.legado.app.ui.widget.components.topbar.GlassTopAppBarDefaults
+import kotlinx.coroutines.flow.collectLatest
 import org.koin.androidx.compose.koinViewModel
 
 
@@ -70,6 +77,19 @@ fun MyRouteScreen(
     onNavigate: (PrefClickEvent) -> Unit
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val context = LocalContext.current
+    LaunchedEffect(viewModel) {
+        viewModel.effects.collectLatest { effect ->
+            when (effect) {
+                // 打开开关即整体切换进 E-Ink（CLEAR_TASK），与退出方向的
+                // EInkMainActivity.onExitToFullMode 对称
+                MyEffect.EnterEInkMode -> context.startActivity<EInkMainActivity> {
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    addFlags(Intent.FLAG_ACTIVITY_CLEAR_TASK)
+                }
+            }
+        }
+    }
     MyScreen(
         state = uiState,
         onIntent = viewModel::onIntent,
@@ -115,6 +135,14 @@ fun MyScreen(
             SplicedColumnGroup(
                 title = ""
             ) {
+                if (state.showEInkModeEntry) {
+                    SwitchSettingItem(
+                        title = stringResource(R.string.my_eink_mode),
+                        imageVector = Icons.AutoMirrored.Filled.MenuBook,
+                        checked = state.isEInkModeOn,
+                        onCheckedChange = { onIntent(MyIntent.SetEInkMode(it)) },
+                    )
+                }
                 WebServiceSettingBlock(
                     uiState = state,
                     onToggleWebService = {

@@ -74,11 +74,10 @@ class ThemeConfigViewModel(
                 _uiState.update { it.copy(fontFolder = settings.fontFolder) }
             }
         }
-        // 「电子书」主题跟随实验室总开关显隐：开关打开即放开，不再要求墨水屏显示同时打开
         viewModelScope.launch {
             labSettingsGateway.settings.collect { settings ->
                 _uiState.update {
-                    it.copy(showEInkTheme = settings.enabled)
+                    it.copy(showEInkTheme = settings.enabled && settings.eInkDisplay)
                 }
             }
         }

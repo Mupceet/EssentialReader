@@ -5,6 +5,7 @@ import androidx.compose.runtime.Stable
 import androidx.lifecycle.viewModelScope
 import io.legado.app.base.BaseViewModel
 import io.legado.app.constant.EventBus
+import io.legado.app.domain.gateway.LabSettingsGateway
 import io.legado.app.service.WebService
 import io.legado.app.utils.eventBus.FlowEventBus
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -18,7 +19,9 @@ import kotlinx.coroutines.launch
 @Stable
 data class MyUiState(
     val isWebServiceRun: Boolean = false,
-    val webServiceAddress: String = ""
+    val webServiceAddress: String = "",
+    val showEInkModeEntry: Boolean = false,
+    val isEInkModeOn: Boolean = false,
 )
 
 sealed class PrefClickEvent {
@@ -36,18 +39,26 @@ sealed class PrefClickEvent {
 
 sealed interface MyIntent {
     data object ToggleWebService : MyIntent
+    data class SetEInkMode(val enabled: Boolean) : MyIntent
 }
 
-sealed interface MyEffect
+sealed interface MyEffect {
+    data object EnterEInkMode : MyEffect
+}
 
 class MyViewModel(
-    application: Application
+    application: Application,
+    private val labSettingsGateway: LabSettingsGateway,
 ) : BaseViewModel(application) {
 
     private val _uiState = MutableStateFlow(
         MyUiState(
             isWebServiceRun = WebService.isRun,
-            webServiceAddress = WebService.hostAddress
+            webServiceAddress = WebService.hostAddress,
+            showEInkModeEntry = labSettingsGateway.currentSettings.run {
+                enabled && eInkDisplay
+            },
+            isEInkModeOn = labSettingsGateway.currentSettings.eInkMode,
         )
     )
     val uiState: StateFlow<MyUiState> = _uiState.asStateFlow()
@@ -66,6 +77,20 @@ class MyViewModel(
                     }
                 }
         }
+        // 「墨水屏模式」开关：条目显隐跟实验室两个开关联动——「启用实验室」
+        // 或「墨水屏显示」任一关闭即隐藏（总开关关闭时实验室页也藏起显示组）；
+        // 开关状态是独立的 eInkMode 偏好——打开即进入 E-Ink，退出模式自动
+        // 关闭（条目不随之消失），冷启动按 eInkMode 分流
+        viewModelScope.launch {
+            labSettingsGateway.settings.collect { settings ->
+                _uiState.update {
+                    it.copy(
+                        showEInkModeEntry = settings.enabled && settings.eInkDisplay,
+                        isEInkModeOn = settings.eInkMode,
+                    )
+                }
+            }
+        }
     }
 
     fun onIntent(intent: MyIntent) {
@@ -80,6 +105,12 @@ class MyViewModel(
                     _uiState.update { it.copy(isWebServiceRun = false, webServiceAddress = "") }
                 }
 
+            }
+            is MyIntent.SetEInkMode -> viewModelScope.launch {
+                // 偏好先落盘再发进入效果：中断最坏态是「开关已开、未跳转」，
+                // 用户冷启动或再拨一次开关即可进入
+                labSettingsGateway.update { it.copy(eInkMode = intent.enabled) }
+                if (intent.enabled) _effects.tryEmit(MyEffect.EnterEInkMode)
             }
         }
     }

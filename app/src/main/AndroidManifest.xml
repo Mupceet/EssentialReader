@@ -194,7 +194,7 @@
                 android:name="com.samsung.android.support.REMOTE_ACTION"
                 android:resource="@xml/spen_remote_actions" />
         </activity>
-        <!-- E-Ink 墨水屏界面（实验室「墨水屏显示」开关打开时接管界面） -->
+        <!-- E-Ink 墨水屏界面（入口：「我的」页顶部「墨水屏模式」开关；eInkMode 打开时冷启动接管） -->
         <activity
             android:name=".eink.EInkMainActivity"
             android:label="@string/lab_eink_display_title"

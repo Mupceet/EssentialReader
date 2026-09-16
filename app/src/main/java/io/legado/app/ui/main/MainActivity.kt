@@ -303,8 +303,9 @@ open class MainActivity : BaseComposeActivity(), AudioPlay.CallBack {
         super.onCreate(savedInstanceState)
 
         if (checkStartupRoute()) return
-        // 实验室「墨水屏显示」开关打开时接管界面（首次引导完成后才可能为 true）
-        if (AppConfigStore.getBoolean(PreferKey.labEInkDisplay) == true) {
+        // 墨水屏模式（eInkMode，「我的」页开关）打开时接管界面；条目显隐门控
+        // 是实验室「墨水屏显示」(labEInkDisplay)，两者独立
+        if (AppConfigStore.getBoolean(PreferKey.eInkMode) == true) {
             startActivity<EInkMainActivity>()
             finish()
             return

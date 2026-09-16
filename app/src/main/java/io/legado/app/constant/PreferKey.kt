@@ -460,6 +460,9 @@ object PreferKey {
     const val labEInkDisplay = "labEInkDisplay"
     const val labEyeProtection = "labEyeProtection"
 
+    // E-Ink 模式当前状态（「我的」页开关；显隐门控是上面的 labEInkDisplay）
+    const val eInkMode = "eInkMode"
+
     // Eye Protection
     const val eyeProtectionEnabled = "eyeProtectionEnabled"
     const val colorTemperature = "colorTemperature"

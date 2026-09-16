@@ -674,6 +674,7 @@
     <string name="change_icon_summary">切換軟體顯示在桌面的圖示</string>
     <string name="help">幫助</string>
     <string name="my">我的</string>
+    <string name="my_eink_mode">電子墨水屏模式</string>
     <string name="reading">閱讀</string>
     <string name="battery_show">%d%%</string>
     <string name="timer_m">%d分鐘</string>
@@ -2301,7 +2302,8 @@
     <string name="lab_enabled_summary">開啟以顯示實驗性功能。這些功能可能不穩定。</string>
     <string name="lab_display">顯示</string>
     <string name="lab_eink_display_title">電子墨水屏顯示</string>
-    <string name="lab_eink_display_summary">開啟後整體切換到電子墨水屏介面</string>
+    <string name="lab_eink_display_summary">在平板介面中顯示電子墨水屏選項</string>
+    <string name="lab_eink_display_hint">您可以在主題 → 顯示選項中調整電子墨水屏顯示設定</string>
     <string name="eye_protection">護眼模式</string>
     <string name="eye_protection_enabled">啟用護眼模式</string>
     <string name="eye_protection_enabled_summary">透過暖色色調減少藍光</string>

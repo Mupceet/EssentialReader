@@ -738,6 +738,7 @@
     <string name="change_icon_summary">切换软件显示在桌面的图标</string>
     <string name="help">帮助</string>
     <string name="my">我的</string>
+    <string name="my_eink_mode">墨水屏模式</string>
     <string name="reading">阅读</string>
     <string name="battery_show">%d%%</string>
     <string name="timer_m">%d 分钟</string>
@@ -2381,7 +2382,8 @@
     <string name="lab_enabled_summary">开启后显示实验性功能，可能不稳定</string>
     <string name="lab_display">显示</string>
     <string name="lab_eink_display_title">墨水屏显示</string>
-    <string name="lab_eink_display_summary">开启后整体切换到墨水屏界面</string>
+    <string name="lab_eink_display_summary">在平板界面显示墨水屏选项</string>
+    <string name="lab_eink_display_hint">可在 主题 → 显示 中调整墨水屏设置</string>
     <string name="lab_diagnostics">诊断</string>
     <string name="lab_page_estimate_diagnostics_title">导出全文页码诊断</string>
     <string name="lab_page_estimate_diagnostics_summary">分享本机最近的估算与校正记录，不会自动上传。</string>

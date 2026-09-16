@@ -18,9 +18,10 @@ import org.koin.core.context.GlobalContext
 /**
  * E-Ink 版本单 Activity 入口（模块模板基类 [EInkHostActivity] 的宿主子类）。
  *
- * 进入条件：实验室「墨水屏显示」开关（PreferKey.labEInkDisplay）打开。
- * 打开即接管界面（MainActivity 冷启动分流至此；实验室页拨开即时切换）；
- * E-Ink 内「退出到完整模式」时关闭该开关并回到 MainActivity。
+ * 进入方式：「我的」页顶部「墨水屏模式」开关（eInkMode）打开即进入
+ * （CLEAR_TASK 整体切换），偏好打开时 MainActivity 冷启动分流至此；
+ * 实验室「墨水屏显示」(labEInkDisplay) 是该开关条目的显隐门控，与模式
+ * 状态独立。E-Ink 内「退出到完整模式」时关闭 eInkMode 并回到 MainActivity。
  *
  * 生命周期编排（引擎装配时机、字体缩放、启动清理、直达最近阅读、
  * 跟随系统深浅色主题、按键分发）全部由基类承担，宿主差异只剩两个钩子
@@ -70,8 +71,11 @@ class EInkMainActivity : EInkHostActivity() {
         // 存续期间切换系统深浅后它是旧值
         appUiConfigurationGateway.synchronizeSystemDarkTheme(isSystemDarkTheme)
         // 完整模式（View UI）——导入导出等管理功能在完整模式中完成，
-        // 再次启用需在 实验室 → 墨水屏显示 重新打开
-        AppConfigStore.putBoolean(PreferKey.labEInkDisplay, false)
+        // 再次进入经 我的 页顶部「墨水屏模式」开关。退出只关 eInkMode（模式
+        // 状态），「墨水屏显示」门控不受影响——条目仍显示、开关已回弹：
+        // 同步写 AppConfigStore 无竞态，preferencesFlow 派生的 LabSettings 流
+        // 会随之更新；MainActivity 冷启动分流立即读该键，不会被弹回
+        AppConfigStore.putBoolean(PreferKey.eInkMode, false)
         // 不能显式指向 MainActivity：切换图标后该组件被禁用，
         // 须解析当前启用的 launcher 组件（主类或 Launcher 别名）
         context.startActivity(

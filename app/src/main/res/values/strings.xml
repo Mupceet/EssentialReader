@@ -768,6 +768,7 @@
     <string name="change_icon_summary">Switch the software icon displayed on the desktop</string>
     <string name="help">Help</string>
     <string name="my">Me</string>
+    <string name="my_eink_mode">E-Ink Mode</string>
     <string name="reading">Read</string>
     <string name="battery_show">%d%%</string>
     <string name="timer_m">%d min</string>
@@ -2405,7 +2406,8 @@
     <string name="lab_enabled_summary">Turn on to show experimental features. These may be unstable.</string>
     <string name="lab_display">Display</string>
     <string name="lab_eink_display_title">E-Ink Display</string>
-    <string name="lab_eink_display_summary">Switch to the E-Ink interface when enabled</string>
+    <string name="lab_eink_display_summary">Show E-Ink display option in the tablet interface</string>
+    <string name="lab_eink_display_hint">You can adjust E-Ink display settings in Theme → Display options</string>
     <string name="lab_diagnostics">Diagnostics</string>
     <string name="lab_page_estimate_diagnostics_title">Export page estimate diagnostics</string>
     <string name="lab_page_estimate_diagnostics_summary">Share the latest local-only estimate and correction records. Nothing is uploaded automatically.</string>
