@@ -3,9 +3,7 @@ package io.legado.app.ui.config.labConfig
 import android.app.Application
 import android.os.Looper
 import io.legado.app.domain.gateway.LabSettingsGateway
-import io.legado.app.domain.gateway.ThemeSettingsGateway
 import io.legado.app.domain.model.settings.LabSettings
-import io.legado.app.domain.model.settings.ThemeSettings
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.runBlocking
@@ -29,17 +27,14 @@ class LabConfigViewModelTest {
     }
 
     @Test
-    fun enableEInkDisplay_appliesElinkThemeAndFlipsFlag() = runBlocking {
+    fun enableEInkDisplay_flipsFlagWithoutTouchingTheme() = runBlocking {
         val labGateway = FakeLabSettingsGateway()
-        val themeGateway = FakeThemeSettingsGateway()
-        val viewModel = createViewModel(labGateway, themeGateway)
+        val viewModel = createViewModel(labGateway)
 
         viewModel.onIntent(LabConfigIntent.SetEInkDisplay(true))
         Shadows.shadowOf(Looper.getMainLooper()).idle()
 
         assertEquals(true, viewModel.uiState.value.settings.eInkDisplay)
-        assertEquals("4", themeGateway.currentSettings.appTheme)
-        assertEquals(1, themeGateway.updateCount)
     }
 
     @Test
@@ -47,34 +42,28 @@ class LabConfigViewModelTest {
         val labGateway = FakeLabSettingsGateway(
             LabSettings(enabled = true, eInkDisplay = true)
         )
-        val themeGateway = FakeThemeSettingsGateway()
-        val viewModel = createViewModel(labGateway, themeGateway)
+        val viewModel = createViewModel(labGateway)
 
         viewModel.onIntent(LabConfigIntent.SetEInkDisplay(false))
         Shadows.shadowOf(Looper.getMainLooper()).idle()
 
         assertEquals(false, viewModel.uiState.value.settings.eInkDisplay)
-        assertEquals(0, themeGateway.updateCount)
     }
 
     @Test
     fun setEnabled_doesNotTouchTheme() = runBlocking {
-        val themeGateway = FakeThemeSettingsGateway()
-        val viewModel = createViewModel(themeGateway = themeGateway)
+        val viewModel = createViewModel()
 
         viewModel.onIntent(LabConfigIntent.SetEnabled(true))
         Shadows.shadowOf(Looper.getMainLooper()).idle()
 
         assertEquals(true, viewModel.uiState.value.settings.enabled)
-        assertEquals(0, themeGateway.updateCount)
     }
 
     private fun createViewModel(
         labGateway: LabSettingsGateway = FakeLabSettingsGateway(),
-        themeGateway: ThemeSettingsGateway = FakeThemeSettingsGateway(),
     ) = LabConfigViewModel(
         settingsGateway = labGateway,
-        themeSettingsGateway = themeGateway,
     )
 
     private class FakeLabSettingsGateway(
@@ -88,21 +77,6 @@ class LabConfigViewModelTest {
 
         override suspend fun update(transform: (LabSettings) -> LabSettings) {
             state.value = transform(state.value)
-        }
-    }
-
-    private class FakeThemeSettingsGateway : ThemeSettingsGateway {
-        private val state = MutableStateFlow(ThemeSettings())
-        var updateCount = 0
-            private set
-
-        override val currentSettings: ThemeSettings
-            get() = state.value
-        override val settings: Flow<ThemeSettings> = state
-
-        override suspend fun update(transform: (ThemeSettings) -> ThemeSettings) {
-            state.value = transform(state.value)
-            updateCount++
         }
     }
 }

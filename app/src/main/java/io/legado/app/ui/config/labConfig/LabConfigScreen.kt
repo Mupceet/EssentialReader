@@ -3,12 +3,8 @@ package io.legado.app.ui.config.labConfig
 import android.content.Intent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Modifier
@@ -18,7 +14,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.legado.app.R
-import io.legado.app.ui.theme.LegadoTheme
 import io.legado.app.ui.theme.adaptiveContentPadding
 import io.legado.app.utils.startActivity
 import io.legado.app.ui.widget.components.AppScaffold
@@ -111,9 +106,6 @@ fun LabConfigScreen(
                             checked = settings.eInkDisplay,
                             onCheckedChange = { onIntent(LabConfigIntent.SetEInkDisplay(it)) },
                         )
-                        if (settings.eInkDisplay) {
-                            HintText(R.string.lab_eink_display_hint)
-                        }
                     }
                 }
                 SplicedColumnGroup(title = stringResource(R.string.lab_diagnostics)) {
@@ -134,14 +126,4 @@ fun LabConfigScreen(
             }
         }
     }
-}
-
-@Composable
-private fun HintText(textRes: Int) {
-    Text(
-        text = stringResource(textRes),
-        style = LegadoTheme.typography.labelSmall,
-        color = MaterialTheme.colorScheme.primary,
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
-    )
 }
