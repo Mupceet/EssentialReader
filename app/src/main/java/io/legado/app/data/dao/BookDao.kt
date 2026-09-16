@@ -356,6 +356,19 @@ interface BookDao {
     )
     fun flowBookShelfByUserGroup(group: Long): Flow<List<BookShelfItem>>
 
+    /**
+     * 用户组书籍实体流：WHERE 谓词与 [flowBookShelfByUserGroup] 的用户组分支
+     * 完全一致（含私有组豁免），仅投影列不同（返回 Book 实体）。
+     */
+    @Query(
+        """
+        SELECT * FROM books
+        WHERE (`group` & :group) > 0
+        AND ((SELECT isPrivate FROM book_groups WHERE groupId = :group) = 1 OR $PUBLIC_BOOK_FILTER)
+        """
+    )
+    fun flowUserGroupBooks(group: Long): Flow<List<Book>>
+
     @Query(
         "SELECT * FROM books WHERE name like '%'||:key||'%' or author like '%'||:key||'%' or originName like '%'||:key||'%'"
     )

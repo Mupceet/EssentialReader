@@ -400,6 +400,7 @@ internal fun HomeScreen(
             HomePane(visible = selectedTab != HomeTabs.BOOKSHELF) { mine() }
             // 内容浮层（书架分组选择面板等）：锚定内容区顶部，位于顶栏
             // 之下、底部操作栏之上，面板外点击收起
+            // 不变量：浮层根节点须自带 zIndex > HomePane 可见态的 1f，才能绘制/命中最前
             contentOverlay()
         }
         EInkOperationBar(

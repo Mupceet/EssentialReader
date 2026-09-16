@@ -25,7 +25,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.zIndex
 import io.legado.app.eink.contract.BookshelfGroupUiModel
 import io.legado.app.eink.designsystem.content.EInkHorizontalDivider
 import io.legado.app.eink.designsystem.content.EInkText
@@ -83,6 +85,9 @@ fun ShelfGroupChip(
         EInkText(
             text = if (expanded) "$text ▴" else "$text ▾",
             style = EInkTheme.typography.titleSmall,
+            // 顶栏高度固定 56dp：长组名单行截断省略，不换行撑高
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
         )
     }
 }
@@ -118,7 +123,13 @@ fun ShelfSelectorPanel(
     val display = sortOverride ?: groups
     val scope = rememberCoroutineScope()
 
-    BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+    BoxWithConstraints(
+        modifier = Modifier
+            .fillMaxSize()
+            // 不变量：content Box 内浮层的 zIndex 必须高于 HomePane 可见态
+            // 的 1f，否则被书架 Pane 盖住绘制且点击穿透到书籍条目
+            .zIndex(2f)
+    ) {
         // 透明点击层：点面板外空白收起
         Box(
             modifier = Modifier
@@ -264,7 +275,10 @@ private fun SortRow(
     }
 }
 
-/** 排序箭头：48dp 触控目标，禁用态中灰不可点（禁用时干脆不挂 clickable，不进语义树）。 */
+/**
+ * 排序箭头：48dp 触控目标，禁用态中灰。禁用态完全退出点击与语义树
+ * （与 EInkPageArrows 用 enabled 参数的约定并存，此处选择不挂点击修饰符）。
+ */
 @Composable
 private fun MoveArrow(
     text: String,

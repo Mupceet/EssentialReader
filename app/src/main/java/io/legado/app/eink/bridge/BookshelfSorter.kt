@@ -9,7 +9,8 @@ import io.legado.app.utils.cnCompare
  * 3 手动（order 字段）、4 max(更新, 阅读) 时间、5 作者，`sortOrder == 1`
  * 为降序，未知 sort 走 else（阅读时间）。
  *
- * 端口只投影「全部书架」，View 版 per-group bookSort 覆盖不适用。
+ * 排序入口含书架全量流与分组流；分组流的组 bookSort 覆盖在
+ * BookshelfGroupEngineImpl 内解析后传入。
  * 手动排序必须显式排序：DAO `flowAll()` 自然序是 `durChapterTime desc`，
  * 与手动序无关，不得依赖自然序巧合。cnCompare 为宿主工具，故排序收敛
  * 在 bridge 而非模块（模块零计算纪律）。

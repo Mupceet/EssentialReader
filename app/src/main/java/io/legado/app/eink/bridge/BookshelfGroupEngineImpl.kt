@@ -8,6 +8,7 @@ import io.legado.app.domain.gateway.BookshelfSettingsGateway
 import io.legado.app.eink.contract.BookshelfGroupEngine
 import io.legado.app.eink.contract.BookshelfGroupUiModel
 import io.legado.app.eink.contract.BookshelfItemUiModel
+import io.legado.app.help.book.isNotShelf
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
@@ -70,7 +71,16 @@ internal object BookshelfGroupEngineImpl : BookshelfGroupEngine, KoinComponent {
 
     override fun observeGroupBooks(groupId: Long): Flow<List<BookshelfItemUiModel>> =
         combine(
-            appDb.bookDao.flowByGroup(groupId),
+            // 用户组走 flowUserGroupBooks：带私有组豁免（谓词同完整模式
+            // flowBookShelfByUserGroup），与面板 flowUserGroupBookCount 计数
+            // 口径一致；全部/根/虚拟组维持 flowByGroup 原查询
+            if (groupId > 0) {
+                appDb.bookDao.flowUserGroupBooks(groupId)
+                    // 镜像 flowByGroup 包装层的下架书过滤，两分支行为对齐
+                    .map { books -> books.filterNot { it.isNotShelf } }
+            } else {
+                appDb.bookDao.flowByGroup(groupId)
+            },
             bookGroupRepository.flowShow().map { groups ->
                 groups.firstOrNull { it.groupId == groupId }
             },
