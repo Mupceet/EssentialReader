@@ -407,10 +407,13 @@
     <string name="bookmark_mark_effect_solid">Solid</string>
     <string name="bookmark_mark_effect_wave">Wave</string>
     <string name="bookmark_mark_effect_dash">Dash</string>
+    <string name="bookmark_mark_effect_strike">Strike</string>
+    <string name="bookmark_mark_effect_highlight">Highlight</string>
     <string name="bookmark_mark_effect_bg">Bg</string>
     <string name="bookmark_mark_effect_text">Text</string>
     <string name="bookmark_mark_custom_color">Custom color</string>
     <string name="bookmark_mark_note">Note</string>
+    <string name="bookmark_mark_delete_note">Delete note</string>
     <string name="bookmark_mark_note_hint">Write a note…</string>
     <string name="bookmark_mark_editing">Existing mark — saving will update it</string>
     <string name="content_process_ai_section">AI edits</string>
@@ -461,6 +464,14 @@
     <string name="book_source_check_save_failed">Check failed: unable to save result, %1$s</string>
     <string name="book_source_check_incomplete">Check failed: task did not finish</string>
     <string name="book_source_check_item_cancelled">Check cancelled</string>
+    <string name="book_source_check_default_keyword">My</string>
+    <string name="book_source_import_success">Import completed</string>
+    <string name="book_source_import_failed">Import failed</string>
+    <string name="book_source_invalid_source">Not a book source</string>
+    <string name="book_source_export_open_failed">Unable to open export file</string>
+    <string name="book_source_export_failed">Export failed: %1$s</string>
+    <string name="book_source_upload_success">Upload completed: %1$s</string>
+    <string name="book_source_upload_failed">Upload failed: %1$s</string>
     <string name="check_select_source">Check the selected source</string>
     <string name="progress_show">%1$s      Progress %2$d/%3$d</string>
     <string name="tts_fix">Please install and select Chinese TTS!</string>
@@ -900,6 +911,12 @@
     <string name="nine_patch_split_right">Right Split</string>
     <string name="nine_patch_split_top">Top Split</string>
     <string name="nine_patch_split_bottom">Bottom Split</string>
+    <string name="manual_nine_slice">Manual 9-slice</string>
+    <string name="edit_nine_slice">Edit stretch region</string>
+    <string name="nine_slice_drag_hint">The green region stretches in both directions; the four edge slices stretch along their length only, and the corners are never deformed. To keep rounded corners intact, drag the split lines outside the arcs (slice ≥ corner radius). Use the image scale, not the split lines, to make the whole frame bigger or smaller.</string>
+    <string name="nine_slice_mode_all">All</string>
+    <string name="nine_slice_mode_horizontal">Horizontal</string>
+    <string name="nine_slice_mode_vertical">Vertical</string>
     <string name="preview_effect">Preview</string>
     <string name="sample_text">Sample Text</string>
     <string name="sure_delete">Are you sure you want to delete?</string>
@@ -1885,6 +1902,7 @@
     <string name="text_typeface">Font Style</string>
     <string name="shadow_typeface">Shadow Style</string>
     <string name="long_click_to_custom">Long Tap to Customize</string>
+    <string name="source_custom_button_long_action">Long-press action</string>
     <string name="disable_manga_scroll_animation">Disable Page Turn Animation</string>
     <string name="manga_cross_fade">Disable Loading Fade-In Animation</string>
     <string name="text_shadow_set">Shadow Settings</string>
@@ -2886,6 +2904,8 @@
     <string name="speech_analysis_rule_ai_summary">Rules preserve stable boundaries; AI only completes uncertain speakers, roles and emotions</string>
     <string name="speech_analysis_ai_summary">AI understands boundaries, speakers and emotions; slower and may incur model costs</string>
     <string name="speech_analysis_ai_model_required">Configure an AI model before enabling AI chapter segmentation</string>
+    <string name="speech_analysis_reasoning_level">Analysis reasoning</string>
+    <string name="speech_analysis_reasoning_level_summary">Off by default. Models that think by default (Zhipu GLM, DeepSeek, …) return the answer only in the reasoning field, which makes analysis fail</string>
     <string name="use_multi_speaker">Multi-speaker reading</string>
     <string name="use_multi_speaker_summary">Use different voices for narration, dialogue and other roles</string>
     <string name="read_aloud_adjust_speed">Adjust reading speed</string>
@@ -3274,4 +3294,11 @@
     <string name="manga_reader_cache_following">Cache following</string>
     <string name="manga_reader_cache_all">Cache entire comic</string>
     <string name="manga_reader_cache_enqueued">Added to offline cache queue</string>
+    <string name="feature_bookmarks_search_notes">Search note content</string>
+    <string name="feature_bookmarks_search_current">Search current %1$s</string>
+    <string name="feature_bookmarks_counts">%1$d bookmarks · %2$d notes</string>
+    <string name="feature_bookmarks_match_hint">Matching note found — tap to view</string>
+    <string name="feature_bookmarks_no_matching_notes">No matching notes</string>
+    <string name="feature_bookmarks_no_notes">No notes</string>
+    <string name="feature_bookmarks_chapter_fallback">Chapter %1$d</string>
 </resources>

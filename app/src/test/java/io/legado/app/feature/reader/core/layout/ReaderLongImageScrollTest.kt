@@ -50,8 +50,8 @@ class ReaderLongImageScrollTest {
 
         assertEquals(2, pages.size)
         assertEquals(400f, pages.first().scrollExtentPx, 0f)
-        // 滚动页堆叠高度 = 内容高度（主分支修订：不再撑到视口，见 ReaderPaginator
-        // finishPage 的 durY 说明；两个断言的旧期望是上游改动前的值，未被同步更新）
+        // 章末页的页高是排版游标（一行 10f），不向内容区高度 100f 收口：下一章正文紧接
+        // 图片后的一行出现（对照旧 TextChapterLayout 的 `height = durY + 20dp`）。
         assertEquals(10f, pages.last().scrollExtentPx, 0f)
         assertTrue(pages.last().elements.single() is ReaderElement.Text)
     }
@@ -69,7 +69,7 @@ class ReaderLongImageScrollTest {
             ),
         ).single()
 
-        // 同上：堆叠高度取内容高度（10），与视口/上下边距无关
+        // 页高为排版游标：只含正文行高 10f，上下留白都不计入堆叠高度。
         assertEquals(10f, page.scrollExtentPx, 0f)
         assertEquals(10f, page.contentTopPx, 0f)
         assertEquals(80f, page.contentBottomPx, 0f)

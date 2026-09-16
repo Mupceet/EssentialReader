@@ -36,6 +36,7 @@ import io.legado.app.constant.IntentAction
 import io.legado.app.constant.NotificationId
 import io.legado.app.constant.PreferKey
 import io.legado.app.constant.Status
+import io.legado.app.domain.model.AiReasoningLevel
 import io.legado.app.domain.model.PlaybackTimer
 import io.legado.app.domain.model.readaloud.CanonicalSpeechParagraph
 import io.legado.app.domain.model.readaloud.ReadAloudPlaybackCursor
@@ -415,7 +416,7 @@ abstract class BaseReadAloudService : BaseService(),
             val startsAtChapterBeginning = preparedReadAloudNumber == 0
             val preparedParagraphs = preparedChapter.paragraphs(preparedReadAloudByPage)
             var preparedContentList = preparedParagraphs
-                .map { it.text.replace(Regex("[袮祢꧁]"), " ") }
+                .map { it.text.replace(Regex("[袮祢꧁\uFFFC]"), " ") }
             var preparedContentChapterPositions: List<Int?> =
                 preparedParagraphs.map { it.chapterPosition }
             val preparedSpeechPlan = buildSpeechPlan(
@@ -528,6 +529,10 @@ abstract class BaseReadAloudService : BaseService(),
                 chapterIndex = chapterIndex,
                 paragraphs = paragraphs,
                 analysisMode = SpeechAnalysisMode.fromStorage(ReadConfig.speechAnalysisMode),
+                analysisReasoningLevel = AiReasoningLevel.fromStorage(
+                    ReadConfig.speechAnalysisReasoningLevel,
+                    AiReasoningLevel.OFF,
+                ),
                 useMultiSpeaker = ReadConfig.useMultiSpeaker,
             )
         }.onFailure {

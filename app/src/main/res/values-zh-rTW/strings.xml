@@ -322,10 +322,13 @@
     <string name="bookmark_mark_effect_solid">單實線</string>
     <string name="bookmark_mark_effect_wave">波浪線</string>
     <string name="bookmark_mark_effect_dash">虛線</string>
+    <string name="bookmark_mark_effect_strike">刪除線</string>
+    <string name="bookmark_mark_effect_highlight">螢光</string>
     <string name="bookmark_mark_effect_bg">背景色</string>
     <string name="bookmark_mark_effect_text">字體色</string>
     <string name="bookmark_mark_custom_color">自訂顏色</string>
     <string name="bookmark_mark_note">備註</string>
+    <string name="bookmark_mark_delete_note">刪除筆記</string>
     <string name="bookmark_mark_note_hint">輸入備註…</string>
     <string name="bookmark_mark_editing">已有標記，儲存將更新</string>
     <string name="content_process_ai_section">AI 改寫</string>
@@ -372,6 +375,14 @@
     <string name="book_source_check_save_failed">校驗失敗：無法儲存結果，%1$s</string>
     <string name="book_source_check_incomplete">校驗失敗：工作未完成</string>
     <string name="book_source_check_item_cancelled">校驗已取消</string>
+    <string name="book_source_check_default_keyword">我的</string>
+    <string name="book_source_import_success">匯入完成</string>
+    <string name="book_source_import_failed">匯入失敗</string>
+    <string name="book_source_invalid_source">不是書源</string>
+    <string name="book_source_export_open_failed">無法開啟匯出檔案</string>
+    <string name="book_source_export_failed">匯出失敗：%1$s</string>
+    <string name="book_source_upload_success">上傳成功：%1$s</string>
+    <string name="book_source_upload_failed">上傳失敗：%1$s</string>
     <string name="check_select_source">校驗所選</string>
     <string name="progress_show">%1$s      進度 %2$d/%3$d</string>
     <string name="tts_fix">請安裝並選擇中文TTS！</string>
@@ -1636,6 +1647,12 @@
     <string name="nine_patch_split_right">右切分線</string>
     <string name="nine_patch_split_top">上切分線</string>
     <string name="nine_patch_split_bottom">下切分線</string>
+    <string name="manual_nine_slice">手動九宮格切圖</string>
+    <string name="edit_nine_slice">編輯拉伸區域</string>
+    <string name="nine_slice_drag_hint">綠色選區會被橫向和縱向雙向拉伸；上下兩條邊只沿長度橫向拉伸，左右兩條邊只沿長度縱向拉伸，四個角只等比縮放、不變形。要讓圓角完整保留，切分線必須拖到圓弧外側（切片寬度 ≥ 圓角半徑）；想整體調大調小框請用「縮放」，不要靠切分。</string>
+    <string name="nine_slice_mode_all">全部</string>
+    <string name="nine_slice_mode_horizontal">水平</string>
+    <string name="nine_slice_mode_vertical">垂直</string>
     <string name="preview_effect">預覽</string>
     <string name="sample_text">範例文字</string>
     <string name="sure_delete">確定要刪除嗎？</string>
@@ -1978,6 +1995,7 @@
     <string name="text_typeface">字體樣式</string>
     <string name="shadow_typeface">陰影樣式</string>
     <string name="long_click_to_custom">長按自訂</string>
+    <string name="source_custom_button_long_action">長按操作</string>
     <string name="disable_manga_scroll_animation">停用翻頁動畫</string>
     <string name="manga_cross_fade">停用載入淡入動畫</string>
     <string name="text_shadow_set">陰影設定</string>
@@ -2669,6 +2687,8 @@
     <string name="speech_analysis_rule_ai_summary">保留穩定規則邊界，僅由 AI 補全不確定的人物、角色和情感</string>
     <string name="speech_analysis_ai_summary">AI 綜合理解分片邊界、說話人和情感，速度較慢且可能產生模型費用</string>
     <string name="speech_analysis_ai_model_required">請先設定 AI 模型，再啟用 AI 章節分片</string>
+    <string name="speech_analysis_reasoning_level">分析推理級別</string>
+    <string name="speech_analysis_reasoning_level_summary">預設關閉。預設開啟思考的模型（智譜 GLM、DeepSeek 等）只把內容放在推理欄位裡，會導致分析失敗</string>
     <string name="use_multi_speaker">多角色朗讀</string>
     <string name="use_multi_speaker_summary">為旁白、對話等不同角色使用不同音色</string>
     <string name="read_aloud_adjust_speed">調整語速</string>
@@ -2902,4 +2922,11 @@
     <string name="ai_auto_group_error_invalid_response">AI 未回傳可解析的分組方案。</string>
     <string name="ai_auto_group_error_unexpected">AI 自動分組失敗。</string>
     <string name="ai_auto_group_result">已建立 %1$d 個分組，沿用 %2$d 個分組，更新 %3$d 本書，略過 %4$d 本書。</string>
+    <string name="feature_bookmarks_search_notes">搜尋筆記內容</string>
+    <string name="feature_bookmarks_search_current">搜尋目前%1$s</string>
+    <string name="feature_bookmarks_counts">%1$d 個書籤 · %2$d 個筆記</string>
+    <string name="feature_bookmarks_match_hint">包含相符筆記，點擊查看</string>
+    <string name="feature_bookmarks_no_matching_notes">找不到相關筆記</string>
+    <string name="feature_bookmarks_no_notes">暫無筆記</string>
+    <string name="feature_bookmarks_chapter_fallback">第 %1$d 章</string>
 </resources>

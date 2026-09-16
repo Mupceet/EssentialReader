@@ -63,6 +63,8 @@ data class ReaderChapterMeasureStyle(
     val titleAlignment: ReaderTextAlignment,
     val imagePageBreakBefore: Boolean = false,
     val imagePageBreakAfter: Boolean = false,
+    /** 单图样式：标题段排版结束后立即断页，让章标题独占一页（对齐旧 TextChapterLayout）。 */
+    val titlePageBreakAfter: Boolean = false,
     val bodyLineHeightPx: Float? = null,
     val bodyBaselineOffsetPx: Float? = null,
     val titleLineHeightPx: Float? = null,
@@ -304,7 +306,7 @@ class ReaderChapterBlockMeasurer(
             flushInline(skipBlank = hasStandaloneImage || droppedActionImage)
             return null
         }
-        source.blocks.forEach { block ->
+        source.blocks.forEachIndexed { index, block ->
             when (block) {
                 is ReaderChapterSourceBlock.Text -> {
                     addStyledParagraph(
@@ -313,10 +315,18 @@ class ReaderChapterBlockMeasurer(
                         block.fontSizeScale,
                         block.isSubtitle,
                     )?.let { return it }
+                    // 旧 TextChapterLayout 在单图样式的标题段排版完（`durY += titleBottomSpacing`
+                    // 之后）直接 `prepareNextPageIfNeed()`——无参调用无条件结束当前页，于是标题
+                    // 独占一页、正文从下一页开始。标题分成多段时只在最后一段之后断页。
+                    if (block.isTitle && style.titlePageBreakAfter &&
+                        (source.blocks.getOrNull(index + 1) as? ReaderChapterSourceBlock.Text)?.isTitle != true
+                    ) {
+                        blocks += ReaderMeasuredBlock.PageBreak
+                    }
                 }
                 is ReaderChapterSourceBlock.Image -> {
                     val options = imageOptionsResolver.resolve(block.source)
-                    if (style.excludeActionImages && options?.action != null) return@forEach
+                    if (style.excludeActionImages && options?.action != null) return@forEachIndexed
                     val placeholderExtent = (style.bodyLineHeightPx ?: style.bodyStyle.fontSizePx)
                         .coerceAtLeast(1f)
                     val originalSize = imageDimensionsResolver.resolve(block.source)

@@ -377,10 +377,13 @@
     <string name="bookmark_mark_effect_solid">单实线</string>
     <string name="bookmark_mark_effect_wave">波浪线</string>
     <string name="bookmark_mark_effect_dash">虚线</string>
+    <string name="bookmark_mark_effect_strike">删除线</string>
+    <string name="bookmark_mark_effect_highlight">荧光</string>
     <string name="bookmark_mark_effect_bg">背景色</string>
     <string name="bookmark_mark_effect_text">字体色</string>
     <string name="bookmark_mark_custom_color">自定义颜色</string>
     <string name="bookmark_mark_note">备注</string>
+    <string name="bookmark_mark_delete_note">删除笔记</string>
     <string name="bookmark_mark_note_hint">输入备注…</string>
     <string name="bookmark_mark_editing">已有标记，保存将更新</string>
     <string name="content_process_ai_section">AI 改写</string>
@@ -431,6 +434,14 @@
     <string name="book_source_check_save_failed">校验失败：无法保存结果，%1$s</string>
     <string name="book_source_check_incomplete">校验失败：任务未完成</string>
     <string name="book_source_check_item_cancelled">校验已取消</string>
+    <string name="book_source_check_default_keyword">我的</string>
+    <string name="book_source_import_success">导入完成</string>
+    <string name="book_source_import_failed">导入失败</string>
+    <string name="book_source_invalid_source">不是书源</string>
+    <string name="book_source_export_open_failed">无法打开导出文件</string>
+    <string name="book_source_export_failed">导出失败：%1$s</string>
+    <string name="book_source_upload_success">上传成功：%1$s</string>
+    <string name="book_source_upload_failed">上传失败：%1$s</string>
     <string name="check_select_source">校验所选</string>
     <string name="progress_show">%1$s      进度 %2$d/%3$d</string>
     <string name="tts_fix">请安装并选择中文 TTS！</string>
@@ -869,6 +880,12 @@
     <string name="nine_patch_split_right">右切分线</string>
     <string name="nine_patch_split_top">上切分线</string>
     <string name="nine_patch_split_bottom">下切分线</string>
+    <string name="manual_nine_slice">手动九切片</string>
+    <string name="edit_nine_slice">编辑拉伸区域</string>
+    <string name="nine_slice_drag_hint">绿色选区会被横向和纵向双向拉伸；上下两条边只沿长度横向拉伸，左右两条边只沿长度纵向拉伸，四个角只等比缩放、不变形。要让圆角完整保留，切分线必须拖到圆弧外侧（切片宽度 ≥ 圆角半径）；想整体调大调小框请用「缩放」，不要靠切分。</string>
+    <string name="nine_slice_mode_all">全部</string>
+    <string name="nine_slice_mode_horizontal">水平</string>
+    <string name="nine_slice_mode_vertical">垂直</string>
     <string name="preview_effect">预览效果</string>
     <string name="sample_text">示例文本</string>
     <string name="sure_delete">确定要删除吗？</string>
@@ -1828,6 +1845,7 @@
     <string name="text_typeface">字体样式</string>
     <string name="shadow_typeface">阴影样式</string>
     <string name="long_click_to_custom">长按自定义</string>
+    <string name="source_custom_button_long_action">长按操作</string>
     <string name="disable_manga_scroll_animation">禁用翻页动画</string>
     <string name="manga_cross_fade">禁用加载淡入动画</string>
     <string name="text_shadow_set">阴影设置</string>
@@ -2881,6 +2899,8 @@
     <string name="speech_analysis_rule_ai_summary">保留稳定规则边界，仅由 AI 补全不确定的人物、角色和情感</string>
     <string name="speech_analysis_ai_summary">AI 综合理解分片边界、说话人和情感，速度较慢且可能产生模型费用</string>
     <string name="speech_analysis_ai_model_required">请先配置 AI 模型，再启用 AI 章节分片</string>
+    <string name="speech_analysis_reasoning_level">分析推理级别</string>
+    <string name="speech_analysis_reasoning_level_summary">默认关闭。默认开启思考的模型（智谱 GLM、DeepSeek 等）只把内容放在推理字段里，会导致分析失败</string>
     <string name="use_multi_speaker">多角色朗读</string>
     <string name="use_multi_speaker_summary">为旁白、对话等不同角色使用不同音色</string>
     <string name="read_aloud_adjust_speed">调整语速</string>
@@ -3269,4 +3289,11 @@
     <string name="manga_reader_cache_following">缓存后续章节</string>
     <string name="manga_reader_cache_all">缓存整部漫画</string>
     <string name="manga_reader_cache_enqueued">已加入离线缓存队列</string>
+    <string name="feature_bookmarks_search_notes">搜索笔记内容</string>
+    <string name="feature_bookmarks_search_current">搜索当前%1$s</string>
+    <string name="feature_bookmarks_counts">%1$d 个书签 · %2$d 个笔记</string>
+    <string name="feature_bookmarks_match_hint">包含匹配笔记，点击查看</string>
+    <string name="feature_bookmarks_no_matching_notes">没有找到相关笔记</string>
+    <string name="feature_bookmarks_no_notes">暂无笔记</string>
+    <string name="feature_bookmarks_chapter_fallback">第 %1$d 章</string>
 </resources>

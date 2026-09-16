@@ -58,6 +58,7 @@ object ReadConfig {
     val progressBarBehavior get() = read.progressBarBehavior
     val showSelectMenuIcon get() = read.showSelectMenuIcon
     val textSelectMenuConfig get() = read.textSelectMenuConfig
+    val lastMarkingStyle get() = read.lastMarkingStyle
     val showReadTitleAddition get() = read.showReadTitleAddition
     val clickActionTL get() = read.clickActionTL
     val clickActionTC get() = read.clickActionTC
@@ -100,6 +101,7 @@ object ReadConfig {
     val audioPreDownloadNum get() = aloud.audioPreDownloadNum
     val audioCacheCleanTime get() = aloud.audioCacheCleanTime * 60 * 1000L
     val speechAnalysisMode get() = aloud.speechAnalysisMode
+    val speechAnalysisReasoningLevel get() = aloud.speechAnalysisReasoningLevel
     val useMultiSpeaker get() = aloud.useMultiSpeaker
     val defaultInterface get() = aloud.defaultInterface
 

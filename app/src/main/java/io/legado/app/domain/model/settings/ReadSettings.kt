@@ -51,6 +51,7 @@ data class ReadSettings(
     val expandTextMenu: Boolean = false,
     val showSelectMenuIcon: Boolean = true,
     val textSelectMenuConfig: String = "",
+    val lastMarkingStyle: String = "",
     val showReadTitleAddition: Boolean = true,
     val autoReadSpeed: Int = 10,
     val systemTypefaces: Int = 0,

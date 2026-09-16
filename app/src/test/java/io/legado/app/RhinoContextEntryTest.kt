@@ -17,11 +17,10 @@ import java.util.concurrent.atomic.AtomicReference
 /**
  * Rhino 入口必须保证先安装自定义全局 ContextFactory 再 `Context.enter()`。
  *
- * 回归对象（3.26.17-beta.9 书源登录页崩溃）：
- * Rhino 的 `Context.enter()` 取的是全局工厂，而生产 [RhinoContext] 的工厂只在
+ * 回归对象：Rhino 的 `Context.enter()` 取的是全局工厂，而生产 [RhinoContext] 的工厂只在
  * RhinoScriptEngine 的 object init 中安装。安装前进入上下文会拿到普通
- * `org.mozilla.javascript.Context`，直接强转既抛 ClassCastException，又因为
- * 没有 `Context.exit()` 把该线程永久留在普通 Context 上。
+ * `org.mozilla.javascript.Context`，直接强转既抛 ClassCastException，又因为没有
+ * `Context.exit()` 把该线程永久留在普通 Context 上。
  */
 class RhinoContextEntryTest {
 
@@ -68,7 +67,7 @@ class RhinoContextEntryTest {
         }
     }
 
-    /** 崩溃现场用的就是这个 suspend 重载（书源登录页 headers 计算）。 */
+    /** 书源登录页计算 headers 用的就是这个 suspend 重载。 */
     @Test
     fun suspendRunScriptWithContextEnterAndExitCleanly() = runBlocking {
         val result = runScriptWithContext { "ok" }
