@@ -176,11 +176,12 @@ fun BookshelfScreen(
     gridState: LazyGridState = rememberLazyGridState(),
     onPageUp: () -> Unit = {},
     onPageDown: () -> Unit = {},
+    emptyMessage: String = "书架为空",
 ) {
     Box(modifier = Modifier.fillMaxSize()) {
         when {
             state.isLoading -> EInkLoading(modifier = Modifier.fillMaxSize())
-            state.isEmpty -> EmptyBookshelf(modifier = Modifier.fillMaxSize())
+            state.isEmpty -> EmptyBookshelf(modifier = Modifier.fillMaxSize(), message = emptyMessage)
             state.isGridLayout -> BookGrid(
                 books = state.books,
                 updatingBookUrls = state.updatingBookUrls,
@@ -583,8 +584,8 @@ private fun ShelfBadge(
 
 
 @Composable
-private fun EmptyBookshelf(modifier: Modifier = Modifier) {
+private fun EmptyBookshelf(modifier: Modifier = Modifier, message: String) {
     Box(modifier = modifier, contentAlignment = Alignment.Center) {
-        EInkText("书架为空", style = EInkTheme.typography.bodyLarge)
+        EInkText(message, style = EInkTheme.typography.bodyLarge)
     }
 }

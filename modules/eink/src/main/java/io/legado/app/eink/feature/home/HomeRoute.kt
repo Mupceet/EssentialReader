@@ -26,6 +26,7 @@ import androidx.compose.ui.zIndex
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import io.legado.app.eink.R
+import io.legado.app.eink.contract.BookshelfGroupIds
 import io.legado.app.eink.contract.BookshelfItemUiModel
 import io.legado.app.eink.designsystem.control.EInkSearchHintBar
 import io.legado.app.eink.designsystem.navigation.EInkOperationBar
@@ -43,6 +44,8 @@ import io.legado.app.eink.designsystem.theme.EInkTheme
 import io.legado.app.eink.feature.bookshelf.BookshelfScreen
 import io.legado.app.eink.feature.bookshelf.BookshelfStylePanel
 import io.legado.app.eink.feature.bookshelf.BookshelfViewModel
+import io.legado.app.eink.feature.bookshelf.ShelfGroupChip
+import io.legado.app.eink.feature.bookshelf.ShelfSelectorPanel
 import io.legado.app.eink.feature.bookshelf.adaptiveGridColumns
 import io.legado.app.eink.feature.bookshelf.bookshelfGridCellWidth
 import io.legado.app.eink.feature.bookshelf.bookshelfListRowHeight
@@ -112,6 +115,10 @@ fun HomeRoute(
     // 书架界面在场的这段时间，离开首页即收起，返回不复活
     var showStylePanel by remember { mutableStateOf(false) }
 
+    // 书架分组选择器显隐（UI 局部状态，同 showStylePanel 纪律：
+    // 不随导航栈保存，切 Tab/离开首页即收起）
+    var showGroupSelector by remember { mutableStateOf(false) }
+
     // 列表封面尺寸单点解析（同网格格宽约定：显示与预取共用同一 Dp 值，
     // 封面缓存键逐字节一致）：行高取基础封面高与字体缩放下文字实需高的
     // 较大值（bookshelfListRowHeight KDoc），宽按 66:90 等比随行高伸缩。
@@ -133,13 +140,15 @@ fun HomeRoute(
     // 列表与网格各一套状态，切换布局后各自停在离开时的页。
     // 行高是列表分页几何键（行高随字体缩放伸缩，不再恒定）：改变后
     // 分页状态重建、页首回第一页并按新行高重新实测页项数
-    val listPager = rememberEInkListPagerState(orientation, listCoverHeight)
+    // 选中分组同入几何键：切组即换书集，分页状态重建回第一页
+    val listPager = rememberEInkListPagerState(orientation, listCoverHeight, uiState.selectedGroupId)
     // 标题最大行数与封面宽都改变网格条目几何（行高/列数），必须重建并
     // 重测页项数；对齐只改文字位置，不影响几何，不入键
     val gridPager = rememberEInkGridPagerState(
         orientation,
         uiState.style.gridCoverWidth,
         uiState.style.titleMaxLines,
+        uiState.selectedGroupId,
     )
     val pager: EInkPageController = if (uiState.isGridLayout) gridPager else listPager
     // 「我的」页独立分页状态（条目整页翻页，对齐书架约定；行高与方向
@@ -257,10 +266,37 @@ fun HomeRoute(
             onSelectTab = { target ->
                 // 面板仅属于书架界面：切到「我的」即收起（底部操作条在面板
                 // 点击层之外，Tab 切换是面板打开期间唯一可达的其它界面）
-                if (selectedTab != target) showStylePanel = false
+                if (selectedTab != target) {
+                    showStylePanel = false
+                    showGroupSelector = false
+                }
                 selectedTab = target
             },
             headerTitle = HomeTabLabels[selectedTab],
+            titleTrailing = if (selectedTab == HomeTabs.BOOKSHELF && uiState.groupSelectorAvailable) {
+                {
+                    val groupName = uiState.groups
+                        .firstOrNull { it.groupId == uiState.selectedGroupId }?.name ?: "全部"
+                    ShelfGroupChip(
+                        text = groupName,
+                        expanded = showGroupSelector,
+                        onClick = { showGroupSelector = !showGroupSelector },
+                    )
+                }
+            } else {
+                null
+            },
+            contentOverlay = {
+                if (showGroupSelector) {
+                    ShelfSelectorPanel(
+                        groups = uiState.groups,
+                        selectedGroupId = uiState.selectedGroupId,
+                        onSelectGroup = viewModel::selectGroup,
+                        onMoveGroup = viewModel::moveGroup,
+                        onDismiss = { showGroupSelector = false },
+                    )
+                }
+            },
             showRefresh = selectedTab == HomeTabs.BOOKSHELF,
             isRefreshing = uiState.isRefreshing,
             onRefresh = viewModel::refresh,
@@ -279,7 +315,9 @@ fun HomeRoute(
                     listState = listPager.listState,
                     gridState = gridPager.gridState,
                     onPageUp = pageUp,
-                    onPageDown = pageDown
+                    onPageDown = pageDown,
+                    emptyMessage = if (uiState.selectedGroupId == BookshelfGroupIds.ALL) "书架为空"
+                    else "此分组暂无书籍",
                 )
             },
             mine = {
@@ -325,6 +363,8 @@ internal fun HomeScreen(
     onRefresh: () -> Unit,
     onShowStylePanel: () -> Unit,
     onSearchClick: () -> Unit,
+    titleTrailing: (@Composable () -> Unit)? = null,
+    contentOverlay: @Composable () -> Unit = {},
     pageArrows: @Composable () -> Unit,
     bookshelf: @Composable () -> Unit,
     mine: @Composable () -> Unit
@@ -339,6 +379,7 @@ internal fun HomeScreen(
         //（动作按钮新规格：撑满顶栏高、贴右屏，自带底部分隔线）
         EInkTopBar(
             title = headerTitle,
+            titleTrailing = titleTrailing,
             actionsFillMax = true,
             actions = {
                 if (showRefresh) {
@@ -357,6 +398,9 @@ internal fun HomeScreen(
             // 放置 = 不绘制、不命中、不进语义，触摸不会穿透到下层书架
             HomePane(visible = selectedTab == HomeTabs.BOOKSHELF) { bookshelf() }
             HomePane(visible = selectedTab != HomeTabs.BOOKSHELF) { mine() }
+            // 内容浮层（书架分组选择面板等）：锚定内容区顶部，位于顶栏
+            // 之下、底部操作栏之上，面板外点击收起
+            contentOverlay()
         }
         EInkOperationBar(
             tabs = HomeTabLabels.mapIndexed { index, label ->

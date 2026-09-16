@@ -58,6 +58,8 @@ import io.legado.app.eink.designsystem.theme.EInkTheme
  * @param titleEnabled 标题可点击性；false 时中灰置灰（仅 [onTitleClick] 非 null 时有意义）
  * @param titleClickLabel 标题点击的无障碍语义标签（如"书籍详情"）
  * @param titleStyle 标题样式；null 时用默认 titleLarge（首页等传 titleLarge 放大）
+ * @param titleTrailing 标题尾部内容槽（如首页书架的分组 chip）；仅普通
+ *   标题分支渲染（可点击标题分支暂无消费方，需要时再扩展）
  * @param actionsFillMax true 时动作区贴右撑满高度（图标动作模式），
  *   动作内直接使用 [EInkOperationBarIcon]；false 时动作区随顶栏内边距（文本动作模式）
  * @param actions 右侧动作区内容
@@ -71,6 +73,7 @@ fun EInkTopBar(
     titleEnabled: Boolean = true,
     titleClickLabel: String? = null,
     titleStyle: TextStyle? = null,
+    titleTrailing: (@Composable () -> Unit)? = null,
     actionsFillMax: Boolean = false,
     actions: @Composable () -> Unit = {},
 ) {
@@ -109,11 +112,13 @@ fun EInkTopBar(
                     contentAlignment = Alignment.CenterStart,
                 )
             } else {
-                Box(
+                // Box 换 Row：trailing 内容在标题文本右侧、动作区之前；
+                // 标题仍占满剩余宽（weight(1f)）
+                Row(
                     modifier = Modifier
                         .weight(1f)
                         .then(if (actionsFillMax) Modifier.fillMaxHeight() else Modifier),
-                    contentAlignment = Alignment.CenterStart,
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
                     BasicText(
                         text = title,
@@ -123,6 +128,7 @@ fun EInkTopBar(
                         overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.padding(start = EInkSpacing.m)
                     )
+                    titleTrailing?.invoke()
                 }
             }
             if (actionsFillMax) {
