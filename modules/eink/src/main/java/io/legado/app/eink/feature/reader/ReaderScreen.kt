@@ -78,6 +78,7 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import io.legado.app.eink.contract.EInkEngineRegistry
+import io.legado.app.eink.contract.ReaderFontSelection
 import io.legado.app.eink.contract.ReaderPageSnapshot
 import io.legado.app.eink.contract.ReaderTapZoneAction
 import io.legado.app.eink.contract.ReaderTapZoneGrid
@@ -194,6 +195,9 @@ fun ReaderRoute(
     // 排版设置弹层（字体配置/信息配置/边距调整）：居中透明卡片，
     // 打开期间面板与操作条隐藏；返回键逐级回退到排版展开态
     var styleDialog by remember { mutableStateOf<ReaderStyleDialog?>(null) }
+    // 字体二级浮层（字体配置弹层内「当前字体/更多字体」进入）：全屏分页
+    // 列表，点选应用后回一级；×/返回键只关本级（styleDialog 不动）
+    var fontPicker by remember { mutableStateOf(false) }
     // 点击区域蒙层（九宫格简化版，其它面板入口）：全屏覆盖含操作条，
     // 自持返回键（蒙层内 BackHandler 后组合优先于 Route 链）；退出即
     // 落盘生效，面板状态保留——关闭后回到其它面板展开态
@@ -544,7 +548,12 @@ fun ReaderRoute(
     // 字体文件列表：字体弹层打开时拉取（SAF 换文件夹后由 VM 刷新）
     val fontOptions by viewModel.fontOptions.collectAsStateWithLifecycle()
     LaunchedEffect(styleDialog) {
-        if (styleDialog == ReaderStyleDialog.Fonts) viewModel.loadFontOptions()
+        if (styleDialog == ReaderStyleDialog.Fonts) {
+            viewModel.loadFontOptions()
+        } else {
+            // 一级字体弹层关闭即复位二级浮层（组合条件已挡，此处防重开残影）
+            fontPicker = false
+        }
     }
 
     LaunchedEffect(bookUrl) {
@@ -950,6 +959,7 @@ fun ReaderRoute(
                 onSetFont = viewModel::setReaderFont,
                 onSetBodyWeight = viewModel::setBodyWeight,
                 onSetTitleWeight = viewModel::setTitleWeight,
+                onOpenFontPicker = { fontPicker = true },
                 onPickFolder = { fontFolderLauncher.launch(null) },
                 onClose = { styleDialog = null },
                 onBackdropClick = dismissToCleanReading,
@@ -968,6 +978,20 @@ fun ReaderRoute(
                 onBackdropClick = dismissToCleanReading,
             )
             null -> Unit
+        }
+
+        // 字体二级浮层：组合晚于一级字体弹层（BackHandler 优先接管返回键）；
+        // 全屏本体无背板，点选应用/× 即关（styleDialog 不动，一级保留）
+        if (styleDialog == ReaderStyleDialog.Fonts && fontPicker) {
+            ReaderFontPickerOverlay(
+                fontOptions = fontOptions,
+                selectedPath = (uiState.style.bodyFont as? ReaderFontSelection.File)?.path,
+                onSelect = { option ->
+                    viewModel.setReaderFont(ReaderFontSelection.File(option.path))
+                    fontPicker = false
+                },
+                onClose = { fontPicker = false },
+            )
         }
 
         // 点击区域蒙层（九宫格简化版）：全屏覆盖（面板/操作条/阅读手势

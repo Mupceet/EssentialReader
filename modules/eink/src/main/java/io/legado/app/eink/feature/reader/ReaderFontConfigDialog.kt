@@ -5,13 +5,9 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -31,11 +27,13 @@ import io.legado.app.eink.designsystem.theme.EInkTheme
 import io.legado.app.eink.designsystem.theme.EInkSpacing
 
 /**
- * 字体配置弹层：统一字体原则——正文/标题/页眉（页脚经 applyHeaderStyle
- * 跟随页眉）字体完全一致。三列字体网格（系统默认/衬线/等宽 + 字体
- * 文件）；正文字重与标题字重各为「细体/常规/粗体/自定义」四选，仅
- * 自定义显示拖动条（100..900）；底部全宽字体文件夹按钮（恒为
- * 「选择字体文件夹」，重复选择即换文件夹），选择后字体进入上方网格。
+ * 字体配置弹层（一级，固定面板无滚动）：统一字体原则——正文/标题/页眉
+ * （页脚经 applyHeaderStyle 跟随页眉）字体完全一致。系统预设一行三钮；
+ * 条件行反显当前选中文件字体（选中反色，点击进二级）+「更多字体…（N）」
+ * 入口（无文件字体选中时独占整行），文件字体在全屏二级浮层
+ * [ReaderFontPickerOverlay] 分页选择；正文字重与标题字重各为
+ * 「细体/常规/粗体/自定义」四选，仅自定义显示拖动条（100..900）；底部
+ * 全宽字体文件夹按钮（恒为「选择字体文件夹」，重复选择即换文件夹）。
  */
 @Composable
 internal fun ReaderFontConfigDialog(
@@ -43,6 +41,7 @@ internal fun ReaderFontConfigDialog(
     style: ReaderTextStyle,
     fontOptions: List<ReaderFontOption>,
     onSetFont: (ReaderFontSelection) -> Unit,
+    onOpenFontPicker: () -> Unit,
     onSetBodyWeight: (Int) -> Unit,
     onSetTitleWeight: (Int) -> Unit,
     onPickFolder: () -> Unit,
@@ -57,31 +56,12 @@ internal fun ReaderFontConfigDialog(
         showActions = false,
     ) {
         Column(
-            modifier = Modifier
-                .verticalScroll(rememberScrollState())
-                .heightIn(max = 360.dp),
             verticalArrangement = Arrangement.spacedBy(EInkSpacing.xs),
         ) {
-            val entries = buildList {
-                add(FontEntry("系统默认", style.bodyFont == ReaderFontSelection.Sans) {
-                    onSetFont(ReaderFontSelection.Sans)
-                })
-                add(FontEntry("系统衬线", style.bodyFont == ReaderFontSelection.Serif) {
-                    onSetFont(ReaderFontSelection.Serif)
-                })
-                add(FontEntry("系统等宽", style.bodyFont == ReaderFontSelection.Mono) {
-                    onSetFont(ReaderFontSelection.Mono)
-                })
-                fontOptions.forEach { option ->
-                    add(
-                        FontEntry(
-                            // 显示名去除扩展名（.ttf/.otf），选中身份仍按 path 比对
-                            label = option.name.substringBeforeLast("."),
-                            selected = style.bodyFont == ReaderFontSelection.File(option.path),
-                        ) { onSetFont(ReaderFontSelection.File(option.path)) }
-                    )
-                }
-            }
+            // 当前选中的文件字体（须仍在文件夹枚举中：换过文件夹的幽灵选中不显示）
+            val selectedFileOption = (style.bodyFont as? ReaderFontSelection.File)
+                ?.path
+                ?.let { path -> fontOptions.firstOrNull { it.path == path } }
             // 标签在左（按需占宽保证完整显示，同字重行；垂直居中对齐
             // 首行网格按钮），网格居右；顶部加呼吸边距与标题区拉开层次
             Row(
@@ -93,9 +73,9 @@ internal fun ReaderFontConfigDialog(
                     modifier = Modifier.height(44.dp),
                     contentAlignment = Alignment.Center,
                 ) {
-                EInkText(
-                    text = "字体选择",
-                    style = EInkTheme.typography.bodyMedium,
+                    EInkText(
+                        text = "字体选择",
+                        style = EInkTheme.typography.bodyMedium,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
@@ -104,24 +84,69 @@ internal fun ReaderFontConfigDialog(
                     modifier = Modifier.weight(1f),
                     verticalArrangement = Arrangement.spacedBy(EInkSpacing.xs),
                 ) {
-                    entries.chunked(3).forEach { rowEntries ->
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(EInkSpacing.xs),
-                        ) {
-                            rowEntries.forEach { entry ->
-                                EInkButton(
-                                    text = entry.label,
-                                    onClick = entry.onClick,
-                                    modifier = Modifier.weight(1f),
-                                    selected = entry.selected,
-                                    height = 44.dp,
-                                    style = EInkTheme.typography.bodyMedium,
-                                    role = Role.Button,
-                                )
-                            }
-                            repeat(3 - rowEntries.size) { Spacer(modifier = Modifier.weight(1f)) }
+                    // 系统预设一行三钮（选中反色，同一级旧网格逻辑）
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(EInkSpacing.xs),
+                    ) {
+                        EInkButton(
+                            text = "系统默认",
+                            onClick = { onSetFont(ReaderFontSelection.Sans) },
+                            modifier = Modifier.weight(1f),
+                            selected = style.bodyFont == ReaderFontSelection.Sans,
+                            height = 44.dp,
+                            style = EInkTheme.typography.bodyMedium,
+                            role = Role.Button,
+                        )
+                        EInkButton(
+                            text = "系统衬线",
+                            onClick = { onSetFont(ReaderFontSelection.Serif) },
+                            modifier = Modifier.weight(1f),
+                            selected = style.bodyFont == ReaderFontSelection.Serif,
+                            height = 44.dp,
+                            style = EInkTheme.typography.bodyMedium,
+                            role = Role.Button,
+                        )
+                        EInkButton(
+                            text = "系统等宽",
+                            onClick = { onSetFont(ReaderFontSelection.Mono) },
+                            modifier = Modifier.weight(1f),
+                            selected = style.bodyFont == ReaderFontSelection.Mono,
+                            height = 44.dp,
+                            style = EInkTheme.typography.bodyMedium,
+                            role = Role.Button,
+                        )
+                    }
+                    // 条件行：选中文件字体反显（选中反色，点击进二级）+
+                    // 「更多字体…（N）」入口；无文件字体选中时入口独占整行
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(EInkSpacing.xs),
+                    ) {
+                        if (selectedFileOption != null) {
+                            EInkButton(
+                                // 显示名去除扩展名（.ttf/.otf），选中身份按 path 比对
+                                text = selectedFileOption.name.substringBeforeLast("."),
+                                onClick = onOpenFontPicker,
+                                modifier = Modifier.weight(1f),
+                                selected = true,
+                                height = 44.dp,
+                                style = EInkTheme.typography.bodyMedium,
+                                role = Role.Button,
+                            )
                         }
+                        EInkButton(
+                            text = if (fontOptions.isEmpty()) {
+                                "更多字体…"
+                            } else {
+                                "更多字体…（${fontOptions.size}）"
+                            },
+                            onClick = onOpenFontPicker,
+                            modifier = Modifier.weight(1f),
+                            height = 44.dp,
+                            style = EInkTheme.typography.bodyMedium,
+                            role = Role.Button,
+                        )
                     }
                 }
             }
@@ -148,13 +173,6 @@ internal fun ReaderFontConfigDialog(
         }
     }
 }
-
-/** 字体网格项：展示名 + 选中态 + 点击回调。 */
-private data class FontEntry(
-    val label: String,
-    val selected: Boolean,
-    val onClick: () -> Unit,
-)
 
 /**
  * 字重设置行：标签在左（按需占宽、垂直对齐按钮行），右侧纵列为
