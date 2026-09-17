@@ -102,8 +102,6 @@ open class MainActivity : BaseComposeActivity(), AudioPlay.CallBack {
         private const val KEY_RESTORE_READ_ALOUD = "restoreReadAloud"
         private const val KEY_RESTORE_READ_IN_BOOKSHELF = "restoreReadInBookshelf"
         private const val KEY_RESTORE_READ_CHAPTER_CHANGED = "restoreReadChapterChanged"
-        private val startupUpdateCheckGate = ProcessStartupUpdateCheckGate()
-
         @Volatile
         var hasActiveReadBookRoute: Boolean = false
 
@@ -310,7 +308,7 @@ open class MainActivity : BaseComposeActivity(), AudioPlay.CallBack {
             finish()
             return
         }
-        val shouldAutoCheckUpdate = startupUpdateCheckGate.consume(
+        val shouldAutoCheckUpdate = ProcessStartupUpdateCheckGate.consume(
             otherSettingsGateway.currentSettings.autoCheckUpdateOnStart
         )
 

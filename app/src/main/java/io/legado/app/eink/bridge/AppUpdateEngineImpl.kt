@@ -1,11 +1,13 @@
 package io.legado.app.eink.bridge
 
+import io.legado.app.domain.gateway.OtherSettingsGateway
 import io.legado.app.eink.contract.AppUpdateEngine
 import io.legado.app.eink.contract.AppUpdateInfo
 import io.legado.app.exception.NoStackTraceException
 import io.legado.app.help.update.AppUpdate
 import io.legado.app.help.update.UpToDateException
 import io.legado.app.model.Download
+import io.legado.app.ui.main.ProcessStartupUpdateCheckGate
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -27,6 +29,22 @@ object AppUpdateEngineImpl : AppUpdateEngine {
      * 重新装配的是注册表条目，进行中的检查结果由 UI 侧状态承接）。
      */
     private val checkScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+
+    private val otherSettingsGateway: OtherSettingsGateway by lazy {
+        org.koin.core.context.GlobalContext.get().get()
+    }
+
+    /**
+     * 启动自动检查门控：设置键与进程级一次性闸均沿用宿主完整模式
+     * 同一套（MainActivity 启动链同款），两模式合计每进程最多自动
+     * 检查一次；E-Ink 冷启动分流发生在宿主编排之前，闸从未消耗，
+     * 此处首次 consume 即完整模式的等效位置。
+     */
+    override fun shouldAutoCheckOnStart(): Boolean {
+        return ProcessStartupUpdateCheckGate.consume(
+            otherSettingsGateway.currentSettings.autoCheckUpdateOnStart
+        )
+    }
 
     override suspend fun checkUpdate(): AppUpdateInfo? {
         val update = AppUpdate.gitHubUpdate

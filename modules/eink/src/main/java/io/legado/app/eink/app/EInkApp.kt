@@ -1,16 +1,25 @@
 package io.legado.app.eink.app
 
 import android.app.Application
+import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.safeDrawingPadding
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.HasDefaultViewModelProviderFactory
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.ViewModelStore
@@ -18,13 +27,19 @@ import androidx.lifecycle.ViewModelStoreOwner
 import androidx.lifecycle.viewmodel.CreationExtras
 import androidx.lifecycle.viewmodel.MutableCreationExtras
 import androidx.lifecycle.viewmodel.compose.LocalViewModelStoreOwner
+import androidx.lifecycle.viewmodel.compose.viewModel
 import io.legado.app.eink.contract.EInkEngineRegistry
 import io.legado.app.eink.debug.ComponentGalleryRoute
 import io.legado.app.eink.debug.ThemeDebugRoute
+import io.legado.app.eink.designsystem.content.EInkText
+import io.legado.app.eink.designsystem.control.EInkDialog
+import io.legado.app.eink.designsystem.theme.EInkSpacing
+import io.legado.app.eink.designsystem.theme.EInkTheme
 import io.legado.app.eink.feature.bookdetail.BookDetailRoute
 import io.legado.app.eink.feature.changesource.ChangeSourceRoute
 import io.legado.app.eink.feature.home.FontScaleSettingsRoute
 import io.legado.app.eink.feature.home.HomeRoute
+import io.legado.app.eink.feature.home.releaseNoteToPlainText
 import io.legado.app.eink.feature.reader.ReaderRoute
 import io.legado.app.eink.feature.search.SearchRoute
 import io.legado.app.eink.feature.toc.TocRoute
@@ -48,6 +63,17 @@ fun EInkApp(
         initialStack(initialReaderBookUrl)
     ),
 ) {
+    // 更新检查状态的 Activity 级 VM：求值处位于每条目 store owner 覆盖
+    // 之外（同 controller），跨屏幕切换与 Activity recreate 存活
+    val updateViewModel: EInkAppUpdateViewModel = viewModel()
+
+    // 启动自动检查（对齐宿主完整模式启动链）：设置开关与进程级一次性
+    // 闸由端口实现侧裁决；Activity recreate 重跑本效应时闸已消耗，
+    // 直接跳过，进行中的检查由 VM 状态承接
+    LaunchedEffect(Unit) {
+        EInkEngineRegistry.appUpdateEngine?.let(updateViewModel::autoCheckOnStart)
+    }
+
     // 单 Activity 架构：系统返回键优先 pop 导航栈，根页面时交还系统（退出应用）
     BackHandler(enabled = controller.canPop) {
         controller.pop()
@@ -110,6 +136,7 @@ fun EInkApp(
                     when (screen) {
                         is EInkScreen.Home -> {
                             HomeRoute(
+                                updateViewModel = updateViewModel,
                                 onBookClick = { bookUrl ->
                                     // 点击即预取（对齐完整模式 MainNavigator 的
                                     // prefetchForOpen 时机）：会话装载与当前章内容
@@ -228,6 +255,42 @@ fun EInkApp(
                 }
             }
         }
+    }
+
+    // 更新弹层：根层渲染、覆盖任意屏幕（对齐宿主 Activity 级 UpdateDialog
+    // 形态——直达最近阅读场景检查完成时阅读页之上也能弹）；状态由
+    // Activity 级 VM 持有，「我的」页手动检查与启动自动检查共用
+    val appUpdateEngine = EInkEngineRegistry.appUpdateEngine
+    val availableUpdate = updateViewModel.updateCheck as? UpdateCheckState.Available
+    if (availableUpdate != null && appUpdateEngine != null) {
+        val context = LocalContext.current
+        EInkDialog(
+            onDismiss = { updateViewModel.updateCheck = UpdateCheckState.Idle },
+            title = "发现新版本 ${availableUpdate.info.versionName}",
+            confirmText = "立即更新",
+            onConfirm = {
+                appUpdateEngine.startDownload(availableUpdate.info)
+                Toast.makeText(
+                    context,
+                    "已开始下载 ${availableUpdate.info.fileName}",
+                    Toast.LENGTH_SHORT
+                ).show()
+                updateViewModel.updateCheck = UpdateCheckState.Idle
+            },
+            content = {
+                // 长说明限制高度内滚动，面板不随说明无限增高
+                Column(
+                    modifier = Modifier
+                        .heightIn(max = 320.dp)
+                        .verticalScroll(rememberScrollState())
+                ) {
+                    EInkText(
+                        text = releaseNoteToPlainText(availableUpdate.info.note),
+                        style = EInkTheme.typography.bodyMedium,
+                    )
+                }
+            }
+        )
     }
 }
 

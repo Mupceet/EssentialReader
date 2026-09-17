@@ -26,6 +26,7 @@ import androidx.compose.ui.zIndex
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import io.legado.app.eink.R
+import io.legado.app.eink.app.EInkAppUpdateViewModel
 import io.legado.app.eink.contract.BookshelfGroupIds
 import io.legado.app.eink.contract.BookshelfItemUiModel
 import io.legado.app.eink.designsystem.control.EInkSearchHintBar
@@ -91,7 +92,8 @@ private val HomeTabIcons = listOf(
  * 旋转或字体缩放改变行高后，分页状态重建、页首回第一页并重新实测页项数。
  */
 @Composable
-fun HomeRoute(
+internal fun HomeRoute(
+    updateViewModel: EInkAppUpdateViewModel,
     onBookClick: (String) -> Unit,
     onBookLongClick: (BookshelfItemUiModel) -> Unit,
     onSearch: () -> Unit,
@@ -324,6 +326,7 @@ fun HomeRoute(
                     pager = minePager,
                     onPageUp = minePageUp,
                     onPageDown = minePageDown,
+                    updateViewModel = updateViewModel,
                     onOpenFontScale = onOpenFontScale,
                     onOpenFullMode = onOpenFullMode,
                     onOpenThemeDebug = onOpenThemeDebug,

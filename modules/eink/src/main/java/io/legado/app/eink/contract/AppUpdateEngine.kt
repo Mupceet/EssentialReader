@@ -16,6 +16,11 @@ package io.legado.app.eink.contract
  *         ├─ AppUpdateInfo   ─► E-Ink 纯文本更新弹层
  *         │                      └─「立即更新」─► startDownload() ─► 宿主下载管线
  *         └─ 抛异常          ─► toast 异常 message（宿主提供面向用户的文案）
+ *
+ * E-Ink 启动（EInkApp 根层）
+ *    └─ shouldAutoCheckOnStart() ─ true ─► checkUpdate()
+ *         ├─ null / 抛异常   ─► 静默（对齐宿主自动检查口径，不打扰）
+ *         └─ AppUpdateInfo   ─► 同一更新弹层（根层渲染，任意屏幕之上）
  * ```
  *
  * ## 为什么可选（而非注册空实现）
@@ -35,6 +40,20 @@ package io.legado.app.eink.contract
  *   fire-and-forget：进度与完成反馈由宿主通知承担，模块不展示进度 UI。
  */
 interface AppUpdateEngine {
+
+    /**
+     * 本次进程是否应执行启动自动检查。
+     *
+     * 「是否自动检查」是宿主独占知识：用户设置（完整模式「其他设置」的
+     * 启动检查开关）与进程级一次性频控（每次进程生命周期最多自动检查
+     * 一次，与完整模式共享同一闸）都在宿主侧。调用即消耗本次进程的
+     * 自动检查机会（consume 语义）：返回 true 后无论检查结果如何，
+     * 本进程内后续调用一律返回 false。
+     *
+     * @return 设置开启且本进程尚未自动检查过时 true；否则 false，
+     *   调用方不得再发起自动检查（手动检查不受影响）。
+     */
+    fun shouldAutoCheckOnStart(): Boolean
 
     /**
      * 检查应用更新。
