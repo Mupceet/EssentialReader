@@ -73,7 +73,7 @@ import kotlinx.coroutines.launch
  * - 系统栏避让：顶部用菜单层固定避让快照（[topInset]，宿主
  *   rememberStatusBarTop 口径——不跟随状态栏回归动画插值）；左右/底部
  *   同 readerSystemBarInsets 口径（displayCutout ∪ systemBars）；
- * - 回退：顶栏关闭 / 底栏返回 / 返回键只关本级（一级字体弹层保留）；
+ * - 回退：底栏返回 / 返回键只关本级（一级字体弹层保留）；
  *   全屏本体无背板可点；
  * - 空态：无字体时居中提示，翻页箭头置灰。
  */
@@ -148,16 +148,11 @@ internal fun ReaderFontPickerOverlay(
             // 顶部菜单层固定避让快照：不跟随状态栏回归动画插值逐步顶下
             .padding(top = topInset),
     ) {
-        // 顶栏：标题 + 关闭（关闭同返回，只关本级；图标钮写法同目录页顶栏）
+        // 顶栏：仅标题（关闭走底栏返回，用户定案）；actionsFillMax 使标题
+        // 左边距为目录页同款 16dp（否则 Row 内边距与标题起始边距叠成 32dp）
         EInkTopBar(
             title = if (fontOptions.isEmpty()) "选择字体" else "选择字体（${fontOptions.size}）",
-            actions = {
-                EInkOperationBarIcon(
-                    icon = painterResource(R.drawable.eink_ic_close),
-                    contentDescription = "关闭",
-                    onClick = onClose,
-                )
-            },
+            actionsFillMax = true,
         )
         // 列表区 / 空态
         Box(
