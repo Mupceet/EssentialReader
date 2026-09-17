@@ -17,7 +17,7 @@
 2. **呈现形态 = Shelf Selector（书架选择器），唯一形态**：放弃分组筛选条与文件夹
    卡两种早先候选（用户反馈"卡片不方便"，方案重提为选择器）；书架本体始终是
    平铺书列表（网格/列表 + 整页翻页），分组经顶栏选择器切换。
-3. **排序按钮 = 分组顺序调整**：选择器面板内「排序」进入排序模式，行尾 ▲▼
+3. **【已作废，见 §9 修订】排序按钮 = 分组顺序调整**：选择器面板内「排序」进入排序模式，行尾 ▲▼
    移动分组位置，写入 `BookGroup.order`（宿主表）。此条扩展了决策 1 的写入面：
    eink 写分组顺序，其余管理仍只读。
 4. **契约面 = 新可选端口**：新增 `BookshelfGroupEngine` 可选端口
@@ -42,7 +42,7 @@
 - 排序写入先例：宿主 `GroupManageSheet` 拖拽排序（`GroupViewModel.upGroup` /
   `BookGroupRepository.update`）。
 
-## 3. 契约（`modules/eink/contract/BookshelfGroupEngine.kt`，新文件）
+## 3. 契约（`modules/eink/contract/BookshelfGroupEngine.kt`，新文件）【moveGroup 已随 §9 修订移除，现行契约四成员】
 
 ```kotlin
 /** 分组快照（宿主构造义务：一次映射，模块零计算，同 BookshelfItemUiModel 纪律） */
