@@ -29,7 +29,6 @@ import io.legado.app.eink.contract.BookshelfGroupUiModel
 import io.legado.app.eink.designsystem.content.EInkHorizontalDivider
 import io.legado.app.eink.designsystem.content.EInkText
 import io.legado.app.eink.designsystem.interaction.einkClickable
-import io.legado.app.eink.designsystem.navigation.EInkPageArrows
 import io.legado.app.eink.designsystem.theme.EInkShapes
 import io.legado.app.eink.designsystem.theme.EInkSpacing
 import io.legado.app.eink.designsystem.theme.EInkTheme
@@ -71,8 +70,7 @@ fun ShelfGroupChip(
 }
 
 /**
- * 面板每页分组 chip 数（整页兜底：分组按此值 chunked 分页，
- * 翻页 = 整页替换，零动画）。
+ * 面板分组 chip 展示上限（分组按此值截断，超出部分不展示）。
  */
 private const val PAGE_SIZE = 16
 
@@ -82,9 +80,8 @@ private const val PAGE_SIZE = 16
  * - 每个分组一个 chip（文案 `组名 ·N`，N=书数，含「全部」）：当前选中
  *   组反色实心（onSurface 底 + background 字），其余 1dp 描边；点选任意
  *   chip 即切组并收起；
- * - 整页兜底：分组按 [PAGE_SIZE] 每页 16 个 chip 平铺，翻页 = 整页替换
- *   （零动画，弹层禁自由滚动同书架铁律）；仅一页时两箭头置灰仍渲染
- *   （与书架操作栏行为一致）；
+ * - 分组数以 [PAGE_SIZE] 为展示上限，超出部分不展示（面板高度上限
+ *   60%、超出裁切，弹层禁自由滚动同书架铁律）；
  * - 浮层锚定内容区顶部（挂在 HomeScreen 内容 Box 内，位于顶栏之下、
  *   底部操作栏之上），面板外点击收起；书列表不重排、书架分页状态不动。
  */
@@ -127,14 +124,14 @@ fun ShelfSelectorPanel(
                 // 消费面板内空白点击，避免透传到关闭层
                 .einkClickable(onClick = {}),
         ) {
-            // 当前页分组 chip 流式平铺（weight fill=false：内容不足一页时
-            // 面板收缩包裹，超限时先压缩此区保页脚可见；clip 防越界绘制）
+            // 分组 chip 流式平铺（weight fill=false：内容不足时面板收缩
+            // 包裹，超限裁切；clip 防越界绘制）
             FlowRow(
                 modifier = Modifier
                     .fillMaxWidth()
                     .weight(1f, fill = false)
                     .clipToBounds()
-                    .padding(horizontal = EInkSpacing.xs, vertical = EInkSpacing.s),
+                    .padding(horizontal = EInkSpacing.m, vertical = EInkSpacing.s),
                 horizontalArrangement = Arrangement.spacedBy(EInkSpacing.xs),
                 verticalArrangement = Arrangement.spacedBy(EInkSpacing.xs),
             ) {
@@ -148,26 +145,6 @@ fun ShelfSelectorPanel(
                         },
                     )
                 }
-            }
-            // 页脚：右下角页码小字 + 整页翻页箭头（仅一页时置灰仍渲染）
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = EInkSpacing.m, vertical = EInkSpacing.xs),
-                horizontalArrangement = Arrangement.spacedBy(EInkSpacing.s, Alignment.End),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                EInkText(
-                    text = "${pageIndex + 1}/$pageCount 页",
-                    style = EInkTheme.typography.bodySmall,
-                    color = EInkTheme.colorScheme.outline,
-                )
-                EInkPageArrows(
-                    pageUpEnabled = pageIndex > 0,
-                    pageDownEnabled = pageIndex < pageCount - 1,
-                    onPageUp = { pageInput = pageIndex - 1 },
-                    onPageDown = { pageInput = pageIndex + 1 },
-                )
             }
             // 面板底部收边
             EInkHorizontalDivider()
@@ -206,7 +183,7 @@ private fun GroupChip(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         EInkText(
-            text = "${group.name} ·${group.bookCount}",
+            text = "${group.name}·${group.bookCount}本",
             style = EInkTheme.typography.bodyMedium,
             color = if (selected) colors.background else colors.onSurface,
             maxLines = 1,
