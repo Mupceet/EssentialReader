@@ -28,6 +28,7 @@ import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
@@ -76,8 +77,9 @@ data class BookshelfUiState(
  * 返回）时 [stateIn] 保留着上次数据，Room 流重发同值不触发重组，
  * 不会重复闪加载页。
  *
- * 刷新（[refresh]）复刻 View 版下拉刷新（`MainViewModel.upToc/updateToc`）：
- * 并发拉取书架书目录，进度经引擎侧 sync 保留，失败标记 updateError；
+ * 刷新（[refresh]）对齐宿主书架手动刷新（下拉刷新/菜单「更新目录」传
+ * 当前分组书单的口径）：手动按当前选中分组，自动全量；并发拉取书架书
+ * 目录，进度经引擎侧 sync 保留，失败标记 updateError；
  * 进入首页（ViewModel 创建）后延迟自动刷新一次。单本书的刷新管线
  * 在宿主 bridge（BookshelfEngineImpl.refreshBookToc）。
  */
@@ -211,10 +213,13 @@ class BookshelfViewModel(application: Application) : AndroidViewModel(applicatio
     }
 
     /**
-     * 刷新书架：进行中时直接忽略，与 View 版 upToc 的排队去重行为一致。
-     * View 版下拉刷新和菜单“更新目录”都不会中断当前任务，重复触发只会排队
-     * 当前书架中尚未处理的书籍；E-Ink 首页展示全部书籍，因此这里简化为
-     * 活动期间 no-op。
+     * 刷新书架：进行中时直接忽略，与宿主刷新的排队去重行为一致——宿主
+     * 下拉刷新和菜单「更新目录」都不会中断进行中的任务；E-Ink 逐书独立
+     * 刷新无整轮队列，简化为活动期间 no-op。
+     *
+     * 刷新范围：手动触发按当前选中分组（对齐宿主传当前展示书单的口径，
+     * 「全部」即全量）；自动触发恒全量（对齐宿主启动 upAllBookToc，
+     * 避免冷启动停在某组时其余组的更新被跳过）。
      */
     fun refresh() = refresh("manual")
 
@@ -230,11 +235,16 @@ class BookshelfViewModel(application: Application) : AndroidViewModel(applicatio
             _isRefreshing.value = true
             _updatingUrls.value = emptySet()
             try {
-                val books = engine.updatableBooks()
+                // 手动刷新按 UI 当前生效的选中分组（含乐观覆盖），自动刷新
+                // 恒全量（见函数 KDoc）
+                val scopeGroupId =
+                    if (trigger == "manual") groupState.selected.first() else BookshelfGroupIds.ALL
+                val books = engine.updatableBooks(scopeGroupId)
                 val concurrency = min(settings.threadCount, MAX_REFRESH_CONCURRENCY)
                 Log.i(
                     TAG,
-                    "EInk refresh start trigger=$trigger scope=${books.size} concurrency=$concurrency"
+                    "EInk refresh start trigger=$trigger group=$scopeGroupId " +
+                        "scope=${books.size} concurrency=$concurrency"
                 )
                 books.asFlow()
                     .onEachParallel(concurrency) { book ->

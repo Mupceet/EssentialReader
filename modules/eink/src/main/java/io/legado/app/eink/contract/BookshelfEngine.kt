@@ -27,7 +27,7 @@ enum class BookshelfTocRefreshResult {
  * 进入书架页
  *  ├─ observeShelf() ─────────► 书籍流 ─► 列表渲染（增删/进度变化自动发射）
  *  ├─ autoRefreshBook 开启
- *  │    └─ updatableBooks() ─► 并发 refreshBookToc(bookUrl) × N
+ *  │    └─ updatableBooks(groupId) ─► 并发 refreshBookToc(bookUrl) × N
  *  │                            ├─ OK/NO_BOOK/NO_SOURCE/ERROR ─► VM 刷新统计
  *  │                            └─ 成功即预缓存入队（宿主内部）
  *  └─ preDownloadChapterCount > 0
@@ -87,8 +87,13 @@ interface BookshelfEngine {
      */
     suspend fun deleteBooksNotInBookshelf()
 
-    /** 本次待刷新目录的书籍（非本地且可更新）。 */
-    suspend fun updatableBooks(): List<BookshelfItemUiModel>
+    /**
+     * 待刷新目录的书籍（非本地且可更新）。[groupId] 指定刷新范围：
+     * [BookshelfGroupIds.ALL] 为全部书架，其余值口径同分组选择器
+     * （用户组含私有组豁免）。模块手动刷新传当前选中分组，自动刷新
+     * 传全部。
+     */
+    suspend fun updatableBooks(groupId: Long): List<BookshelfItemUiModel>
 
     /**
      * 刷新单本书目录：阻塞至该书完成；不抛异常，结果经

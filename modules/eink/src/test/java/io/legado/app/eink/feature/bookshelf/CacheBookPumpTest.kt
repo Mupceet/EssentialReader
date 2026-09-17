@@ -96,7 +96,7 @@ private class FakeEngine(gateOpen: Boolean = false) : BookshelfEngine {
 
     override suspend fun deleteBooksNotInBookshelf() = Unit
 
-    override suspend fun updatableBooks(): List<BookshelfItemUiModel> = emptyList()
+    override suspend fun updatableBooks(groupId: Long): List<BookshelfItemUiModel> = emptyList()
 
     override suspend fun refreshBookToc(bookUrl: String): BookshelfTocRefreshResult =
         BookshelfTocRefreshResult.OK

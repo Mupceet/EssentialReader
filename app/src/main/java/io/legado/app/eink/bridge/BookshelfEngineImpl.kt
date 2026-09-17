@@ -15,6 +15,7 @@ import io.legado.app.eink.contract.BookshelfTocRefreshResult
 import io.legado.app.help.book.BookHelp
 import io.legado.app.help.book.addType
 import io.legado.app.help.book.isLocal
+import io.legado.app.help.book.isNotShelf
 import io.legado.app.help.book.isUpError
 import io.legado.app.help.book.removeType
 import io.legado.app.help.book.sync
@@ -70,10 +71,18 @@ internal object BookshelfEngineImpl : BookshelfEngine, KoinComponent {
         appDb.bookDao.deleteNotShelfBook()
     }
 
-    override suspend fun updatableBooks(): List<BookshelfItemUiModel> =
-        appDb.bookDao.flowByGroup(BookGroup.IdAll).first()
-            .filter { !it.isLocal && it.canUpdate }
+    override suspend fun updatableBooks(groupId: Long): List<BookshelfItemUiModel> {
+        // 书单口径镜像 BookshelfGroupEngineImpl.observeGroupBooks：用户组走
+        // flowUserGroupBooks（私有组豁免，镜像 flowByGroup 包装层的下架书
+        // 过滤）；全部/根/虚拟组走 flowByGroup（查询内已滤 notShelf）
+        val books = if (groupId > 0) {
+            appDb.bookDao.flowUserGroupBooks(groupId).first().filterNot { it.isNotShelf }
+        } else {
+            appDb.bookDao.flowByGroup(groupId).first()
+        }
+        return books.filter { !it.isLocal && it.canUpdate }
             .map { it.toBookshelfItemUiModel() }
+    }
 
     override suspend fun refreshBookToc(bookUrl: String): BookshelfTocRefreshResult {
         val book = appDb.bookDao.getBook(bookUrl) ?: return BookshelfTocRefreshResult.NO_BOOK
