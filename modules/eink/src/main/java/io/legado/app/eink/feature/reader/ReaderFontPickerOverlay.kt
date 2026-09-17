@@ -23,18 +23,21 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import io.legado.app.eink.R
 import io.legado.app.eink.contract.ReaderFontOption
-import io.legado.app.eink.designsystem.content.EInkHorizontalDivider
 import io.legado.app.eink.designsystem.content.EInkText
-import io.legado.app.eink.designsystem.control.EInkCloseButton
 import io.legado.app.eink.designsystem.interaction.eInkActionColors
 import io.legado.app.eink.designsystem.interaction.einkClickable
 import io.legado.app.eink.designsystem.interaction.rememberImmediatePressState
+import io.legado.app.eink.designsystem.navigation.EInkOperationBar
+import io.legado.app.eink.designsystem.navigation.EInkOperationBarIcon
 import io.legado.app.eink.designsystem.navigation.EInkPageArrows
+import io.legado.app.eink.designsystem.navigation.EInkTopBar
 import io.legado.app.eink.designsystem.pager.EInkPageSwipe
 import io.legado.app.eink.designsystem.pager.rememberEInkListPagerState
 import io.legado.app.eink.designsystem.refresh.EInkRefreshIntent
@@ -48,20 +51,25 @@ import kotlinx.coroutines.launch
  * 全屏字体选择浮层（字体配置弹层的二级）：单列整行显示文件夹字体，
  * 复用全仓全屏列表分页定式（[rememberEInkListPagerState]：LazyColumn
  * 禁滚 + 首布局实测页容量 + 整页跳转；上下滑动手势识别为翻页，同 ▲▼）。
+ * 骨架参考目录界面（TocScreen）：顶栏（标题 + 关闭）+ 列表 + 底部
+ * 操作栏（返回 / 切换字体文件夹 / 翻页胶囊）。
  *
- * - 字体名单行省略号（去扩展名，同一级弹层口径）；选中行按 DS §42 用
- *   左侧实心竖条 + 名称加粗（大面积持久反色残影重），按压仍瞬时反色（§35）；
- * - 页脚（页码 + 箭头）仅字体数超过一页容量时渲染；打开时定位到当前
- *   选中字体所在页（jumpToItemAligned），定位完成前以 surface 色遮盖
- *   列表防闪现第一页（同目录页 positioned 先例）；
- * - 回退：× / 返回键只关本级（一级字体弹层保留）；全屏本体无背板可点；
- * - 空态：无字体时居中提示，无页脚。
+ * - 字体名单行省略号（去扩展名，同一级弹层口径，行内左右留 [EInkSpacing.l]
+ *   边距）；选中行按 DS §42 用左侧实心竖条 + 名称加粗（大面积持久反色
+ *   残影重），按压仍瞬时反色（§35）；
+ * - 打开时定位到当前选中字体所在页（jumpToItemAligned），定位完成前以
+ *   surface 色遮盖列表防闪现第一页（同目录页 positioned 先例）；
+ * - 底栏「选择字体文件夹」图标随时可换文件夹（SAF），列表即时刷新；
+ * - 回退：顶栏关闭 / 底栏返回 / 返回键只关本级（一级字体弹层保留）；
+ *   全屏本体无背板可点；
+ * - 空态：无字体时居中提示，翻页箭头置灰。
  */
 @Composable
 internal fun ReaderFontPickerOverlay(
     fontOptions: List<ReaderFontOption>,
     selectedPath: String?,
     onSelect: (ReaderFontOption) -> Unit,
+    onPickFolder: () -> Unit,
     onClose: () -> Unit,
 ) {
     val pager = rememberEInkListPagerState()
@@ -110,28 +118,17 @@ internal fun ReaderFontPickerOverlay(
             .fillMaxSize()
             .background(EInkTheme.colorScheme.surface),
     ) {
-        // 标题行（同 EInkDialog 面板形态：标题 + × + 通幅分隔线）
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(
-                    start = EInkSpacing.m,
-                    end = EInkSpacing.m,
-                    top = EInkSpacing.m,
-                    bottom = EInkSpacing.s,
-                ),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            EInkText(
-                text = if (fontOptions.isEmpty()) "选择字体" else "选择字体（${fontOptions.size}）",
-                style = EInkTheme.typography.titleMedium,
-                modifier = Modifier.weight(1f),
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            EInkCloseButton(onClose = onClose)
-        }
-        EInkHorizontalDivider()
+        // 顶栏：标题 + 关闭（关闭同返回，只关本级；图标钮写法同目录页顶栏）
+        EInkTopBar(
+            title = if (fontOptions.isEmpty()) "选择字体" else "选择字体（${fontOptions.size}）",
+            actions = {
+                EInkOperationBarIcon(
+                    icon = painterResource(R.drawable.eink_ic_close),
+                    contentDescription = "关闭",
+                    onClick = onClose,
+                )
+            },
+        )
         // 列表区 / 空态
         Box(
             modifier = Modifier
@@ -178,33 +175,35 @@ internal fun ReaderFontPickerOverlay(
                 }
             }
         }
-        // 页脚：页码 + 翻页箭头，仅字体数超过一页容量时渲染（单页不渲染不占位）
-        val pageSize = pager.pageItemCount
-        if (fontOptions.isNotEmpty() && pageSize > 0 && fontOptions.size > pageSize) {
-            val pageCount = (fontOptions.size + pageSize - 1) / pageSize
-            val pageNumber = (pager.pageStart / pageSize).coerceIn(0, pageCount - 1) + 1
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = EInkSpacing.m, vertical = EInkSpacing.xs),
-                horizontalArrangement = Arrangement.spacedBy(EInkSpacing.s, Alignment.End),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                EInkText(
-                    text = "$pageNumber/$pageCount 页",
-                    style = EInkTheme.typography.bodySmall,
-                    color = EInkTheme.colorScheme.outline,
+        // 底部操作栏（同目录页）：返回 / 切换字体文件夹 居左 + 翻页胶囊；
+        // 翻页可用状态收敛在箭头槽叶作用域读取（翻页只重组箭头两个图标）
+        EInkOperationBar(
+            tabs = emptyList(),
+            selectedTabIndex = 0,
+            onTabSelect = {},
+            navigationIcon = {
+                EInkOperationBarIcon(
+                    icon = painterResource(R.drawable.eink_ic_arrow_back),
+                    contentDescription = "返回",
+                    onClick = onClose,
                 )
+            },
+            actions = {
+                EInkOperationBarIcon(
+                    icon = painterResource(R.drawable.eink_ic_folder),
+                    contentDescription = "选择字体文件夹",
+                    onClick = onPickFolder,
+                )
+            },
+            pageArrows = {
                 EInkPageArrows(
                     pageUpEnabled = pager.canPageUp(),
                     pageDownEnabled = pager.canPageDown(fontOptions.size),
                     onPageUp = pageUp,
                     onPageDown = pageDown,
                 )
-            }
-        }
-        // 底部收边
-        EInkHorizontalDivider()
+            },
+        )
     }
 }
 
@@ -233,7 +232,7 @@ private fun FontPickerRow(
             .then(press.modifier)
             .background(colors.containerColor)
             .einkClickable(role = Role.Button, onClickLabel = label, onClick = onClick)
-            .padding(horizontal = EInkSpacing.m),
+            .padding(horizontal = EInkSpacing.l),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(EInkSpacing.s),
     ) {

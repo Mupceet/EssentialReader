@@ -29,11 +29,11 @@ import io.legado.app.eink.designsystem.theme.EInkSpacing
 /**
  * 字体配置弹层（一级，固定面板无滚动）：统一字体原则——正文/标题/页眉
  * （页脚经 applyHeaderStyle 跟随页眉）字体完全一致。系统预设一行三钮；
- * 条件行反显当前选中文件字体（选中反色，点击进二级）+「更多字体…（N）」
- * 入口（无文件字体选中时独占整行），文件字体在全屏二级浮层
- * [ReaderFontPickerOverlay] 分页选择；正文字重与标题字重各为
- * 「细体/常规/粗体/自定义」四选，仅自定义显示拖动条（100..900）；底部
- * 全宽字体文件夹按钮（恒为「选择字体文件夹」，重复选择即换文件夹）。
+ * 条件行反显当前选中文件字体（选中反色，点击进二级）+ 入口按钮——
+ * 文件夹枚举为空（未选过文件夹/空文件夹）时显示「选择字体文件夹」
+ * 直开 SAF，否则「更多字体…（N）」进二级浮层 [ReaderFontPickerOverlay]
+ * 分页选择（换文件夹在二级底栏图标，重复选择即换）；正文字重与标题字重
+ * 各为「细体/常规/粗体/自定义」四选，仅自定义显示拖动条（100..900）。
  */
 @Composable
 internal fun ReaderFontConfigDialog(
@@ -125,7 +125,8 @@ internal fun ReaderFontConfigDialog(
                     ) {
                         if (selectedFileOption != null) {
                             EInkButton(
-                                // 显示名去除扩展名（.ttf/.otf），选中身份按 path 比对
+                                // 显示名去除扩展名（.ttf/.otf），选中身份按 path 比对；
+                                // 长名占满半宽，留横向内边距防贴边（默认 0dp）
                                 text = selectedFileOption.name.substringBeforeLast("."),
                                 onClick = onOpenFontPicker,
                                 modifier = Modifier.weight(1f),
@@ -133,19 +134,23 @@ internal fun ReaderFontConfigDialog(
                                 height = 44.dp,
                                 style = EInkTheme.typography.bodyMedium,
                                 role = Role.Button,
+                                contentPadding = PaddingValues(horizontal = 8.dp),
                             )
                         }
                         EInkButton(
+                            // 空枚举（未选过文件夹/空文件夹）= 首选动作是选文件夹：
+                            // 直开 SAF；选过则显示数量进二级
                             text = if (fontOptions.isEmpty()) {
-                                "更多字体…"
+                                "选择字体文件夹"
                             } else {
                                 "更多字体…（${fontOptions.size}）"
                             },
-                            onClick = onOpenFontPicker,
+                            onClick = if (fontOptions.isEmpty()) onPickFolder else onOpenFontPicker,
                             modifier = Modifier.weight(1f),
                             height = 44.dp,
                             style = EInkTheme.typography.bodyMedium,
                             role = Role.Button,
+                            contentPadding = PaddingValues(horizontal = 8.dp),
                         )
                     }
                 }
@@ -161,14 +166,6 @@ internal fun ReaderFontConfigDialog(
                 value = style.titleWeight ?: catalog.defaultInt(Ids.TITLE_WEIGHT),
                 valueRange = catalog.intRange(Ids.TITLE_WEIGHT),
                 onSetWeight = onSetTitleWeight,
-            )
-            EInkButton(
-                text = "选择字体文件夹",
-                onClick = onPickFolder,
-                modifier = Modifier.fillMaxWidth(),
-                height = 44.dp,
-                style = EInkTheme.typography.bodyMedium,
-                role = Role.Button,
             )
         }
     }

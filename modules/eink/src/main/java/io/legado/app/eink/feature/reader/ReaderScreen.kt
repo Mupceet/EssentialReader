@@ -990,6 +990,7 @@ fun ReaderRoute(
                     viewModel.setReaderFont(ReaderFontSelection.File(option.path))
                     fontPicker = false
                 },
+                onPickFolder = { fontFolderLauncher.launch(null) },
                 onClose = { fontPicker = false },
             )
         }
