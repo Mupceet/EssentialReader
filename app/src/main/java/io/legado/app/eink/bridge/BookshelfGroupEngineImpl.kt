@@ -1,6 +1,5 @@
 package io.legado.app.eink.bridge
 
-import io.legado.app.constant.AppLog
 import io.legado.app.data.appDb
 import io.legado.app.data.entities.BookGroup
 import io.legado.app.data.repository.BookGroupRepository
@@ -13,7 +12,6 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
@@ -22,7 +20,7 @@ import org.koin.core.component.inject
 import splitties.init.appCtx
 
 /**
- * 书架分组端口实现：薄转发既有 Room 查询 + 快照映射 + 排序落库。
+ * 书架分组端口实现：薄转发既有 Room 查询 + 快照映射。
  * 位掩码运算全部封闭在本层（flowByGroup 查询内），不进契约。
  */
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -101,24 +99,6 @@ internal object BookshelfGroupEngineImpl : BookshelfGroupEngine, KoinComponent {
     override suspend fun setSelectedGroup(groupId: Long) {
         bookshelfSettingsGateway.update { it.copy(saveTabPosition = groupId) }
     }
-
-    override suspend fun moveGroup(groupId: Long, up: Boolean) {
-        val groups = bookGroupRepository.flowShow().first()
-        val reordered = reorderedGroupsForMove(groups, groupId, up) ?: return
-        val changed = reordered.filter { new ->
-            groups.firstOrNull { it.groupId == new.groupId }?.order != new.order
-        }
-        try {
-            appDb.runInTransaction {
-                changed.forEach { appDb.bookGroupDao.update(it) }
-            }
-        } catch (e: Throwable) {
-            if (e is kotlinx.coroutines.CancellationException) throw e
-            // 排序落库失败不抛给模块：真值流不重发，模块乐观层由下一次
-            // 分组表变化收敛；日志指名定位
-            AppLog.put("分组排序失败 groupId=$groupId\n${e.localizedMessage}", e)
-        }
-    }
 }
 
 /**
@@ -144,22 +124,4 @@ internal fun buildGroupUiModels(
         name = nameOf(group),
         bookCount = count ?: 0,
     )
-}
-
-/**
- * 排序重排（纯函数）：目标行与相邻行交换后整体重赋 `order = index`，
- * 保证 order 唯一有序（宿主可容忍历史碰撞值）。不可移动返回 null。
- */
-internal fun reorderedGroupsForMove(
-    groups: List<BookGroup>,
-    groupId: Long,
-    up: Boolean,
-): List<BookGroup>? {
-    val index = groups.indexOfFirst { it.groupId == groupId }
-    if (index < 0) return null
-    val target = index + if (up) -1 else 1
-    if (target !in groups.indices) return null
-    return groups.toMutableList()
-        .apply { add(target, removeAt(index)) }
-        .mapIndexed { i, g -> g.copy(order = i) }
 }

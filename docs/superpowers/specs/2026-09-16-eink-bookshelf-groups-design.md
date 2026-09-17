@@ -160,3 +160,18 @@ uiState = combine(booksFlow, styleState, _isRefreshing, _updatingUrls, groupsFlo
 - 组内书籍排序入口（宿主 `bookshelfSort` 继续全局生效；组 `bookSort` 覆盖逻辑
   在宿主 `sortBooks` 内，模块不感知）。
 - eink 侧分组搜索/过滤联动（搜索页仍全局搜书）。
+
+## 9. 决策修订（2026-09-17 真机反馈）
+
+1. **排序移除（决策 3 作废）**：真机验证后用户拍板 eink 侧彻底移除排序入口
+   （面板排序态、契约 `moveGroup`、宿主实现与纯函数、VM 转发全部删除；
+   0.4.0 未发布，不留无调用方死代码）。分组顺序调整归完整模式
+   `GroupManageSheet`；端口职责收窄为分组浏览/切换 + 选中记忆
+   （只读 + `setSelectedGroup` 写）。
+2. **面板 = 流式 chip 平铺**：原单列行 + 上下翻页的呈现被否（真机反馈
+   「上下翻页选择不方便也不美观」），面板改为 FlowRow chip 平铺：
+   面板头整行删除，打开即见分组；每个分组一个 chip（文案 `组名 ·N`，
+   N=书数，含「全部」），**当前选中组 chip 反色实心**（onSurface 底 +
+   background 字，无描边），其余 1dp 描边常规字重；整页兜底 16 chip/页，
+   翻页 = 整页替换（零动画），页脚 `x/y 页` 小字 + EInkPageArrows
+   （仅一页时两箭头置灰仍渲染）。

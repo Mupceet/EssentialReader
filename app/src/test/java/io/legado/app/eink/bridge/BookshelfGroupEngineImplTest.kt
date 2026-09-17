@@ -3,13 +3,11 @@ package io.legado.app.eink.bridge
 import io.legado.app.data.entities.BookGroup
 import io.legado.app.eink.contract.BookshelfGroupUiModel
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNull
 import org.junit.Test
 
 /**
  * BookshelfGroupEngineImpl 的纯函数面：分组快照组装（hideEmpty 过滤 +
- * 名称解析注入）与排序重排（邻位交换 + order 整体重赋）。
- * 数据库交互不在单测范围（宿主层既有查询，真机验证）。
+ * 名称解析注入）。数据库交互不在单测范围（宿主层既有查询，真机验证）。
  */
 class BookshelfGroupEngineImplTest {
 
@@ -56,27 +54,5 @@ class BookshelfGroupEngineImplTest {
             hideEmpty = false, nameOf = { "解析名" },
         )
         assertEquals("解析名", result.single().name)
-    }
-
-    // ---- reorderedGroupsForMove ----
-
-    @Test
-    fun `上移与相邻行交换且整体重赋唯一 order`() {
-        val groups = listOf(group(1L), group(2L), group(3L)).mapIndexed { i, g -> g.copy(order = i) }
-        val moved = reorderedGroupsForMove(groups, 2L, up = true)!!
-        assertEquals(listOf(2L, 1L, 3L), moved.map { it.groupId })
-        assertEquals(listOf(0, 1, 2), moved.map { it.order })
-    }
-
-    @Test
-    fun `首行上移与末行下移为 no-op 返回 null`() {
-        val groups = listOf(group(1L), group(2L)).mapIndexed { i, g -> g.copy(order = i) }
-        assertNull(reorderedGroupsForMove(groups, 1L, up = true))
-        assertNull(reorderedGroupsForMove(groups, 2L, up = false))
-    }
-
-    @Test
-    fun `未知 groupId 返回 null`() {
-        assertNull(reorderedGroupsForMove(listOf(group(1L)), 99L, up = true))
     }
 }

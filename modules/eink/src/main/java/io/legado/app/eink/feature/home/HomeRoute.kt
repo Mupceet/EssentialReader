@@ -292,7 +292,6 @@ fun HomeRoute(
                         groups = uiState.groups,
                         selectedGroupId = uiState.selectedGroupId,
                         onSelectGroup = viewModel::selectGroup,
-                        onMoveGroup = viewModel::moveGroup,
                         onDismiss = { showGroupSelector = false },
                     )
                 }

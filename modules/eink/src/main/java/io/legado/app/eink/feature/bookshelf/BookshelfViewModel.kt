@@ -169,11 +169,6 @@ class BookshelfViewModel(application: Application) : AndroidViewModel(applicatio
         viewModelScope.launch { groupEngine?.setSelectedGroup(groupId) }
     }
 
-    /** 排序模式 ▲▼：转发宿主 moveGroup（每击即写），乐观重排在面板层。 */
-    fun moveGroup(groupId: Long, up: Boolean) {
-        viewModelScope.launch { groupEngine?.moveGroup(groupId, up) }
-    }
-
     private var refreshJob: Job? = null
 
     // 刷新性能日志：与 View 版 MainViewModel 同 tag（ShelfBench），便于两版对拍与刷新慢的问题定位

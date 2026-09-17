@@ -38,8 +38,9 @@ data class BookshelfGroupUiModel(
  * 未注册 = 宿主无分组浏览能力，书架选择器整体不渲染（书架维持全量平铺），
  * 不参与 install 必填校验。
  *
- * 职责边界：分组浏览/切换/排序由本端口承载；分组管理（建组、删组、
- * 书归组、AI 分组、标签规则）不在端口面内，仍归完整模式。
+ * 职责边界：分组浏览/切换/选中记忆由本端口承载；分组排序与分组管理
+ * （建组、删组、书归组、AI 分组、标签规则）不在端口面内，仍归完整模式
+ * （排序归 GroupManageSheet）。
  *
  * 宿主数据交互（位掩码模型，模块不感知）：
  * ```text
@@ -49,7 +50,6 @@ data class BookshelfGroupUiModel(
  * observeGroupBooks(groupId) ──► BookDao.flowByGroup(groupId)
  *                      + 组 bookSort>=0 时覆盖全局排序（sortBooks）
  * selectedGroup / setSelectedGroup ──► 宿主书架设置 saveTabPosition
- * moveGroup(groupId, up) ──► 与相邻行交换显示序列，重赋唯一 order 落库
  * ```
  */
 interface BookshelfGroupEngine {
@@ -81,12 +81,4 @@ interface BookshelfGroupEngine {
      * `saveTabPosition`。模块侧应乐观更新 UI，不等待落库。
      */
     suspend fun setSelectedGroup(groupId: Long)
-
-    /**
-     * 排序模式 ▲▼ 的唯一写通道：把 [groupId] 与显示序列中的相邻行
-     * （[up] = true 上邻，false 下邻）交换位置。每次点击即写，不攒批；
-     * 首行上移/末行下移为 no-op。结果经 [observeGroups] 重发，
-     * 模块乐观重排后由真值流收敛。
-     */
-    suspend fun moveGroup(groupId: Long, up: Boolean)
 }
