@@ -37,8 +37,9 @@ import io.legado.app.eink.designsystem.theme.EInkTheme
 /**
  * 书架选择器收起态 chip：跟在顶栏「书架」标题后，显示当前分组名。
  *
- * 样式为描边加重（加粗边框 + 标题级字重，用户 2026-09-16 定案偏好，
- * 不用反色实心）：2dp 描边区别于常规 1dp 元素，▾/▴ 指示展开态。
+ * 样式为描边 + 标题级字重（用户 2026-09-16 定案偏好反色实心之外
+ * 的加重形态；2026-09-17 真机反馈 2dp 描边过重，回调常规 1dp，
+ * 以标题字重与常规元素区分）：▾/▴ 指示展开态。
  * E-Ink 约束：静态绘制，零动画零阴影。
  */
 @Composable
@@ -51,7 +52,7 @@ fun ShelfGroupChip(
     Row(
         modifier = Modifier
             .padding(start = EInkSpacing.s)
-            .border(width = 2.dp, color = colors.onSurface, shape = EInkShapes.medium)
+            .border(width = 1.dp, color = colors.onSurface, shape = EInkShapes.medium)
             .einkClickable(
                 role = Role.Button,
                 onClickLabel = "选择分组",
