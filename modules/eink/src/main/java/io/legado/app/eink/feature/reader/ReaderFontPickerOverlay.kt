@@ -270,7 +270,8 @@ private fun FontPickerRow(
             .then(press.modifier)
             .background(colors.containerColor)
             .einkClickable(role = Role.Button, onClickLabel = label, onClick = onClick)
-            .padding(horizontal = EInkSpacing.l),
+            // 与目录界面行同口径 16dp（亦与顶栏标题左边距同列对齐）
+            .padding(horizontal = EInkSpacing.m),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(EInkSpacing.s),
     ) {
