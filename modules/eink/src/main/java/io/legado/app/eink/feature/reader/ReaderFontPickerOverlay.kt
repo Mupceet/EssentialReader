@@ -6,11 +6,18 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.displayCutout
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.systemBars
+import androidx.compose.foundation.layout.union
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.runtime.Composable
@@ -27,6 +34,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import io.legado.app.eink.R
 import io.legado.app.eink.contract.ReaderFontOption
@@ -59,7 +67,12 @@ import kotlinx.coroutines.launch
  *   残影重），按压仍瞬时反色（§35）；
  * - 打开时定位到当前选中字体所在页（jumpToItemAligned），定位完成前以
  *   surface 色遮盖列表防闪现第一页（同目录页 positioned 先例）；
- * - 底栏「选择字体文件夹」图标随时可换文件夹（SAF），列表即时刷新；
+ * - 底栏「定位到当前」回到选中字体所在页（未选/幽灵选中回第一页，写法同
+ *   目录页「回到当前」）；「选择字体文件夹」图标（空心描边版）随时可换
+ *   文件夹（SAF），列表即时刷新；
+ * - 系统栏避让：顶部用菜单层固定避让快照（[topInset]，宿主
+ *   rememberStatusBarTop 口径——不跟随状态栏回归动画插值）；左右/底部
+ *   同 readerSystemBarInsets 口径（displayCutout ∪ systemBars）；
  * - 回退：顶栏关闭 / 底栏返回 / 返回键只关本级（一级字体弹层保留）；
  *   全屏本体无背板可点；
  * - 空态：无字体时居中提示，翻页箭头置灰。
@@ -68,6 +81,7 @@ import kotlinx.coroutines.launch
 internal fun ReaderFontPickerOverlay(
     fontOptions: List<ReaderFontOption>,
     selectedPath: String?,
+    topInset: Dp,
     onSelect: (ReaderFontOption) -> Unit,
     onPickFolder: () -> Unit,
     onClose: () -> Unit,
@@ -87,10 +101,7 @@ internal fun ReaderFontPickerOverlay(
         if (!positioned) {
             snapshotFlow { pager.pageItemCount }.first { it > 0 }
         }
-        val selected = selectedPath
-            ?.let { path -> fontOptions.indexOfFirst { it.path == path } }
-            ?.takeIf { it >= 0 } ?: 0
-        pager.jumpToItemAligned(selected)
+        pager.jumpToItemAligned(selectedFontIndex(fontOptions, selectedPath))
         positioned = true
     }
     // 数据原地变化（文件夹重扫）后把实际位置拉回页首（防御）
@@ -112,11 +123,30 @@ internal fun ReaderFontPickerOverlay(
         }
     }
 
+    // 定位到当前选中字体（未选/幽灵选中回第一页）；写法同目录页「回到当前」
+    // （jumpToItemAligned，不带翻页刷新意图）
+    val locateCurrent: () -> Unit = remember(pager, fontOptions, selectedPath, scope) {
+        {
+            scope.launch {
+                pager.jumpToItemAligned(selectedFontIndex(fontOptions, selectedPath))
+            }
+        }
+    }
+
     BackHandler(onBack = onClose)
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(EInkTheme.colorScheme.surface),
+            .background(EInkTheme.colorScheme.surface)
+            // 左右/底部避让 displayCutout ∪ systemBars（同 ReaderScreen
+            // .readerSystemBarInsets 口径；顶部走快照，不在此处避让）
+            .windowInsetsPadding(
+                WindowInsets.displayCutout
+                    .union(WindowInsets.systemBars)
+                    .only(WindowInsetsSides.Horizontal + WindowInsetsSides.Bottom)
+            )
+            // 顶部菜单层固定避让快照：不跟随状态栏回归动画插值逐步顶下
+            .padding(top = topInset),
     ) {
         // 顶栏：标题 + 关闭（关闭同返回，只关本级；图标钮写法同目录页顶栏）
         EInkTopBar(
@@ -190,6 +220,11 @@ internal fun ReaderFontPickerOverlay(
             },
             actions = {
                 EInkOperationBarIcon(
+                    icon = painterResource(R.drawable.eink_ic_toc_locate),
+                    contentDescription = "定位到当前字体",
+                    onClick = locateCurrent,
+                )
+                EInkOperationBarIcon(
                     icon = painterResource(R.drawable.eink_ic_folder),
                     contentDescription = "选择字体文件夹",
                     onClick = onPickFolder,
@@ -206,6 +241,14 @@ internal fun ReaderFontPickerOverlay(
         )
     }
 }
+
+/** 当前选中文件字体下标（按 path 匹配）；未选/幽灵选中归 0。 */
+private fun selectedFontIndex(
+    fontOptions: List<ReaderFontOption>,
+    selectedPath: String?,
+): Int = selectedPath
+    ?.let { path -> fontOptions.indexOfFirst { it.path == path } }
+    ?.takeIf { it >= 0 } ?: 0
 
 /** 选中标记尺寸：左侧实心竖条（§42 additive inking：加黑比去黑可靠）。 */
 private val FontRowMarkWidth = 4.dp

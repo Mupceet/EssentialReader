@@ -986,6 +986,9 @@ fun ReaderRoute(
             ReaderFontPickerOverlay(
                 fontOptions = fontOptions,
                 selectedPath = (uiState.style.bodyFont as? ReaderFontSelection.File)?.path,
+                // 菜单层固定避让快照（hideStatusBar 两态下都是真实栏高，见
+                // rememberStatusBarTop 口径）
+                topInset = statusBarTop,
                 onSelect = { option ->
                     viewModel.setReaderFont(ReaderFontSelection.File(option.path))
                     fontPicker = false
