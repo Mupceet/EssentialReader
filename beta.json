@@ -1,49 +1,49 @@
 {
-  "tag_name": "3.26.17-beta.14",
-  "name": "Pre-release 3.26.17-beta.14",
+  "tag_name": "3.26.17-beta.15",
+  "name": "Pre-release 3.26.17-beta.15",
   "body": "**此版本为测试版，会存在不稳定问题。**\n\n# 更新日志\n\n墨本阅读——开源阅读 legado 的墨水屏增强发行版：同一本书，两种读法。\n\n## 3.26.17-beta（预发布）\n\n本次更新为墨水屏模式书架带来分组浏览能力：\n\n### 新增\n\n* 墨水屏书架顶栏「书架」旁新增当前分组显示，点开即可在分组面板中切换：分组以标签平铺展示（组名与书数一屏尽览），点选即切换并收起；选中分组与完整模式记忆互通，两边切换书架分组状态一致\n* 分组列表跟随完整模式的分组设置：隐藏空分组、分组排序（order）实时同步\n\n### 说明\n\n* 分组的管理操作（新建、重命名、删除、书籍归组、调整顺序）仍在完整模式进行；墨水屏模式专注浏览与切换",
   "prerelease": true,
-  "created_at": "2026-09-17T02:46:56Z",
+  "created_at": "2026-09-17T13:16:53Z",
   "assets": [
     {
-      "browser_download_url": "https://github.com/Mupceet/EssentialReader/releases/download/3.26.17-beta.14/mapping.txt",
+      "browser_download_url": "https://github.com/Mupceet/EssentialReader/releases/download/3.26.17-beta.15/mapping.txt",
       "content_type": "text/plain",
-      "created_at": "2026-09-17T03:09:31Z",
+      "created_at": "2026-09-17T14:47:48Z",
       "download_count": 0,
-      "id": 569338959,
+      "id": 570463692,
       "name": "mapping.txt",
       "state": "uploaded",
-      "url": "https://api.github.com/repos/Mupceet/EssentialReader/releases/assets/569338959"
+      "url": "https://api.github.com/repos/Mupceet/EssentialReader/releases/assets/570463692"
     },
     {
-      "browser_download_url": "https://github.com/Mupceet/EssentialReader/releases/download/3.26.17-beta.14/moben-3.26.17-beta.14-arm64-v8a.apk",
+      "browser_download_url": "https://github.com/Mupceet/EssentialReader/releases/download/3.26.17-beta.15/moben-3.26.17-beta.15-arm64-v8a.apk",
       "content_type": "application/vnd.android.package-archive",
-      "created_at": "2026-09-17T03:09:31Z",
+      "created_at": "2026-09-17T14:47:48Z",
       "download_count": 0,
-      "id": 569338962,
-      "name": "moben-3.26.17-beta.14-arm64-v8a.apk",
+      "id": 570463690,
+      "name": "moben-3.26.17-beta.15-arm64-v8a.apk",
       "state": "uploaded",
-      "url": "https://api.github.com/repos/Mupceet/EssentialReader/releases/assets/569338962"
+      "url": "https://api.github.com/repos/Mupceet/EssentialReader/releases/assets/570463690"
     },
     {
-      "browser_download_url": "https://github.com/Mupceet/EssentialReader/releases/download/3.26.17-beta.14/moben-3.26.17-beta.14-armeabi-v7a.apk",
+      "browser_download_url": "https://github.com/Mupceet/EssentialReader/releases/download/3.26.17-beta.15/moben-3.26.17-beta.15-armeabi-v7a.apk",
       "content_type": "application/vnd.android.package-archive",
-      "created_at": "2026-09-17T03:09:31Z",
+      "created_at": "2026-09-17T14:47:48Z",
       "download_count": 0,
-      "id": 569338960,
-      "name": "moben-3.26.17-beta.14-armeabi-v7a.apk",
+      "id": 570463694,
+      "name": "moben-3.26.17-beta.15-armeabi-v7a.apk",
       "state": "uploaded",
-      "url": "https://api.github.com/repos/Mupceet/EssentialReader/releases/assets/569338960"
+      "url": "https://api.github.com/repos/Mupceet/EssentialReader/releases/assets/570463694"
     },
     {
-      "browser_download_url": "https://github.com/Mupceet/EssentialReader/releases/download/3.26.17-beta.14/moben-3.26.17-beta.14.apk",
+      "browser_download_url": "https://github.com/Mupceet/EssentialReader/releases/download/3.26.17-beta.15/moben-3.26.17-beta.15.apk",
       "content_type": "application/vnd.android.package-archive",
-      "created_at": "2026-09-17T03:09:31Z",
+      "created_at": "2026-09-17T14:47:48Z",
       "download_count": 0,
-      "id": 569338958,
-      "name": "moben-3.26.17-beta.14.apk",
+      "id": 570463688,
+      "name": "moben-3.26.17-beta.15.apk",
       "state": "uploaded",
-      "url": "https://api.github.com/repos/Mupceet/EssentialReader/releases/assets/569338958"
+      "url": "https://api.github.com/repos/Mupceet/EssentialReader/releases/assets/570463688"
     }
   ]
 }
