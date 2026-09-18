@@ -1029,11 +1029,17 @@ fun ReaderRoute(
             }
         }
         // 云端进度恢复确认（宿主 ConfirmRestoreProgress 同义；文案对齐
-        // 宿主 restore_progress / found_cloud_progress）
+        // 宿主 restore_progress / found_cloud_progress）。第三动作
+        // 「以本设备为准」：无条件上传本设备进度覆盖云端（宿主菜单
+        // 「覆盖云端进度」同义）——主动回退阅读后用它消除「每次进书
+        // 都提示恢复」的冲突态
         uiState.cloudProgressPrompt?.let {
             EInkDialog(
                 onDismiss = { viewModel.dismissCloudProgress() },
                 title = "恢复进度",
+                confirmText = "恢复",
+                neutralText = "以本设备为准",
+                onNeutral = { viewModel.coverCloudProgress() },
                 onConfirm = { viewModel.confirmCloudProgress() },
             ) {
                 EInkText(

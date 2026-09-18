@@ -109,6 +109,19 @@ internal class ReaderProgressSyncer(
         }
     }
 
+    /**
+     * 以本设备进度覆盖云端（弹框「以本设备为准」；宿主菜单「覆盖云端
+     * 进度」/ReadBook.uploadProgress 同义）：用户显式动作，无条件上传、
+     * 不做超前比较，亦无 DEBUG gate——上传成功后云端与本设备一致，
+     * 进书冲突提示随之消除。
+     */
+    fun coverCloudProgress() {
+        scope.launch {
+            log("覆盖云端：以本设备进度上传（用户确认）")
+            uploadCurrentProgress()
+        }
+    }
+
     // ---- 触发点实现 ----
 
     /** 进书装载完成：宿主 ReadBookLoadDelegate.loadDataCompleted 尾部同步位（一键全开档）。 */

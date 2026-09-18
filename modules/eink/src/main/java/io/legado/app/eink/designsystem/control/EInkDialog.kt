@@ -36,6 +36,9 @@ import io.legado.app.eink.designsystem.theme.EInkTheme
  * 两种形态：
  * - 确认弹框（默认）：标题 + [belowTitle] + [content] + 取消/确认按钮
  *   （§35 按压反色；[onConfirm] 传 null 时确认按钮呈禁用态）。
+ *   三动作形态：[onNeutral] 非空时主按钮行上方加一整行第三动作
+ *   （文案长于两字时三等分行会省略截断，且直接应答关系应保持二元
+ *   对位——如「恢复进度」弹框的「以本设备为准」）。
  * - 面板弹框：[onClose] 非空时标题行右侧显示 × 关闭钮并在标题行下加分隔线；
  *   [showActions] = false 隐藏底部按钮组（排版调参等实时预览场景，背后
  *   内容不被遮盖）。
@@ -64,6 +67,8 @@ fun EInkDialog(
     confirmText: String = "确定",
     cancelText: String = "取消",
     onConfirm: (() -> Unit)? = null,
+    neutralText: String? = null,
+    onNeutral: (() -> Unit)? = null,
     onClose: (() -> Unit)? = null,
     onBackdropClick: (() -> Unit)? = null,
     showActions: Boolean = true,
@@ -133,28 +138,43 @@ fun EInkDialog(
                 content()
             }
             if (showActions) {
-                Row(
+                // 外层统一持有四向边距：第三动作行与主按钮行同组纵向堆叠
+                // （spacedBy 与行内一致）；无第三动作时度量与单 Row 形态相同
+                Column(
                     modifier = Modifier.padding(
                         start = EInkSpacing.m,
                         end = EInkSpacing.m,
                         top = EInkSpacing.m,
                         bottom = EInkSpacing.m
                     ),
-                    horizontalArrangement = Arrangement.spacedBy(EInkSpacing.s)
+                    verticalArrangement = Arrangement.spacedBy(EInkSpacing.s)
                 ) {
-                    EInkButton(
-                        text = cancelText,
-                        onClick = onDismiss,
-                        modifier = Modifier.weight(1f),
-                        height = 44.dp,
-                    )
-                    EInkButton(
-                        text = confirmText,
-                        enabled = onConfirm != null,
-                        onClick = { onConfirm?.invoke() },
-                        modifier = Modifier.weight(1f),
-                        height = 44.dp,
-                    )
+                    if (onNeutral != null && neutralText != null) {
+                        EInkButton(
+                            text = neutralText,
+                            onClick = onNeutral,
+                            modifier = Modifier.fillMaxWidth(),
+                            height = 44.dp,
+                        )
+                    }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(EInkSpacing.s)
+                    ) {
+                        EInkButton(
+                            text = cancelText,
+                            onClick = onDismiss,
+                            modifier = Modifier.weight(1f),
+                            height = 44.dp,
+                        )
+                        EInkButton(
+                            text = confirmText,
+                            enabled = onConfirm != null,
+                            onClick = { onConfirm?.invoke() },
+                            modifier = Modifier.weight(1f),
+                            height = 44.dp,
+                        )
+                    }
                 }
             }
         }

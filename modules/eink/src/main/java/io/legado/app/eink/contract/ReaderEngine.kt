@@ -193,7 +193,8 @@ interface ReaderEngineCallback {
  * 换源/重定向替换后 ─► reloadBook(handle)     全量重建会话
  * 离开阅读 ─► saveReadingProgress() + unregister(callback)
  * 云端进度同步 ─► syncCloudProgress(trigger) ─► 云端超前 ─► onCloudProgressNewer
- *                                          └─► 用户确认 ─► applyCloudProgress
+ *                                          ├─► 用户确认 ─► applyCloudProgress
+ *                                          └─► 用户以本设备为准 ─► coverCloudProgress
  * ```
  *
  * 职责边界：模块阅读页 VM 保留全部界面编排（菜单状态、翻页交互、调参
@@ -252,6 +253,18 @@ interface ReaderEngine {
      * 默认无实现。
      */
     fun applyCloudProgress(progress: ReaderCloudProgress) {}
+
+    /**
+     * 用户选择以本设备进度覆盖云端（[ReaderEngineCallback.
+     * onCloudProgressNewer] 弹框的「以本设备为准」动作）：宿主无条件
+     * 上传当前会话进度、不与云端比较（宿主「覆盖云端进度」菜单同义），
+     * 成功后云端与本设备一致、冲突态自然消除。
+     *
+     * 非 suspend、主线程调用，宿主内部自行转异步；与 [syncCloudProgress]
+     * 一致对调用方静默（失败仅入宿主日志——失败时云端仍超前，下次进书
+     * 会再次提示，无静默丢失）。默认无实现。
+     */
+    fun coverCloudProgress() {}
 
     // ---- 会话只读状态 ----
 

@@ -1076,6 +1076,16 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application),
         }
     }
 
+    /**
+     * 用户选择以本设备进度覆盖云端（弹框第三动作）：仅提示在场时可调；
+     * 上传后云端与本设备一致，后续进书不再提示冲突。
+     */
+    fun coverCloudProgress() {
+        if (_uiState.value.cloudProgressPrompt == null) return
+        _uiState.update { it.copy(cloudProgressPrompt = null) }
+        engine.coverCloudProgress()
+    }
+
     /** 用户放弃恢复云端进度（保留本地进度）。 */
     fun dismissCloudProgress() {
         _uiState.update { it.copy(cloudProgressPrompt = null) }

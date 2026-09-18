@@ -181,6 +181,10 @@ internal object ReaderEngineImpl : ReaderEngine, KoinComponent {
         progressSyncer.applyCloudProgress(progress)
     }
 
+    override fun coverCloudProgress() {
+        progressSyncer.coverCloudProgress()
+    }
+
     // ---- 会话只读状态 ----
 
     override val sessionBook: ReaderBookSnapshot?
