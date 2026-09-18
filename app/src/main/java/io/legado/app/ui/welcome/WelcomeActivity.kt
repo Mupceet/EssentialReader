@@ -78,9 +78,18 @@ open class WelcomeActivity : BaseActivity<ActivityWelcomeBinding>() {
     }
 
     private fun startMainActivity() {
-        startActivity<MainActivity>()
-        if (getPrefBoolean(PreferKey.defaultToRead) && appDb.bookDao.lastReadBook != null) {
-            startActivity<ReadBookActivity>()
+        // 墨水屏模式（themeMode "4"）在欢迎页直接分流（MainActivity 的
+        // 同款分流保留兜底非欢迎页入口），免去 MainActivity 空转一跳；
+        // 直达最近阅读由 EInkMainActivity 入口按同一开关自行编排
+        if (AppConfig.themeMode == "4") {
+            startActivity<io.legado.app.eink.EInkMainActivity>()
+        } else {
+            startActivity<MainActivity>()
+            if (getPrefBoolean(PreferKey.defaultToRead) &&
+                appDb.bookDao.lastReadBook != null
+            ) {
+                startActivity<ReadBookActivity>()
+            }
         }
         finish()
     }

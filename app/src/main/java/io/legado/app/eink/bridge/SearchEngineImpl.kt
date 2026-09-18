@@ -128,6 +128,17 @@ internal object SearchEngineImpl : SearchEngine {
             searchModel.cancelSearch()
         }
 
+        // 宿主 SearchModel 自带 workingState 门控的 pause/resume：剩余源
+        // 不再启动、在途源照常完成并推送（不触发取消/结束事件），与契约
+        // 挂起/恢复语义一一对应
+        override fun pauseSearch() {
+            searchModel.pause()
+        }
+
+        override fun resumeSearch() {
+            searchModel.resume()
+        }
+
         override fun close() {
             searchModel.close()
             scope.cancel()

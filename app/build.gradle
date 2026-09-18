@@ -156,7 +156,12 @@ android {
 
 dependencies {
     // E-Ink 模块二进制消费（:modules:eink:publishToMavenLocal 发布；将来换远程坐标）
-    implementation 'io.legado.app.eink:eink:0.2.0'
+    // 0.5.0-oldstack：0.5.0 契约面（setTextBold 移除、jumpToPosition/pauseSearch
+    // 等新必选成员）+ 可选端口（AppUpdate/分组/云同步）+ 排版协商与字体端口。
+    // oldstack 后缀 = 依赖集钉回 AGP8.13 可消费档（BOM 2026.06.01/Coil 3.5/
+    // lifecycle 2.9.4）——0.5.0 主栈产物依赖 Compose 1.12/lifecycle 2.11，其
+    // AAR 元数据要求 AGP ≥ 9.1，本宿主（AGP 8.13）不可用
+    implementation 'io.legado.app.eink:eink:0.5.0-oldstack'
     // bridge 适配层需要：契约 CoverEngine 签名暴露 Coil 类型；GlobalSettings 快照状态需 Compose runtime
     implementation libs.compose.runtime
     implementation libs.coil.compose

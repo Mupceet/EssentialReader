@@ -80,10 +80,14 @@ internal object TocEngineImpl : TocEngine {
         bookUrl: String,
         chapterIndex: Int,
         chapterTitle: String,
+        chapterPos: Int,
     ) {
+        // 目录跳章落进度：置位同步抑制标记（随后进书同步被抑制，宿主
+        // chapterChanged 同位语义）
+        ReaderProgressSyncer.markChapterJumped()
         val book = appDb.bookDao.getBook(bookUrl) ?: return
         book.durChapterIndex = chapterIndex
-        book.durChapterPos = 0
+        book.durChapterPos = chapterPos
         book.durChapterTitle = chapterTitle
         book.durChapterTime = System.currentTimeMillis()
         appDb.bookDao.update(book)
