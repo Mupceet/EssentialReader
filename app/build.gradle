@@ -48,7 +48,7 @@ android {
     }
     defaultConfig {
         applicationId "io.legado.app"
-        minSdk 23
+        minSdk 21
         targetSdk 36
         versionCode 10000 + gitCommits
         versionName version
@@ -156,12 +156,12 @@ android {
 
 dependencies {
     // E-Ink 模块二进制消费（:modules:eink:publishToMavenLocal 发布；将来换远程坐标）
-    // 0.6.1-oldstack：0.6.0 契约能力粒度（目录守卫/Locked/书签笔记按能力/
-    // 段评声明）+ Presets 预设档参数（正文字重三预设、无自定义滑条）。
-    // oldstack 后缀 = 依赖集钉回 AGP8.13 可消费档（BOM 2026.06.01/Coil 3.5/
-    // lifecycle 2.9.4）——主栈产物依赖 Compose 1.12/lifecycle 2.11，其
-    // AAR 元数据要求 AGP ≥ 9.1，本宿主（AGP 8.13）不可用
-    implementation 'io.legado.app.eink:eink:0.6.1-oldstack'
+    // 0.6.1-min21：0.6.0/0.6.1 全量契约面 + 依赖集整体降到 minSdk 21 档
+    // （BOM 2025.11.00/foundation 1.9.4/Coil 3.0.4/lifecycle-compose 2.8.7/
+    // activity 1.8.2/appcompat 1.7.0，六变量钉版孪生坐标）——面向
+    // Android 5.x 墨水屏设备；宿主自身依赖同步降到 ≤21（Coil 3.0.4）。
+    // 主栈/oldstack 产物依赖集要求 minSdk 23，本宿主降 21 后不可用
+    implementation 'io.legado.app.eink:eink:0.6.1-min21'
     // bridge 适配层需要：契约 CoverEngine 签名暴露 Coil 类型；GlobalSettings 快照状态需 Compose runtime
     implementation libs.compose.runtime
     implementation libs.coil.compose
