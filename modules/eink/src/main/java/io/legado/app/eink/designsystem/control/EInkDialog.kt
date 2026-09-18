@@ -34,8 +34,8 @@ import io.legado.app.eink.designsystem.theme.EInkTheme
  * 随组合卸载，无窗口泄漏。
  *
  * 两种形态：
- * - 确认弹框（默认）：标题 + [content] + 取消/确认按钮（§35 按压反色；
- *   [onConfirm] 传 null 时确认按钮呈禁用态）。
+ * - 确认弹框（默认）：标题 + [belowTitle] + [content] + 取消/确认按钮
+ *   （§35 按压反色；[onConfirm] 传 null 时确认按钮呈禁用态）。
  * - 面板弹框：[onClose] 非空时标题行右侧显示 × 关闭钮并在标题行下加分隔线；
  *   [showActions] = false 隐藏底部按钮组（排版调参等实时预览场景，背后
  *   内容不被遮盖）。
@@ -69,6 +69,7 @@ fun EInkDialog(
     showActions: Boolean = true,
     contentAlignment: Alignment = Alignment.Center,
     panelPadding: PaddingValues = PaddingValues(0.dp),
+    belowTitle: (@Composable () -> Unit)? = null,
     content: @Composable () -> Unit,
 ) {
     // 系统返回 = 逐级回退的 onDismiss：组合期注册、收起随组合注销；
@@ -117,6 +118,9 @@ fun EInkDialog(
             if (onClose != null) {
                 EInkHorizontalDivider()
             }
+            // 标题下面板级插槽：无横向内边距，分隔线/进度行类元素
+            // 通到面板左右边缘的口径与 onClose 分隔线一致；null 不渲染
+            belowTitle?.invoke()
             // Column 而非 Box：内容插槽可平铺多个兄弟组件（如滑条行组），
             // 逐行纵向堆叠
             Column(

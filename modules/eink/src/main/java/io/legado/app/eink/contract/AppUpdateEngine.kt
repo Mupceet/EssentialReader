@@ -1,5 +1,7 @@
 package io.legado.app.eink.contract
 
+import kotlinx.coroutines.flow.StateFlow
+
 /**
  * 应用更新端口 —— 端口总表中唯一的**可选**端口。
  *
@@ -7,14 +9,15 @@ package io.legado.app.eink.contract
  *
  * 更新的主体是**宿主应用**而非 E-Ink 模式/模块：检查哪个发布仓库、
  * 走什么渠道（正式/测试）、版本比较规则、下载与安装管线，全部是宿主
- * 独占知识。模块侧只做两件事：
+ * 独占知识。模块侧只做三件事：
  *
  * ```text
  * 「我的」页入口行（本端口已注册才渲染）
  *    └─ 点击 ─► checkUpdate()
  *         ├─ null            ─► toast「已是最新版本」
  *         ├─ AppUpdateInfo   ─► E-Ink 纯文本更新弹层
- *         │                      └─「立即更新」─► startDownload() ─► 宿主下载管线
+ *         │                      └─「立即更新」─► startDownload()
+ *         │                           └─ collect downloadProgress ─► 弹层内进度条
  *         └─ 抛异常          ─► toast 异常 message（宿主提供面向用户的文案）
  *
  * E-Ink 启动（EInkApp 根层）
@@ -68,10 +71,27 @@ interface AppUpdateEngine {
     /**
      * 启动更新包下载。宿主以自有管线承接（本仓参照实现：
      * DownloadService 系统下载器 + 进度通知 + 完成后调起系统安装器）。
+     * fire-and-forget：模块经 [downloadProgress] 观测进度做应用内补充
+     * 展示——部分系统不给通知栏权限，通知进度不可见时模块侧进度是
+     * 唯一可见反馈。
      *
      * @param update [checkUpdate] 返回的同一条更新快照。
      */
     fun startDownload(update: AppUpdateInfo)
+
+    /**
+     * 最近一次 [startDownload] 的更新包下载进度。
+     *
+     * - null：尚无发布（未开始/宿主不支持进度观测）；
+     * - 非 null：进度快照按宿主页轮询节奏（约 1s）刷新，宿主保证
+     *   [AppDownloadProgress.state] 达到终态（SUCCEEDED/FAILED）后
+     *   停留不再回退。
+     *
+     * 宿主实现以最近一次 [startDownload] 的下载地址为关联键，从自有
+     * 下载管线的进度中过滤本条更新；companion 宿主无进度观测能力时
+     * 返回恒 null 的流即可（模块按「准备中」呈现，不构成错误）。
+     */
+    val downloadProgress: StateFlow<AppDownloadProgress?>
 }
 
 /**
@@ -92,3 +112,42 @@ data class AppUpdateInfo(
     /** 更新包文件名（含 ABI 与版本，下载提示用）。 */
     val fileName: String
 )
+
+/**
+ * 更新包下载进度快照：宿主下载管线发布，模块渲染应用内进度。
+ * 义务对齐其它 UiModel：全基元不可变、不携带宿主下载器类型。
+ */
+data class AppDownloadProgress(
+    /** 下载状态机；SUCCEEDED/FAILED 为终态。 */
+    val state: AppDownloadState,
+    /** 已下载字节数。 */
+    val bytesSoFar: Long,
+    /** 总字节数；<= 0 表示总长未知（此时 [percent] 恒 -1）。 */
+    val totalBytes: Long,
+) {
+    /** 整数百分比 0..100；总长未知时 -1（调用方按不定长呈现）。 */
+    val percent: Int
+        get() = if (totalBytes > 0) {
+            ((bytesSoFar * 100) / totalBytes).coerceIn(0, 100).toInt()
+        } else {
+            -1
+        }
+}
+
+/** 更新包下载状态机（宿主下载器状态的基元投影）。 */
+enum class AppDownloadState {
+    /** 已入队等待网络/调度。 */
+    PENDING,
+
+    /** 传输中。 */
+    RUNNING,
+
+    /** 暂停（等待网络/重试等）。 */
+    PAUSED,
+
+    /** 成功；宿主已/将调起系统安装器。 */
+    SUCCEEDED,
+
+    /** 失败；重新调用 [AppUpdateEngine.startDownload] 可重试。 */
+    FAILED,
+}

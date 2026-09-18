@@ -5,9 +5,12 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import io.legado.app.eink.contract.AppDownloadProgress
+import io.legado.app.eink.contract.AppDownloadState
 import io.legado.app.eink.contract.AppUpdateEngine
 import io.legado.app.eink.contract.AppUpdateInfo
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 
 /**
@@ -29,6 +32,12 @@ internal class EInkAppUpdateViewModel : ViewModel() {
     /** 更新检查状态机（启动自动检查与「我的」页手动检查共用）。 */
     var updateCheck by mutableStateOf<UpdateCheckState>(UpdateCheckState.Idle)
         internal set
+
+    /** 更新下载状态机（「立即更新」后弹层内嵌的进度行）。 */
+    var download by mutableStateOf<UpdateDownloadState>(UpdateDownloadState.Idle)
+        internal set
+
+    private var downloadJob: Job? = null
 
     /**
      * 启动自动检查：经端口询问宿主门控（「其他设置」启动检查开关 +
@@ -53,6 +62,55 @@ internal class EInkAppUpdateViewModel : ViewModel() {
             }
         }
     }
+
+    /**
+     * 「立即更新」：转发宿主下载管线，弹层保持更新提示形态不动，
+     * 标题下方内嵌进度行（部分系统不给通知栏权限，通知进度不可见，
+     * 应用内进度是唯一可见反馈）。
+     */
+    fun startUpdateDownload(engine: AppUpdateEngine, info: AppUpdateInfo) {
+        downloadJob?.cancel()
+        download = UpdateDownloadState.Downloading(info, progress = null)
+        engine.startDownload(info)
+        downloadJob = viewModelScope.launch {
+            engine.downloadProgress.collect { progress ->
+                onProgressEmitted(progress)
+            }
+        }
+    }
+
+    /** 收起更新弹层：检查与下载观测一并复位，宿主下载不中断。 */
+    fun dismissUpdate() {
+        updateCheck = UpdateCheckState.Idle
+        dismissDownload()
+    }
+
+    /** 停止进度观测（弹层收起或下载完成时内部调用）。 */
+    private fun dismissDownload() {
+        downloadJob?.cancel()
+        downloadJob = null
+        download = UpdateDownloadState.Idle
+    }
+
+    private fun onProgressEmitted(progress: AppDownloadProgress?) {
+        val current = download as? UpdateDownloadState.Downloading ?: return
+        if (progress == null) return
+        // eink 屏按百分比/状态粒度落状态，避免 1Hz 轮询整行重刷；
+        // 总长未知（percent=-1）时百分比不可用，退回逐次刷新字节文本
+        val old = current.progress
+        if (old != null && progress.percent >= 0 &&
+            progress.percent == old.percent && progress.state == old.state
+        ) {
+            return
+        }
+        if (progress.state == AppDownloadState.SUCCEEDED) {
+            // 宿主下载完成即调起系统安装器，更新弹层同步收起
+            updateCheck = UpdateCheckState.Idle
+            dismissDownload()
+            return
+        }
+        download = current.copy(progress = progress)
+    }
 }
 
 /** 更新检查状态机：Idle / Checking / 发现新版本（Available）。 */
@@ -60,4 +118,13 @@ internal sealed interface UpdateCheckState {
     data object Idle : UpdateCheckState
     data object Checking : UpdateCheckState
     data class Available(val info: AppUpdateInfo) : UpdateCheckState
+}
+
+/** 更新下载状态机：Idle / 下载中（含最近一次进度快照）。 */
+internal sealed interface UpdateDownloadState {
+    data object Idle : UpdateDownloadState
+    data class Downloading(
+        val info: AppUpdateInfo,
+        val progress: AppDownloadProgress?,
+    ) : UpdateDownloadState
 }

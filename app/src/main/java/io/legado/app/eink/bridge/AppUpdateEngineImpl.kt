@@ -1,18 +1,27 @@
 package io.legado.app.eink.bridge
 
 import io.legado.app.domain.gateway.OtherSettingsGateway
+import io.legado.app.eink.contract.AppDownloadProgress
+import io.legado.app.eink.contract.AppDownloadState
 import io.legado.app.eink.contract.AppUpdateEngine
 import io.legado.app.eink.contract.AppUpdateInfo
 import io.legado.app.exception.NoStackTraceException
 import io.legado.app.help.update.AppUpdate
 import io.legado.app.help.update.UpToDateException
 import io.legado.app.model.Download
+import io.legado.app.model.DownloadProgressStore
+import io.legado.app.model.DownloadProgressStore.DownloadProgress
 import io.legado.app.ui.main.ProcessStartupUpdateCheckGate
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import splitties.init.appCtx
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
@@ -60,8 +69,30 @@ object AppUpdateEngineImpl : AppUpdateEngine {
         // 防御：正常路径下 checkUpdate 返回的资产直链/文件名必非空
         //（GitHub API 资产字段保证），此处仅阻断理论上的空值透传
         if (update.downloadUrl.isBlank() || update.fileName.isBlank()) return
+        _downloadProgress.value = null
         Download.start(appCtx, update.downloadUrl, update.fileName)
+        // progressOf 派生自 StateFlow：collect 首个发射即当前快照，
+        // 同地址残留行（上一轮已完成/进行中）无需额外补读
+        progressJob?.cancel()
+        progressJob = checkScope.launch {
+            DownloadProgressStore.progressOf(update.downloadUrl).collect {
+                _downloadProgress.value = it?.toAppDownloadProgress()
+            }
+        }
     }
+
+    private val _downloadProgress = MutableStateFlow<AppDownloadProgress?>(null)
+    override val downloadProgress: StateFlow<AppDownloadProgress?> =
+        _downloadProgress.asStateFlow()
+
+    private var progressJob: Job? = null
+
+    private fun DownloadProgress.toAppDownloadProgress() =
+        AppDownloadProgress(
+            state = state.toAppDownloadState(),
+            bytesSoFar = bytesSoFar,
+            totalBytes = totalBytes,
+        )
 
     private fun AppUpdate.UpdateInfo.toAppUpdateInfo() = AppUpdateInfo(
         versionName = tagName,
@@ -70,6 +101,18 @@ object AppUpdateEngineImpl : AppUpdateEngine {
         fileName = fileName
     )
 }
+
+/**
+ * 模型层下载状态 → 契约状态机投影（1:1，类型穷尽）。
+ */
+internal fun DownloadProgressStore.DownloadState.toAppDownloadState(): AppDownloadState =
+    when (this) {
+        DownloadProgressStore.DownloadState.PENDING -> AppDownloadState.PENDING
+        DownloadProgressStore.DownloadState.RUNNING -> AppDownloadState.RUNNING
+        DownloadProgressStore.DownloadState.PAUSED -> AppDownloadState.PAUSED
+        DownloadProgressStore.DownloadState.SUCCEEDED -> AppDownloadState.SUCCEEDED
+        DownloadProgressStore.DownloadState.FAILED -> AppDownloadState.FAILED
+    }
 
 /**
  * [AppUpdate.AppUpdateInterface.check] 的回调链 → suspend 桥接。

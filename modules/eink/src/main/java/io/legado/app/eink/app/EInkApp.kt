@@ -1,7 +1,6 @@
 package io.legado.app.eink.app
 
 import android.app.Application
-import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -28,6 +27,7 @@ import androidx.lifecycle.viewmodel.CreationExtras
 import androidx.lifecycle.viewmodel.MutableCreationExtras
 import androidx.lifecycle.viewmodel.compose.LocalViewModelStoreOwner
 import androidx.lifecycle.viewmodel.compose.viewModel
+import io.legado.app.eink.contract.AppDownloadState
 import io.legado.app.eink.contract.EInkEngineRegistry
 import io.legado.app.eink.debug.ComponentGalleryRoute
 import io.legado.app.eink.debug.ThemeDebugRoute
@@ -259,23 +259,35 @@ fun EInkApp(
 
     // 更新弹层：根层渲染、覆盖任意屏幕（对齐宿主 Activity 级 UpdateDialog
     // 形态——直达最近阅读场景检查完成时阅读页之上也能弹）；状态由
-    // Activity 级 VM 持有，「我的」页手动检查与启动自动检查共用
+    // Activity 级 VM 持有，「我的」页手动检查与启动自动检查共用。
+    // 「立即更新」后弹框不切换形态，标题下方内嵌 4dp 细进度条；状态
+    // 由确认钮承担（下载中禁用/失败变重试）——部分系统不给通知栏
+    // 权限，通知进度不可见
     val appUpdateEngine = EInkEngineRegistry.appUpdateEngine
     val availableUpdate = updateViewModel.updateCheck as? UpdateCheckState.Available
     if (availableUpdate != null && appUpdateEngine != null) {
-        val context = LocalContext.current
+        val downloadingUpdate = updateViewModel.download as? UpdateDownloadState.Downloading
+        val failed = downloadingUpdate?.progress?.state == AppDownloadState.FAILED
+        val busy = downloadingUpdate != null && !failed
         EInkDialog(
-            onDismiss = { updateViewModel.updateCheck = UpdateCheckState.Idle },
+            onDismiss = { updateViewModel.dismissUpdate() },
             title = "发现新版本 ${availableUpdate.info.versionName}",
-            confirmText = "立即更新",
-            onConfirm = {
-                appUpdateEngine.startDownload(availableUpdate.info)
-                Toast.makeText(
-                    context,
-                    "已开始下载 ${availableUpdate.info.fileName}",
-                    Toast.LENGTH_SHORT
-                ).show()
-                updateViewModel.updateCheck = UpdateCheckState.Idle
+            confirmText = when {
+                failed -> "重试"
+                busy -> "下载中"
+                else -> "立即更新"
+            },
+            // 下载进行中无确认动作：禁用态承担「忙」提示，收起走「取消」
+            onConfirm = if (busy) null else {
+                { updateViewModel.startUpdateDownload(appUpdateEngine, availableUpdate.info) }
+            },
+            // 槽位常驻（未下载时为空轨道，兼作标题下分隔线，面板级
+            // 插槽通到面板左右边缘）：下载开始仅小牌出现并沿线移动，
+            // 正文不因进度行下跳
+            belowTitle = {
+                EInkAppUpdateProgressRow(
+                    percent = downloadingUpdate?.progress?.percent ?: -1
+                )
             },
             content = {
                 // 长说明限制高度内滚动，面板不随说明无限增高
