@@ -17,6 +17,7 @@ import okhttp3.Request
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
+import kotlin.time.Duration.Companion.milliseconds
 
 object AppUpdateGitHub : AppUpdate.AppUpdateInterface {
 
@@ -63,16 +64,30 @@ object AppUpdateGitHub : AppUpdate.AppUpdateInterface {
             AppVariant.BETA_RELEASE -> "beta"
             else -> return null
         }
+        val manifestUrl = "$updateManifestBaseUrl/$channel.json"
+        val expectPreRelease = variant == AppVariant.BETA_RELEASE
+        // raw.githubusercontent.com 国内直连不可达是常态，加速优先；
+        // 加速源失效时回退直连保持原行为。两次尝试各占一份
+        // manifestTimeoutMillis，ALL 渠道最坏情况放大到 10s，
+        // 由 check 的整体超时（15s）给 API 兜底留出余量
+        return fetchManifestRelease(UpdateAccelerator.accelerate(manifestUrl), expectPreRelease)
+            ?: fetchManifestRelease(manifestUrl, expectPreRelease)
+    }
+
+    private suspend fun fetchManifestRelease(
+        url: String,
+        expectPreRelease: Boolean
+    ): GithubRelease? {
         return try {
-            withTimeoutOrNull(manifestTimeoutMillis) {
+            withTimeoutOrNull(manifestTimeoutMillis.milliseconds) {
                 val response = okHttpClient.newCallResponse {
-                    url("$updateManifestBaseUrl/$channel.json")
+                    url(url)
                 }
                 response.use {
                     if (!it.isSuccessful) return@withTimeoutOrNull null
                     val release = GSON.fromJsonObject<GithubRelease>(it.body.text()).getOrNull()
                         ?: return@withTimeoutOrNull null
-                    val expectedPreRelease = variant == AppVariant.BETA_RELEASE
+                    val expectedPreRelease = expectPreRelease
                     release.takeIf {
                         it.isPreRelease == expectedPreRelease &&
                             it.assets.orEmpty().any { asset -> asset.isValid }
@@ -131,7 +146,7 @@ object AppUpdateGitHub : AppUpdate.AppUpdateInterface {
         return AppUpdate.UpdateInfo(
             tagName = info.versionName,
             updateLog = info.note,
-            downloadUrl = info.downloadUrl,
+            downloadUrl = UpdateAccelerator.resolveDownloadUrl(info.downloadUrl),
             fileName = info.name
         )
     }
@@ -205,13 +220,13 @@ object AppUpdateGitHub : AppUpdate.AppUpdateInterface {
                 return@async AppUpdate.UpdateInfo(
                     latest.versionName,
                     latest.note,
-                    latest.downloadUrl,
+                    UpdateAccelerator.resolveDownloadUrl(latest.downloadUrl),
                     latest.name
                 )
             }
 
             throw UpToDateException()
-        }.timeout(10000)
+        }.timeout(15000)
     }
 
     private data class SemVer(
