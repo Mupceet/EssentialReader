@@ -137,7 +137,19 @@ afterEvaluate {
                 // lifecycle-compose 2.9.4 / foundation 1.11.4——0.5.0 主栈
                 // 依赖的 Compose 1.12 / lifecycle 2.11 AAR 元数据要求
                 // AGP ≥ 9.1，旧栈宿主不可用；复现：临时改
-                // libs.versions.toml 四变量后 publishToMavenLocal）
+                // libs.versions.toml 四变量后 publishToMavenLocal）；
+                // 另有 0.6.1-min21 孪生坐标（同源码、依赖集整体降到
+                // minSdk 21 档——墨水屏设备大量驻留 Android 5.x：BOM
+                // 2025.11.00 / foundation 1.9.4 / Coil 3.0.4 /
+                // lifecycle-compose 2.8.7 / activity 1.8.2 / appcompat 1.7.0，
+                // 已经宿主 minSdk 21 全链路验证（manifest 合并/编译/打包）；
+                // 复现：临时改 libs.versions.toml 六变量后
+                // publishToMavenLocal。注意：消费方 Kotlin 须 ≥ 2.3
+                // （元数据一版本前向）、compileSdk 须满足 compose 1.9 线
+                // AAR 元数据（编译门槛非设备门槛）、API 21/22 真机行为
+                // 需回归。模块无阻降接口：源码纯 Compose + 协程，超 21 的
+                // 框架调用均在宿主侧且有 SDK 门控（如
+                // fontVariationSettings API 26）
                 version = "0.6.1"
             }
         }

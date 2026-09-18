@@ -131,6 +131,17 @@ sources jar，坐标 `io.legado.app.eink:eink`）。
      宿主在用；**0.2.0 = 主栈（AGP9/K2.4/Java21）构建**，K2.3 宿主
      消费时元数据按一版本前向规则可读、Java 21 字节码经 D8 消解，
      均需真机回归确认后再切换坐标。
+   - **min21 孪生轨道（0.6.1 起）**：面向大量驻留 Android 5.x 的墨水屏
+     设备——`<版本>-min21` 坐标同源码、依赖集整体降到 minSdk 21 档
+     （BOM 2025.11.00 / foundation 1.9.4 / Coil 3.0.4 /
+     lifecycle-compose 2.8.7 / activity 1.8.2 / appcompat 1.7.0），已经
+     宿主 minSdk 21 全链路验证（manifest 合并/编译/打包）。消费门槛：
+     宿主自身依赖也须 ≤21（如 Coil 需同步降到 3.0.x）、Kotlin ≥ 2.3
+     （元数据一版本前向）、compileSdk 满足 compose 1.9 线 AAR 元数据
+     （编译门槛非设备门槛）；API 21/22 真机行为需回归。模块侧无阻降
+     接口：源码纯 Compose + 协程，无 >21 的直接框架调用（宿主 bridge
+     侧超 21 的调用须自行 SDK 门控，参照 EssentialReader 的
+     fontVariationSettings API 26 处理）。
 
 ## 3. 引擎差异表（各宿主实测记录）
 
