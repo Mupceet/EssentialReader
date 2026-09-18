@@ -213,13 +213,12 @@ Java 17 / minSdk 21（按 §0 升 23）/ 无 Compose 无 Coil（图片栈 Glide�
 - **ProGuard**：模块 `consumer-rules.pro` 随模块走；Compose/Coil 规则由
   各自 consumer 提供。
 - **SharedPreferences**：模块零自有存储——全部设置经 GlobalSettings
-  端口，存储后端由宿主决定；E-InK 自有偏好 `keepScreenOn` 以历史键
-  `einkReaderKeepScreenOn`、`readerTapZones`（九宫格点击区域，9 位
-  编码整键）以 `einkReaderTapZones`、`pullDownBookmark`（下拉添加
-  书签，默认关）以 `einkReaderPullDownBookmark` 落宿主侧专属 prefs
-  文件（本仓为 `eink_preferences`，键名历史继承）。勿落宿主默认
-  prefs 文件——被 DataStore MIGRATE_ALL_KEYS 迁移接管的默认文件
-  进程启动即被整文件清空，自有键会随每次重启反复重置。
+  端口，存储后端由宿主决定；E-InK 自有偏好 `readerTapZones`（九宫格
+  点击区域，9 位编码整键）以 `einkReaderTapZones`、`pullDownBookmark`
+  （下拉添加书签，默认关）以 `einkReaderPullDownBookmark` 落宿主侧
+  专属 prefs 文件（本仓为 `eink_preferences`，键名历史继承）。勿落
+  宿主默认 prefs 文件——被 DataStore MIGRATE_ALL_KEYS 迁移接管的默认
+  文件进程启动即被整文件清空，自有键会随每次重启反复重置。
 
 ## 5. 移植验证清单
 

@@ -566,11 +566,11 @@ fun ReaderRoute(
         }
     }
 
-    // 保持屏幕常亮：常亮设置开启或自动翻页运行中时申请；
-    // 离开阅读页时清除标记（常亮只作用于阅读页）
-    DisposableEffect(uiState.keepScreenOn, uiState.autoPlay) {
+    // 保持屏幕常亮：仅自动翻页运行中申请；离开阅读页时清除标记
+    // （常亮只作用于阅读页）
+    DisposableEffect(uiState.autoPlay) {
         val window = (view.context as? Activity)?.window
-        if (uiState.keepScreenOn || uiState.autoPlay) {
+        if (uiState.autoPlay) {
             window?.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         } else {
             window?.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
@@ -907,7 +907,6 @@ fun ReaderRoute(
                     ) {
                         ReaderOtherPanel(
                             state = uiState,
-                            onToggleKeepScreenOn = viewModel::toggleKeepScreenOn,
                             onTogglePullDownBookmark = viewModel::togglePullDownBookmark,
                             onToggleHideStatusBar = viewModel::toggleHideStatusBar,
                             onToggleShowReviewBubbles = viewModel::toggleShowReviewBubbles,

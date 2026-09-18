@@ -74,7 +74,6 @@ data class ReaderUiState(
     val autoPlayProgress: Float = 0f,
     val isLocalBook: Boolean = false,
     val inBookshelf: Boolean = false,
-    val keepScreenOn: Boolean = false,
     /** 阅读区竖直下拉添加书签开关（E-InK 自有偏好，默认关；关闭时下拉手势只吞并不动作）。 */
     val pullDownBookmark: Boolean = false,
     /** 隐藏状态栏（转发完整模式同键阅读设置；开启后页眉接管 时间/电量）。 */
@@ -146,7 +145,6 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application),
         run {
             val style = engine.currentStyle()
             ReaderUiState(
-                keepScreenOn = EInkEngineRegistry.globalSettings.keepScreenOn,
                 pullDownBookmark = EInkEngineRegistry.globalSettings.pullDownBookmark,
                 hideStatusBar = EInkEngineRegistry.globalSettings.hideStatusBar,
                 showReviewBubbles = EInkEngineRegistry.globalSettings.showReviewBubbles,
@@ -821,13 +819,6 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application),
         viewModelScope.launch(Dispatchers.IO) {
             engine.setFontFolder(uri)
             _fontOptions.value = engine.availableFonts()
-        }
-    }
-
-    fun toggleKeepScreenOn() {
-        _uiState.update {
-            EInkEngineRegistry.globalSettings.keepScreenOn = !it.keepScreenOn
-            it.copy(keepScreenOn = !it.keepScreenOn)
         }
     }
 
