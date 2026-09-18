@@ -13,19 +13,13 @@ import io.legado.app.eink.contract.ReaderStyleParamIds as Ids
  *  - 标题行距、页眉/页脚字号无配置键；
  *  - 标题字号为「正文 + 增量」模型（引擎 titlePaint = textSize+titleSize），
  *    契约 TITLE_SIZE 的绝对值在 applyStyle/currentStyle 映射期换算；
- *  - 正文字重仅 0 常规/1 粗/2 细三预设（引擎 getPaints），契约 BODY_WEIGHT
- *    的 100..900 自定义值在 applyStyle 映射期就近量化。
+ *  - 正文字重仅 0 常规/1 粗/2 细三预设（引擎 getPaints）——Presets 档
+ *    声明（无自定义滑条；若有自定义值进入 applyStyle 就近量化兜底）。
  *
- * 已知待办（模块侧优化，下个 eink 版本落入）：
- *  - 设置弹层「页眉页脚字号」「标题字重」两行无条件渲染、不按目录守卫
- *    ——本宿主未声明时滑条值域塌缩为 0..0 / 按钮无效果。字号渲染为锁死
- *    档（预留带推导 ≈ 12sp，对齐完整模式），待模块加目录守卫后隐藏。
- *  - 契约改进提案（2026-09-18）：目录参数的 available 为整参二值，表达
- *    不了「仅默认值可用、其余档位不支持」的部分支持——典型如本宿主
- *    标题字重：引擎 textBold 单键，默认档即标题粗体（getPaints 的
- *    else 分支 bold/normal），无独立标题字重键、其它取值均不支持。
- *    建议 ReaderStyleParam 演进为可声明可选值子集或「锁定默认」标记，
- *    模块 UI 对不支持档位置灰（保留默认态可见）或整行隐藏。
+ * 契约改进已落地（模块 0.6.0）：设置弹层行按目录守卫——本宿主未声明
+ * HEADER_SIZE/FOOTER_SIZE（页眉页脚字号行隐藏）与 TITLE_WEIGHT（标题
+ * 字重行隐藏；引擎单键耦合无独立标题字重键，直接声明不支持）。
+ * 页眉/页脚字号渲染为锁死档（预留带推导 ≈ 12sp，对齐完整模式）。
  *
  * affectsLayout 判定：本宿主 visibleHeight = viewHeight - 上下边距（含
  * E-Ink 装饰预留），页眉/页脚显隐与分割线不改变分页几何（绘制于边距
@@ -42,8 +36,14 @@ internal object HostStyleCatalog {
             stepped(Ids.BODY_LINE_SPACING, 0f, 30f, 12f),
             stepped(Ids.BODY_PARAGRAPH_SPACING, 0f, 10f, 2f),
             ReaderStyleParam.Font(Ids.BODY_FONT, available = true, affectsLayout = true),
-            // 自定义滑条区间（100..900 就近量化为引擎三预设）
-            stepped(Ids.BODY_WEIGHT, 100f, 900f, 400f),
+            // 正文字重：引擎仅三预设（textBold 0 常规/1 粗/2 细）——预设档
+            // 声明，无自定义滑条（allowCustom = false 隐藏「自定义」按钮）
+            ReaderStyleParam.Presets(
+                id = Ids.BODY_WEIGHT,
+                available = true,
+                affectsLayout = true,
+                default = 0,
+            ),
             ReaderStyleParam.Choice(
                 id = Ids.TITLE_MODE,
                 available = true,

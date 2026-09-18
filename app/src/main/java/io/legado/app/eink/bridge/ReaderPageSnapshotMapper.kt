@@ -43,11 +43,12 @@ internal object ReaderPageSnapshotMapper {
             contentSpec = ChapterProvider.contentPaint.copyPaintSpec(),
             sdkInt = Build.VERSION.SDK_INT,
             imageLoader = ::defaultImageLoader,
-            bookmarkBadge = rows.any { row ->
-                row.bookText.isEmpty() &&
-                    row.chapterIndex == page.chapterIndex &&
-                    page.containPos(row.chapterPos)
-            },
+            bookmarkBadge = ReaderSelectionEngineImpl.supportsPageBookmark &&
+                rows.any { row ->
+                    row.bookText.isEmpty() &&
+                        row.chapterIndex == page.chapterIndex &&
+                        page.containPos(row.chapterPos)
+                },
             markings = rows.asSequence()
                 .filter { it.bookText.isNotEmpty() && it.chapterIndex == page.chapterIndex }
                 .map { row ->

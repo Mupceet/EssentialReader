@@ -27,19 +27,18 @@ import splitties.init.appCtx
  * 评分机制本宿主未实现——标题不匹配时直接走 NeedConfirm（fallback =
  * 存储坐标），不发起网络。
  *
- * 已知待办（契约改进提案，2026-09-18）：MarksEngine 为整端口二值
- * （注册 = 书签+笔记双 Tab 全上）。建议演进为按能力注册——宿主可声明
- * 仅支持书签 / 仅笔记 / 两者，模块据此隐藏无数据源的 Tab。本宿主即
- * 踩中该缺口：bookmarks 单表无判别字段，完整模式快速书签（页摘录）
- * 会被笔记 Tab 误纳为长摘录划线卡。
- * 能力显隐范围不限于目录页 Tab——阅读界面的相关设置项与入口同需
- * 跟随能力声明，典型如「下拉添加书签」开关（阅读「其它设置」面板，
- * GlobalSettings.pullDownBookmark）：应按宿主的「页面书签」能力显隐，
- * 而非随 ReaderSelectionEngine 整体注册门控（当前划线/想法与页面
- * 书签捆绑注册，仅支持其一的宿主会出现死开关或死入口）；同族还有
- * 顶栏书签钮、页角标、下拉手势、长按选择的划线/想法操作条。
+ * 已知待办（契约改进已落地，模块 0.6.0）：MarksEngine 支持按能力注册
+ * （supportsBookmarks/supportsMarkings，目录页仅渲染有数据源的 Tab，
+ * 阅读界面书签/笔记入口联动显隐）。本宿主声明书签能力不支持——书签
+ * 模型为「选中文字书签」，统一经笔记 Tab 管理（目录页只剩 目录|笔记
+ * 两段）；笔记能力正常。完整模式快速书签（页摘录）归笔记 Tab 为单表
+ * 无判别字段的已知取舍（治本需 bookmarks 表加判别列）。
  */
 internal object MarksEngineImpl : MarksEngine {
+
+    /** 书签列表能力：不支持（书签即选中文字书签，笔记 Tab 承载）——目录页书签 Tab 隐藏。 */
+    override val supportsBookmarks: Boolean
+        get() = false
 
     override fun observeBookmarks(bookUrl: String): Flow<List<BookmarkUiModel>> =
         observeRows(bookUrl) { rows ->

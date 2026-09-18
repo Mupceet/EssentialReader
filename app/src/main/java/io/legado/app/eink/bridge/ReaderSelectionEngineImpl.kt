@@ -31,6 +31,15 @@ internal fun Bookmark.isPageBookmark() = bookText.isEmpty()
  */
 internal object ReaderSelectionEngineImpl : ReaderSelectionEngine {
 
+    /**
+     * 页面书签能力：本宿主不支持——书签模型为「选中文字书签」（即划线/
+     * 笔记，经笔记 Tab 管理），无独立的页面级快速书签管理面。声明不支持
+     * 后模块隐藏下拉书签手势、顶栏书签钮、页角标与「下拉添加书签」开关
+     * （togglePageBookmark 实现保留但不可达）。
+     */
+    override val supportsPageBookmark: Boolean
+        get() = false
+
     override suspend fun saveMarking(commit: ReaderSelectionCommit): Boolean {
         val book = ReadBook.book ?: return false
         return try {

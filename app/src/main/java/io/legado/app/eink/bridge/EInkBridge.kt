@@ -191,14 +191,15 @@ private object GlobalSettingsImpl : GlobalSettings {
      * ——与契约的段评模型（带 click 脚本的图片槽位）不同构，转发会把
      * 注入字符漏进页快照文本块（真机表现为标题与段尾的小方块）。
      *
-     * 已知待办（契约改进提案，2026-09-18）：段评气泡应由宿主声明能力
-     * （如 GlobalSettings 能力位或独立端口），模块据此隐藏「显示段评
-     * 气泡」开关及相关元素——当前该行无条件渲染，不支持宿主上呈现为
-     * 恒关死开关。
+     * 契约改进已落地（模块 0.6.0）：supportsReviewBubbles 能力声明，模块
+     * 据此隐藏「显示段评气泡」开关——本宿主声明不支持。
      */
     override var showReviewBubbles: Boolean
         get() = false
         set(value) {}
+
+    override val supportsReviewBubbles: Boolean
+        get() = false
 
     /**
      * 点击区域九宫格（E-Ink 自有偏好，不转发完整模式 clickAction* 键）：
