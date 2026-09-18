@@ -520,7 +520,8 @@ fun ReaderRoute(
     }
 
     // 页面书签 toggle（v2 Task 9，设计 §4）：顶栏书签钮与阅读区竖直下拉
-    // 共用；端口在位才可达（降级宿主两者皆不渲染/不响应，见 ReaderScreen）。
+    // 共用；端口在位才可达（降级宿主两者皆不渲染/不响应，见 ReaderScreen）；
+    // 下拉入口另受「下拉添加书签」开关门控（默认关），顶栏钮不受限。
     // 三态：null = 端口缺失/无页/无会话书 → toast「操作失败」；true = 本次
     // 添加、false = 本次移除，均静默——角标变化随宿主重排的新快照即反馈
     val onPageBookmarkToggle: () -> Unit = {
@@ -907,6 +908,7 @@ fun ReaderRoute(
                         ReaderOtherPanel(
                             state = uiState,
                             onToggleKeepScreenOn = viewModel::toggleKeepScreenOn,
+                            onTogglePullDownBookmark = viewModel::togglePullDownBookmark,
                             onToggleHideStatusBar = viewModel::toggleHideStatusBar,
                             onToggleShowReviewBubbles = viewModel::toggleShowReviewBubbles,
                             onOpenTapZones = { tapZoneEditor = true },
@@ -1159,8 +1161,9 @@ fun ReaderRoute(
  * - 水平滑动翻页，判定对齐 View 版：触发距离读引擎 pageTouchSlop（AppConfig.pageTouchSlop 经端口）
  *   （完整版设置"翻页触发距离"，0 = 系统 slop，Compose 版只读不设），
  *   松手前反向回拖取消；无跟手移动，翻页整页立即替换。与竖直下拉书签
- *   （累计下拉 ≥ 80dp toggle 一次，须向下强竖直优势且无选区、操作条
- *   收起、批注端口在位）经统一仲裁共存，判据见 ReaderDragArbitration。
+ *   （累计下拉 ≥ 80dp toggle 一次，须「下拉添加书签」开（默认关）、向下
+ *   强竖直优势且无选区、操作条收起、批注端口在位）经统一仲裁共存，
+ *   判据见 ReaderDragArbitration。
  *
  * 选区状态由调用方持有（[selection] / [onSelectionChange]），翻页/重排
  * （pageVersion 推进）清空也由调用方承担；松手/抬手合成经
@@ -1236,6 +1239,9 @@ internal fun ReaderScreen(
         // 点击分区同样跨手势实时读：蒙层退出更新分区时不重启手势检测器
         // （同上不以之为 pointerInput key，避免中途打断在途拖拽）
         val currentTapZones by rememberUpdatedState(state.tapZones)
+        // 下拉添加书签开关同法实时读：其它设置面板中途切换时在途手势
+        // 不重启，下一手势即按新值参与书签认领
+        val currentPullDownBookmark by rememberUpdatedState(state.pullDownBookmark)
         // 与页画布同规格的测量闭包（applySpec 幂等，重复设置无害）：
         // 长按命中测试与浮条锚点按引擎同款字体度量
         val themeForeground = EInkTheme.colorScheme.onBackground
@@ -1369,8 +1375,9 @@ internal fun ReaderScreen(
                         // 竖直优势均无门控，起手带下坠的横滑被其以 8dp 任意
                         // 方向抖动整笔抢走后，书签触发不了（需净下拉 80dp）、
                         // 翻页检测器已取消，整次滑动被吞。
-                        // - 书签认领：向下且 |Σy| > |Σx|×1.5 且当前可达（端口
-                        //   在位/操作条收起/无选区/无排版错误）；认领后主导性
+                        // - 书签认领：向下且 |Σy| > |Σx|×1.5 且当前可达（「下拉
+                        //   添加书签」开关开（默认关）/端口在位/操作条收起/
+                        //   无选区/无排版错误）；认领后主导性
                         //   翻转即交接翻页并锁存（本次手势不再回书签）；
                         // - 翻页认领：|Σx| ≥ 触摸 slop（与原独立横向检测器的
                         //   认领时机一致）；触发距离 = 引擎 pageTouchSlop（px），
@@ -1378,7 +1385,8 @@ internal fun ReaderScreen(
                         //   相反则取消（等价 View 版 isCancel）；选区存在期间
                         //   水平手势不翻页（端点调整只经把手拖拽）；
                         // - 超过 slop 或已认领的位移一律消费（压掉点按）；书签
-                        //   不可达（端口缺失等）时同样只吞并滑动不产生动作；
+                        //   不可达（开关关/端口缺失等）时同样只吞并滑动不
+                        //   产生动作；
                         // - 一次手势至多 toggle 一次书签，结束/取消复位。
                         // 检测器不以 controls/selection/error 为 key（拖拽中途
                         // 翻转状态不重启手势），实时值经 rememberUpdatedState 读取。
@@ -1418,7 +1426,8 @@ internal fun ReaderScreen(
                                     totalX,
                                     totalY,
                                     touchSlop,
-                                    bookmarkReady = selectionEnabled &&
+                                    bookmarkReady = currentPullDownBookmark &&
+                                        selectionEnabled &&
                                         !currentControlsVisible && currentError == null &&
                                         currentSelection == null,
                                 )

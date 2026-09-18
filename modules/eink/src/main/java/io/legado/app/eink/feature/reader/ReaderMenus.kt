@@ -671,12 +671,14 @@ internal fun PanelTabRow(labels: List<String>, selected: Int, onSelect: (Int) ->
 internal fun ReaderOtherPanel(
     state: ReaderUiState,
     onToggleKeepScreenOn: () -> Unit,
+    onTogglePullDownBookmark: () -> Unit,
     onToggleHideStatusBar: () -> Unit,
     onToggleShowReviewBubbles: () -> Unit,
     onOpenTapZones: () -> Unit,
 ) {
     ToggleRow(label = "保持屏幕常亮", checked = state.keepScreenOn, onToggle = onToggleKeepScreenOn)
     ToggleRow(label = "隐藏状态栏", checked = state.hideStatusBar, onToggle = onToggleHideStatusBar)
+    ToggleRow(label = "下拉添加书签", checked = state.pullDownBookmark, onToggle = onTogglePullDownBookmark)
     ToggleRow(label = "显示段评气泡", checked = state.showReviewBubbles, onToggle = onToggleShowReviewBubbles)
     OptionRow(label = "点击区域设置", onClick = onOpenTapZones)
 }

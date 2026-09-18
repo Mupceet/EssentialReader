@@ -75,6 +75,8 @@ data class ReaderUiState(
     val isLocalBook: Boolean = false,
     val inBookshelf: Boolean = false,
     val keepScreenOn: Boolean = false,
+    /** 阅读区竖直下拉添加书签开关（E-InK 自有偏好，默认关；关闭时下拉手势只吞并不动作）。 */
+    val pullDownBookmark: Boolean = false,
     /** 隐藏状态栏（转发完整模式同键阅读设置；开启后页眉接管 时间/电量）。 */
     val hideStatusBar: Boolean = false,
     /** 段评气泡参与排版（转发完整模式同键阅读设置；切换触发重排）。 */
@@ -145,6 +147,7 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application),
             val style = engine.currentStyle()
             ReaderUiState(
                 keepScreenOn = EInkEngineRegistry.globalSettings.keepScreenOn,
+                pullDownBookmark = EInkEngineRegistry.globalSettings.pullDownBookmark,
                 hideStatusBar = EInkEngineRegistry.globalSettings.hideStatusBar,
                 showReviewBubbles = EInkEngineRegistry.globalSettings.showReviewBubbles,
                 tapZones = EInkEngineRegistry.globalSettings.readerTapZones,
@@ -825,6 +828,14 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application),
         _uiState.update {
             EInkEngineRegistry.globalSettings.keepScreenOn = !it.keepScreenOn
             it.copy(keepScreenOn = !it.keepScreenOn)
+        }
+    }
+
+    /** 下拉添加书签开关（E-InK 自有偏好，默认关）：写入 + 乐观更新，手势侧实时读 UiState。 */
+    fun togglePullDownBookmark() {
+        _uiState.update {
+            EInkEngineRegistry.globalSettings.pullDownBookmark = !it.pullDownBookmark
+            it.copy(pullDownBookmark = !it.pullDownBookmark)
         }
     }
 

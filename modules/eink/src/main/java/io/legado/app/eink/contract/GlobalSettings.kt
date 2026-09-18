@@ -78,6 +78,16 @@ interface GlobalSettings {
     var keepScreenOn: Boolean
 
     /**
+     * 阅读区竖直下拉添加书签（E-InK 自有界面偏好，完整模式无对应设置）。
+     *
+     * 可写（其它设置面板开关，默认关）：关闭时竖直下拉不认领书签
+     * （手势仍被统一仲裁吞并以压掉点按，不产生动作）；读取在阅读 VM
+     * 构造时一次，写入即时生效（UiState 同步）且同步落盘。嵌入式宿主
+     * 实现以自有键 `einkReaderPullDownBookmark` 存宿主侧自有 prefs 文件。
+     */
+    var pullDownBookmark: Boolean
+
+    /**
      * 阅读页隐藏系统状态栏（转发宿主阅读设置，与完整模式「隐藏状态栏」
      * 同键共享存储）。
      *

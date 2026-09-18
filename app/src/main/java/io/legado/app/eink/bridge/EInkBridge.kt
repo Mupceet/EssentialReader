@@ -41,6 +41,9 @@ internal object EinkLegacyPrefsStore {
     /** readerTapZones 的自有键（9 位编码，见 ReaderTapZoneGrid）。 */
     const val KEY_TAP_ZONES = "einkReaderTapZones"
 
+    /** pullDownBookmark 的自有键（默认关）。 */
+    const val KEY_PULL_DOWN_BOOKMARK = "einkReaderPullDownBookmark"
+
     fun prefs(): SharedPreferences =
         appCtx.getSharedPreferences(FILE_NAME, Context.MODE_PRIVATE)
 }
@@ -116,13 +119,15 @@ internal val einkSettingsWriteScope =
  * changeSourceCheckAuthor 经 ChangeSourceSettingsGateway；
  * useDefaultCover（「我的」页可写）为本对象持有的 Compose 快照状态 +
  * CoverSettingsGateway 异步落盘——组合内读取订阅变化，切换后开关行与
- * 书架/详情可见封面立即重组；keepScreenOn、readerTapZones（均为阅读
- * 菜单设置、E-InK 自有偏好、完整模式无对应设置——后者不转发完整模式
- * clickAction* 键：值域只有三动作，转发会让两侧配置互相覆盖）同走
+ * 书架/详情可见封面立即重组；keepScreenOn、readerTapZones、pullDownBookmark
+ * （均为阅读菜单设置、E-InK 自有偏好、完整模式无对应设置；readerTapZones
+ * 不转发完整模式 clickAction* 键：值域只有三动作，转发会让两侧配置互相
+ * 覆盖）同走
  * EinkLegacyPrefsStore 专属 prefs 文件不经设置网关（默认 prefs 文件是
  * DataStore 迁移源、启动即被整文件清空，不可作存储位）：keepScreenOn
- * 为 EInkSettings 端口化的历史键（键名逐字继承），readerTapZones 为
- * 新增自有键（9 位编码整键存取，见 ReaderTapZoneGrid）；syncReadingProgress（「我的」页
+ * 为 EInkSettings 端口化的历史键（键名逐字继承），readerTapZones（
+ * 9 位编码整键存取，见 ReaderTapZoneGrid）与 pullDownBookmark（下拉
+ * 添加书签，默认关）为新增自有键；syncReadingProgress（「我的」页
  * 可写）经 BackupSettingsGateway 转发宿主「同步阅读进度」主键，写时
  * 带宿主设置页同款父子联动。
  *
@@ -163,6 +168,13 @@ private object GlobalSettingsImpl : GlobalSettings, KoinComponent {
         set(value) {
             einkLegacyPrefs.edit()
                 .putBoolean(EinkLegacyPrefsStore.KEY_KEEP_SCREEN_ON, value).apply()
+        }
+
+    override var pullDownBookmark: Boolean
+        get() = einkLegacyPrefs.getBoolean(EinkLegacyPrefsStore.KEY_PULL_DOWN_BOOKMARK, false)
+        set(value) {
+            einkLegacyPrefs.edit()
+                .putBoolean(EinkLegacyPrefsStore.KEY_PULL_DOWN_BOOKMARK, value).apply()
         }
 
     override var readerTapZones: ReaderTapZoneGrid
