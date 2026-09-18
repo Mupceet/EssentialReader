@@ -9,8 +9,20 @@ import androidx.compose.runtime.Stable
  * 可选端口（同 [EInkEngineRegistry.appUpdateEngine] 先例）：注册表缺失本端口
  * 时，模块降级——长按选择整体不启用（松手无动作、无操作条，选择交互无
  * 可用出路），下拉书签与顶栏书签钮隐藏，不做假死路径。
+ *
+ * 能力粒度（0.6.0 起）：注册 = 至少支持一种能力，宿主按实际支持覆写
+ * 能力声明——仅支持划线/想法的宿主 [supportsPageBookmark] = false（下拉
+ * 书签开关、顶栏书签钮、页角标、下拉手势隐藏），仅支持页面书签的宿主
+ * [supportsMarkings] = false（长按选择不启用，操作条只余复制）。默认
+ * 均为 true（两能力齐备，旧宿主零改动）。
  */
 interface ReaderSelectionEngine {
+
+    /** 划线/想法能力：长按选择、选区操作条标记动作与点按标记浮条。 */
+    val supportsMarkings: Boolean get() = true
+
+    /** 页面书签能力：快速书签 toggle、下拉书签、顶栏书签钮、页角标。 */
+    val supportsPageBookmark: Boolean get() = true
 
     /**
      * 保存标记（同锚点 upsert，创建/写想法/编辑想法复用）。

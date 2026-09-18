@@ -12,8 +12,18 @@ import kotlinx.coroutines.flow.Flow
  *
  * 可选端口（同 [ReaderSelectionEngine] 先例）：注册表缺失本端口时，
  * 目录页不显示书签 / 笔记 Tab（只剩目录），不做假死路径。
+ *
+ * 能力粒度（0.6.0 起）：宿主可只支持其一——[supportsBookmarks] /
+ * [supportsMarkings] 声明后，目录页仅渲染有数据源的 Tab（两者皆 false
+ * 等价于不注册）。默认均为 true（旧宿主零改动）。
  */
 interface MarksEngine {
+
+    /** 书签列表能力：目录页「书签」Tab。 */
+    val supportsBookmarks: Boolean get() = true
+
+    /** 笔记列表能力：目录页「笔记」Tab 与笔记导出。 */
+    val supportsMarkings: Boolean get() = true
 
     /**
      * 订阅书籍的全部页面书签（bookmarks 表，跨源；按 chapterIndex、

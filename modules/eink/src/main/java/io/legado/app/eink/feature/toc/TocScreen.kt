@@ -442,9 +442,13 @@ internal fun TocScreen(
     onConfirmJump: () -> Unit,
     onDismissJump: () -> Unit,
 ) {
-    // 降级宿主（marksEngine 缺失）：Tab 行不渲染，内容也强制回目录——
-    // 避免状态里残留的书签/笔记 Tab 形成无路可退的死屏
-    val tab = if (state.marksAvailable) state.selectedTab else TocTab.Chapters
+    // 降级宿主（marksEngine 缺失或能力未声明）：Tab 行不渲染对应段，
+    // 内容也强制回目录——避免状态里残留的书签/笔记 Tab 形成无路可退的死屏
+    val tab = when (state.selectedTab) {
+        TocTab.Bookmarks -> if (state.bookmarksAvailable) state.selectedTab else TocTab.Chapters
+        TocTab.Notes -> if (state.markingsAvailable) state.selectedTab else TocTab.Chapters
+        TocTab.Chapters -> state.selectedTab
+    }
     Box(modifier = Modifier.fillMaxSize()) {
         Column(modifier = Modifier.fillMaxSize()) {
             // 顶栏：书名居左，动作按钮随 Tab 切换（新规格：撑满顶栏高、贴右屏）
@@ -482,9 +486,14 @@ internal fun TocScreen(
                 }
             )
             // 标题下三段切换：marksEngine 缺失（降级宿主）时整体不渲染，
-            // 只剩目录列表（契约 §3.3 降级语义，不留假死入口）
-            if (state.marksAvailable) {
-                TocTabRow(selected = tab, onSelect = onTabSelect)
+            // 只剩目录列表；能力粒度（0.6.0）：未声明能力的 Tab 段不渲染
+            if (state.bookmarksAvailable || state.markingsAvailable) {
+                TocTabRow(
+                    selected = tab,
+                    showBookmarks = state.bookmarksAvailable,
+                    showNotes = state.markingsAvailable,
+                    onSelect = onTabSelect,
+                )
             }
             Box(modifier = Modifier.weight(1f)) {
                 when {
@@ -715,6 +724,8 @@ private fun ChapterItem(
 @Composable
 private fun TocTabRow(
     selected: TocTab,
+    showBookmarks: Boolean,
+    showNotes: Boolean,
     onSelect: (TocTab) -> Unit,
 ) {
     Box(modifier = Modifier.fillMaxWidth()) {
@@ -733,18 +744,22 @@ private fun TocTabRow(
                 modifier = Modifier.weight(1f),
                 onClick = { onSelect(TocTab.Chapters) },
             )
-            TocTabItem(
-                text = "书签",
-                selected = selected == TocTab.Bookmarks,
-                modifier = Modifier.weight(1f),
-                onClick = { onSelect(TocTab.Bookmarks) },
-            )
-            TocTabItem(
-                text = "笔记",
-                selected = selected == TocTab.Notes,
-                modifier = Modifier.weight(1f),
-                onClick = { onSelect(TocTab.Notes) },
-            )
+            if (showBookmarks) {
+                TocTabItem(
+                    text = "书签",
+                    selected = selected == TocTab.Bookmarks,
+                    modifier = Modifier.weight(1f),
+                    onClick = { onSelect(TocTab.Bookmarks) },
+                )
+            }
+            if (showNotes) {
+                TocTabItem(
+                    text = "笔记",
+                    selected = selected == TocTab.Notes,
+                    modifier = Modifier.weight(1f),
+                    onClick = { onSelect(TocTab.Notes) },
+                )
+            }
         }
     }
 }

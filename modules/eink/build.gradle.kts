@@ -106,8 +106,39 @@ afterEvaluate {
                 //         source/action 交互元数据、ReaderEngine 新增
                 //         dispatchImageAction（默认无操作，旧宿主点按无响应）
                 //         且入口基类改 AppCompatActivity（源码级基类变更，
-                //         宿主子类须随 AAR 重编译）
-                version = "0.4.0"
+                //         宿主子类须随 AAR 重编译）；
+                // 0.5.0 = 0.4.0 设版后陆续并入的特性整体发布：云端进度同步
+                //         触发链路（ReaderSyncTrigger / applyCloudProgress /
+                //         onCloudProgressNewer + 恢复弹框「以本设备为准」）
+                //         + 可选端口三件（ReaderSelectionEngine / MarksEngine /
+                //         BookshelfGroupEngine）与配套 UI + AppUpdateEngine
+                //         可选更新端口（启动自动检查 + gh-proxy 加速 + 弹框
+                //         内嵌下载进度）+ 阅读字体选择两级交互浮层 +
+                //         einkReaderTapZones / einkReaderPullDownBookmark 落
+                //         宿主专属 prefs 文件 + 移除保持屏幕常亮（仅自动翻页
+                //         场景常亮）。依赖集抬至 Compose UI 1.12 / Coil 3.6.2，
+                //         宿主专属 prefs 文件 + 移除保持屏幕常亮（仅自动翻页
+                //         场景常亮）。依赖集抬至 Compose UI 1.12 / Coil 3.6.2，
+                //         AAR 消费方 compileSdk 须 ≥ 37；
+                // 0.6.0 = 契约能力粒度四件套（宿主侧提案落地）：
+                //         ReaderStyleParam 新增 Locked（仅默认值可用 → UI 置灰
+                //         锁定态）；设置弹层按目录守卫（参数未声明整行隐藏，
+                //         不再出现 0..0 死滑条）；ReaderSelectionEngine 增
+                //         supportsMarkings/supportsPageBookmark、MarksEngine 增
+                //         supportsBookmarks/supportsMarkings（默认均 true，旧
+                //         宿主零改动）——目录页 Tab、下拉书签/顶栏书签钮/
+                //         页角标/长按选择按能力显隐；GlobalSettings 增
+                //         supportsReviewBubbles（false = 隐藏段评开关）；
+                // 0.6.1 = ReaderStyleParam 新增 Presets（协议预设档集、无
+                //         自定义滑条——字重行 allowCustom = false 时隐藏
+                //         「自定义」按钮与滑条）；
+                // 另发布 0.5.0-oldstack 孪生坐标（同源码、依赖集钉回
+                // AGP8.13 可消费档：BOM 2026.06.01 / Coil 3.5.0 /
+                // lifecycle-compose 2.9.4 / foundation 1.11.4——0.5.0 主栈
+                // 依赖的 Compose 1.12 / lifecycle 2.11 AAR 元数据要求
+                // AGP ≥ 9.1，旧栈宿主不可用；复现：临时改
+                // libs.versions.toml 四变量后 publishToMavenLocal）
+                version = "0.6.1"
             }
         }
     }

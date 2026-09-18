@@ -54,6 +54,33 @@ sealed interface ReaderStyleParam {
         override val available: Boolean,
         override val affectsLayout: Boolean,
     ) : ReaderStyleParam
+
+    /**
+     * 固定值参数：宿主锁定该参数（仅默认值可用、其余档位不支持——如引擎
+     * 单键耦合下标题字重恒粗体的宿主）。UI 呈现置灰锁定态（值可见、不可
+     * 调）；宿主也可选择不声明本参数使设置行整体隐藏。
+     */
+    data class Locked(
+        override val id: String,
+        /** 锁定值（量纲随 id 约定）。 */
+        val value: Float,
+    ) : ReaderStyleParam {
+        override val available: Boolean get() = true
+        override val affectsLayout: Boolean get() = false
+    }
+
+    /**
+     * 预设档参数：宿主仅支持协议约定的固定档位集（如字重 0 常规/1 粗/
+     * 2 细三预设），无连续自定义——UI 呈现预设按钮组、隐藏自定义入口
+     * （对比 [Stepped] 声明的自定义滑条区间）。
+     */
+    data class Presets(
+        override val id: String,
+        override val available: Boolean,
+        override val affectsLayout: Boolean,
+        /** 默认档（协议约定域内的值）。 */
+        val default: Int,
+    ) : ReaderStyleParam
 }
 
 class ReaderStyleCatalog(val params: List<ReaderStyleParam>) {

@@ -26,7 +26,9 @@ internal fun ReaderStyleCatalog.clampInt(id: String, value: Int): Int {
 
 /** 整型默认值。 */
 internal fun ReaderStyleCatalog.defaultInt(id: String): Int =
-    stepped(id)?.default?.roundToInt() ?: 0
+    stepped(id)?.default?.roundToInt()
+        ?: (find(id) as? ReaderStyleParam.Presets)?.default
+        ?: 0
 
 /** 浮点参数按步进映射为整型档位域（如字距 -0.5..0.5、步进 0.05 → -10..10）。 */
 internal fun ReaderStyleCatalog.floatStepIndexRange(id: String, step: Float): IntRange {

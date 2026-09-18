@@ -26,7 +26,8 @@ data class ReaderSessionSnapshot(
     val chapters: List<ChapterUiModel>? = null,
     val bookmarks: List<BookmarkUiModel> = emptyList(),
     val markings: List<MarkingUiModel> = emptyList(),
-    val marksAvailable: Boolean = false,
+    val bookmarksAvailable: Boolean = false,
+    val markingsAvailable: Boolean = false,
 )
 
 /**
@@ -41,10 +42,11 @@ internal class ReaderSessionStore {
     val session: StateFlow<ReaderSessionSnapshot?> = _session.asStateFlow()
 
     /** 启动新会话（同书重复调用由调用方短路；此处仍整体替换旧会话数据）。 */
-    fun begin(bookUrl: String, marksAvailable: Boolean) {
+    fun begin(bookUrl: String, bookmarksAvailable: Boolean, markingsAvailable: Boolean) {
         _session.value = ReaderSessionSnapshot(
             bookUrl = bookUrl,
-            marksAvailable = marksAvailable,
+            bookmarksAvailable = bookmarksAvailable,
+            markingsAvailable = markingsAvailable,
         )
     }
 
@@ -115,14 +117,19 @@ internal object ReaderSessionCache {
         if (bookUrl.isEmpty()) return
         if (store.isActive(bookUrl)) return
         sessionJob?.cancel()
-        val marksAvailable = EInkEngineRegistry.marksEngine != null
-        store.begin(bookUrl, marksAvailable)
+        // 能力粒度（0.6.0）：按宿主声明只订阅有数据源的能力
+        val marks = EInkEngineRegistry.marksEngine
+        val bookmarksAvailable = marks?.supportsBookmarks == true
+        val markingsAvailable = marks?.supportsMarkings == true
+        store.begin(bookUrl, bookmarksAvailable, markingsAvailable)
         sessionJob = scope.launch {
             launch { warmChapters(bookUrl) }
-            if (!marksAvailable) return@launch
-            val marks = EInkEngineRegistry.marksEngine ?: return@launch
-            launch { marks.observeBookmarks(bookUrl).collect { store.setBookmarks(bookUrl, it) } }
-            launch { marks.observeMarkings(bookUrl).collect { store.setMarkings(bookUrl, it) } }
+            if (bookmarksAvailable) {
+                launch { marks!!.observeBookmarks(bookUrl).collect { store.setBookmarks(bookUrl, it) } }
+            }
+            if (markingsAvailable) {
+                launch { marks!!.observeMarkings(bookUrl).collect { store.setMarkings(bookUrl, it) } }
+            }
         }
     }
 

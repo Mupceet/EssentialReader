@@ -76,7 +76,8 @@ class TocUiStateTest {
         assertEquals(TocTab.Chapters, s.selectedTab)
         assertTrue(s.bookmarks.isEmpty())
         assertTrue(s.markings.isEmpty())
-        assertFalse(s.marksAvailable)
+        assertFalse(s.bookmarksAvailable)
+        assertFalse(s.markingsAvailable)
         assertNull(s.pendingJump)
         assertFalse(s.canExport)
     }

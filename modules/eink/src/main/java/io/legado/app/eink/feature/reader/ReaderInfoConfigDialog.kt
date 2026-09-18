@@ -98,7 +98,7 @@ internal fun ReaderInfoConfigDialog(
                         role = Role.Tab,
                     )
                 }
-                if (!titleSizeFollowBody) {
+                if (!titleSizeFollowBody && catalog.available(Ids.TITLE_SIZE)) {
                     EInkSliderRow(
                         label = null,
                         value = style.titleSize ?: catalog.defaultInt(Ids.TITLE_SIZE),
@@ -147,15 +147,19 @@ internal fun ReaderInfoConfigDialog(
                     Spacer(modifier = Modifier.weight(1f))
                 }
             }
-            LabeledSettingRow(label = "页眉页脚字号") {
-                EInkSliderRow(
-                    label = null,
-                    value = style.footerSize ?: catalog.defaultInt(Ids.FOOTER_SIZE),
-                    valueRange = catalog.intRange(Ids.FOOTER_SIZE),
-                    thumbLabel = { "${it}sp" },
-                    tickStep = 6,
-                    onSetValue = onSetTipSize,
-                )
+            // 目录守卫（0.6.0）：宿主未声明页眉页脚字号（锁死档宿主）时
+            // 整行隐藏——不再出现值域塌缩为 0..0 的死滑条
+            if (catalog.available(Ids.FOOTER_SIZE)) {
+                LabeledSettingRow(label = "页眉页脚字号") {
+                    EInkSliderRow(
+                        label = null,
+                        value = style.footerSize ?: catalog.defaultInt(Ids.FOOTER_SIZE),
+                        valueRange = catalog.intRange(Ids.FOOTER_SIZE),
+                        thumbLabel = { "${it}sp" },
+                        tickStep = 6,
+                        onSetValue = onSetTipSize,
+                    )
+                }
             }
         }
     }

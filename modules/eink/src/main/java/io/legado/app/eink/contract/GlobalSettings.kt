@@ -104,8 +104,15 @@ interface GlobalSettings {
      * 旧值），排版最迟随下一次翻页的内容刷新对齐。
      *
      * 可写（阅读菜单开关）：fire-and-forget 写入 + 显式重排触发。
+     *
+     * 能力声明（0.6.0 起）：[supportsReviewBubbles] = false 的宿主上，
+     * 阅读菜单的「显示段评气泡」开关整体隐藏（宿主无段评能力时不留
+     * 死开关；本键的读写不再被触达）。
      */
     var showReviewBubbles: Boolean
+
+    /** 段评气泡能力声明：false = 宿主不支持，模块隐藏相关开关与元素。 */
+    val supportsReviewBubbles: Boolean get() = true
 
     /**
      * 阅读页点击分区（3×3 九宫格简化版，完整模式「点击区域设置」的

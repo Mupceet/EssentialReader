@@ -155,18 +155,39 @@ internal fun ReaderFontConfigDialog(
                     }
                 }
             }
-            WeightSettingRow(
-                label = "正文字重",
-                value = style.bodyWeight ?: catalog.defaultInt(Ids.BODY_WEIGHT),
-                valueRange = catalog.intRange(Ids.BODY_WEIGHT),
-                onSetWeight = onSetBodyWeight,
-            )
-            WeightSettingRow(
-                label = "标题字重",
-                value = style.titleWeight ?: catalog.defaultInt(Ids.TITLE_WEIGHT),
-                valueRange = catalog.intRange(Ids.TITLE_WEIGHT),
-                onSetWeight = onSetTitleWeight,
-            )
+            // 目录守卫（0.6.0）：参数未声明（宿主不支持）时整行隐藏；
+            // Locked（仅默认值可用）时置灰呈现锁定值——不再出现值域塌缩
+            // 为 0..0 的死滑条或无效按钮
+            when (val bodyWeightParam = catalog.find(Ids.BODY_WEIGHT)) {
+                is io.legado.app.eink.contract.ReaderStyleParam.Locked ->
+                    LockedWeightRow(label = "正文字重", value = style.bodyWeight ?: 0)
+                null -> Unit
+                // 预设档宿主：三预设按钮，无自定义入口
+                is io.legado.app.eink.contract.ReaderStyleParam.Presets -> WeightSettingRow(
+                    label = "正文字重",
+                    value = style.bodyWeight ?: bodyWeightParam.default,
+                    valueRange = catalog.intRange(Ids.BODY_WEIGHT),
+                    onSetWeight = onSetBodyWeight,
+                    allowCustom = false,
+                )
+                else -> WeightSettingRow(
+                    label = "正文字重",
+                    value = style.bodyWeight ?: catalog.defaultInt(Ids.BODY_WEIGHT),
+                    valueRange = catalog.intRange(Ids.BODY_WEIGHT),
+                    onSetWeight = onSetBodyWeight,
+                )
+            }
+            when (catalog.find(Ids.TITLE_WEIGHT)) {
+                is io.legado.app.eink.contract.ReaderStyleParam.Locked ->
+                    LockedWeightRow(label = "标题字重", value = style.titleWeight ?: 0)
+                null -> Unit
+                else -> WeightSettingRow(
+                    label = "标题字重",
+                    value = style.titleWeight ?: catalog.defaultInt(Ids.TITLE_WEIGHT),
+                    valueRange = catalog.intRange(Ids.TITLE_WEIGHT),
+                    onSetWeight = onSetTitleWeight,
+                )
+            }
         }
     }
 }
@@ -185,6 +206,9 @@ private fun WeightSettingRow(
     value: Int,
     valueRange: IntRange,
     onSetWeight: (Int) -> Unit,
+    // false = 预设档宿主（ReaderStyleParam.Presets）：隐藏「自定义」按钮
+    // 与滑条，仅三预设可选
+    allowCustom: Boolean = true,
 ) {
     val isCustom = value !in 0..2
     // 标签与按钮统一 bodyMedium（与滑条标签同风格，轻一级）
@@ -230,18 +254,20 @@ private fun WeightSettingRow(
                         role = Role.Tab,
                     )
                 }
-                EInkButton(
-                    text = "自定义",
-                    onClick = { if (!isCustom) onSetWeight(presetToCustom(value)) },
-                    modifier = Modifier.weight(1f),
-                    selected = isCustom,
-                    height = 40.dp,
-                    style = buttonStyle,
-                    contentPadding = PaddingValues(horizontal = 2.dp),
-                    role = Role.Tab,
-                )
+                if (allowCustom) {
+                    EInkButton(
+                        text = "自定义",
+                        onClick = { if (!isCustom) onSetWeight(presetToCustom(value)) },
+                        modifier = Modifier.weight(1f),
+                        selected = isCustom,
+                        height = 40.dp,
+                        style = buttonStyle,
+                        contentPadding = PaddingValues(horizontal = 2.dp),
+                        role = Role.Tab,
+                    )
+                }
             }
-            if (isCustom) {
+            if (isCustom && allowCustom) {
                 EInkSliderRow(
                     label = null,
                     value = value.coerceIn(valueRange.first, valueRange.last),
@@ -260,4 +286,55 @@ private fun presetToCustom(value: Int): Int = when (value) {
     1 -> 900
     2 -> 300
     else -> 400
+}
+
+/**
+ * 锁定字重行：宿主声明 [io.legado.app.eink.contract.ReaderStyleParam.Locked]
+ * 时的置灰呈现——值可见（次级灰，与未选 Tab 文字同色系）、不可调，
+ * 右侧标注「固定」说明不可变更，不留假交互。
+ */
+@Composable
+private fun LockedWeightRow(
+    label: String,
+    value: Int,
+) {
+    val presetText = when (value) {
+        0 -> "常规"
+        1 -> "粗体"
+        2 -> "细体"
+        else -> value.toString()
+    }
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(48.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(EInkSpacing.xs),
+    ) {
+        Box(
+            modifier = Modifier.height(48.dp),
+            contentAlignment = Alignment.Center,
+        ) {
+            EInkText(
+                text = label,
+                style = EInkTheme.typography.bodyMedium,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+        Box(
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxWidth()
+                .height(48.dp),
+            contentAlignment = Alignment.CenterEnd,
+        ) {
+            EInkText(
+                text = "$presetText · 固定",
+                style = EInkTheme.typography.bodyMedium,
+                color = EInkTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+            )
+        }
+    }
 }

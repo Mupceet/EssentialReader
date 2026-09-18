@@ -41,8 +41,10 @@ data class TocUiState(
     val bookmarks: List<BookmarkUiModel> = emptyList(),
     /** 笔记 Tab 列表（划线 + 想法；marksEngine 可用时由 observeMarkings 维护）。 */
     val markings: List<MarkingUiModel> = emptyList(),
-    /** marksEngine 是否注册（false = 不渲染书签/笔记 Tab）。 */
-    val marksAvailable: Boolean = false,
+    /** 书签 Tab 可用（marksEngine 注册且声明书签能力）。 */
+    val bookmarksAvailable: Boolean = false,
+    /** 笔记 Tab 可用（marksEngine 注册且声明笔记能力）。 */
+    val markingsAvailable: Boolean = false,
     /** 笔记导出进行中（导出入口置灰）。 */
     val exporting: Boolean = false,
     /** 跳转确认弹层（null = 无）。 */
@@ -122,24 +124,34 @@ class TocViewModel(application: Application) : AndroidViewModel(application) {
             if (warm != null) {
                 _uiState.update {
                     it.copy(
-                        marksAvailable = warm.marksAvailable,
+                        bookmarksAvailable = warm.bookmarksAvailable,
+                        markingsAvailable = warm.markingsAvailable,
                         bookmarks = warm.bookmarks,
                         markings = warm.markings,
                     )
                 }
                 observeSession(bookUrl)
             } else {
-                // 书解析成功：登记 marks 能力并订阅书签/笔记流（独立 launch，不阻塞目录加载）
-                _uiState.update { it.copy(marksAvailable = marksEngine != null) }
+                // 书解析成功：登记 marks 能力并按能力订阅书签/笔记流（独立 launch，不阻塞目录加载）
+                _uiState.update {
+                    it.copy(
+                        bookmarksAvailable = marksEngine?.supportsBookmarks == true,
+                        markingsAvailable = marksEngine?.supportsMarkings == true,
+                    )
+                }
                 marksEngine?.let { marks ->
-                    viewModelScope.launch {
-                        marks.observeBookmarks(book.bookUrl).collect { list ->
-                            _uiState.update { it.copy(bookmarks = list) }
+                    if (marks.supportsBookmarks) {
+                        viewModelScope.launch {
+                            marks.observeBookmarks(book.bookUrl).collect { list ->
+                                _uiState.update { it.copy(bookmarks = list) }
+                            }
                         }
                     }
-                    viewModelScope.launch {
-                        marks.observeMarkings(book.bookUrl).collect { list ->
-                            _uiState.update { it.copy(markings = list) }
+                    if (marks.supportsMarkings) {
+                        viewModelScope.launch {
+                            marks.observeMarkings(book.bookUrl).collect { list ->
+                                _uiState.update { it.copy(markings = list) }
+                            }
                         }
                     }
                 }
@@ -189,7 +201,8 @@ class TocViewModel(application: Application) : AndroidViewModel(application) {
                 if (snapshot == null || snapshot.bookUrl != bookUrl) return@collect
                 _uiState.update {
                     it.copy(
-                        marksAvailable = snapshot.marksAvailable,
+                        bookmarksAvailable = snapshot.bookmarksAvailable,
+                        markingsAvailable = snapshot.markingsAvailable,
                         bookmarks = snapshot.bookmarks,
                         markings = snapshot.markings,
                         chapters = snapshot.chapters ?: it.chapters,

@@ -133,13 +133,20 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application),
     }
 
     /**
-     * 批注端口可用性：决定选区操作条「画线/想法/删除」键显隐——未注册
-     * [EInkEngineRegistry.selectionEngine] 的宿主为合法降级态，
-     * 长按选择整体不启用（无选词/无触觉/无操作条），下拉书签与顶栏书签钮
-     * 隐藏，不做假死路径。
+     * 划线/想法能力：未注册 [EInkEngineRegistry.selectionEngine] 或宿主声明
+     * 不支持划线（supportsMarkings = false）的合法降级态——长按选择整体
+     * 不启用（无选词/无触觉/无操作条标记动作），不做假死路径。
      */
     val selectionEnabled: Boolean
-        get() = EInkEngineRegistry.selectionEngine != null
+        get() = EInkEngineRegistry.selectionEngine?.supportsMarkings == true
+
+    /**
+     * 页面书签能力（0.6.0 能力粒度）：下拉书签手势、顶栏书签钮、页角标与
+     * 「下拉添加书签」开关的显隐依据——未注册选区端口或宿主声明
+     * supportsPageBookmark = false 时隐藏。
+     */
+    val pageBookmarkEnabled: Boolean
+        get() = EInkEngineRegistry.selectionEngine?.supportsPageBookmark == true
 
     private val _uiState = MutableStateFlow(
         run {

@@ -33,10 +33,11 @@ class ReaderSessionStoreTest {
     fun `启动后会话快照可直读且默认列表为空`() {
         val store = ReaderSessionStore()
         assertNull("未启动无会话", store.snapshotValue())
-        store.begin("book-a", marksAvailable = true)
+        store.begin("book-a", bookmarksAvailable = true, markingsAvailable = true)
         val session = store.snapshotValue()!!
         assertEquals("book-a", session.bookUrl)
-        assertTrue(session.marksAvailable)
+        assertTrue(session.bookmarksAvailable)
+        assertTrue(session.markingsAvailable)
         assertNull("章节未就绪为 null（调用方可回落自加载）", session.chapters)
         assertTrue(session.bookmarks.isEmpty())
         assertTrue(session.markings.isEmpty())
@@ -47,7 +48,7 @@ class ReaderSessionStoreTest {
     @Test
     fun `目录书签笔记写入同一会话且停止后清空`() {
         val store = ReaderSessionStore()
-        store.begin("book-a", marksAvailable = true)
+        store.begin("book-a", bookmarksAvailable = true, markingsAvailable = true)
         store.setChapters("book-a", listOf(chapter(0)))
         store.setBookmarks("book-a", listOf(bookmark(1)))
         store.setMarkings("book-a", listOf(marking("m1")))
@@ -64,11 +65,11 @@ class ReaderSessionStoreTest {
     @Test
     fun `换书后旧订阅的迟到推送被丢弃`() {
         val store = ReaderSessionStore()
-        store.begin("book-a", marksAvailable = true)
+        store.begin("book-a", bookmarksAvailable = true, markingsAvailable = true)
         store.setChapters("book-a", listOf(chapter(0)))
 
         // 换书：整体替换会话（旧书数据不残留）
-        store.begin("book-b", marksAvailable = true)
+        store.begin("book-b", bookmarksAvailable = true, markingsAvailable = true)
         assertNull(store.snapshotValue()!!.chapters)
 
         // 旧书订阅在途的迟到推送不得污染新会话

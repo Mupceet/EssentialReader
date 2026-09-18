@@ -756,6 +756,7 @@ fun ReaderRoute(
             selection = selection,
             session = selectionSession,
             selectionEnabled = viewModel.selectionEnabled,
+            pageBookmarkEnabled = viewModel.pageBookmarkEnabled,
             // 落库冻结后把手停用（调界停用），选中带只读保留到重排的新快照
             handlesEnabled = !selectionFrozen,
             // 选区是否已落在用户标记上（动作集分派：已有标记 → 复制/想法/删除）
@@ -1195,6 +1196,7 @@ internal fun ReaderScreen(
     selection: ReaderSelectionUi?,
     session: ReaderSelectionSession?,
     selectionEnabled: Boolean,
+    pageBookmarkEnabled: Boolean,
     handlesEnabled: Boolean,
     selectionHasMarking: Boolean,
     selectionBarVisible: Boolean,
@@ -1426,7 +1428,7 @@ internal fun ReaderScreen(
                                     totalY,
                                     touchSlop,
                                     bookmarkReady = currentPullDownBookmark &&
-                                        selectionEnabled &&
+                                        pageBookmarkEnabled &&
                                         !currentControlsVisible && currentError == null &&
                                         currentSelection == null,
                                 )
@@ -1733,7 +1735,7 @@ internal fun ReaderScreen(
                     // 页面书签钮（v2 Task 9，设计 §4）：选中态 = 当前页快照
                     // bookmarkBadge；批注端口缺失（selectionEnabled = false）
                     // 时整颗不渲染（契约 §3.3 降级语义）
-                    bookmarkEnabled = selectionEnabled,
+                    bookmarkEnabled = pageBookmarkEnabled,
                     bookmarkBadge = state.page?.bookmarkBadge == true,
                     onOpenDetail = onOpenDetail,
                     onChangeSource = onChangeSource,
