@@ -1,6 +1,7 @@
 package io.legado.app.eink.bridge
 
 import android.content.Context
+import android.content.SharedPreferences
 import androidx.compose.runtime.mutableStateOf
 import io.legado.app.constant.PreferKey
 import io.legado.app.domain.gateway.CoverSettingsGateway
@@ -19,11 +20,30 @@ import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
 import splitties.init.appCtx
 
-/** [GlobalSettingsImpl.keepScreenOn] 的历史键（EInkSettings 时期逐字继承）。 */
-private const val KEY_READER_KEEP_SCREEN_ON = "einkReaderKeepScreenOn"
+/**
+ * E-InK 自有偏好（keepScreenOn/readerTapZones）的存储位。
+ *
+ * 历史存储位是宿主默认 prefs 文件（`<packageName>_preferences`），而该
+ * 文件正是 DataStore「settings」的 MIGRATE_ALL_KEYS 迁移源
+ * （SettingsRepository）：androidx 在每次进程启动时对非空源文件执行
+ * 迁移并在 cleanUp 中 clear() 整文件——自有键写进去后进程一重启即被
+ * 清空回默认（点击区域/常亮开关反复重置的根因）。故迁至专属文件
+ * [FILE_NAME]，键名逐字保留；旧默认文件中的残留由该迁移机制自行清空。
+ */
+internal object EinkLegacyPrefsStore {
 
-/** [GlobalSettingsImpl.readerTapZones] 的自有键（9 位编码，见 ReaderTapZoneGrid）。 */
-private const val KEY_READER_TAP_ZONES = "einkReaderTapZones"
+    /** E-InK 自有偏好的专属 prefs 文件（独立于 DataStore 迁移源）。 */
+    const val FILE_NAME = "eink_preferences"
+
+    /** keepScreenOn 的历史键（EInkSettings 时期逐字继承）。 */
+    const val KEY_KEEP_SCREEN_ON = "einkReaderKeepScreenOn"
+
+    /** readerTapZones 的自有键（9 位编码，见 ReaderTapZoneGrid）。 */
+    const val KEY_TAP_ZONES = "einkReaderTapZones"
+
+    fun prefs(): SharedPreferences =
+        appCtx.getSharedPreferences(FILE_NAME, Context.MODE_PRIVATE)
+}
 
 /**
  * E-Ink 引擎桥接层装配入口。
@@ -97,11 +117,12 @@ internal val einkSettingsWriteScope =
  * useDefaultCover（「我的」页可写）为本对象持有的 Compose 快照状态 +
  * CoverSettingsGateway 异步落盘——组合内读取订阅变化，切换后开关行与
  * 书架/详情可见封面立即重组；keepScreenOn、readerTapZones（均为阅读
- * 菜单设置、E-Ink 自有偏好、完整模式无对应设置——后者不转发完整模式
- * clickAction* 键：值域只有三动作，转发会让两侧配置互相覆盖）走同一
- * 默认 prefs 文件不经设置网关：keepScreenOn 为 EInkSettings 端口化的
- * 历史键（键名逐字继承），readerTapZones 为新增自有键
- * （9 位编码整键存取，见 ReaderTapZoneGrid）；syncReadingProgress（「我的」页
+ * 菜单设置、E-InK 自有偏好、完整模式无对应设置——后者不转发完整模式
+ * clickAction* 键：值域只有三动作，转发会让两侧配置互相覆盖）同走
+ * EinkLegacyPrefsStore 专属 prefs 文件不经设置网关（默认 prefs 文件是
+ * DataStore 迁移源、启动即被整文件清空，不可作存储位）：keepScreenOn
+ * 为 EInkSettings 端口化的历史键（键名逐字继承），readerTapZones 为
+ * 新增自有键（9 位编码整键存取，见 ReaderTapZoneGrid）；syncReadingProgress（「我的」页
  * 可写）经 BackupSettingsGateway 转发宿主「同步阅读进度」主键，写时
  * 带宿主设置页同款父子联动。
  *
@@ -134,28 +155,23 @@ private object GlobalSettingsImpl : GlobalSettings, KoinComponent {
         useDefaultCoverState.value = coverSettingsGateway.currentSettings.useDefaultCover
     }
 
-    /**
-     * E-Ink 自有偏好的历史存储（模块 EInkSettings 时期逐字继承）：
-     * 默认 prefs 文件 + 原键名，存量设置无损。
-     */
-    private val einkLegacyPrefs by lazy {
-        appCtx.getSharedPreferences(
-            appCtx.packageName + "_preferences", Context.MODE_PRIVATE
-        )
-    }
+    /** E-InK 自有偏好的存储位（[EinkLegacyPrefsStore] 专属文件，历史键名不变）。 */
+    private val einkLegacyPrefs by lazy { EinkLegacyPrefsStore.prefs() }
 
     override var keepScreenOn: Boolean
-        get() = einkLegacyPrefs.getBoolean(KEY_READER_KEEP_SCREEN_ON, false)
+        get() = einkLegacyPrefs.getBoolean(EinkLegacyPrefsStore.KEY_KEEP_SCREEN_ON, false)
         set(value) {
-            einkLegacyPrefs.edit().putBoolean(KEY_READER_KEEP_SCREEN_ON, value).apply()
+            einkLegacyPrefs.edit()
+                .putBoolean(EinkLegacyPrefsStore.KEY_KEEP_SCREEN_ON, value).apply()
         }
 
     override var readerTapZones: ReaderTapZoneGrid
         get() = ReaderTapZoneGrid.decodeOrDefault(
-            einkLegacyPrefs.getString(KEY_READER_TAP_ZONES, null)
+            einkLegacyPrefs.getString(EinkLegacyPrefsStore.KEY_TAP_ZONES, null)
         )
         set(value) {
-            einkLegacyPrefs.edit().putString(KEY_READER_TAP_ZONES, value.encode()).apply()
+            einkLegacyPrefs.edit()
+                .putString(EinkLegacyPrefsStore.KEY_TAP_ZONES, value.encode()).apply()
         }
 
     override val threadCount: Int

@@ -73,7 +73,7 @@ interface GlobalSettings {
      *
      * 可写（阅读菜单开关）：读取在阅读 VM 构造时一次，写入即时生效
      * 且同步落盘。嵌入式宿主实现以历史键 `einkReaderKeepScreenOn` 存
-     * 默认 prefs 文件（存量设置无损继承）。
+     * 宿主侧自有 prefs 文件（键名历史继承）。
      */
     var keepScreenOn: Boolean
 
