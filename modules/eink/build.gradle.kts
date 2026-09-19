@@ -6,10 +6,10 @@ plugins {
 
 android {
     namespace = "io.legado.app.eink"
-    // 跟随宿主 compileSdk 37。曾刻意压 36 作兼容下限，2026-09 随宿主
-    // 依赖集升级（Compose UI 1.12 / Coil 3.6.2 的 AAR 元数据要求
-    // minCompileSdk=37）下限被打穿，回到与宿主同轨。
-    compileSdk = 37
+    // 35 ＝ 依赖集地板（模块 AAR 元数据 minCompileSdk 跟随本值）。
+    // 版本约束、家族调研结论与升档协议的权威注释在模块
+    // gradle/libs.versions.toml 头部——改 compileSdk 前先读它。
+    compileSdk = 35
 
     defaultConfig {
         // minSdk 21：可被低 minSdk 宿主直接依赖，库 minSdk 高于宿主会导致 manifest merge 失败
@@ -48,43 +48,48 @@ android {
 }
 
 dependencies {
+    // ── 依赖经模块自有版本目录 einkLibs 钉「保守档」 ──
+    // （modules/eink/gradle/libs.versions.toml，随模块树复制；根 settings
+    // 4 行 versionCatalogs 挂载。）单一坐标服务新旧宿主：保守版进 POM、
+    // 新栈宿主解析自动取 max。**版本的语义、家族调研结论与升档协议的
+    // 权威注释在该 toml 头部——升级任何依赖前先读它**（误升只会抬高
+    // 旧宿主门槛，对新栈宿主零收益）。
+
     // Compose — Foundation/UI/Runtime only, no Material3 (per E-Ink spec §3, §4)
-    implementation(platform(libs.androidx.compose.bom))
-    implementation(libs.androidx.compose.ui)
-    implementation("androidx.compose.ui:ui-graphics")
-    implementation(libs.androidx.compose.foundation)
-    implementation("androidx.compose.runtime:runtime")
+    implementation(platform(einkLibs.compose.bom))
+    implementation(einkLibs.compose.ui)
+    implementation(einkLibs.compose.ui.graphics)
+    implementation(einkLibs.compose.foundation)
+    implementation(einkLibs.compose.runtime)
 
     // ViewModel + 协程（模块承载全部 E-Ink ViewModel）
-    implementation(libs.bundles.coroutines)
+    implementation(einkLibs.coroutines.core)
+    implementation(einkLibs.coroutines.android)
     // 入口基类 EInkHostActivity 为 AppCompatActivity（宿主 DialogFragment
     // 弹层——段评半屏 WebView 等——的事务宿主，见其 KDoc）；模块自身
     // 仍不组合任何 AppCompat UI
-    implementation(libs.appcompat.appcompat)
-    // 与宿主同轨（catalog 2.11.0）。曾钉 2.9.4 以保 compileSdk 36 兼容
-    // 下限，下限回到 37 后钉版失去意义
-    implementation(libs.androidx.lifecycle.viewmodel.compose)
-    implementation(libs.androidx.lifecycle.runtime.compose)
-    implementation(libs.activity.compose)
+    implementation(einkLibs.appcompat)
+    implementation(einkLibs.lifecycle.viewmodel.compose)
+    implementation(einkLibs.lifecycle.runtime.compose)
+    implementation(einkLibs.activity.compose)
 
     // 图片加载（EInkAsyncImage / EInkBookCover 封面）— implementation：
     // 契约 CoverEngine 为纯 Kotlin 字节端口（fetchCoverBytes），签名不
     // 暴露任何图片框架类型，宿主编译期零 Coil 可见性、app 依赖清单无需
-    // 添加（AAR 形态经 POM runtime 域自动传递；源码嵌入形态只需版本
-    // 目录提供模块编译所需的两个 coil 别名）。模块自有 ImageLoader +
+    // 添加（AAR 形态经 POM runtime 域自动传递）。模块自有 ImageLoader +
     // 封面 Fetcher，网络字节经 CoverEngine 端口回到宿主管线（防盗链/
     // 解密/持久缓存在宿主侧，见 contract/CoverEngine KDoc）
-    implementation(libs.coil.compose)
-    implementation(libs.coil.network.okhttp)
+    implementation(einkLibs.coil.compose)
+    implementation(einkLibs.coil.network.okhttp)
 
     // Tooling (debug only)
-    debugImplementation(libs.androidx.compose.ui.tooling)
-    debugImplementation(libs.androidx.compose.ui.tooling.preview)
+    debugImplementation(einkLibs.compose.ui.tooling)
+    debugImplementation(einkLibs.compose.ui.tooling.preview)
 
     // Unit tests（纯函数 JVM 测试，无需 Robolectric）
-    testImplementation(libs.junit)
+    testImplementation(einkLibs.junit)
     // 并发单元测试（onEachParallel / CacheBookPump 的虚拟时间验证）
-    testImplementation(libs.kotlinx.coroutines.test)
+    testImplementation(einkLibs.coroutines.test)
 }
 
 
@@ -140,24 +145,15 @@ afterEvaluate {
     //         暴露 Coil 类型，Coil 降为 implementation（宿主零 Coil
     //         可见性，模块自有 ImageLoader + 封面 Fetcher）；另含
     //         TITLE_WEIGHT Presets 分支补齐与信息弹层逐行目录守卫；
-    // 另发布 0.5.0-oldstack 孪生坐标（同源码、依赖集钉回
-                // AGP8.13 可消费档：BOM 2026.06.01 / Coil 3.5.0 /
-                // lifecycle-compose 2.9.4 / foundation 1.11.4——0.5.0 主栈
-                // 依赖的 Compose 1.12 / lifecycle 2.11 AAR 元数据要求
-                // AGP ≥ 9.1，旧栈宿主不可用；复现：临时改
-                // libs.versions.toml 四变量后 publishToMavenLocal）；
-                // 另有 0.6.1-min21 孪生坐标（同源码、依赖集整体降到
-                // minSdk 21 档——墨水屏设备大量驻留 Android 5.x：BOM
-                // 2025.11.00 / foundation 1.9.4 / Coil 3.0.4 /
-                // lifecycle-compose 2.8.7 / activity 1.8.2 / appcompat 1.7.0，
-                // 已经宿主 minSdk 21 全链路验证（manifest 合并/编译/打包）；
-                // 复现：临时改 libs.versions.toml 六变量后
-                // publishToMavenLocal。注意：消费方 Kotlin 须 ≥ 2.3
-                // （元数据一版本前向）、compileSdk 须满足 compose 1.9 线
-                // AAR 元数据（编译门槛非设备门槛）、API 21/22 真机行为
-                // 需回归。模块无阻降接口：源码纯 Compose + 协程，超 21 的
-                // 框架调用均在宿主侧且有 SDK 门控（如
-                // fontVariationSettings API 26）
+    //         **依赖集永久钉保守档**（BOM 2025.11.00 / Foundation 1.9.4 /
+    //         Coil 3.0.4 / lifecycle-compose 2.8.7 / activity 1.8.2 /
+    //         appcompat 1.7.0，compileSdk 35＝依赖集 AAR 元数据地板，经
+    //         模块自有版本目录 einkLibs 声明、脱离宿主根目录）——单一
+    //         坐标服务新旧宿主，消费门槛 AGP ≥ 8.6.0 / K2.3 / Java 17 /
+    //         minSdk 21；
+    // 孪生坐标 0.5.0-oldstack / 0.6.1-min21（已退役，保留为历史坐标）：
+    // 统一前为分开服务旧栈与 minSdk 21 宿主的过渡产物，0.7.0 起主坐标
+    // 即覆盖两类消费形态，不再发布孪生；
                 version = "0.6.1"
             }
         }

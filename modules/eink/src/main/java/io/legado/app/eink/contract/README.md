@@ -33,7 +33,7 @@
 ## 2. 接入流程（七步）
 
 1. **Gradle**：宿主 app `implementation project(':modules:eink')`（或等价
-   的二进制依赖；版本栈要求见 porting 文档 §4）。
+   的二进制依赖；版本栈门槛见 porting 文档 §0）。
 2. **实现端口**：为本目录 §3 表中的每个接口写宿主实现（本仓参照：
    `app/src/main/java/io/legado/app/eink/bridge/`，逐文件对照移植）。
    每个接口的 KDoc 是实现契约的权威说明——职责边界、调用时机、线程

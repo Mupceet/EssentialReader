@@ -11,19 +11,31 @@
 
 ## 0. 版本栈硬门槛（动手前先对表）
 
-模块源码 minSdk 为 21，但**依赖栈的实际门槛是 minSdk 23**（Coil 3.5 全
-构件 + Compose BOM 2026.06.01 全栈均声明 23）。宿主 minSdk < 23 时
-manifest merge 直接失败，且 `tools:overrideLibrary` 不可行（涉及数十个
-构件）——唯一路径是宿主 minSdk 升 23，或模块连同 BOM/Coil 整体降版并
-自行验证。
+模块依赖集**整体钉保守档**，版本声明在**模块自有版本目录**
+`modules/eink/gradle/libs.versions.toml`（根 settings 以 `einkLibs` 挂载，
+文件随模块树复制；该 toml 头部是版本语义、家族调研结论与升档协议的
+**权威注释**——升级任何依赖前先读它）：单一坐标服务新旧宿主——模块按
+保守档编译、POM 随保守版发布，新栈宿主解析时自动升到自己的更高版本
+（Gradle 取 max，二进制兼容；本仓 app 即此形态：BOM 2026.08.00 /
+Coil 3.6.2 / lifecycle 2.11）。
 
-| 维度 | 模块默认 | 宿主不满足时 | 实测（AGP 8.13 宿主） |
-|---|---|---|---|
-| minSdk | 源码 21 / 依赖栈 23 | 宿主须 ≥ 23 | 21 → 23 通过 |
-| compileSdk | 37 | 对齐宿主所支持的最高版 | 37 → 36 |
-| Java 字节码 | 21 | 对齐宿主 compileOptions | 21 → 17 |
-| Kotlin | 2.4 编写 | 2.3 可编（一版本前向元数据兼容） | 2.3.0 通过 |
-| Compose BOM | 2026.06.01 | 低于此按 §4 保守回退 | 2026.06.01 通过 |
+消费门槛（宿主须全部满足；2026-09 家族调研实证：原生家族地板
+AGP 8.13.2 / compileSdk 36 / Kotlin 2.3.0 / minSdk 21，当前门槛对
+legado 家族 22 个 Android 仓 100% 覆盖，Kotlin 2.3 为零余量贴地档）：
+
+| 维度 | 门槛 | 说明 |
+|---|---|---|
+| minSdk | ≥ 21 | 宿主**自身依赖**也须 ≤21 档（如宿主自有 Coil 须降到 3.0.x 同档） |
+| compileSdk | ≥ 35 | 模块 AAR 元数据 minCompileSdk = 35——**依赖集地板**（compose ui/foundation 1.9.4 与 core 1.15 实测均 35），对应 **AGP ≥ 8.6.0**。再降须连降 Compose 线（1.9.4 以下）重验能力，且 Kotlin ≥2.3 门槛在更旧宿主上先卡死，收益归零 |
+| Kotlin | ≥ 2.3 | 模块以 K2.4 构建，元数据一版本前向可读（源码嵌入形态则随宿主 KGP 编译，无此约束） |
+| Java 字节码 | 17 | 宿主 D8 消解（AAR 形态；源码嵌入随宿主 compileOptions） |
+
+保守档基线（升档须整体重验上表并重发版本）：Compose BOM 2025.11.00 /
+Foundation 1.9.4 / Coil 3.0.4 / lifecycle-compose 2.8.7 / activity 1.8.2 /
+appcompat 1.7.0 / coroutines 1.11.0。API 21/22 真机行为需回归；模块
+无阻降接口——源码纯 Compose + 协程，无 >21 的直接框架调用（宿主
+bridge 侧超 21 的调用须自行 SDK 门控，参照 EssentialReader 的
+fontVariationSettings API 26 处理）。
 
 ## 1. 架构与职责边界
 
@@ -45,6 +57,8 @@ manifest merge 直接失败，且 `tools:overrideLibrary` 不可行（涉及数�
 │                                   EInkApp 根 Composable + 栈导航
 ├─ designsystem/ feature/ arch/ debug/ util/ res/
 │                                   （模块内部实现与自包含资源，宿主不读）
+├─ gradle/libs.versions.toml        ★ 模块自有版本目录（保守档钉版 +
+│                                   升档协议权威注释，经 einkLibs 挂载）
 └─ build.gradle.kts                 AGP 9 形态（AGP < 9 宿主按 §2 步骤 3b 改）
 
 app/.../eink/（宿主 = 入口子类 + 桥接层，移植时按目标引擎重写）
@@ -66,21 +80,27 @@ app/.../eink/（宿主 = 入口子类 + 桥接层，移植时按目标引擎重�
 
 ## 2. 移植步骤（嵌入目标上游）
 
-1. **复制模块树**：整个 `modules/eink/` 目录（含 build.gradle.kts、docs、
-   consumer-rules.pro）。
+1. **复制模块树**：整个 `modules/eink/` 目录（含 build.gradle.kts、
+   gradle/libs.versions.toml、docs、consumer-rules.pro）。
 2. **settings.gradle**：`include ':modules:eink'`。
-3. **版本目录**：目标仓 `gradle/libs.versions.toml` 需含以下**精确别名**
-   （与模块 build.gradle.kts 的引用一一对应，名字不同则改目录侧别名）：
-   - 库：`androidx-compose-bom`、`androidx-compose-ui`、
-     `androidx-compose-foundation`、`androidx-compose-ui-tooling`、
-     `androidx-compose-ui-tooling-preview`、`compose-runtime`、
-     `androidx-lifecycle-viewmodel-compose`、`androidx-lifecycle-runtime-compose`、
-     `activity-compose`、`coil-compose`、`coil-network-okhttp`、`junit`、
-     coroutines bundle；
-   - 插件：`android-library`、`kotlin-android`、`compose-compiler`
-     （`org.jetbrains.kotlin.plugin.compose`，版本必须与宿主 Kotlin 完全
-     一致）。版本跟随目标仓；宿主没有的条目（如纯 View 宿主的全部
-     Compose 项）按 §0 门槛新增。
+3. **版本目录与挂载**：模块库依赖钉在**模块自有版本目录**
+   `modules/eink/gradle/libs.versions.toml`（保守档与升档协议的权威注释
+   在该文件头部，见 §0）。目标仓 settings 的
+   `dependencyResolutionManagement` 加 4 行挂载：
+   ```groovy
+   // Groovy settings.gradle（KTS 同构：einkLibs { from(files(...)) }）
+   versionCatalogs {
+       einkLibs {
+           from(files('modules/eink/gradle/libs.versions.toml'))
+       }
+   }
+   ```
+   目标仓根目录 `libs.versions.toml` **只需提供模块引用的插件别名**：
+   - 插件：`android-library`、`kotlin-android`（AGP < 9 宿主必需，见
+     步骤 3b）、`compose-compiler`（`org.jetbrains.kotlin.plugin.compose`，
+     版本必须与宿主 Kotlin 完全一致）。
+   插件版本跟随目标仓；宿主已用更高版本依赖时解析自动取 max，无需与
+   模块钉版对齐。
 3b. **模块构建适配（AGP < 9 宿主必做，模块树唯一例外）**：
    - plugins 增加 `alias(libs.plugins.kotlin.android)`（AGP 9 内置
      Kotlin 时才可省略）；
@@ -138,21 +158,16 @@ sources jar，坐标 `io.legado.app.eink:eink`）。
      `BuildConfig.DEBUG` 裁剪的调试入口（组件画廊等）；
    - 产物栈绑定：AAR 由哪个构建栈产出就带哪个栈的字节码/Kotlin 元数据
      ——跨栈消费前核对 §0（Kotlin 编译器可读一版本前向的元数据）。
-     现行版本：**0.1.0 = 旧栈（AGP8.13/K2.3/Java17）构建**，develop
-     宿主在用；**0.2.0 起均为主栈（AGP9/K2.4/Java21）构建**（当前
-     发布线 0.6.x），K2.3 宿主消费时元数据按一版本前向规则可读、
-     Java 21 字节码经 D8 消解，均需真机回归确认后再切换坐标。
-   - **min21 孪生轨道（0.6.1 起）**：面向大量驻留 Android 5.x 的墨水屏
-     设备——`<版本>-min21` 坐标同源码、依赖集整体降到 minSdk 21 档
-     （BOM 2025.11.00 / foundation 1.9.4 / Coil 3.0.4 /
-     lifecycle-compose 2.8.7 / activity 1.8.2 / appcompat 1.7.0），已经
-     宿主 minSdk 21 全链路验证（manifest 合并/编译/打包）。消费门槛：
-     宿主自身依赖也须 ≤21（如 Coil 需同步降到 3.0.x）、Kotlin ≥ 2.3
-     （元数据一版本前向）、compileSdk 满足 compose 1.9 线 AAR 元数据
-     （编译门槛非设备门槛）；API 21/22 真机行为需回归。模块侧无阻降
-     接口：源码纯 Compose + 协程，无 >21 的直接框架调用（宿主 bridge
-     侧超 21 的调用须自行 SDK 门控，参照 EssentialReader 的
-     fontVariationSettings API 26 处理）。
+     坐标沿革：**0.1.0** = 旧栈（AGP8.13/K2.3）构建，develop 宿主在用
+     （历史坐标）；**0.2.0 起均为主栈（AGP9/K2.4）构建**；**0.7.0 起
+     单一坐标**——依赖集永久钉保守档（§0），oldstack / min21 孪生轨道
+     退役，旧栈宿主直接消费主坐标（K2.3 元数据一版本前向、Java 17
+     字节码 D8 消解、AGP ≥ 8.6.0），真机回归确认后再切换。
+   - **孪生轨道（已退役）**：`0.5.0-oldstack` 与 `0.6.1-min21` 是统一
+     前为分别服务旧栈 / minSdk 21 宿主的过渡坐标（同源码、临时改版本
+     目录后 publishToMavenLocal 产出），保留为历史坐标不再更新——
+     0.7.0 起主坐标即覆盖两类消费形态（保守档依赖集 + compileSdk 35，
+     见 §0）。
 
 ## 3. 引擎差异表（各宿主实测记录）
 
@@ -196,9 +211,10 @@ Java 17 / minSdk 21（按 §0 升 23）/ 无 Compose 无 Coil（图片栈 Glide�
 
 ## 4. 兼容性注意事项
 
-- **Compose BOM 版本差**：模块基于 BOM 2026.06.01 编写。模块只使用
-  Foundation/UI/Runtime 稳定 API；构建报 unresolved 时回退保守写法
-  （改动收敛在模块内，两边同时受益）。
+- **Compose BOM 版本差**：模块按保守档 BOM 2025.11.00 编译（只使用
+  Foundation/UI/Runtime 稳定 API，已在 1.9.4 线全量编译与单测验证）。
+  宿主用更新栈时解析自动升版，模块代码运行于宿主版本；需要模块使用
+  更新 Compose API 时升的是模块钉版基线（§0），不在宿主侧适配。
 - **图片加载（字节端口形态）**：模块图片栈完全自闭环——自有
   ImageLoader + 封面字节端口（`CoverEngine.fetchCoverBytes`）：宿主以
   自有管线返回封面字节（防盗链/书源请求头/地址规则解析/解密/持久缓存
