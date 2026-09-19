@@ -8,7 +8,6 @@ import io.legado.app.eink.contract.ChapterUiModel
 import io.legado.app.eink.contract.EInkEngineRegistry
 import io.legado.app.eink.contract.JumpResolution
 import io.legado.app.eink.contract.MarkingUiModel
-import io.legado.app.eink.contract.PendingJumpConfirm
 import io.legado.app.eink.contract.TocBookUiModel
 import io.legado.app.eink.contract.TocFetchResult
 import io.legado.app.eink.session.ReaderSessionCache
@@ -68,6 +67,18 @@ data class TocUiState(
     val canExport: Boolean
         get() = markings.isNotEmpty() && !exporting
 }
+
+/**
+ * 「仍跳转」确认弹层瞬态（目录页/笔记页共用）：[JumpResolution.NeedConfirm]
+ * 的 UiState 投影，对齐宿主 PendingBookmarkTarget 语义。模块内部类型，
+ * 宿主不构造。
+ */
+data class PendingJumpConfirm(
+    /** 展示给用户的确认文案（宿主拼装，含章节名等上下文）。 */
+    val message: String,
+    /** 确认后的跳转坐标（null = 确认后仅关闭弹层不跳转）。 */
+    val fallback: JumpResolution.Located?,
+)
 
 /**
  * 标题下三段切换（marksEngine 缺失时只剩目录，Tab 行整体不渲染）。

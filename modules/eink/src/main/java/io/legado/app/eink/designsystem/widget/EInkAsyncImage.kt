@@ -10,6 +10,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import coil3.ImageLoader
 import coil3.SingletonImageLoader
 import coil3.compose.AsyncImage
 import coil3.compose.AsyncImagePainter
@@ -24,9 +25,10 @@ import coil3.request.ImageRequest
  * 所有网络图片都通过这一个薄封装进入图片库的 Compose 入口，保证
  * ContentScale、占位/失败态一致。
  *
- * 底层使用 Coil（与宿主共用 SingletonImageLoader：内存/磁盘缓存、请求
- * 生命周期、书源请求头拦截器均由宿主 ImageLoader 承担），调用方不要再
- * 自行 copy bitmap 或维护第二份 LruCache。
+ * 底层使用 Coil：[imageLoader] 由调用方注入（封面管线传入模块自有
+ * loader，见 feature/common 的 einkImageLoader），默认回落进程
+ * SingletonImageLoader。调用方不要再自行 copy bitmap 或维护第二份
+ * LruCache。
  *
  * 刻意不用 SubcomposeAsyncImage（其文档明示子组合慢、不宜用于 Lazy
  * 列表；墨水屏弱 SoC 上会拖慢整页翻帧）：加载中/失败占位以普通 Box
@@ -43,6 +45,7 @@ fun EInkAsyncImage(
     model: Any?,
     contentDescription: String?,
     modifier: Modifier = Modifier,
+    imageLoader: ImageLoader? = null,
     contentScale: ContentScale = ContentScale.Crop,
     loading: (@Composable () -> Unit)? = null,
     failure: (@Composable () -> Unit)? = null,
@@ -50,13 +53,14 @@ fun EInkAsyncImage(
     // remember 缓存未命中结果：同一次驻留内不重复探查；条目重新进入组合
     //（翻页回看）时重查——期间预取写入缓存即命中
     val context = LocalContext.current
+    val loader = imageLoader ?: SingletonImageLoader.get(context)
     val cachedPainter = remember(model) {
         val request = model as? ImageRequest
         val key = request?.memoryCacheKey
         if (request == null || key == null) {
             null
         } else {
-            SingletonImageLoader.get(context).memoryCache
+            loader.memoryCache
                 ?.get(MemoryCache.Key(key))
                 ?.image
                 ?.asPainter(request.context)
@@ -79,6 +83,7 @@ fun EInkAsyncImage(
         AsyncImage(
             model = model,
             contentDescription = contentDescription,
+            imageLoader = loader,
             modifier = Modifier.matchParentSize(),
             contentScale = contentScale,
             onState = { state = it },

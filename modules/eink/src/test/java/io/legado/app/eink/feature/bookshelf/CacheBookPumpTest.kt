@@ -103,8 +103,6 @@ private class FakeEngine(gateOpen: Boolean = false) : BookshelfEngine {
 
     override val isCacheRunning: Boolean get() = false
 
-    override fun setCacheWorkingState(working: Boolean) = Unit
-
     override suspend fun startCacheProcessJob() {
         startCount.incrementAndGet()
         gate.await()

@@ -56,9 +56,12 @@ sealed interface ReaderStyleParam {
     ) : ReaderStyleParam
 
     /**
-     * 固定值参数：宿主锁定该参数（仅默认值可用、其余档位不支持——如引擎
+     * 固定值参数：宿主锁定该参数（仅单一值可用、其余档位不支持——如引擎
      * 单键耦合下标题字重恒粗体的宿主）。UI 呈现置灰锁定态（值可见、不可
      * 调）；宿主也可选择不声明本参数使设置行整体隐藏。
+     *
+     * 消费范围：仅数值参数（[Stepped] 同族 id，[value] 量纲随 id 约定）；
+     * 枚举/开关参数的「锁定」用 [Choice] 单选项或不声明表达，不使用本类型。
      */
     data class Locked(
         override val id: String,
@@ -70,9 +73,15 @@ sealed interface ReaderStyleParam {
     }
 
     /**
-     * 预设档参数：宿主仅支持协议约定的固定档位集（如字重 0 常规/1 粗/
-     * 2 细三预设），无连续自定义——UI 呈现预设按钮组、隐藏自定义入口
-     * （对比 [Stepped] 声明的自定义滑条区间）。
+     * 预设档参数：宿主仅支持协议约定的固定档位集，无连续自定义——UI
+     * 呈现预设按钮组、隐藏自定义滑条入口（对比 [Stepped] 声明的自定义
+     * 滑条区间）。
+     *
+     * 协议域：当前仅字重两 id（[ReaderStyleParamIds.BODY_WEIGHT] /
+     * [ReaderStyleParamIds.TITLE_WEIGHT]）定义预设协议——档位 0 常规 /
+     * 1 粗 / 2 细（同 [ReaderTextStyle.bodyWeight] 注释），[default] 取
+     * 档位值。其余 id 声明 Presets 属未定义呈现，适配方不得依赖；枚举
+     * 档参数用 [Choice] 表达。
      */
     data class Presets(
         override val id: String,

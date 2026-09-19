@@ -18,7 +18,13 @@ import androidx.compose.runtime.Stable
  */
 interface ReaderSelectionEngine {
 
-    /** 划线/想法能力：长按选择、选区操作条标记动作与点按标记浮条。 */
+    /**
+     * 划线/想法能力：长按选择、选区操作条标记动作与点按标记浮条。
+     *
+     * 与 [MarksEngine.supportsMarkings] 同名不同义：此处是**阅读内保存**
+     * 能力，彼处是**目录页列表/导出**能力；宿主通常两者一致声明，
+     * 不一致时两处入口各自独立显隐（互不推导）。
+     */
     val supportsMarkings: Boolean get() = true
 
     /** 页面书签能力：快速书签 toggle、下拉书签、顶栏书签钮、页角标。 */

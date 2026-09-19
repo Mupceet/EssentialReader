@@ -22,7 +22,13 @@ interface MarksEngine {
     /** 书签列表能力：目录页「书签」Tab。 */
     val supportsBookmarks: Boolean get() = true
 
-    /** 笔记列表能力：目录页「笔记」Tab 与笔记导出。 */
+    /**
+     * 笔记列表能力：目录页「笔记」Tab 与笔记导出。
+     *
+     * 与 [ReaderSelectionEngine.supportsMarkings] 同名不同义：此处是
+     * **列表/导出**能力，彼处是**阅读内保存**能力；宿主通常两者一致
+     * 声明，不一致时两处入口各自独立显隐（互不推导）。
+     */
     val supportsMarkings: Boolean get() = true
 
     /**
@@ -116,12 +122,3 @@ sealed interface JumpResolution {
     /** 无法解析（记录不存在/数据损坏）：模块 toast [message]，不跳转。 */
     data class Failed(val message: String) : JumpResolution
 }
-
-/** 「仍跳转」确认弹层瞬态（目录页/笔记页共用；对齐宿主 PendingBookmarkTarget 语义）。 */
-@EInkImmutable
-data class PendingJumpConfirm(
-    /** 展示给用户的确认文案（宿主拼装，含章节名等上下文）。 */
-    val message: String,
-    /** 确认后的跳转坐标（null = 确认后仅关闭弹层不跳转）。 */
-    val fallback: JumpResolution.Located?,
-)

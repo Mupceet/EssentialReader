@@ -107,7 +107,7 @@ interface GlobalSettings {
      *
      * 能力声明（0.6.0 起）：[supportsReviewBubbles] = false 的宿主上，
      * 阅读菜单的「显示段评气泡」开关整体隐藏（宿主无段评能力时不留
-     * 死开关；本键的读写不再被触达）。
+     * 死开关；本键的读写不再被触达，实现可为固定值）。
      */
     var showReviewBubbles: Boolean
 

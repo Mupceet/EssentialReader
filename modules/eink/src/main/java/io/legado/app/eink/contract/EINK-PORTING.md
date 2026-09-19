@@ -36,6 +36,8 @@ manifest merge 直接失败，且 `tools:overrideLibrary` 不可行（涉及数�
 │    GlobalSettings（模块全部设置项的唯一出入口）+ BookshelfEngine +
 │    SearchEngine + TocEngine + BookDetailEngine + ChangeSourceEngine +
 │    CoverEngine + ReaderEngine（各端口及其伴生回调/结果类型）+
+│    AppUpdateEngine / ReaderSelectionEngine / MarksEngine /
+│    BookshelfGroupEngine（四个可选端口）+
 │    EngineHandles（BookHandle/SourceHandle/SearchResultHandle）+
 │    ReaderPageSnapshot（排版产物快照系）+ ReaderTextStyle（排版参数快照）+
 │    各页 UiModel（跨界展示模型）
@@ -49,9 +51,14 @@ app/.../eink/（宿主 = 入口子类 + 桥接层，移植时按目标引擎重�
 ├─ EinkMainActivity.kt              入口子类（两钩子 + 可选字体钩子，约 50 行）
 └─ bridge/                          ★ 唯一需要重写的部分：端口实现 + 快照映射
      EInkBridge.kt          装配入口（Registry.install + 设置快照对齐）
-     BookshelfEngineImpl / SearchEngineImpl / TocEngineImpl /
-     BookDetailEngineImpl / ChangeSourceEngineImpl / CoverEngineImpl /
-     ReaderEngineImpl / ReaderPageSnapshotMapper
+     *EngineImpl（12 个）    各端口实现：Bookshelf / Search / Toc /
+                            BookDetail / ChangeSource / Cover / Reader /
+                            AppUpdate / ReaderSelection / Marks /
+                            BookshelfGroup（后四个可选，随宿主能力取舍）
+     快照映射与支撑          ReaderPageSnapshotMapper、HostStyleCatalog、
+                            BookshelfUiMapper / Sorter / StyleMapper、
+                            ReaderProgressSyncer / Policy、ReaderStyleMutations、
+                            ReaderTipFonts、ReaderChapterPager、EInkBookmarkState
 ```
 
 「模块树零改动，只重写 bridge」在**源码层面**成立；唯一例外是模块的
@@ -68,7 +75,8 @@ app/.../eink/（宿主 = 入口子类 + 桥接层，移植时按目标引擎重�
      `androidx-compose-foundation`、`androidx-compose-ui-tooling`、
      `androidx-compose-ui-tooling-preview`、`compose-runtime`、
      `androidx-lifecycle-viewmodel-compose`、`androidx-lifecycle-runtime-compose`、
-     `activity-compose`、`coil-compose`、`junit`、coroutines bundle；
+     `activity-compose`、`coil-compose`、`coil-network-okhttp`、`junit`、
+     coroutines bundle；
    - 插件：`android-library`、`kotlin-android`、`compose-compiler`
      （`org.jetbrains.kotlin.plugin.compose`，版本必须与宿主 Kotlin 完全
      一致）。版本跟随目标仓；宿主没有的条目（如纯 View 宿主的全部
@@ -79,13 +87,16 @@ app/.../eink/（宿主 = 入口子类 + 桥接层，移植时按目标引擎重�
    - `kotlin { jvmToolchain(...) }` 块从 `android {}` 内移到顶层
      （嵌套形态是 AGP 9 内置 Kotlin 专属 DSL）；
    - compileSdk / Java 版本对齐宿主（§0 表）。
-4. **app 依赖**：`implementation project(':modules:eink')`；**另需补两条**
-   模块不会传递的依赖——`coil-compose`（契约 `CoverEngine` 签名暴露
-   Coil 类型，模块的 implementation 依赖不外泄）与 `compose-runtime`
-   （`GlobalSettings.useDefaultCover` 的快照状态语义需要）。
+4. **app 依赖**：`implementation project(':modules:eink')`；**另需补一条**
+   模块不会传递的依赖——`compose-runtime`（模块对它是 implementation，
+   不外泄；`GlobalSettings.useDefaultCover` 的快照状态语义需要）。
+   图片栈零宿主义务：Coil 为模块 `implementation` 依赖（契约 `CoverEngine`
+   是纯 Kotlin 字节端口），宿主 app 代码与依赖清单均不出现 Coil——
+   步骤 3 的两个 coil 别名仅是模块自身编译所需。
 5. **编写宿主入口与桥接层**：入口写一个 `EInkHostActivity` 子类（实现
    `onInstallEngines()` 与 `onExitToFullMode(context)` 两钩子）；`bridge/`
-   九个文件按 §3 差异表适配引擎调用。可选覆写 `uiFontFamily()` 为 E-Ink
+   按 §1 清单逐端口实现（§3 差异表只列各宿主与通版的差异）。可选覆写
+   `uiFontFamily()` 为 E-Ink
    界面提供全局 UI 字体（默认 null = 平台默认字体；组合内调用，可订阅
    宿主状态流实时生效），不覆写不影响移植。
 6. **Manifest**：注册入口（无桌面图标，由分流点进入）：
@@ -117,8 +128,8 @@ sources jar，坐标 `io.legado.app.eink:eink`）。
    `implementation 'io.legado.app.eink:eink:0.1.0'`。
 3. **注意事项（实测）**：
    - 模块 implementation 依赖不随 AAR 外泄编译期可见性——宿主 bridge
-     仍需自备 `coil-compose`（契约签名暴露 Coil 类型）与
-     `compose-runtime`（快照状态）；
+     仅需自备 `compose-runtime`（`GlobalSettings.useDefaultCover` 的
+     快照状态语义）；契约零图片框架类型，Coil 对宿主完全不可见；
    - 宿主首次解析会经网络取 `compose-bom` 的 .pom（POM 路径不含
      BOM import 语义，compose-bom 作为普通依赖出现）——离线环境需
      预缓存或在宿主声明同一 BOM platform；镜像源环境下 dl.google.com
@@ -128,9 +139,9 @@ sources jar，坐标 `io.legado.app.eink:eink`）。
    - 产物栈绑定：AAR 由哪个构建栈产出就带哪个栈的字节码/Kotlin 元数据
      ——跨栈消费前核对 §0（Kotlin 编译器可读一版本前向的元数据）。
      现行版本：**0.1.0 = 旧栈（AGP8.13/K2.3/Java17）构建**，develop
-     宿主在用；**0.2.0 = 主栈（AGP9/K2.4/Java21）构建**，K2.3 宿主
-     消费时元数据按一版本前向规则可读、Java 21 字节码经 D8 消解，
-     均需真机回归确认后再切换坐标。
+     宿主在用；**0.2.0 起均为主栈（AGP9/K2.4/Java21）构建**（当前
+     发布线 0.6.x），K2.3 宿主消费时元数据按一版本前向规则可读、
+     Java 21 字节码经 D8 消解，均需真机回归确认后再切换坐标。
    - **min21 孪生轨道（0.6.1 起）**：面向大量驻留 Android 5.x 的墨水屏
      设备——`<版本>-min21` 坐标同源码、依赖集整体降到 minSdk 21 档
      （BOM 2025.11.00 / foundation 1.9.4 / Coil 3.0.4 /
@@ -188,14 +199,18 @@ Java 17 / minSdk 21（按 §0 升 23）/ 无 Compose 无 Coil（图片栈 Glide�
 - **Compose BOM 版本差**：模块基于 BOM 2026.06.01 编写。模块只使用
   Foundation/UI/Runtime 稳定 API；构建报 unresolved 时回退保守写法
   （改动收敛在模块内，两边同时受益）。
-- **图片加载（0.2.0 起）**：模块以 `api` 传递 `coil-compose` 与
-  `coil-network-okhttp`——AAR 消费方**开箱可加载网络封面**（Coil 3 缺
-  网络抓取器构件时 http 封面全部失败，曾致 develop 宿主封面不显示，
-  0.1.0 及源码嵌入形态需宿主自行补 `coil-network-okhttp`）。防盗链/
-  书源请求头仍经 `CoverEngine` 注入：Coil 宿主复用宿主单例
-  ImageLoader 拦截器（本仓形态）；Glide 等其它栈宿主默认无防盗链
-  （相关封面回退占位），恢复路径为模块的 Coil 实例注册带书源解析的
-  网络拦截器。
+- **图片加载（字节端口形态）**：模块图片栈完全自闭环——自有
+  ImageLoader + 封面字节端口（`CoverEngine.fetchCoverBytes`）：宿主以
+  自有管线返回封面字节（防盗链/书源请求头/地址规则解析/解密/持久缓存
+  都在宿主侧），模块负责解码、按目标尺寸降采样、显示与内存缓存。
+  契约签名零图片框架类型，Coil 为模块 `implementation` 依赖——宿主
+  app 代码与依赖清单均不出现 Coil（源码嵌入仅需版本目录别名；AAR
+  形态经 POM runtime 域自动传递，开箱可加载网络封面）。Glide 等任意
+  图片栈宿主都能经端口表达防盗链（返回头映射即可）；无持久缓存的
+  宿主实现每次冷启动重新抓取，建议自带文件缓存与失败冷却。阅读页
+  内嵌插图不经此链路（页快照的 loader 闭包由宿主提供）。
+  （旧形态：0.2.0–0.6.x 曾以 `api` 传递 Coil、端口为
+  `ImageRequest.Builder` 配置块。）
 - **排版协商与字体端口（0.3.0 起）**：`ReaderEngine` 新增四个带默认
   实现的成员，旧宿主零改动即降级——`styleCatalog()` 不实现即返回
   null，模块回落内置 17 参数基线（`FallbackReaderStyleCatalog`），

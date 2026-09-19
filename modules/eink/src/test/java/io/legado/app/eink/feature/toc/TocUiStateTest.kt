@@ -3,7 +3,6 @@ package io.legado.app.eink.feature.toc
 import io.legado.app.eink.contract.ChapterUiModel
 import io.legado.app.eink.contract.JumpResolution
 import io.legado.app.eink.contract.MarkingUiModel
-import io.legado.app.eink.contract.PendingJumpConfirm
 import io.legado.app.eink.contract.TocBookUiModel
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse

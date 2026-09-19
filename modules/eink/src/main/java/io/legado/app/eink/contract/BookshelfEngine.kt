@@ -106,15 +106,6 @@ interface BookshelfEngine {
     val isCacheRunning: Boolean
 
     /**
-     * 预缓存泵工作态开关：true = 运行，false = 暂停。
-     *
-     * 模块当前不调用：预缓存已改为每本书入队即消费、与目录刷新并行，
-     * 不再有「目录优先」整轮暂停。端口保留以维持已发布契约兼容，宿主
-     * 实现维持转发即可。
-     */
-    fun setCacheWorkingState(working: Boolean)
-
-    /**
      * 启动预缓存处理循环（挂起至泵结束；模块在书架页按
      * [preDownloadChapterCount][GlobalSettings.preDownloadChapterCount]
      * 门槛调用，运行在模块进程级作用域，不随书架页 VM 销毁取消——每本

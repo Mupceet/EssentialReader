@@ -1,11 +1,10 @@
 package io.legado.app.eink.feature.common
 
 import android.content.Context
-import coil3.SingletonImageLoader
 import io.legado.app.eink.contract.EInkEngineRegistry
 
 /**
- * 封面预取：把下一页的封面提前载入 Coil 内存缓存。
+ * 封面预取：把下一页的封面提前载入模块 ImageLoader 的内存缓存。
  *
  * 翻页是同步组合整页新条目：封面若不在内存缓存，Coil 请求即便最终命中
  * 磁盘也要经协程派发，先画文字占位、到位后再重画——墨水屏上两次全页
@@ -30,7 +29,7 @@ fun <T> prefetchCovers(
     if (items.isEmpty()) return
     // 「使用默认封面」模式下不显示网络封面，预取纯浪费
     if (EInkEngineRegistry.globalSettings.useDefaultCover) return
-    val imageLoader = SingletonImageLoader.get(context)
+    val imageLoader = einkImageLoader(context)
     for (item in items) {
         val url = coverUrl(item)
         if (url.isNullOrBlank()) continue

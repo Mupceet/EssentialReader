@@ -67,14 +67,15 @@ dependencies {
     implementation(libs.androidx.lifecycle.runtime.compose)
     implementation(libs.activity.compose)
 
-    // 图片加载（EInkAsyncImage / EInkBookCover 封面）— api 传递：
-    // 契约 CoverEngine 签名暴露 Coil 类型，宿主 bridge 需编译期可见；
-    // coil-network-okhttp 使 AAR 消费方开箱具备网络封面能力
-    // （Coil 3 的网络抓取器经 ServiceLoader 自动注册，缺它则 http 封面
-    // 全部失败——曾致 develop 宿主封面不显示）。防盗链/书源请求头仍由
-    // 宿主经 CoverEngine 注入（见 contract/CoverEngine KDoc）
-    api(libs.coil.compose)
-    api(libs.coil.network.okhttp)
+    // 图片加载（EInkAsyncImage / EInkBookCover 封面）— implementation：
+    // 契约 CoverEngine 为纯 Kotlin 字节端口（fetchCoverBytes），签名不
+    // 暴露任何图片框架类型，宿主编译期零 Coil 可见性、app 依赖清单无需
+    // 添加（AAR 形态经 POM runtime 域自动传递；源码嵌入形态只需版本
+    // 目录提供模块编译所需的两个 coil 别名）。模块自有 ImageLoader +
+    // 封面 Fetcher，网络字节经 CoverEngine 端口回到宿主管线（防盗链/
+    // 解密/持久缓存在宿主侧，见 contract/CoverEngine KDoc）
+    implementation(libs.coil.compose)
+    implementation(libs.coil.network.okhttp)
 
     // Tooling (debug only)
     debugImplementation(libs.androidx.compose.ui.tooling)
@@ -129,10 +130,17 @@ afterEvaluate {
                 //         宿主零改动）——目录页 Tab、下拉书签/顶栏书签钮/
                 //         页角标/长按选择按能力显隐；GlobalSettings 增
                 //         supportsReviewBubbles（false = 隐藏段评开关）；
-                // 0.6.1 = ReaderStyleParam 新增 Presets（协议预设档集、无
-                //         自定义滑条——字重行 allowCustom = false 时隐藏
-                //         「自定义」按钮与滑条）；
-                // 另发布 0.5.0-oldstack 孪生坐标（同源码、依赖集钉回
+    // 0.6.1 = ReaderStyleParam 新增 Presets（协议预设档集、无
+    //         自定义滑条——字重行 allowCustom = false 时隐藏
+    //         「自定义」按钮与滑条）；
+    // 0.7.0 = 契约清理轮（待发布）：PendingJumpConfirm 迁出 contract 包
+    //         （模块内部类型，宿主零引用）；移除 BookshelfEngine.
+    //         setCacheWorkingState（模块不再调用，契约面不留废弃成员）；
+    //         CoverEngine 改纯 Kotlin 字节端口 fetchCoverBytes——签名不再
+    //         暴露 Coil 类型，Coil 降为 implementation（宿主零 Coil
+    //         可见性，模块自有 ImageLoader + 封面 Fetcher）；另含
+    //         TITLE_WEIGHT Presets 分支补齐与信息弹层逐行目录守卫；
+    // 另发布 0.5.0-oldstack 孪生坐标（同源码、依赖集钉回
                 // AGP8.13 可消费档：BOM 2026.06.01 / Coil 3.5.0 /
                 // lifecycle-compose 2.9.4 / foundation 1.11.4——0.5.0 主栈
                 // 依赖的 Compose 1.12 / lifecycle 2.11 AAR 元数据要求

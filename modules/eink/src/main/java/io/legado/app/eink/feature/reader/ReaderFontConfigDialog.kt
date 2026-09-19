@@ -177,10 +177,18 @@ internal fun ReaderFontConfigDialog(
                     onSetWeight = onSetBodyWeight,
                 )
             }
-            when (catalog.find(Ids.TITLE_WEIGHT)) {
+            when (val titleWeightParam = catalog.find(Ids.TITLE_WEIGHT)) {
                 is io.legado.app.eink.contract.ReaderStyleParam.Locked ->
                     LockedWeightRow(label = "标题字重", value = style.titleWeight ?: 0)
                 null -> Unit
+                // 预设档宿主：三预设按钮，无自定义入口（同正文字重）
+                is io.legado.app.eink.contract.ReaderStyleParam.Presets -> WeightSettingRow(
+                    label = "标题字重",
+                    value = style.titleWeight ?: titleWeightParam.default,
+                    valueRange = catalog.intRange(Ids.TITLE_WEIGHT),
+                    onSetWeight = onSetTitleWeight,
+                    allowCustom = false,
+                )
                 else -> WeightSettingRow(
                     label = "标题字重",
                     value = style.titleWeight ?: catalog.defaultInt(Ids.TITLE_WEIGHT),

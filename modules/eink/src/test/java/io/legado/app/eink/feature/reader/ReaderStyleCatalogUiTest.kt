@@ -1,6 +1,8 @@
 package io.legado.app.eink.feature.reader
 
 import io.legado.app.eink.contract.FallbackReaderStyleCatalog
+import io.legado.app.eink.contract.ReaderStyleCatalog
+import io.legado.app.eink.contract.ReaderStyleParam
 import io.legado.app.eink.contract.ReaderStyleParamIds as Ids
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -27,6 +29,14 @@ class ReaderStyleCatalogUiTest {
         assertEquals(8..40, catalog.intRange(Ids.BODY_SIZE))
         assertEquals(0..4, catalog.intRange(Ids.BODY_INDENT))
         assertEquals("缺失参数兜底 0..0", 0..0, catalog.intRange(Ids.BODY_FONT))
+    }
+
+    @Test
+    fun `锁定参数值域为锁定值单点`() {
+        val locked = ReaderStyleCatalog(
+            listOf(ReaderStyleParam.Locked(Ids.TITLE_SIZE, value = 24f))
+        )
+        assertEquals(24..24, locked.intRange(Ids.TITLE_SIZE))
     }
 
     @Test

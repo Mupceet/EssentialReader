@@ -22,7 +22,6 @@ import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import coil3.request.ImageRequest
-import coil3.request.crossfade
 import io.legado.app.eink.contract.EInkEngineRegistry
 import io.legado.app.eink.designsystem.theme.EInkShapes
 import io.legado.app.eink.designsystem.theme.EInkTheme
@@ -58,6 +57,10 @@ internal fun coverTargetSizePx(width: Dp, height: Dp, density: Density): Pair<In
  * 缓存项才能被显示路径同步命中。显式键带目标尺寸：Coil 默认键不含尺寸
  * （无 transformations 时），列表 66dp 与网格 ~96dp 两种尺寸会写同一条目
  * 互相顶替（较小位图被 INEXACT 校验拒绝后又重抓）；分尺寸分键后互不干扰。
+ *
+ * http(s) 封面 data 为 [EInkCoverData]（经端口抓取字节），其余形态
+ * （data: 内联/本地路径）原样交给模块图片栈内置 fetcher。目标尺寸由
+ * 模块自设（[size]），不再跨桥。
  */
 internal fun buildEInkCoverRequest(
     context: Context,
@@ -66,10 +69,9 @@ internal fun buildEInkCoverRequest(
     widthPx: Int,
     heightPx: Int,
 ): ImageRequest = ImageRequest.Builder(context)
-    .data(url)
-    .crossfade(false)
+    .data(coverRequestData(url, sourceOrigin))
+    .size(widthPx, heightPx)
     .memoryCacheKey("eink-cover|$url|${widthPx}x$heightPx")
-    .apply(EInkEngineRegistry.coverEngine.coverRequestOptions(sourceOrigin, widthPx, heightPx))
     .build()
 
 /**
@@ -79,11 +81,11 @@ internal fun buildEInkCoverRequest(
  * 端口（CoverEngine），不属于 Design System（规范 §44），供书架/搜索/
  * 详情等多个 feature 共用，故落在 bookshelf 包。
  *
- * 封面加载统一通过 [EInkAsyncImage] 进入 Coil，不在 Compose 侧做
- * bitmap copy 或额外 LruCache；内存缓存、磁盘缓存与生命周期由宿主
- * 单例 ImageLoader 管理。url 原样作为 data，请求选项（书源 origin 头、
- * 目标尺寸）经 CoverEngine 端口由宿主提供（与 MD3 主工程
- * buildCoverImageRequest 行为对齐）。
+ * 封面加载统一通过 [EInkAsyncImage] 进入模块自有 ImageLoader
+ * （[einkImageLoader]），不在 Compose 侧做 bitmap copy 或额外 LruCache；
+ * 内存缓存与请求生命周期由模块图片栈管理，http(s) 封面字节经
+ * CoverEngine 端口回到宿主管线（防盗链头/解密/持久缓存在宿主侧），
+ * 非 http(s) 封面由内置 fetcher 直接解析。
  *
  * 封面统一 [EInkShapes.medium]（4dp）圆角裁剪，对齐 MD3 主工程
  * CoilBookCover 的 RoundedCornerShape(4.dp)；文字占位封面同理被裁剪，
@@ -114,8 +116,7 @@ fun EInkBookCover(
     val context = LocalContext.current
 
     // 请求实例按入参 remember：重组间保持同一 ImageRequest，避免请求被
-    // 反复重建。crossfade(false) 显式关闭：宿主单例 ImageLoader 全局开
-    // crossfade，与墨水屏零动画规范冲突，必须逐请求覆盖
+    // 反复重建。过渡动画零配置——模块自有 loader 即 Coil 默认（无 crossfade）
     val model: Any = remember(context, url, sourceOrigin, targetWidthPx, targetHeightPx) {
         buildEInkCoverRequest(context, url, sourceOrigin, targetWidthPx, targetHeightPx)
     }
@@ -131,6 +132,7 @@ fun EInkBookCover(
         model = model,
         contentDescription = name,
         modifier = coverModifier,
+        imageLoader = einkImageLoader(context),
         loading = placeholderContent,
         failure = placeholderContent,
     )

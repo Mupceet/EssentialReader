@@ -12,10 +12,14 @@ internal fun ReaderStyleCatalog.available(id: String): Boolean =
 private fun ReaderStyleCatalog.stepped(id: String): ReaderStyleParam.Stepped? =
     find(id) as? ReaderStyleParam.Stepped
 
-/** 整型值域（参数缺失时 0..0，仅作展示兜底，不用于钳制）。 */
-internal fun ReaderStyleCatalog.intRange(id: String): IntRange {
-    val p = stepped(id) ?: return 0..0
-    return p.min.roundToInt()..p.max.roundToInt()
+/**
+ * 整型值域（Stepped 取边界 / Locked 取锁定值单点；参数缺失时 0..0，
+ * 仅作展示兜底，不用于钳制）。
+ */
+internal fun ReaderStyleCatalog.intRange(id: String): IntRange = when (val p = find(id)) {
+    is ReaderStyleParam.Stepped -> p.min.roundToInt()..p.max.roundToInt()
+    is ReaderStyleParam.Locked -> p.value.roundToInt()..p.value.roundToInt()
+    else -> 0..0
 }
 
 /** 整型钳制（参数缺失时不钳制，原值透传）。 */

@@ -145,10 +145,6 @@ internal object BookshelfEngineImpl : BookshelfEngine, KoinComponent {
     override val isCacheRunning: Boolean
         get() = CacheBook.isRun
 
-    override fun setCacheWorkingState(working: Boolean) {
-        CacheBook.setWorkingState(working)
-    }
-
     override suspend fun startCacheProcessJob() {
         CacheBook.startProcessJob(Dispatchers.IO)
     }

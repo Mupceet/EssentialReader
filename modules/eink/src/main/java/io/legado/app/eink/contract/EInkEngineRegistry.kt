@@ -92,9 +92,10 @@ object EInkEngineRegistry {
         get() = require(_readerEngine, "ReaderEngine")
 
     /**
-     * 应用更新端口——**可选**端口（与选区批注 `selectionEngine` 同为可选）：
-     * 未注册 = 宿主无 app 级更新能力（companion 宿主的合法状态），
-     * 「我的」页检查更新入口随之不渲染，不参与 install 必填校验。
+     * 应用更新端口——四个可选端口之一（其余为 [selectionEngine] /
+     * [marksEngine] / [bookshelfGroupEngine]）：未注册 = 宿主无 app 级
+     * 更新能力（companion 宿主的合法状态），「我的」页检查更新入口随之
+     * 不渲染，不参与 install 必填校验。
      */
     val appUpdateEngine: AppUpdateEngine?
         get() = _appUpdateEngine
@@ -130,6 +131,10 @@ object EInkEngineRegistry {
      * 注册全部引擎端口实现。由模块入口模板 [EInkHostActivity]
      * 在 attachBaseContext（宿主 onInstallEngines 钩子）调用，必须早于任何
      * E-Ink Composable 组合（VM 构造）。重复调用为整体替换。
+     *
+     * 升级提示：整体替换不保留上次装配的可选端口——宿主升级模块后，
+     * install 新增的可选端口参数默认 null，须在装配点显式传入，否则
+     * 对应 UI 入口静默消失（无报错）。
      *
      * @param globalSettings 全局设置视图实现。
      * @param bookshelfEngine 书架端口实现。

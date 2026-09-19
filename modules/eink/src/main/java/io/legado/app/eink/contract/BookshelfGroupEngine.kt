@@ -63,8 +63,9 @@ interface BookshelfGroupEngine {
 
     /**
      * 组内书籍流：映射语义与 [BookshelfEngine.observeShelf] 完全一致
-     * （作者清洗/封面挑选/未读数预计算一次完成）。`groupId` 为
-     * [BookshelfGroupIds.ALL] 时不分发（调用方应走 observeShelf）；
+     * （作者清洗/封面挑选/未读数预计算一次完成）。模块永不以
+     * [BookshelfGroupIds.ALL] 调用本方法（选中「全部」时调用方走
+     * [BookshelfEngine.observeShelf]），实现遇 ALL 返回空流即可；
      * 其余值含虚拟组（未分组 -100 等）与用户组。组 `bookSort >= 0`
      * 时覆盖全局排序。
      */
