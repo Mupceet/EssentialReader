@@ -114,7 +114,7 @@ afterEvaluate {
                 groupId = "io.legado.app.eink"
                 artifactId = "eink"
                 // 版本沿革与历史坐标的注释见 build.gradle.kts（单一权威）
-                version = "0.6.1"
+                version = "0.7.0"
             }
         }
     }
