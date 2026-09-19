@@ -38,10 +38,11 @@ dependencyResolutionManagement {
     }
     // eink 模块自有版本目录（保守档钉版，文件随模块树走）——
     // 模块库依赖经 einkLibs.* 引用，与宿主根目录 libs 解耦；
-    // 移植形态见 modules/eink/.../contract/EINK-PORTING.md §2 步骤 3
+    // 模块经 git 子模块集成（eink-lib/ 目录，eink/lib 独立分支），
+    // 移植形态见 eink-lib/modules/eink 内 contract/EINK-PORTING.md §2
     versionCatalogs {
         einkLibs {
-            from(files('modules/eink/gradle/libs.versions.toml'))
+            from(files('eink-lib/modules/eink/gradle/libs.versions.toml'))
         }
     }
 }
@@ -51,5 +52,6 @@ include ':app'
 include ':modules:book'
 include ':modules:rhino'
 include ':modules:eink'
+project(':modules:eink').projectDir = file('eink-lib/modules/eink')
 include ':baselineprofile'
 project(':baselineprofile').projectDir = file('baselineProfile')

@@ -20,6 +20,8 @@ jobs:
         with:
           ref: ${{ github.event.inputs.branch }}
           fetch-depth: 0
+          # eink 模块经 git 子模块集成（eink/lib 分支）
+          submodules: recursive
 
       - name: Set up JDK 21
         uses: actions/setup-java@v5
