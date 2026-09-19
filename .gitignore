@@ -16,3 +16,7 @@ package-lock.json
 .idea/
 # Kotlin 2.0
 .kotlin/
+
+# IDE/session 工作区文件
+.vs/
+.zcode/

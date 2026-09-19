@@ -22,11 +22,12 @@ pluginManagement {
 dependencyResolutionManagement {
     repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
     repositories {
-        // E-Ink 模块二进制消费入口：本地发布产物（将来替换为远程仓库）
+        // E-Ink 模块二进制消费入口（备用形态：mavenLocal 发布产物；
+        // 本分支现为子模块源码集成，见下方 include）
         mavenLocal()
         //镜像仓库,无法连接源仓库自行启用镜像仓库,不要提交修改
         maven { url "https://maven.aliyun.com/repository/google" }
-        maven { url 'https://maven.aliyun.com/repository/public' }
+        maven { url "https://maven.aliyun.com/repository/public" }
         //原仓库
         google {
             content {
@@ -46,9 +47,22 @@ dependencyResolutionManagement {
         //maven { url "https://maven-central-asia.storage-download.googleapis.com/maven2/" }
         //maven { url 'https://repo.huaweicloud.com/repository/maven/' }
     }
+    // eink 模块自有版本目录（保守档钉版，文件随子模块走）——模块库依赖
+    // 经 einkLibs.* 引用，与本仓根目录 libs 解耦；
+    // 移植形态见 eink-lib/modules/eink 内 contract/EINK-PORTING.md §2
+    versionCatalogs {
+        einkLibs {
+            from(files('eink-lib/modules/eink/gradle/libs.versions.toml'))
+        }
+    }
 }
 rootProject.name = 'legado'
 
 include ':app'
 include ':modules:book'
 include ':modules:rhino'
+// eink 模块经 git 子模块集成（eink-lib/，eink/lib 独立分支）；
+// 本仓为 AGP 8.13 旧栈——选用模块的 AGP<9 构建变体
+include ':modules:eink'
+project(':modules:eink').projectDir = file('eink-lib/modules/eink')
+project(':modules:eink').buildFileName = 'build-agp8.gradle.kts'

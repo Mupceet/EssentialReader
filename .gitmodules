@@ -1,0 +1,4 @@
+[submodule "eink-lib"]
+	path = eink-lib
+	url = https://github.com/Mupceet/EssentialReader.git
+	branch = eink/lib
