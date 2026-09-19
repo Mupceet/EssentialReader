@@ -73,9 +73,20 @@ KDoc 为权威**。
 
 ## 2. 源码嵌入步骤（形态一）
 
-1. **复制模块树**：整个 `modules/eink/` 目录（含 build.gradle.kts、
-   gradle/libs.versions.toml、docs、consumer-rules.pro）。
-2. **settings.gradle**：`include ':modules:eink'`。
+1. **获取模块树**，两种等价形态：
+   - **子模块（推荐）**：引用 eink/lib 独立分支（本仓 md3/port/eink 即
+     此形态），升级＝推进子模块指针后提交：
+     ```bash
+     git submodule add -b eink/lib https://github.com/Mupceet/EssentialReader.git eink-lib
+     ```
+     settings 侧 `include ':modules:eink'` 配
+     `project(':modules:eink').projectDir = file('eink-lib/modules/eink')`，
+     步骤 3 的 einkLibs 挂载路径相应为
+     `eink-lib/modules/eink/gradle/libs.versions.toml`；
+   - **手工复制**：整个 `modules/eink/` 目录（含 build.gradle.kts、
+     gradle/libs.versions.toml、docs、consumer-rules.pro）。
+2. **settings.gradle**：`include ':modules:eink'`（子模块形态配
+   projectDir 重定向，见步骤 1）。
 3. **版本目录与挂载**：模块库依赖钉在自有版本目录
    `modules/eink/gradle/libs.versions.toml`（保守档与升档协议的权威注释
    在该文件头部，见 §0）。目标仓 settings 的
