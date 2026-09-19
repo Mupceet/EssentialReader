@@ -160,26 +160,44 @@ fun Context.startForegroundServiceCompat(intent: Intent) {
 val Context.defaultSharedPreferences: SharedPreferences
     get() = PreferenceManager.getDefaultSharedPreferences(this)
 
+/**
+ * 键类型漂移防御：异端/跨版本备份恢复可能向默认 prefs 写入异型值
+ * （如 String 占据 Boolean 键），SharedPreferences 读取即抛
+ * ClassCastException 致界面崩溃（真机案例：brightnessVwPos 被写成
+ * String，ReadMenu 初始化即崩）。读侧遇类型不符回落默认值并清除脏键
+ * （自愈，下次写入恢复正确类型）。
+ */
+private fun <T> SharedPreferences.getTyped(
+    key: String,
+    defValue: T,
+    getter: SharedPreferences.(String, T) -> T,
+): T = try {
+    getter(key, defValue)
+} catch (e: ClassCastException) {
+    edit { remove(key) }
+    defValue
+}
+
 fun Context.getPrefBoolean(key: String, defValue: Boolean = false) =
-    defaultSharedPreferences.getBoolean(key, defValue)
+    defaultSharedPreferences.getTyped(key, defValue) { k, d -> getBoolean(k, d) }
 
 fun Context.putPrefBoolean(key: String, value: Boolean = false) =
     defaultSharedPreferences.edit { putBoolean(key, value) }
 
 fun Context.getPrefInt(key: String, defValue: Int = 0) =
-    defaultSharedPreferences.getInt(key, defValue)
+    defaultSharedPreferences.getTyped(key, defValue) { k, d -> getInt(k, d) }
 
 fun Context.putPrefInt(key: String, value: Int) =
     defaultSharedPreferences.edit { putInt(key, value) }
 
 fun Context.getPrefLong(key: String, defValue: Long = 0L) =
-    defaultSharedPreferences.getLong(key, defValue)
+    defaultSharedPreferences.getTyped(key, defValue) { k, d -> getLong(k, d) }
 
 fun Context.putPrefLong(key: String, value: Long) =
     defaultSharedPreferences.edit { putLong(key, value) }
 
 fun Context.getPrefString(key: String, defValue: String? = null) =
-    defaultSharedPreferences.getString(key, defValue)
+    defaultSharedPreferences.getTyped(key, defValue) { k, d -> getString(k, d) }
 
 fun Context.putPrefString(key: String, value: String?) =
     defaultSharedPreferences.edit { putString(key, value) }
