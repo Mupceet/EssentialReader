@@ -54,7 +54,7 @@ internal object EinkLegacyPrefsStore {
  * attachBaseContext 首行触发，早于任何 E-Ink Composable 组合与端口读取）。
  *
  * 移植到新上游时：本目录（eink/bridge/）是唯一需要重写的部分，模块侧
- * 零改动（见 docs/eink-porting.md 的差异表）。
+ * 零改动（差异记录见 contract/EINK-PORTING.md §3）。
  */
 object EInkBridge {
 

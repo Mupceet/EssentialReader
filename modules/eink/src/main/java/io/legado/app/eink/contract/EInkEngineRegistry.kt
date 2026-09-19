@@ -39,7 +39,7 @@ import io.legado.app.eink.contract.EInkEngineRegistry.keyEventHub
  *
  * 移植到新上游时：模块树原样复制，仅重写宿主侧 bridge/ 下的端口实现
  * 并在入口子类的 onInstallEngines 钩子中调用 [install]
- * （见 docs/eink-porting.md）。
+ * （见同目录 EINK-PORTING.md 移植手册）。
  */
 object EInkEngineRegistry {
 
@@ -191,6 +191,6 @@ object EInkEngineRegistry {
      */
     private fun <T : Any> require(value: T?, port: String): T =
         checkNotNull(value) {
-            ":modules:eink 引擎端口未注册：$port。宿主入口需先调用 EInkEngineRegistry.install(...) 完成装配（见 docs/eink-porting.md）"
+            ":modules:eink 引擎端口未注册：$port。宿主入口需先调用 EInkEngineRegistry.install(...) 完成装配（见 contract/EINK-PORTING.md 移植手册）"
         }
 }
