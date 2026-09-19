@@ -1,6 +1,11 @@
 package io.legado.app.ui.main.my
 
+import android.Manifest
+import android.annotation.SuppressLint
 import android.content.Intent
+import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
@@ -20,7 +25,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ExitToApp
-import androidx.compose.material.icons.automirrored.filled.HelpOutline
 import androidx.compose.material.icons.automirrored.filled.LibraryBooks
 import androidx.compose.material.icons.automirrored.filled.MenuBook
 import androidx.compose.material.icons.automirrored.filled.Rule
@@ -69,6 +73,7 @@ import org.koin.androidx.compose.koinViewModel
 
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
+@SuppressLint("InlinedApi") // 仅 API 37+ 缺少权限时才发出该 effect，权限名常量会被内联
 @Composable
 fun MyRouteScreen(
     viewModel: MyViewModel = koinViewModel(),
@@ -78,6 +83,19 @@ fun MyRouteScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
+    val localNetworkPermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (granted) {
+            viewModel.onIntent(MyIntent.StartWebService)
+        } else {
+            Toast.makeText(
+                context,
+                R.string.web_service_local_network_permission_denied,
+                Toast.LENGTH_LONG
+            ).show()
+        }
+    }
     LaunchedEffect(viewModel) {
         viewModel.effects.collectLatest { effect ->
             when (effect) {
@@ -87,6 +105,9 @@ fun MyRouteScreen(
                     addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                     addFlags(Intent.FLAG_ACTIVITY_CLEAR_TASK)
                 }
+                MyEffect.RequestLocalNetworkPermission -> localNetworkPermissionLauncher.launch(
+                    Manifest.permission.ACCESS_LOCAL_NETWORK
+                )
             }
         }
     }

@@ -186,6 +186,102 @@ const onReachBottom = (entries: IntersectionObserverEntry[]) => {
   }
 }
 
+// 自动翻页（滚动模式，行为对齐App端）
+const autoPagePaused = ref(false)
+let autoPageRaf = 0
+let autoPageLastFrame = 0
+let autoPageResumeTimer: number | undefined
+
+/**
+ * 自动翻页速度（毫秒/页）。防御历史配置或手改 JSON：非法值回落到默认 10 秒/页，
+ * 避免 0 造成 `innerHeight / 0` 一次性滚到章末。
+ */
+const autoPageDurationMs = () => {
+  const seconds = Number(store.config.autoPageSpeed)
+  return Math.min(120, Math.max(1, Number.isFinite(seconds) ? seconds : 10)) * 1000
+}
+
+/**
+ * 章末判定。要求内容超过一屏，避免首屏尚未加载时把空页面误判为已到章末。
+ */
+const atChapterEnd = () =>
+  document.documentElement.scrollHeight > window.innerHeight + 1 &&
+  window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 1
+
+const startAutoPage = () => {
+  if (autoPageRaf || !store.config.autoPage) return
+  // 弹窗打开期间不启动滚动（细节5：目录/设置弹窗打开时暂停）
+  if (popCataVisible.value || readSettingsVisible.value) {
+    autoPagePaused.value = true
+    return
+  }
+  autoPageLastFrame = 0
+  const tick = (now: number) => {
+    if (!store.config.autoPage || autoPagePaused.value) {
+      autoPageRaf = 0
+      return
+    }
+    if (autoPageLastFrame === 0) autoPageLastFrame = now
+    const elapsed = now - autoPageLastFrame
+    autoPageLastFrame = now
+    // 与App端一致：每帧滚动 视口高度 / (速度秒数 × 1000ms) × 本帧毫秒数
+    window.scrollBy(0, (window.innerHeight / autoPageDurationMs()) * elapsed)
+    // 未开启无限加载时章末不会再有新内容：停在章末，不继续空转
+    if (!infiniteLoading.value && atChapterEnd()) {
+      pauseAutoPage(0)
+      return
+    }
+    autoPageRaf = requestAnimationFrame(tick)
+  }
+  autoPageRaf = requestAnimationFrame(tick)
+}
+const stopAutoPage = () => {
+  if (autoPageRaf) cancelAnimationFrame(autoPageRaf)
+  autoPageRaf = 0
+}
+const resumeAutoPage = () => {
+  if (autoPageResumeTimer) {
+    window.clearTimeout(autoPageResumeTimer)
+    autoPageResumeTimer = undefined
+  }
+  if (!store.config.autoPage) return
+  autoPagePaused.value = false
+  startAutoPage()
+}
+/**
+ * 暂停自动翻页
+ * @param idleResumeMs 大于0时在用户停止交互一段时间后自动恢复；0表示保持暂停直到手动恢复
+ */
+const pauseAutoPage = (idleResumeMs = 3000) => {
+  if (autoPageResumeTimer) {
+    window.clearTimeout(autoPageResumeTimer)
+    autoPageResumeTimer = undefined
+  }
+  if (!store.config.autoPage) return
+  autoPagePaused.value = true
+  stopAutoPage()
+  if (idleResumeMs > 0) {
+    autoPageResumeTimer = window.setTimeout(resumeAutoPage, idleResumeMs)
+  }
+}
+// 开关切换
+watch(
+  () => store.config.autoPage,
+  on => (on ? startAutoPage() : stopAutoPage()),
+)
+// 打开目录/设置弹窗时暂停，关闭后恢复
+watch([popCataVisible, readSettingsVisible], ([cata, settings]) => {
+  if (cata || settings) {
+    pauseAutoPage(0)
+  } else {
+    resumeAutoPage()
+  }
+})
+// 用户滚轮/触摸交互时暂停，停止操作一段时间后自动恢复（touchmove 保证长按拖动期间持续暂停）
+const onUserWheel = () => pauseAutoPage()
+const onUserTouch = () => pauseAutoPage()
+const onUserTouchMove = () => pauseAutoPage()
+
 // 字体
 const fontFamily = computed(() => {
   if (store.config.font >= 0) {
@@ -270,9 +366,11 @@ watch(
 const top = ref()
 const bottom = ref()
 const toTop = () => {
+  pauseAutoPage()
   jump(top.value)
 }
 const toBottom = () => {
+  pauseAutoPage()
   jump(bottom.value)
 }
 
@@ -382,11 +480,17 @@ const onVisibilityChange = () => {
   if (document.visibilityState == 'hidden' && _bookProgress) {
     store.saveBookProgress()
   }
+  if (document.visibilityState === 'hidden') {
+    pauseAutoPage(0)
+  } else {
+    resumeAutoPage()
+  }
 }
 // 定时同步
 
 // 章节切换
 const toNextChapter = () => {
+  pauseAutoPage()
   store.setContentLoading(true)
   const index = chapterIndex.value + 1
   if (typeof catalog.value[index] !== 'undefined') {
@@ -404,6 +508,7 @@ const toNextChapter = () => {
   }
 }
 const toPreChapter = () => {
+  pauseAutoPage()
   store.setContentLoading(true)
   const index = chapterIndex.value - 1
   if (typeof catalog.value[index] !== 'undefined') {
@@ -425,6 +530,9 @@ let canJump = true
 // 监听方向键
 const handleKeyPress = (event: KeyboardEvent) => {
   if (!canJump) return
+  if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(event.key)) {
+    pauseAutoPage()
+  }
   switch (event.key) {
     case 'ArrowLeft':
       event.stopPropagation()
@@ -479,6 +587,10 @@ const ignoreKeyPress = (event: KeyboardEvent) => {
 
 onMounted(async () => {
   await store.loadWebConfig()
+  if (store.config.autoPage) startAutoPage()
+  window.addEventListener('wheel', onUserWheel, { passive: true })
+  window.addEventListener('touchstart', onUserTouch, { passive: true })
+  window.addEventListener('touchmove', onUserTouchMove, { passive: true })
   //获取书籍数据
   const bookUrl = sessionStorage.getItem('bookUrl')
   const name = sessionStorage.getItem('bookName')
@@ -531,8 +643,16 @@ onUnmounted(() => {
   window.removeEventListener('keyup', handleKeyPress)
   window.removeEventListener('keydown', ignoreKeyPress)
   window.removeEventListener('resize', onResize)
+  window.removeEventListener('wheel', onUserWheel)
+  window.removeEventListener('touchstart', onUserTouch)
+  window.removeEventListener('touchmove', onUserTouchMove)
   // 兼容Safari < 14
   document.removeEventListener('visibilitychange', onVisibilityChange)
+  stopAutoPage()
+  if (autoPageResumeTimer) {
+    window.clearTimeout(autoPageResumeTimer)
+    autoPageResumeTimer = undefined
+  }
   readSettingsVisible.value = false
   popCataVisible.value = false
   scrollObserver?.disconnect()

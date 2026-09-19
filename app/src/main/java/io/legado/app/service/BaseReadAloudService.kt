@@ -39,6 +39,8 @@ import io.legado.app.constant.Status
 import io.legado.app.domain.model.AiReasoningLevel
 import io.legado.app.domain.model.PlaybackTimer
 import io.legado.app.domain.model.readaloud.CanonicalSpeechParagraph
+import io.legado.app.domain.model.readaloud.ContentSplitPolicies
+import io.legado.app.domain.model.readaloud.ContentSplitPolicy
 import io.legado.app.domain.model.readaloud.ReadAloudPlaybackCursor
 import io.legado.app.domain.model.readaloud.ReadAloudPlaybackInfo
 import io.legado.app.domain.model.readaloud.ReadAloudPlaybackQueue
@@ -46,6 +48,8 @@ import io.legado.app.domain.model.readaloud.ReadAloudSessionStatus
 import io.legado.app.domain.model.readaloud.SpeechAnalysisMode
 import io.legado.app.domain.model.readaloud.SpeechPlanItem
 import io.legado.app.domain.model.readaloud.resolveReadAloudStartPosition
+import io.legado.app.domain.model.settings.ReadAloudContentSplitMode
+import io.legado.app.domain.model.settings.ReadAloudTimerMode
 import io.legado.app.domain.usecase.PrepareChapterSpeechPlanUseCase
 import io.legado.app.feature.reader.core.readaloud.ReaderReadAloudChapter
 import io.legado.app.help.MediaHelp
@@ -228,6 +232,14 @@ abstract class BaseReadAloudService : BaseService(),
     private var androidMediaControlEnabled = ReadConfig.androidMediaControlEnabled
     private val finishChapterTimerLock = Any()
     private var finishChapterAtIndex = NO_FINISH_CHAPTER
+
+    /**
+     * 章节定时的剩余章数；`null` 表示未开启。
+     *
+     * 与 [finishChapterAtIndex] 一样只在 [finishChapterTimerLock] 下读写：两者在同一处
+     * 章末判定里一起被消费，分开加锁会出现「臂标已清除但计数没减」的中间态。
+     */
+    private var chapterQuota: Int? = null
     private var prepareReadAloudJob: Coroutine<*>? = null
     private var prepareReadAloudGeneration = 0L
     private var cover: Bitmap =
@@ -235,8 +247,6 @@ abstract class BaseReadAloudService : BaseService(),
     var pageChanged = false
     private var toLast = false
     var paragraphStartPos = 0
-    var readAloudByPage = false
-        private set
 
     /** 当前朗读段在章节语义文本中的绝对起始位置；页内切段不引入换行符，进度必须以它为准 */
     protected fun paragraphChapterPositionAt(index: Int): Int? =
@@ -280,10 +290,7 @@ abstract class BaseReadAloudService : BaseService(),
         initBroadcastReceiver()
         initPhoneStateListener()
         upMediaSessionPlaybackState(PlaybackStateCompat.STATE_PLAYING)
-        setTimer(ReadConfig.ttsTimer)
-        if (timeMinute > 0) {
-            toastOnUi("朗读定时 $timeMinute 分钟")
-        }
+        applyPersistedTimer()
         execute {
             ImageLoader
                 .loadBitmap(this@BaseReadAloudService, ReadBook.book?.getDisplayCover())
@@ -369,6 +376,8 @@ abstract class BaseReadAloudService : BaseService(),
             IntentAction.next -> nextChapter()
             IntentAction.addTimer -> addTimer()
             IntentAction.setTimer -> setTimer(intent.getIntExtra("minute", 0))
+            IntentAction.setTimerChapters ->
+                setTimerChapters(intent.getIntExtra("chapters", 0))
             IntentAction.stop -> stopReadAloudService()
         }
         return super.onStartCommand(intent, flags, startId)
@@ -396,12 +405,15 @@ abstract class BaseReadAloudService : BaseService(),
                 AppLog.put("启动朗读失败：章节分页未完成 chapterIndex=${input.chapter.index}")
                 return@execute
             }
+            val contentSplitMode = resolveContentSplitMode()
             val preparedChapter = ReaderReadAloudChapter.create(
                 chapterIndex = input.chapter.index,
                 title = input.displayTitle,
                 semanticContent = input.source.semanticContent,
                 pageStarts = pagination.pageStarts,
+                contentSplitMode = contentSplitMode,
             )
+            val splitPolicy = contentSplitPolicy(contentSplitMode)
             val start = resolveReadAloudStartPosition(
                 requestedPageIndex = requestedPageIndex,
                 requestedOffsetInPage = requestedStartPos,
@@ -411,10 +423,14 @@ abstract class BaseReadAloudService : BaseService(),
             )
             val pageIndex = start.pageIndex
             val startPos = start.offsetInPage
-            val preparedReadAloudByPage = ReadConfig.readAloudByPage
+            val preparedReadAloudByPage =
+                contentSplitMode == ReadAloudContentSplitMode.Page
             var preparedReadAloudNumber = preparedChapter.pageStart(pageIndex) + startPos
             val startsAtChapterBeginning = preparedReadAloudNumber == 0
-            val preparedParagraphs = preparedChapter.paragraphs(preparedReadAloudByPage)
+            val preparedParagraphs = preparedChapter.paragraphs(
+                splitByPage = preparedReadAloudByPage,
+                policy = splitPolicy,
+            )
             var preparedContentList = preparedParagraphs
                 .map { it.text.replace(Regex("[袮祢꧁\uFFFC]"), " ") }
             var preparedContentChapterPositions: List<Int?> =
@@ -422,7 +438,11 @@ abstract class BaseReadAloudService : BaseService(),
             val preparedSpeechPlan = buildSpeechPlan(
                 bookUrl = ReadBook.book?.bookUrl.orEmpty(),
                 chapterIndex = ReadBook.durChapterIndex,
-                paragraphs = preparedChapter.canonicalSpeechParagraphs(),
+                paragraphs = preparedChapter.canonicalSpeechParagraphs(
+                    splitByPage = preparedReadAloudByPage,
+                    policy = splitPolicy,
+                ),
+                splitPolicy = splitPolicy,
             )
             if (generation != prepareReadAloudGeneration) return@execute
             var preparedPlaybackQueue = runCatching {
@@ -435,7 +455,8 @@ abstract class BaseReadAloudService : BaseService(),
             val usePreparedPlaybackQueue = useSpeechPlaybackQueue && !preparedPlaybackQueue.isEmpty
             var preparedNowSpeak = preparedChapter.paragraphIndexAtOrAfter(
                 preparedReadAloudNumber + 1,
-                preparedReadAloudByPage,
+                splitByPage = preparedReadAloudByPage,
+                policy = splitPolicy,
             )
             if (!usePreparedPlaybackQueue && preparedNowSpeak !in preparedContentList.indices) {
                 AppLog.put(
@@ -492,7 +513,6 @@ abstract class BaseReadAloudService : BaseService(),
             if (generation != prepareReadAloudGeneration) return@execute
             this@BaseReadAloudService.pageIndex = pageIndex
             readerReadAloudChapter = preparedChapter
-            readAloudByPage = preparedReadAloudByPage
             contentList = preparedContentList
             contentChapterPositions = preparedContentChapterPositions
             speechPlan = preparedSpeechPlan
@@ -519,6 +539,7 @@ abstract class BaseReadAloudService : BaseService(),
         bookUrl: String,
         chapterIndex: Int,
         paragraphs: List<CanonicalSpeechParagraph>,
+        splitPolicy: ContentSplitPolicy,
     ): List<SpeechPlanItem> {
         if (bookUrl.isEmpty() || !ReadConfig.useMultiSpeaker) return emptyList()
         val prepareSpeechPlan: PrepareChapterSpeechPlanUseCase =
@@ -534,11 +555,37 @@ abstract class BaseReadAloudService : BaseService(),
                     AiReasoningLevel.OFF,
                 ),
                 useMultiSpeaker = ReadConfig.useMultiSpeaker,
+                policy = splitPolicy,
             )
         }.onFailure {
             AppLog.put("生成多角色朗读计划失败，使用原朗读方式\n${it.localizedMessage}", it)
         }.getOrDefault(emptyList())
     }
+
+    /**
+     * 把用户选择的划分方式解析成实际生效的划分方式。
+     *
+     * 章节划分与播放单元划分都必须经这里解析：`ReaderReadAloudChapter.create` 的切分在
+     * 建章节时完成，若它拿到未解析的「默认」而 `paragraphs(policy)` 拿到解析后的整段，
+     * 两侧粒度就会不一致（多角色开关变化后尤其明显）。
+     */
+    protected fun resolveContentSplitMode(
+        mode: ReadAloudContentSplitMode = ReadAloudContentSplitMode.fromStorage(
+            ReadConfig.contentSplitMode
+        ),
+    ): ReadAloudContentSplitMode =
+        ContentSplitPolicies.resolve(mode, ReadConfig.useMultiSpeaker)
+
+    /** 当前生效的内容划分策略，供朗读服务与预合成共用。 */
+    protected fun contentSplitPolicy(
+        mode: ReadAloudContentSplitMode = ReadAloudContentSplitMode.fromStorage(
+            ReadConfig.contentSplitMode
+        ),
+    ): ContentSplitPolicy =
+        ContentSplitPolicies.forMode(
+            mode = resolveContentSplitMode(mode),
+            storedSymbols = ReadConfig.contentSplitSymbols,
+        )
 
     @SuppressLint("WakelockTimeout")
     open fun play() {
@@ -669,6 +716,8 @@ abstract class BaseReadAloudService : BaseService(),
             title = input.displayTitle,
             semanticContent = input.source.semanticContent,
             pageStarts = pagination.pageStarts,
+            contentSplitMode = readerReadAloudChapter?.contentSplitMode
+                ?: resolveContentSplitMode(),
         )
         val latestPageIndex = latestChapter.pageIndexAt((currentProgress - 1).coerceAtLeast(0))
         readerReadAloudChapter = latestChapter
@@ -801,20 +850,70 @@ abstract class BaseReadAloudService : BaseService(),
         refreshMediaSessionPlaybackState()
     }
 
+    /**
+     * 按持久化设置恢复定时。
+     *
+     * 两种模式互斥：分钟模式起倒计时，章节模式只装剩余章数（到数后停在章末，由
+     * [completeCurrentChapter] 消费），因此这里不需要清另一侧的臂标。
+     */
+    private fun applyPersistedTimer() {
+        when (ReadAloudTimerMode.fromStorage(ReadConfig.readAloudTimerMode)) {
+            ReadAloudTimerMode.Minute -> {
+                val minutes = PlaybackTimer.normalize(ReadConfig.ttsTimer)
+                timeMinute = minutes
+                doDs()
+                if (minutes > 0) {
+                    toastOnUi(appCtx.getString(R.string.timer_m, minutes))
+                }
+            }
+
+            ReadAloudTimerMode.Chapter -> {
+                val chapters = PlaybackTimer.normalizeChapters(ReadConfig.readAloudTimerChapters)
+                synchronized(finishChapterTimerLock) { chapterQuota = chapters.takeIf { it > 0 } }
+                sessionStore.updateTimer(PlaybackTimer.MIN_MINUTES)
+                if (chapters > 0) {
+                    toastOnUi(appCtx.getString(R.string.timer_chapters, chapters))
+                }
+            }
+        }
+    }
+
+    /**
+     * 设置分钟倒计时。
+     *
+     * 只清章节配额（两种模式互斥），**不碰** [finishChapterAtIndex]：「读完本章再停」是
+     * 分钟模式的修饰项，用户调分钟数不应顺手取消一个已经在等的章末停读。
+     */
     private fun setTimer(minute: Int) {
-        clearFinishChapterTimer()
+        synchronized(finishChapterTimerLock) { chapterQuota = null }
         timeMinute = minute
         doDs()
     }
 
     private fun addTimer() {
-        clearFinishChapterTimer()
+        synchronized(finishChapterTimerLock) { chapterQuota = null }
         timeMinute = PlaybackTimer.addIncrement(timeMinute)
         doDs()
     }
 
     /**
-     * 定时
+     * 章节定时剩余章数。
+     *
+     * 只动配额、不清 [finishChapterAtIndex]：章节模式的语义是「再读 N 章就停」，
+     * 换章不算取消。用户改用分钟模式时才交给 [setTimer] 一起清。
+     */
+    private fun setTimerChapters(chapters: Int) {
+        synchronized(finishChapterTimerLock) {
+            chapterQuota = PlaybackTimer.normalizeChapters(chapters).takeIf { it > 0 }
+        }
+    }
+
+    /**
+     * 分钟倒计时。
+     *
+     * 到点时若用户勾了「读完本章再停」，就给 [finishChapterAtIndex] 装臂标，由
+     * [completeCurrentChapter] 在章末停；否则立刻停。章节模式是另一条独立路径
+     * （[chapterQuota]），两者不会互相清除。
      */
     @Synchronized
     private fun doDs() {
@@ -1060,13 +1159,6 @@ abstract class BaseReadAloudService : BaseService(),
             AppConfigStore.observeBoolean(PreferKey.mediaButtonPerNext)
                 .drop(1)
                 .collect { upReadAloudNotification() }
-        }
-        lifecycleScope.launch {
-            AppConfigStore.observeBoolean(PreferKey.finishCurrentChapterAfterTimer)
-                .drop(1)
-                .collect { enabled ->
-                    if (enabled != true) clearFinishChapterTimer()
-                }
         }
     }
 
@@ -1338,7 +1430,8 @@ abstract class BaseReadAloudService : BaseService(),
     abstract fun aloudServicePendingIntent(actionStr: String): PendingIntent?
 
     open fun prevChapter() {
-        clearFinishChapterTimer()
+        // 只清分钟模式装的章末臂标；章节配额的计数跨章保留，否则「读 N 章」永远数不满
+        clearFinishChapterFlag()
         ReadBook.upReadTime()
         toLast = false
         resumeReadAloudInternal()
@@ -1346,7 +1439,7 @@ abstract class BaseReadAloudService : BaseService(),
     }
 
     open fun nextChapter() {
-        clearFinishChapterTimer()
+        clearFinishChapterFlag()
         ReadBook.upReadTime()
         AppLog.putDebug("${readerReadAloudChapter?.title} 朗读结束跳转下一章并朗读")
         resumeReadAloudInternal()
@@ -1363,10 +1456,13 @@ abstract class BaseReadAloudService : BaseService(),
                 durChapterIndex = ReadBook.durChapterIndex,
                 finishedChapterIndex = chapterIndex,
                 finishChapterAtIndex = finishChapterAtIndex,
-                finishChapterSettingEnabled = ReadConfig.finishCurrentChapterAfterTimer,
+                chapterQuota = chapterQuota,
             )
             if (decision.clearTimer) {
                 finishChapterAtIndex = NO_FINISH_CHAPTER
+            }
+            if (decision.remainingChapters != null) {
+                chapterQuota = decision.remainingChapters
             }
             when (decision.action) {
                 ChapterCompletionAction.STOP -> {
@@ -1384,9 +1480,18 @@ abstract class BaseReadAloudService : BaseService(),
         }
     }
 
+    /** 清掉分钟模式装的章末臂标；章节配额不动。 */
+    private fun clearFinishChapterFlag() {
+        synchronized(finishChapterTimerLock) {
+            finishChapterAtIndex = NO_FINISH_CHAPTER
+        }
+    }
+
+    /** 两种定时一起清：取消定时或切换模式时用。 */
     private fun clearFinishChapterTimer() {
         synchronized(finishChapterTimerLock) {
             finishChapterAtIndex = NO_FINISH_CHAPTER
+            chapterQuota = null
         }
     }
 
@@ -1528,22 +1633,30 @@ internal fun nextMediaSessionPositionMs(
 internal const val NO_FINISH_CHAPTER = -1
 
 internal enum class ChapterCompletionAction {
-    /** Timer expired during this chapter — stop read-aloud now. */
+    /** 定时到点 / 章节配额读完 —— 停在当前章末。 */
     STOP,
-    /** No finish-chapter intent — continue to the next chapter. */
+
+    /** 没有停读意图 —— 继续下一章。 */
     ADVANCE,
-    /** The chapter already advanced concurrently — do nothing. */
+
+    /** 章节已经并发推进 —— 什么都不做。 */
     SKIP,
 }
 
 internal data class ChapterCompletionDecision(
     val action: ChapterCompletionAction,
     val clearTimer: Boolean,
+    /** 非 null 时需要写回的新剩余章数（已扣掉刚读完的这一章）。 */
+    val remainingChapters: Int? = null,
 )
 
 /**
- * Decides what a natural chapter boundary should do against the "finish current
- * chapter after timer" state. Pure and thread-free so it can be unit tested.
+ * Decides what a natural chapter boundary should do against the timer state. Pure and
+ * thread-free so it can be unit tested.
+ *
+ * 两个来源：
+ * - `finishChapterAtIndex`：锚定的章节读完了（分钟定时到点时装的臂标）；
+ * - `chapterQuota`：章节定时的剩余章数，每读完一章扣一，扣到 0 时停。
  *
  * SKIP 只保留给"章已推进且臂标不属于已读完章节"的双重触发竞态（臂标消费后为
  * NO_FINISH，自然落入该分支）。臂标锚定的章节自然读完时必须 STOP：
@@ -1553,7 +1666,7 @@ internal fun decideChapterCompletion(
     durChapterIndex: Int,
     finishedChapterIndex: Int,
     finishChapterAtIndex: Int,
-    finishChapterSettingEnabled: Boolean,
+    chapterQuota: Int?,
 ): ChapterCompletionDecision {
     if (durChapterIndex != finishedChapterIndex &&
         finishChapterAtIndex != finishedChapterIndex
@@ -1564,13 +1677,31 @@ internal fun decideChapterCompletion(
             clearTimer = false,
         )
     }
+    val remaining = chapterQuota?.let { PlaybackTimer.consumeChapter(it) }
     return when {
-        finishChapterAtIndex == NO_FINISH_CHAPTER ->
-            ChapterCompletionDecision(ChapterCompletionAction.ADVANCE, clearTimer = false)
-        finishChapterAtIndex != finishedChapterIndex || !finishChapterSettingEnabled ->
-            ChapterCompletionDecision(ChapterCompletionAction.ADVANCE, clearTimer = true)
-        else ->
-            ChapterCompletionDecision(ChapterCompletionAction.STOP, clearTimer = true)
+        remaining == 0 -> ChapterCompletionDecision(
+            action = ChapterCompletionAction.STOP,
+            clearTimer = true,
+            remainingChapters = remaining,
+        )
+
+        finishChapterAtIndex == NO_FINISH_CHAPTER -> ChapterCompletionDecision(
+            action = ChapterCompletionAction.ADVANCE,
+            clearTimer = false,
+            remainingChapters = remaining,
+        )
+
+        finishChapterAtIndex != finishedChapterIndex -> ChapterCompletionDecision(
+            action = ChapterCompletionAction.ADVANCE,
+            clearTimer = true,
+            remainingChapters = remaining,
+        )
+
+        else -> ChapterCompletionDecision(
+            action = ChapterCompletionAction.STOP,
+            clearTimer = true,
+            remainingChapters = remaining,
+        )
     }
 }
 

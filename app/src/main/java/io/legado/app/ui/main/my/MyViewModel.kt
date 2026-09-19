@@ -40,10 +40,16 @@ sealed class PrefClickEvent {
 sealed interface MyIntent {
     data object ToggleWebService : MyIntent
     data class SetEInkMode(val enabled: Boolean) : MyIntent
+
+    /** 本地网络权限授予后由界面触发，避免再次进入申请分支。 */
+    data object StartWebService : MyIntent
 }
 
 sealed interface MyEffect {
     data object EnterEInkMode : MyEffect
+
+    /** Android 17 起 Web 服务需要先获得本地网络权限才能被其他设备访问。 */
+    data object RequestLocalNetworkPermission : MyEffect
 }
 
 class MyViewModel(
@@ -96,15 +102,14 @@ class MyViewModel(
     fun onIntent(intent: MyIntent) {
         when (intent) {
             MyIntent.ToggleWebService -> {
-                val currentIsRun = _uiState.value.isWebServiceRun
-
-                if (!currentIsRun) {
-                    WebService.start(context)
-                } else {
+                if (_uiState.value.isWebServiceRun) {
                     WebService.stop(context)
                     _uiState.update { it.copy(isWebServiceRun = false, webServiceAddress = "") }
+                } else if (WebService.hasLocalNetworkPermission(context)) {
+                    WebService.start(context)
+                } else {
+                    _effects.tryEmit(MyEffect.RequestLocalNetworkPermission)
                 }
-
             }
             is MyIntent.SetEInkMode -> viewModelScope.launch {
                 // 偏好先落盘再发进入效果：中断最坏态是「开关已开、未跳转」，
@@ -112,6 +117,8 @@ class MyViewModel(
                 labSettingsGateway.update { it.copy(eInkMode = intent.enabled) }
                 if (intent.enabled) _effects.tryEmit(MyEffect.EnterEInkMode)
             }
+
+            MyIntent.StartWebService -> WebService.start(context)
         }
     }
 

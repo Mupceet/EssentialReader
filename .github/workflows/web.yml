@@ -3,6 +3,9 @@ name: Build Web
 on:
   push:
     branches:
+      # 上游默认分支是 main、本仓库默认分支是 master；「自动提交产物」步骤要匹配
+      # 默认分支才触发，两个都列以同时覆盖两边（原上游只写 master 时从未触发过）。
+      - main
       - master
     paths:
       - '**/modules/web/**'
@@ -10,6 +13,11 @@ on:
     paths:
       - '**/modules/web/**'
   workflow_dispatch:
+
+# git-auto-commit-action 要往默认分支提交 app/src/main/assets/web/vue/**，需要写权限；
+# 缺这段时 GITHUB_TOKEN 默认只读，push changes 会 403（与 auto-release.yml 的写法一致）。
+permissions:
+  contents: write
 
 
 jobs:

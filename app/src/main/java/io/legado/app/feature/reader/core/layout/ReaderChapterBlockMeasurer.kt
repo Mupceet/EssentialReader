@@ -94,11 +94,23 @@ class ReaderChapterBlockMeasurer(
     private val htmlSourceResolver: ReaderHtmlSourceResolver = ReaderHtmlSourceResolver { _, _ -> null },
     private val imageOptionsResolver: ReaderImageOptionsResolver = ReaderImageOptionsResolver { null },
 ) {
+    /**
+     * 测量整章。给出 [onBlock] 时每产出一个 block 就立即回调——旧 View
+     * `TextChapterLayout` 边排版边 `channel.trySend`，分页光标因此可以在测量过程中推进，
+     * 首屏不必等整章测完（见 `ReaderPaginationSession`）。
+     */
     suspend fun measure(
         source: ReaderChapterSource,
         style: ReaderChapterMeasureStyle,
+        onBlock: ((ReaderMeasuredBlock) -> Unit)? = null,
     ): ReaderChapterMeasureResult {
-        val blocks = ArrayList<ReaderMeasuredBlock>(source.blocks.size)
+        // `blocks += x` 就是 `add(x)`：覆写 add 即可在每个追加点回调，无需在六处追加点重复。
+        val blocks = object : ArrayList<ReaderMeasuredBlock>(source.blocks.size) {
+            override fun add(element: ReaderMeasuredBlock): Boolean {
+                onBlock?.invoke(element)
+                return super.add(element)
+            }
+        }
         val shapers = mutableMapOf<ReaderTextStyle, ReaderTextShaper>()
         fun shaper(textStyle: ReaderTextStyle) = shapers.getOrPut(textStyle) {
             textShaperFactory.create(textStyle)
@@ -119,7 +131,7 @@ class ReaderChapterBlockMeasurer(
             alignmentOverride: ReaderTextAlignment? = null,
             decorations: List<ReaderParagraphDecoration> = emptyList(),
             justifyAtWordBoundaries: Boolean = false,
-        ): ReaderChapterMeasureResult.Unsupported? {
+        ) {
             val baseStyle = if (isTitle) style.titleStyle.copy(
                 fontSizePx = style.titleStyle.fontSizePx * titleScale,
             ) else style.bodyStyle
@@ -140,7 +152,7 @@ class ReaderChapterBlockMeasurer(
                         style.titleLineSpacingMultiplier
                     } else style.bodyLineSpacingMultiplier,
                 )
-                return null
+                return
             }
             val firstText = items.firstOrNull() as? ReaderChapterInlineSource.Text
             val prefixEnd = firstText?.takeIf {
@@ -243,8 +255,8 @@ class ReaderChapterBlockMeasurer(
                         }
                     }
                     is ReaderChapterInlineSource.Image -> {
-                        // 段评开关关闭：带动作脚本的行内图（段评气泡）整体不参与排版，
-                        // 且在图片尺寸解析之前跳过（不触发任何取图请求）
+                        // excludeActionImages 开启时：带动作脚本的行内图（段评气泡）整体
+                        // 不参与排版，且在图片尺寸解析之前跳过（不触发任何取图请求）
                         val options = imageOptionsResolver.resolve(item.source)
                         if (style.excludeActionImages && options?.action != null) {
                             droppedActionImage = true
@@ -284,15 +296,16 @@ class ReaderChapterBlockMeasurer(
                                 pageBreakAfter = mode == ReaderImageLayoutMode.SINGLE_PAGE,
                             )
                         } else {
-                            // 文字嵌入（行内图）：与 View 实现一致，图片作为段内占位参与行排版，
-                            // 只允许缩小到不超过当前行高（禁止放大到铺满整页文字区）。行高上限
-                            // 让紧随其后的内容保持与行内占位一致且稳定的几何。
-                            val maxHeight = lineHeight ?: baseStyle.fontSizePx
-                            val scale = minOf(1f, maxHeight / size.heightPx.coerceAtLeast(1f))
+                            // 文字嵌入（行内图）：对照旧 `TextChapterLayout` 的 ImageColumn —— 占位宽
+                            // 恒为**一个字符格**（旧版就是替换字 袮/祢 的宽度），高按原图比例从该宽度
+                            // 换算，因此立图可以高于当前行；扁平宽图只占一格宽、很矮。
+                            val cellWidthPx = baseStyle.fontSizePx
+                            val aspect =
+                                size.heightPx.coerceAtLeast(1f) / size.widthPx.coerceAtLeast(1f)
                             inline += ReaderMeasuredInlineItem.Image(
                                 source = item.source,
-                                widthPx = size.widthPx * scale,
-                                heightPx = size.heightPx * scale,
+                                widthPx = cellWidthPx,
+                                heightPx = cellWidthPx * aspect,
                                 chapterPosition = item.chapterPosition,
                                 action = options?.action,
                             )
@@ -304,7 +317,6 @@ class ReaderChapterBlockMeasurer(
             // 被剔除的段评图视同独立图参与空白抑制：整行图片段自带的缩进/空白
             // 填充不再残留为空行（与「图不存在」的排版等价）
             flushInline(skipBlank = hasStandaloneImage || droppedActionImage)
-            return null
         }
         source.blocks.forEachIndexed { index, block ->
             when (block) {
@@ -314,7 +326,7 @@ class ReaderChapterBlockMeasurer(
                         block.isTitle,
                         block.fontSizeScale,
                         block.isSubtitle,
-                    )?.let { return it }
+                    )
                     // 旧 TextChapterLayout 在单图样式的标题段排版完（`durY += titleBottomSpacing`
                     // 之后）直接 `prepareNextPageIfNeed()`——无参调用无条件结束当前页，于是标题
                     // 独占一页、正文从下一页开始。标题分成多段时只在最后一段之后断页。
@@ -351,7 +363,7 @@ class ReaderChapterBlockMeasurer(
                     )
                 }
                 is ReaderChapterSourceBlock.Paragraph -> {
-                    addStyledParagraph(block.items, false)?.let { return it }
+                    addStyledParagraph(block.items, false)
                 }
                 is ReaderChapterSourceBlock.Html -> {
                     val paragraphs = try {
@@ -372,7 +384,7 @@ class ReaderChapterBlockMeasurer(
                             alignmentOverride = paragraph.alignment,
                             decorations = paragraph.decorations,
                             justifyAtWordBoundaries = true,
-                        )?.let { return it }
+                        )
                     }
                 }
                 is ReaderChapterSourceBlock.PageBreak -> blocks += ReaderMeasuredBlock.PageBreak

@@ -1,5 +1,6 @@
 package io.legado.app.ui.main
 
+import android.Manifest
 import android.content.Context
 import android.content.Intent
 import android.content.res.Configuration
@@ -9,6 +10,7 @@ import android.view.InputDevice
 import android.view.KeyEvent
 import android.view.MotionEvent
 import androidx.activity.compose.BackHandler
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedContentTransitionScope
 import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.animation.SharedTransitionLayout
@@ -19,12 +21,16 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleOut
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.snapshotFlow
+import androidx.compose.ui.Modifier
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
@@ -38,6 +44,7 @@ import io.legado.app.BuildConfig
 import io.legado.app.R
 import io.legado.app.base.BaseComposeActivity
 import io.legado.app.constant.AppConst.appInfo
+import io.legado.app.data.repository.ReadAloudSettingsRepository
 import io.legado.app.domain.gateway.BackupSettingsGateway
 import io.legado.app.domain.gateway.MangaSettingsGateway
 import io.legado.app.domain.gateway.OtherSettingsGateway
@@ -58,11 +65,14 @@ import io.legado.app.ui.book.audio.AudioPlayViewModel
 import io.legado.app.ui.book.read.ReadBookInputHandler
 import io.legado.app.ui.book.read.ReadBookRouteHost
 import io.legado.app.ui.book.read.page.entities.PageDirection
+import io.legado.app.ui.book.readaloud.ReadAloudShellHost
+import io.legado.app.ui.book.readaloud.player.ReadAloudPlayerViewModel
 import io.legado.app.ui.theme.LocalAppUiConfiguration
 import io.legado.app.ui.welcome.WelcomeActivity
 import io.legado.app.utils.LogUtils
 import io.legado.app.utils.showDialogFragment
 import io.legado.app.utils.startActivity
+import io.legado.app.utils.toastOnUi
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers.IO
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -286,10 +296,20 @@ open class MainActivity : BaseComposeActivity(), AudioPlay.CallBack {
     private val otherSettingsGateway by inject<OtherSettingsGateway>()
     private val mangaSettingsGateway by inject<MangaSettingsGateway>()
     private val backupSettingsGateway by inject<BackupSettingsGateway>()
+    private val readAloudSettingsRepository by inject<ReadAloudSettingsRepository>()
+    private val navRouteTracker by inject<MainNavRouteTracker>()
     private val routeEvents = MutableSharedFlow<RouteEvent>(extraBufferCapacity = 1)
+    private val localNetworkPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (granted) {
+            WebService.startForeground(this)
+        } else {
+            toastOnUi(R.string.web_service_local_network_permission_denied)
+        }
+    }
     private var shouldApplyDefaultToRead = true
     private var restoredReadBookRoute: MainRouteReadBook? = null
-    private var latestBackStack: List<NavKey> = emptyList()
     internal var activeReadBookInputHandler: ReadBookInputHandler? = null
     internal var activeReadBookRoute: MainRouteReadBook? = null
     internal var activeMangaKeyHandler: ((Int) -> Boolean)? = null
@@ -312,9 +332,12 @@ open class MainActivity : BaseComposeActivity(), AudioPlay.CallBack {
             otherSettingsGateway.currentSettings.autoCheckUpdateOnStart
         )
 
-        // 智能自启：如果上次是手动开启状态（web_service_auto 为 true），则自启
-        if (otherSettingsGateway.currentSettings.webServiceAutoStart) {
-            WebService.startForeground(this)
+        // 智能自启：如果上次是手动开启状态（web_service_auto 为 true），则自启；
+        // 本地网络权限缺失时先申请，磁贴等入口也通过该 extra 转发到这里。
+        val requestWebService = otherSettingsGateway.currentSettings.webServiceAutoStart ||
+                intent?.getBooleanExtra(MainIntent.EXTRA_WEB_SERVICE_LOCAL_NETWORK, false) == true
+        if (requestWebService) {
+            startWebServiceWithLocalNetworkPermission()
         }
 
         lifecycleScope.launch {
@@ -333,9 +356,25 @@ open class MainActivity : BaseComposeActivity(), AudioPlay.CallBack {
         }
     }
 
+    /**
+     * Android 17 (API 37) 起 Web 服务需要本地网络权限才能接受局域网入站连接。
+     * 已授予直接启动；未授予先申请，授予后由 launcher 回调补启。
+     */
+    private fun startWebServiceWithLocalNetworkPermission() {
+        if (WebService.hasLocalNetworkPermission(this)) {
+            WebService.startForeground(this)
+        } else {
+            localNetworkPermissionLauncher.launch(Manifest.permission.ACCESS_LOCAL_NETWORK)
+        }
+    }
+
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
+        if (intent.getBooleanExtra(MainIntent.EXTRA_WEB_SERVICE_LOCAL_NETWORK, false)) {
+            startWebServiceWithLocalNetworkPermission()
+            return
+        }
         if (!intent.hasExplicitStartRoute()) return
         routeEvents.tryEmit(
             RouteEvent(
@@ -399,8 +438,17 @@ open class MainActivity : BaseComposeActivity(), AudioPlay.CallBack {
                 }
             }
         }
-        latestBackStack = startRoutes.toList()
         val backStack = rememberNavBackStack(*startRoutes)
+        SideEffect { navRouteTracker.onBackStackChanged(backStack) }
+
+        // 悬浮胶囊是全局叠层：数据来自全局朗读会话与设置，不依赖阅读器是否在栈上。
+        val pageShellPlayerViewModel: ReadAloudPlayerViewModel =
+            org.koin.compose.koinInject()
+        val pageShellPlayerState by pageShellPlayerViewModel.uiState.collectAsStateWithLifecycle()
+        val pageShellAloudSettings by pageShellPlayerViewModel.readAloudSettings
+            .collectAsStateWithLifecycle()
+        val pageShellShowCapsule = pageShellAloudSettings.showReadAloudCapsule
+        val pageShellCapsuleScope = rememberCoroutineScope()
 
         SideEffect {
             shouldApplyDefaultToRead = false
@@ -411,6 +459,7 @@ open class MainActivity : BaseComposeActivity(), AudioPlay.CallBack {
                 MainNavigator.navigateToRoute(
                     backStack = backStack,
                     route = event.route,
+                    tracker = navRouteTracker,
                     resetToHome = event.resetToHome,
                 )
             }
@@ -419,12 +468,17 @@ open class MainActivity : BaseComposeActivity(), AudioPlay.CallBack {
         LaunchedEffect(backStack) {
             snapshotFlow { backStack.toList() }
                 .collect {
-                    latestBackStack = it
+                    // 兜底同步：预测性返回、系统返回手势等不经过 navigateToRoute/navigateBack 的路径
+                    navRouteTracker.onBackStackChanged(it)
                     MainNavigator.onBackStackChanged()
                 }
         }
+        // 全局朗读胶囊据此判断听书页是否在最上层
+        val navBackStack by navRouteTracker.backStack.collectAsStateWithLifecycle()
+        val currentRoute = navBackStack.lastOrNull()
 
         SharedTransitionLayout {
+            Box(modifier = Modifier.fillMaxSize()) {
             NavDisplay(
                 backStack = backStack,
                 entryDecorators = listOf(
@@ -491,12 +545,36 @@ open class MainActivity : BaseComposeActivity(), AudioPlay.CallBack {
                     onNavigateToRoute = { route ->
                         MainNavigator.navigateToRoute(
                             backStack,
-                            route
+                            route,
+                            navRouteTracker,
                         )
                     },
-                    onNavigateBack = { MainNavigator.navigateBack(this@MainActivity, backStack) },
+                    onNavigateBack = {
+                        MainNavigator.navigateBack(this@MainActivity, backStack, navRouteTracker)
+                    },
                 )
             )
+                // 朗读悬浮胶囊叠在整个导航之上：阅读器只是其中一个目的地，
+                // 挂在阅读器里会导致离开阅读界面后胶囊消失。
+                ReadAloudShellHost(
+                    playerState = pageShellPlayerState,
+                    showCapsule = pageShellShowCapsule,
+                    hidden = currentRoute is MainRouteReadAloudPlayer,
+                    onIntent = pageShellPlayerViewModel::onIntent,
+                    onCapsulePositionChanged = { x, y ->
+                        pageShellCapsuleScope.launch {
+                            readAloudSettingsRepository.putCapsulePosition(x, y)
+                        }
+                    },
+                    onOpenPlayer = {
+                        MainNavigator.navigateToRoute(
+                            backStack,
+                            MainRouteReadAloudPlayer,
+                            navRouteTracker
+                        )
+                    },
+            )
+            }
             BackHandler(
                 enabled = !configuration.appShell.predictiveBackEnabled
             ) {
@@ -602,7 +680,7 @@ open class MainActivity : BaseComposeActivity(), AudioPlay.CallBack {
         if (otherSettingsGateway.currentSettings.autoRefresh) {
             outState.putBoolean("isAutoRefreshedBook", true)
         }
-        val readRoute = latestBackStack.lastOrNull() as? MainRouteReadBook
+        val readRoute = navRouteTracker.backStack.value.lastOrNull() as? MainRouteReadBook
             ?: activeReadBookRoute
         if (readRoute != null) {
             outState.putBoolean(KEY_RESTORE_READ_ROUTE, true)

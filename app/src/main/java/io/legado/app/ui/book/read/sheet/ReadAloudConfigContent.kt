@@ -9,6 +9,8 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -18,6 +20,9 @@ import androidx.compose.ui.unit.dp
 import io.legado.app.R
 import io.legado.app.constant.ReadAloudBgMode
 import io.legado.app.domain.model.AiReasoningLevel
+import io.legado.app.domain.model.readaloud.ReadAloudContentSplitSetting
+import io.legado.app.domain.model.readaloud.ReadAloudSplitSymbol
+import io.legado.app.domain.model.settings.ReadAloudContentSplitMode
 import io.legado.app.ui.book.read.ReadBookIntent
 import io.legado.app.ui.book.read.ReadBookUiState
 import io.legado.app.ui.book.readaloud.player.ReadAloudPlayerIntent
@@ -26,8 +31,11 @@ import io.legado.app.ui.widget.components.modalBottomSheet.AppModalBottomSheet
 import io.legado.app.ui.widget.components.settingItem.SliderSettingItem
 import io.legado.app.ui.widget.components.settingItem.TinyClickableSettingItem
 import io.legado.app.ui.widget.components.settingItem.TinyDropdownSettingItem
+import io.legado.app.ui.widget.components.settingItem.TinySettingItem
 import io.legado.app.ui.widget.components.settingItem.TinySwitchSettingItem
 import io.legado.app.ui.widget.components.tabRow.CardTabRow
+import kotlinx.collections.immutable.ImmutableSet
+import kotlinx.collections.immutable.toImmutableSet
 import kotlinx.coroutines.launch
 
 @Composable
@@ -37,6 +45,11 @@ fun ReadAloudConfigContent(
     onIntent: (ReadBookIntent) -> Unit,
     onPlayerIntent: (ReadAloudPlayerIntent) -> Unit,
     modifier: Modifier = Modifier,
+    /**
+     * true 表示内容被整页宿主承载，数值项就地铺开成滑块；
+     * false（默认）表示宿主是卡片弹层，数值项继续打开选择器弹层。
+     */
+    asPage: Boolean = false,
 ) {
     val pagerState = rememberPagerState(pageCount = { 2 })
     val scope = rememberCoroutineScope()
@@ -65,7 +78,7 @@ fun ReadAloudConfigContent(
                 modifier = Modifier
                     .fillMaxWidth()
                     .verticalScroll(rememberScrollState())
-                    .padding(top = 8.dp, bottom = 16.dp, start = 16.dp, end = 16.dp),
+                    .padding(top = 8.dp, bottom = 16.dp),
             ) {
                 if (page == 0) {
                     TinyDropdownSettingItem(
@@ -140,19 +153,19 @@ fun ReadAloudConfigContent(
                         },
                     )
                     TinySwitchSettingItem(
+                        title = stringResource(R.string.read_aloud_keep_on_exit),
+                        description = stringResource(R.string.read_aloud_keep_on_exit_summary),
+                        checked = state.readAloudKeepOnExit,
+                        onCheckedChange = {
+                            onIntent(ReadBookIntent.SetReadAloudKeepOnExit(it))
+                        },
+                    )
+                    TinySwitchSettingItem(
                         title = stringResource(R.string.pref_media_button_per_next),
                         description = stringResource(R.string.pref_media_button_per_next_summary),
                         checked = state.readAloudMediaButtonPerNext,
                         onCheckedChange = {
                             onIntent(ReadBookIntent.SetReadAloudMediaButtonPerNext(it))
-                        },
-                    )
-                    TinySwitchSettingItem(
-                        title = stringResource(R.string.read_aloud_by_page),
-                        description = stringResource(R.string.read_aloud_by_page_summary),
-                        checked = state.readAloudByPage,
-                        onCheckedChange = {
-                            onIntent(ReadBookIntent.SetReadAloudByPage(it))
                         },
                     )
                     TinySwitchSettingItem(
@@ -238,6 +251,71 @@ fun ReadAloudConfigContent(
                             onIntent(ReadBookIntent.SetSpeechAnalysisReasoningLevel(it))
                         },
                     )
+                    TinyDropdownSettingItem(
+                        title = stringResource(R.string.read_aloud_content_split_mode),
+                        selectedValue = state.readAloudContentSplitMode,
+                        displayEntries = arrayOf(
+                            stringResource(R.string.read_aloud_content_split_default),
+                            stringResource(R.string.read_aloud_content_split_paragraph),
+                            stringResource(R.string.read_aloud_content_split_page),
+                            stringResource(R.string.read_aloud_content_split_symbols),
+                        ),
+                        entryValues = ReadAloudContentSplitMode.entries
+                            .map { it.storageValue }
+                            .toTypedArray(),
+                        description = when (state.readAloudContentSplitMode) {
+                            ReadAloudContentSplitMode.Paragraph.storageValue ->
+                                stringResource(R.string.read_aloud_content_split_paragraph_summary)
+
+                            ReadAloudContentSplitMode.Page.storageValue ->
+                                stringResource(R.string.read_aloud_content_split_page_summary)
+
+                            ReadAloudContentSplitMode.Symbols.storageValue ->
+                                stringResource(R.string.read_aloud_content_split_symbols_summary)
+
+                            else ->
+                                stringResource(R.string.read_aloud_content_split_default_summary)
+                        },
+                        onValueChange = { value ->
+                            onIntent(
+                                ReadBookIntent.SetReadAloudContentSplitMode(
+                                    ReadAloudContentSplitSetting.encode(
+                                        mode = ReadAloudContentSplitMode.fromStorage(value),
+                                        symbols = state.readAloudContentSplitSymbols
+                                            .mapNotNull { it.firstOrNull() }
+                                            .ifEmpty { ReadAloudSplitSymbol.sentenceEnds },
+                                    )
+                                )
+                            )
+                        },
+                    )
+                    if (state.readAloudContentSplitMode ==
+                        ReadAloudContentSplitMode.Symbols.storageValue
+                    ) {
+                        // 未显式保存过标点时实际生效的是默认句末标点，界面必须显示同一集合，
+                        // 否则勾选框全空、朗读却仍按句末标点切分。
+                        val selected = state.readAloudContentSplitSymbols
+                            .mapNotNull { it.firstOrNull() }
+                            .toSet()
+                            .ifEmpty { ReadAloudSplitSymbol.sentenceEnds }
+                        ContentSplitSymbolSettingItem(
+                            selectedSymbols = selected.map(Char::toString).toImmutableSet(),
+                            onToggle = { symbol, checked ->
+                                // 至少保留一个标点：全部取消会让「按符号」退化成整段
+                                val next = if (checked) selected + symbol else selected - symbol
+                                if (next.isNotEmpty()) {
+                                    onIntent(
+                                        ReadBookIntent.SetReadAloudContentSplitMode(
+                                            ReadAloudContentSplitSetting.encode(
+                                                mode = ReadAloudContentSplitMode.Symbols,
+                                                symbols = next,
+                                            )
+                                        )
+                                    )
+                                }
+                            },
+                        )
+                    }
                     TinySwitchSettingItem(
                         title = stringResource(R.string.use_multi_speaker),
                         description = stringResource(R.string.use_multi_speaker_summary),
@@ -250,22 +328,74 @@ fun ReadAloudConfigContent(
                         title = stringResource(R.string.sys_tts_config),
                         onClick = { onIntent(ReadBookIntent.OpenSystemTtsSettings) },
                     )
-                    TinyClickableSettingItem(
-                        title = stringResource(R.string.read_aloud_preload),
-                        onClick = { onIntent(ReadBookIntent.OpenPreDownloadNumPicker) },
-                    )
-                    TinyClickableSettingItem(
-                        title = stringResource(R.string.tts_pre_synthesis_concurrency),
-                        onClick = { onIntent(ReadBookIntent.OpenPreSynthesisConcurrencyPicker) },
-                    )
-                    TinyClickableSettingItem(
-                        title = stringResource(R.string.tts_paragraph_interval),
-                        onClick = { onIntent(ReadBookIntent.OpenParagraphIntervalPicker) },
-                    )
-                    TinyClickableSettingItem(
-                        title = stringResource(R.string.audio_cache_clean_time),
-                        onClick = { onIntent(ReadBookIntent.OpenCacheCleanTimePicker) },
-                    )
+                    if (asPage) {
+                        // 整页宿主自己就是一层，数值项直接铺开成滑块：
+                        // 再叠一层选择器 sheet 会重新引入「sheet 套 sheet」的层级问题。
+                        ReadAloudNumberSliderItem(
+                            title = stringResource(R.string.read_aloud_preload),
+                            description = stringResource(
+                                R.string.read_aloud_preload_summary, state.preDownloadNum,
+                            ),
+                            value = state.preDownloadNum,
+                            defaultValue = 10,
+                            valueRange = 0f..100f,
+                            onValueChange = { onIntent(ReadBookIntent.ApplyPreDownloadNum(it)) },
+                        )
+                        ReadAloudNumberSliderItem(
+                            title = stringResource(R.string.tts_pre_synthesis_concurrency),
+                            description = stringResource(
+                                R.string.tts_pre_synthesis_concurrency_summary,
+                                state.preSynthesisConcurrency,
+                            ),
+                            value = state.preSynthesisConcurrency,
+                            defaultValue = 3,
+                            valueRange = 1f..8f,
+                            onValueChange = {
+                                onIntent(ReadBookIntent.ApplyPreSynthesisConcurrency(it))
+                            },
+                        )
+                        ReadAloudNumberSliderItem(
+                            title = stringResource(R.string.tts_paragraph_interval),
+                            description = stringResource(
+                                R.string.tts_paragraph_interval_summary,
+                                state.readAloudParagraphInterval,
+                            ),
+                            value = state.readAloudParagraphInterval,
+                            defaultValue = 0,
+                            valueRange = 0f..5000f,
+                            onValueChange = { onIntent(ReadBookIntent.ApplyParagraphInterval(it)) },
+                        )
+                        ReadAloudNumberSliderItem(
+                            title = stringResource(R.string.audio_cache_clean_time),
+                            description = stringResource(
+                                R.string.audio_cache_clean_time_summary,
+                                state.audioCacheCleanTime,
+                            ),
+                            value = state.audioCacheCleanTime,
+                            defaultValue = 10,
+                            valueRange = 0f..10080f,
+                            onValueChange = { onIntent(ReadBookIntent.ApplyAudioCacheCleanTime(it)) },
+                        )
+                    } else {
+                        TinyClickableSettingItem(
+                            title = stringResource(R.string.read_aloud_preload),
+                            onClick = { onIntent(ReadBookIntent.OpenPreDownloadNumPicker) },
+                        )
+                        TinyClickableSettingItem(
+                            title = stringResource(R.string.tts_pre_synthesis_concurrency),
+                            onClick = {
+                                onIntent(ReadBookIntent.OpenPreSynthesisConcurrencyPicker)
+                            },
+                        )
+                        TinyClickableSettingItem(
+                            title = stringResource(R.string.tts_paragraph_interval),
+                            onClick = { onIntent(ReadBookIntent.OpenParagraphIntervalPicker) },
+                        )
+                        TinyClickableSettingItem(
+                            title = stringResource(R.string.audio_cache_clean_time),
+                            onClick = { onIntent(ReadBookIntent.OpenCacheCleanTimePicker) },
+                        )
+                    }
                     TinyClickableSettingItem(
                         title = stringResource(R.string.clear_cache),
                         onClick = { onIntent(ReadBookIntent.ClearTtsCache) },
@@ -274,6 +404,74 @@ fun ReadAloudConfigContent(
             }
         }
     }
+}
+
+/**
+ * 整页宿主用的数值项：直接铺开滑块，不再叠一层选择器弹层。
+ */
+@Composable
+private fun ReadAloudNumberSliderItem(
+    title: String,
+    description: String,
+    value: Int,
+    defaultValue: Int,
+    valueRange: ClosedFloatingPointRange<Float>,
+    onValueChange: (Int) -> Unit,
+) {
+    SliderSettingItem(
+        title = title,
+        description = description,
+        value = value.toFloat(),
+        defaultValue = defaultValue.toFloat(),
+        valueRange = valueRange,
+        onValueChange = { onValueChange(it.toInt()) },
+    )
+}
+
+/**
+ * 「按符号」划分方式的标点多选。
+ *
+ * 至少保留一个标点：全部取消会让「按符号」退化成整段，与用户刚选的划分方式矛盾。
+ */
+@Composable
+private fun ContentSplitSymbolSettingItem(
+    selectedSymbols: ImmutableSet<String>,
+    onToggle: (Char, Boolean) -> Unit,
+) {
+    var expanded by remember { mutableStateOf(false) }
+    TinySettingItem(
+        title = stringResource(R.string.read_aloud_content_split_symbols),
+        description = stringResource(R.string.read_aloud_content_split_selected_symbols) + ": " +
+                selectedSymbols.joinToString(" "),
+        expanded = expanded,
+        onExpandChange = { expanded = it },
+        expandContent = {
+            ReadAloudSplitSymbol.entries.forEach { option ->
+                TinySwitchSettingItem(
+                    title = stringResource(symbolLabelRes(option)),
+                    checked = option.symbol.toString() in selectedSymbols,
+                    onCheckedChange = { onToggle(option.symbol, it) },
+                )
+            }
+        },
+    )
+}
+
+private fun symbolLabelRes(option: ReadAloudSplitSymbol): Int = when (option) {
+    ReadAloudSplitSymbol.FullStop -> R.string.symbol_period
+    ReadAloudSplitSymbol.Exclamation -> R.string.symbol_exclamation
+    ReadAloudSplitSymbol.Question -> R.string.symbol_question
+    ReadAloudSplitSymbol.Ellipsis -> R.string.symbol_ellipsis
+    ReadAloudSplitSymbol.Semicolon -> R.string.symbol_semicolon
+    ReadAloudSplitSymbol.Comma -> R.string.symbol_comma
+    ReadAloudSplitSymbol.EnumerationComma -> R.string.symbol_enumeration_comma
+    ReadAloudSplitSymbol.Colon -> R.string.symbol_colon
+    ReadAloudSplitSymbol.Dot -> R.string.symbol_halfwidth_period
+    ReadAloudSplitSymbol.Bang -> R.string.symbol_halfwidth_exclamation
+    ReadAloudSplitSymbol.QuestionMark -> R.string.symbol_halfwidth_question
+    ReadAloudSplitSymbol.HalfSemicolon -> R.string.symbol_halfwidth_semicolon
+    ReadAloudSplitSymbol.HalfComma -> R.string.symbol_halfwidth_comma
+    ReadAloudSplitSymbol.HalfColon -> R.string.symbol_halfwidth_colon
 }
 
 @Composable
