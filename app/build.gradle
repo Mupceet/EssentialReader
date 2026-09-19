@@ -155,16 +155,15 @@ android {
 }
 
 dependencies {
-    // E-Ink 模块二进制消费（:modules:eink:publishToMavenLocal 发布；将来换远程坐标）
-    // 0.6.1-min21：0.6.0/0.6.1 全量契约面 + 依赖集整体降到 minSdk 21 档
-    // （BOM 2025.11.00/foundation 1.9.4/Coil 3.0.4/lifecycle-compose 2.8.7/
-    // activity 1.8.2/appcompat 1.7.0，六变量钉版孪生坐标）——面向
-    // Android 5.x 墨水屏设备；宿主自身依赖同步降到 ≤21（Coil 3.0.4）。
-    // 主栈/oldstack 产物依赖集要求 minSdk 23，本宿主降 21 后不可用
-    implementation 'io.legado.app.eink:eink:0.6.1-min21'
-    // bridge 适配层需要：契约 CoverEngine 签名暴露 Coil 类型；GlobalSettings 快照状态需 Compose runtime
+    // E-Ink 模块二进制消费：0.7.0 统一坐标（契约清理轮——CoverEngine 改
+    // 纯 Kotlin 字节端口、移除 setCacheWorkingState；依赖集保守档 BOM
+    // 2025.11.00 / Coil 3.0.4 / lifecycle 2.8.7，AAR minCompileSdk=35、
+    // Kotlin ≥2.3 可读；孪生坐标 -oldstack/-min21 已退役）。
+    // 源码集成形态见 eink/port/legado 分支（git 子模块）
+    implementation 'io.legado.app.eink:eink:0.7.0'
+    // GlobalSettings 快照状态需 Compose runtime；契约零图片框架类型，
+    // Coil 无需宿主自备（AAR runtime 域自动传递）
     implementation libs.compose.runtime
-    implementation libs.coil.compose
     //compileOnly "com.android.tools.build:gradle:$agp_version"
     //noinspection GradleDependency,GradlePackageUpdate
     //coreLibraryDesugaring('com.android.tools:desugar_jdk_libs_nio:2.0.4')
