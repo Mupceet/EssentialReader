@@ -1,0 +1,196 @@
+package io.legado.app.eink.contract
+
+import io.legado.app.eink.app.EInkKeyEventHub
+import io.legado.app.eink.contract.EInkEngineRegistry.install
+import io.legado.app.eink.contract.EInkEngineRegistry.keyEventHub
+
+/**
+ * E-Ink 引擎端口注册表（service locator）。
+ *
+ * :modules:eink 内的全部 ViewModel 经此获取宿主提供的引擎能力端口，
+ * 模块本身不依赖任何引擎类型 —— 这是「模块可整体嵌入任意 legado 系
+ * 上游」的关键。
+ *
+ * 装配与取用时序：
+ * ```text
+ * 宿主入口 attachBaseContext
+ *    └─ onInstallEngines() ──► 宿主 bridge（如 EInkBridge.install()）
+ *                                └─ install(8 个必填端口实现 + 可选 appUpdateEngine / selectionEngine / marksEngine / bookshelfGroupEngine)
+ *                                      └─ 静态注册表整体替换（last-wins）
+ *                                             │ keyEventHub 一并重建
+ *                                             ▼
+ * 模块侧任意取用（VM 构造 / Screen 组合 / 入口模板）
+ *    EInkEngineRegistry.readerEngine / globalSettings / tocEngine / …
+ *    └─ 已注册 ──► 返回端口实现
+ *    └─ 未注册 ──► IllegalStateException（指名缺失端口与修复入口）
+ * ```
+ *
+ * 不选择逐 ViewModel 注入 Factory 的原因：E-Ink 导航控制器
+ * （EInkNavController）使用默认 AndroidViewModelFactory 构造 VM，
+ * 逐屏改注入管道侵入性大于收益；注册表在单 Activity 架构下由
+ * 入口模板生命周期兜底（VM 组合必然晚于 Activity onCreate）。
+ *
+ * 失败模式：端口未注册即被访问时，getter 抛出的
+ * IllegalStateException 会指名缺失的端口与修复入口 —— 而非 lateinit
+ * 的裸字段崩溃栈。install 允许重复调用（同进程内入口 Activity 重入，
+ * 静态注册表仍在），语义为整体替换（last-wins）；每次进入 E-Ink
+ * 重新装配同时承担宿主设置快照对齐（[keyEventHub] 亦随之重置），
+ * 装配模板见 app 侧 EInkBridge.install。
+ *
+ * 移植到新上游时：模块树原样复制，仅重写宿主侧 bridge/ 下的端口实现
+ * 并在入口子类的 onInstallEngines 钩子中调用 [install]
+ * （见同目录 EINK-PORTING.md 移植手册）。
+ */
+object EInkEngineRegistry {
+
+    private var _globalSettings: GlobalSettings? = null
+    private var _bookshelfEngine: BookshelfEngine? = null
+    private var _searchEngine: SearchEngine? = null
+    private var _tocEngine: TocEngine? = null
+    private var _bookDetailEngine: BookDetailEngine? = null
+    private var _changeSourceEngine: ChangeSourceEngine? = null
+    private var _coverEngine: CoverEngine? = null
+    private var _readerEngine: ReaderEngine? = null
+    private var _appUpdateEngine: AppUpdateEngine? = null
+    private var _selectionEngine: ReaderSelectionEngine? = null
+    private var _marksEngine: MarksEngine? = null
+    private var _bookshelfGroupEngine: BookshelfGroupEngine? = null
+
+    /** 模块自有的按键枢纽（非宿主端口）：每次 install 重置，丢弃陈旧 handler。 */
+    private var _keyEventHub = EInkKeyEventHub()
+
+    /** 全局设置端口（多屏与「我的」页读写全部设置项）。 */
+    val globalSettings: GlobalSettings
+        get() = require(_globalSettings, "GlobalSettings")
+
+    /** 书架端口（书架流、目录批量刷新、预缓存联动、启动清理）。 */
+    val bookshelfEngine: BookshelfEngine
+        get() = require(_bookshelfEngine, "BookshelfEngine")
+
+    /** 搜索端口（搜索历史 + 多书源搜索会话）。 */
+    val searchEngine: SearchEngine
+        get() = require(_searchEngine, "SearchEngine")
+
+    /** 目录端口（目录页数据、联网拉取、进度写回）。 */
+    val tocEngine: TocEngine
+        get() = require(_tocEngine, "TocEngine")
+
+    /** 详情端口（查找链、目录预取、书架操作）。 */
+    val bookDetailEngine: BookDetailEngine
+        get() = require(_bookDetailEngine, "BookDetailEngine")
+
+    /** 换源端口（跨源搜索与换源迁移）。 */
+    val changeSourceEngine: ChangeSourceEngine
+        get() = require(_changeSourceEngine, "ChangeSourceEngine")
+
+    /** 封面端口（宿主图片请求策略的唯一出口）。 */
+    val coverEngine: CoverEngine
+        get() = require(_coverEngine, "CoverEngine")
+
+    /** 阅读端口（会话状态机 + 排版引擎转发面）。 */
+    val readerEngine: ReaderEngine
+        get() = require(_readerEngine, "ReaderEngine")
+
+    /**
+     * 应用更新端口——四个可选端口之一（其余为 [selectionEngine] /
+     * [marksEngine] / [bookshelfGroupEngine]）：未注册 = 宿主无 app 级
+     * 更新能力（companion 宿主的合法状态），「我的」页检查更新入口随之
+     * 不渲染，不参与 install 必填校验。
+     */
+    val appUpdateEngine: AppUpdateEngine?
+        get() = _appUpdateEngine
+
+    /**
+     * 选区批注端口——**可选**端口：未注册 = 宿主无批注落库能力，
+     * 阅读页按 [ReaderSelectionEngine] 接口 KDoc 的降级语义处理，
+     * 不参与 install 必填校验。
+     */
+    val selectionEngine: ReaderSelectionEngine?
+        get() = _selectionEngine
+
+    /**
+     * 书签/笔记端口——**可选**端口：未注册 = 宿主无书签/笔记列表能力，
+     * 目录页书签 / 笔记 Tab 按 [MarksEngine] 接口 KDoc 的降级语义处理，
+     * 不参与 install 必填校验。
+     */
+    val marksEngine: MarksEngine?
+        get() = _marksEngine
+
+    /**
+     * 书架分组端口——**可选**端口：未注册 = 宿主无分组浏览能力，
+     * 书架选择器不渲染（书架维持全量平铺），不参与 install 必填校验。
+     */
+    val bookshelfGroupEngine: BookshelfGroupEngine?
+        get() = _bookshelfGroupEngine
+
+    /** 模块自有按键枢纽（入口基类分发、阅读页注册处理器；恒可用）。 */
+    val keyEventHub: EInkKeyEventHub
+        get() = _keyEventHub
+
+    /**
+     * 注册全部引擎端口实现。由模块入口模板 [EInkHostActivity]
+     * 在 attachBaseContext（宿主 onInstallEngines 钩子）调用，必须早于任何
+     * E-Ink Composable 组合（VM 构造）。重复调用为整体替换。
+     *
+     * 升级提示：整体替换不保留上次装配的可选端口——宿主升级模块后，
+     * install 新增的可选端口参数默认 null，须在装配点显式传入，否则
+     * 对应 UI 入口静默消失（无报错）。
+     *
+     * @param globalSettings 全局设置视图实现。
+     * @param bookshelfEngine 书架端口实现。
+     * @param searchEngine 搜索端口实现。
+     * @param tocEngine 目录端口实现。
+     * @param bookDetailEngine 详情端口实现。
+     * @param changeSourceEngine 换源端口实现。
+     * @param coverEngine 封面端口实现。
+     * @param readerEngine 阅读端口实现。
+     * @param appUpdateEngine 应用更新端口实现（可选，默认 null：
+     *   宿主无更新能力时不传，「我的」页入口不渲染）。
+     * @param selectionEngine 选区批注端口实现（可选，默认 null：
+     *   宿主无批注落库能力时不传，阅读页按接口 KDoc 的降级语义处理）。
+     * @param marksEngine 书签/笔记端口实现（可选，默认 null：
+     *   宿主无书签/笔记列表能力时不传，目录页书签 / 笔记 Tab 按接口
+     *   KDoc 的降级语义处理）。
+     * @param bookshelfGroupEngine 书架分组端口实现（可选，默认 null：
+     *   宿主无分组浏览能力时不传，书架选择器不渲染）。
+     */
+    fun install(
+        globalSettings: GlobalSettings,
+        bookshelfEngine: BookshelfEngine,
+        searchEngine: SearchEngine,
+        tocEngine: TocEngine,
+        bookDetailEngine: BookDetailEngine,
+        changeSourceEngine: ChangeSourceEngine,
+        coverEngine: CoverEngine,
+        readerEngine: ReaderEngine,
+        appUpdateEngine: AppUpdateEngine? = null,
+        selectionEngine: ReaderSelectionEngine? = null,
+        marksEngine: MarksEngine? = null,
+        bookshelfGroupEngine: BookshelfGroupEngine? = null,
+    ) {
+        _globalSettings = globalSettings
+        _bookshelfEngine = bookshelfEngine
+        _searchEngine = searchEngine
+        _tocEngine = tocEngine
+        _bookDetailEngine = bookDetailEngine
+        _changeSourceEngine = changeSourceEngine
+        _coverEngine = coverEngine
+        _readerEngine = readerEngine
+        _appUpdateEngine = appUpdateEngine
+        _selectionEngine = selectionEngine
+        _marksEngine = marksEngine
+        _bookshelfGroupEngine = bookshelfGroupEngine
+        _keyEventHub = EInkKeyEventHub()
+    }
+
+    /**
+     * 未初始化端口的统一报错。
+     *
+     * @param value 端口实现（null = 未注册）。
+     * @param port 端口名（写进错误信息，指名修复入口）。
+     */
+    private fun <T : Any> require(value: T?, port: String): T =
+        checkNotNull(value) {
+            ":modules:eink 引擎端口未注册：$port。宿主入口需先调用 EInkEngineRegistry.install(...) 完成装配（见 contract/EINK-PORTING.md 移植手册）"
+        }
+}

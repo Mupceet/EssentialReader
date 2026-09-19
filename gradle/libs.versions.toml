@@ -1,0 +1,14 @@
+# 独立构建的构建栈插件目录（eink/lib 分支根目录）：仅在本工程独立
+# 构建/发布时生效；作为子模块嵌入宿主时本文件被忽略——宿主根目录的
+# 同名插件别名（android-library / compose-compiler）生效，版本随宿主。
+# 依赖版本的语义、消费门槛依据与升档协议的权威注释在
+# modules/eink/gradle/libs.versions.toml 头部。
+
+[versions]
+agp = "9.2.1"
+# compose-compiler 插件版本必须与构建栈 Kotlin 完全一致
+kotlin = "2.4.10"
+
+[plugins]
+android-library = { id = "com.android.library", version.ref = "agp" }
+compose-compiler = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
