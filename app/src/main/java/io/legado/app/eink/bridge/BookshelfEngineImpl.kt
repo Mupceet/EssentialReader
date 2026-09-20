@@ -142,9 +142,6 @@ internal object BookshelfEngineImpl : BookshelfEngine, KoinComponent {
         CacheBook.getOrCreate(source, book).addDownload(book.durChapterIndex, endIndex)
     }
 
-    override val isCacheRunning: Boolean
-        get() = CacheBook.isRun
-
     override suspend fun startCacheProcessJob() {
         CacheBook.startProcessJob(Dispatchers.IO)
     }
