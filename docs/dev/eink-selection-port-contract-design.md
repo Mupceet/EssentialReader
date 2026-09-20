@@ -216,6 +216,11 @@ git diff --check   # 两仓各自
 未验证项（实现切片标注）：真机上 eink 创建的书签 `bookText` 与完整模式创建的逐字一致性
 （占位符清理口径）需人工比对一次。
 
+已知测试缺口（合并轮裁定）：模块两个能力 getter（`selectionEnabled` /
+`pageBookmarkEnabled`）到 `marksEngine` 能力位的映射无单测锁定——为两行 getter 搭
+`ReaderViewModel` stub（需 engine/globalSettings 默认值基建）不成比例，按 YAGNI 放弃；
+重构能力位语义时须人工核对此映射与 `TocViewModel`/`ReaderSessionCache` 三处口径一致。
+
 ## 范围外
 
 - `MarkingUiModel.thought`（列表条目的派生字段）不动。
