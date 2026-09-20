@@ -26,7 +26,7 @@
 - Modify: `modules/eink/src/test/java/io/legado/app/eink/feature/reader/selection/ReaderSelectionInteractionPolicyTest.kt`（删一个测试）
 - Create: `modules/eink/src/test/java/io/legado/app/eink/feature/reader/selection/ReaderPageBookmarkContentTest.kt`
 
-- [ ] **Step 1.1: 建子模块工作分支**
+- [x] **Step 1.1: 建子模块工作分支**
 
 子模块当前是 detached HEAD（指针 30dfb59c3）。在 `D:/Projects/AndroidProjects/EssentialReader/eink-lib` 下：
 
@@ -36,7 +36,7 @@ git switch -c eink/lib        # 已存在同名分支则报错，改用: git swi
 git status --short            # 期望干净
 ```
 
-- [ ] **Step 1.2: 写失败测试（新载荷拼装）**
+- [x] **Step 1.2: 写失败测试（新载荷拼装）**
 
 创建 `modules/eink/src/test/java/io/legado/app/eink/feature/reader/selection/ReaderPageBookmarkContentTest.kt`：
 
@@ -107,7 +107,7 @@ class ReaderPageBookmarkContentTest {
 }
 ```
 
-- [ ] **Step 1.3: 确认红**
+- [x] **Step 1.3: 确认红**
 
 ```bash
 cd /d/Projects/AndroidProjects/EssentialReader && ./gradlew.bat :modules:eink:testDebugUnitTest --tests "io.legado.app.eink.feature.reader.selection.ReaderPageBookmarkContentTest"
@@ -115,7 +115,7 @@ cd /d/Projects/AndroidProjects/EssentialReader && ./gradlew.bat :modules:eink:te
 
 预期：**编译失败**（`ReaderPageBookmarkContent` / `toPageBookmarkContent` 未解析）。这就是本步的正确结果。
 
-- [ ] **Step 1.4: 重写契约文件**
+- [x] **Step 1.4: 重写契约文件**
 
 `modules/eink/src/main/java/io/legado/app/eink/contract/ReaderSelectionEngine.kt` 整文件替换为：
 
@@ -242,7 +242,7 @@ class ReaderPageBookmarkContent(
 )
 ```
 
-- [ ] **Step 1.5: 新增载荷拼装扩展**
+- [x] **Step 1.5: 新增载荷拼装扩展**
 
 `ReaderTextSelection.kt`：在 `internal fun lineText(...)`（第 27 行）之后新增：
 
@@ -261,7 +261,7 @@ internal fun ReaderPageSnapshot.toPageBookmarkContent(): ReaderPageBookmarkConte
 
 并在该文件 import 区加入 `io.legado.app.eink.contract.ReaderPageBookmarkContent`（其余 contract 导入已有）。
 
-- [ ] **Step 1.6: 改 ReaderViewModel**
+- [x] **Step 1.6: 改 ReaderViewModel**
 
 替换 `saveMarking` / `togglePageBookmark`（约 585-644 行区域；`deleteMarking`/`findMarking` 不动，只改各自 KDoc 里对 saveMarking 的引用字样）为：
 
@@ -317,7 +317,7 @@ suspend fun togglePageBookmark(): Boolean? {
 
 import 区：新增 `io.legado.app.eink.feature.reader.selection.toPageBookmarkContent`。
 
-- [ ] **Step 1.7: 改 ReaderScreen**
+- [x] **Step 1.7: 改 ReaderScreen**
 
 五处改动：
 
@@ -425,13 +425,13 @@ when {
 - `ReaderMarkingBar` KDoc（约 128-139 行）中「`[commitSelection]` 为『写想法』提交专用（原文覆写版……）防止跨行标记按行内截段落库时 upsert 不命中原记录」改为「`[commitSelection]` 为想法弹层预览专用（完整原文覆写行内截段；契约 v2 起更新按 id 提交，不再作为落库选区）」。
 - 上方约 442-443 行、328-329 行注释里「saveMarking(thought=true) 同锚点 upsert，划线转想法」「提交文本一律用标记完整原文，防跨行标记按行内截段落库 upsert 不命中」同步改为「按 id updateMarkingNote（锚点不变）」的说法；预览文本仍取完整原文。
 
-- [ ] **Step 1.8: 清理 policy 与 sheets**
+- [x] **Step 1.8: 清理 policy 与 sheets**
 
 `ReaderSelectionInteractionPolicy.kt`：删除 `markingThoughtFromNote` 及其 KDoc（约 70-76 行整块）。
 `ReaderSelectionInteractionPolicyTest.kt`：删除测试 `` `想法弹框内容清空即变划线` ``（约 138-145 行）。
 `ReaderSelectionSheets.kt`：KDoc 第 42-43 行「确认 = 调用方按**内容**判类型落库：note 非空 = 想法（虚线），清空 = 划线（实线，想法清空内容即自动变回划线）；同锚点 upsert 为原地更新。」改为「确认 = 调用方按**内容**判类型落库：note 非空 = 想法（虚线），清空 = 划线（实线，想法清空内容即自动变回划线）；新建/更新由调用方按弹层来源分派（createMarking / updateMarkingNote）。」
 
-- [ ] **Step 1.9: 跑模块测试（绿）**
+- [x] **Step 1.9: 跑模块测试（绿）**
 
 ```bash
 cd /d/Projects/AndroidProjects/EssentialReader && ./gradlew.bat :modules:eink:testDebugUnitTest
@@ -439,7 +439,7 @@ cd /d/Projects/AndroidProjects/EssentialReader && ./gradlew.bat :modules:eink:te
 
 预期：全部 PASS（含新增 4 个载荷测试）。`:app:compileAppDebugKotlin` 此时会失败是**预期内**的（宿主 bridge 还是旧签名），Task 2 修复。
 
-- [ ] **Step 1.10: 残留检查**
+- [x] **Step 1.10: 残留检查**
 
 ```bash
 grep -rn "saveMarking\|markingThoughtFromNote" /d/Projects/AndroidProjects/EssentialReader/eink-lib/modules/eink/src --include="*.kt"
@@ -448,7 +448,7 @@ grep -rn "\.thought" /d/Projects/AndroidProjects/EssentialReader/eink-lib/module
 
 预期：第一条零命中；第二条零命中（TocScreen 的 `marking.thought` 在 feature/toc，不在 reader，且是 `MarksEngine.MarkingUiModel` 字段，保留）。
 
-- [ ] **Step 1.11: 提交（eink-lib 仓）**
+- [x] **Step 1.11: 提交（eink-lib 仓）**
 
 ```bash
 cd /d/Projects/AndroidProjects/EssentialReader/eink-lib
@@ -472,7 +472,7 @@ git diff --check
 - Modify: `modules/eink/src/main/java/io/legado/app/eink/feature/reader/selection/ReaderTextSelection.kt`
 - Test: `modules/eink/src/test/java/io/legado/app/eink/feature/reader/selection/ReaderPageBookmarkContentTest.kt`
 
-- [ ] **Step 1b.1: 先补失败测试**
+- [x] **Step 1b.1: 先补失败测试**
 
 `ReaderPageBookmarkContentTest.kt`：`line(...)` helper 加 `breaks: Int = 0` 参数并传入
 `paragraphBreaksAfter = breaks`；新增两个用例：
@@ -502,7 +502,7 @@ fun `空行分隔累积双换行`() {
 跑 `./gradlew.bat :modules:eink:testDebugUnitTest --tests "...ReaderPageBookmarkContentTest"`
 确认编译失败（`paragraphBreaksAfter` 未解析）。
 
-- [ ] **Step 1b.2: 契约加字段**
+- [x] **Step 1b.2: 契约加字段**
 
 `ReaderPageSnapshot.kt` 的 `ReaderPageLine`，在 `decorations` 之前（`bottom` 之后）加：
 
@@ -517,7 +517,7 @@ fun `空行分隔累积双换行`() {
     val paragraphBreaksAfter: Int = 0,
 ```
 
-- [ ] **Step 1b.3: 拼装改用边界**
+- [x] **Step 1b.3: 拼装改用边界**
 
 `ReaderTextSelection.kt` 的 `toPageBookmarkContent` 替换为：
 
@@ -549,7 +549,7 @@ internal fun ReaderPageSnapshot.toPageBookmarkContent(): ReaderPageBookmarkConte
      *  段落边界口径同构；图片页不含 \uFFFC 占位——模块无此字符语义）。 */
 ```
 
-- [ ] **Step 1b.4: 跑测试与残留检查（绿）**
+- [x] **Step 1b.4: 跑测试与残留检查（绿）**
 
 ```bash
 cd /d/Projects/AndroidProjects/EssentialReader && ./gradlew.bat :modules:eink:testDebugUnitTest
@@ -557,7 +557,7 @@ cd /d/Projects/AndroidProjects/EssentialReader && ./gradlew.bat :modules:eink:te
 
 预期全绿（含新增 2 用例）。`git -C eink-lib diff --check` 干净。
 
-- [ ] **Step 1b.5: 提交（eink-lib 仓）**
+- [x] **Step 1b.5: 提交（eink-lib 仓）**
 
 ```bash
 cd /d/Projects/AndroidProjects/EssentialReader/eink-lib
@@ -575,7 +575,7 @@ git commit -m "fix(eink): 书签载荷按段落边界拼装——ReaderPageLine 
 - Test: `app/src/test/java/io/legado/app/eink/bridge/ReaderSelectionEngineImplTest.kt`
 - Test: `app/src/test/java/io/legado/app/eink/bridge/ReaderPageSnapshotMapperTest.kt`（同构对照门禁）
 
-- [ ] **Step 2.1: 写失败测试**
+- [x] **Step 2.1: 写失败测试**
 
 `ReaderSelectionEngineImplTest.kt` 追加（import 区补 `io.legado.app.data.entities.BookMarking`、`io.legado.app.domain.model.TextProcessStyle`、`io.legado.app.utils.GSON`、`io.legado.app.utils.fromJsonObject`）：
 
@@ -617,7 +617,7 @@ cd /d/Projects/AndroidProjects/EssentialReader && ./gradlew.bat :app:testAppDebu
 
 预期：**编译失败**（`withEinkNote` / `bookmarkDisplayText` 未解析）。
 
-- [ ] **Step 2.2: 实现宿主侧**
+- [x] **Step 2.2: 实现宿主侧**
 
 `ReaderSelectionEngineImpl.kt` 改动：
 
@@ -784,7 +784,7 @@ KDoc：方法上方注释把「页文本为标题」的来源改为「显示字�
 `ReaderPaginatorTest`（:72 `甲\n\n乙`、:133 三行同段无 `\n`）确认块结构与分隔口径，
 再实现推导。
 
-- [ ] **Step 2.2b: 同构对照门禁（先红后绿）**
+- [x] **Step 2.2b: 同构对照门禁（先红后绿）**
 
 `ReaderPageSnapshotMapperTest.kt` 追加：用 `ReaderPaginatorTest` 同款 fixture（含同段
 折行 + 空行分隔 + 标题行）排出一页，`ReaderPageSnapshotMapper.map` 得快照后断言
@@ -794,7 +794,7 @@ KDoc：方法上方注释把「页文本为标题」的来源改为「显示字�
 口径一致）。fixture 需覆盖：同段折行（无 `\n`）、相邻段落（单 `\n`）、空行分隔
 （`\n\n`）、标题行。
 
-- [ ] **Step 2.3: 跑宿主测试与编译（绿）**
+- [x] **Step 2.3: 跑宿主测试与编译（绿）**
 
 ```bash
 cd /d/Projects/AndroidProjects/EssentialReader && ./gradlew.bat :app:testAppDebugUnitTest --tests "io.legado.app.eink.bridge.ReaderSelectionEngineImplTest" --tests "io.legado.app.eink.bridge.ReaderPageSnapshotMapperTest"
@@ -803,7 +803,7 @@ cd /d/Projects/AndroidProjects/EssentialReader && ./gradlew.bat :app:testAppDebu
 
 预期：测试全 PASS（ReaderSelectionEngineImplTest 原 12 + 新增 2；ReaderPageSnapshotMapperTest 全部含同构门禁）；编译通过（含 `:modules:eink`）。
 
-- [ ] **Step 2.4: 提交（主仓，不含子模块指针）**
+- [x] **Step 2.4: 提交（主仓，不含子模块指针）**
 
 ```bash
 cd /d/Projects/AndroidProjects/EssentialReader
@@ -819,7 +819,7 @@ git commit -m "refactor(eink): 宿主适配 ReaderSelectionEngine 契约 v2—�
 - Modify: `modules/eink/build.gradle.kts`（0.7.0 版本注释块）
 - Modify: `modules/eink/src/main/java/io/legado/app/eink/contract/README.md`（端口总表第 81 行）
 
-- [ ] **Step 3.1: 追加 0.7.1 版本注释块（0.7.0 已在远端定版，不并入）**
+- [x] **Step 3.1: 追加 0.7.1 版本注释块（0.7.0 已在远端定版，不并入）**
 
 实施期事实：`origin/eink/lib` 的 `0caf7a80e` 已把 0.7.0 定版发布（`version = "0.7.0"`），本地指针落在定版前。本轮条目写成新的 0.7.1 块。`build.gradle.kts` 在 0.7.0 条目块之后（孪生坐标注释之前）追加（若本地无 0.7.0 定版块，则以本地存在的 `0.7.0 = 契约清理轮（待发布）` 注释末尾为插入点，措辞中"0.7.0 起"不受影响）：
 
@@ -836,7 +836,7 @@ git commit -m "refactor(eink): 宿主适配 ReaderSelectionEngine 契约 v2—�
 
 注意：版本号**不翻**（对齐「待发布」先例：注释先行，0.7.1 发布时统一翻）。本地分支与 `origin/eink/lib`（0.7.0 定版）已分叉，rebase/merge 由维护者在推送时决定。
 
-- [ ] **Step 3.2: 端口总表条目补状态机语义**
+- [x] **Step 3.2: 端口总表条目补状态机语义**
 
 `contract/README.md` 第 81 行替换为：
 
@@ -844,7 +844,7 @@ git commit -m "refactor(eink): 宿主适配 ReaderSelectionEngine 契约 v2—�
 | `ReaderSelectionEngine` | 阅读内选区批注与页面书签（可选） | 注册即默认两能力齐备；`supportsMarkings`/`supportsPageBookmark` = false 时对应入口隐藏；契约 v2：笔记转换按 id 走 `updateMarkingNote`（不可重复添加），书签显示载荷由模块携带 |
 ```
 
-- [ ] **Step 3.3: 提交（eink-lib 仓）**
+- [x] **Step 3.3: 提交（eink-lib 仓）**
 
 ```bash
 cd /d/Projects/AndroidProjects/EssentialReader/eink-lib
@@ -861,7 +861,7 @@ git diff --check
 - Modify: `docs/dev/eink-selection-bookmark-marking-design.md`（决策记录追加）
 - Modify: git 子模块指针 `eink-lib`
 
-- [ ] **Step 4.1: 旧设计文档决策记录追加**
+- [x] **Step 4.1: 旧设计文档决策记录追加**
 
 `docs/dev/eink-selection-bookmark-marking-design.md` 的「决策记录」小节末尾（紧邻的下一个 `##` 标题之前）追加最后一条：
 
@@ -874,7 +874,7 @@ git diff --check
   详见 [eink-selection-port-contract-design.md](./eink-selection-port-contract-design.md)。
 ```
 
-- [ ] **Step 4.2: 主仓提交（文档 + 指针）**
+- [x] **Step 4.2: 主仓提交（文档 + 指针）**
 
 ```bash
 cd /d/Projects/AndroidProjects/EssentialReader
@@ -882,7 +882,7 @@ git add docs/dev/eink-selection-bookmark-marking-design.md eink-lib
 git commit -m "build(eink): 推进 eink-lib 指针至契约 v2 并回填旧设计决策记录"
 ```
 
-- [ ] **Step 4.3: 全量验证**
+- [x] **Step 4.3: 全量验证**
 
 ```bash
 cd /d/Projects/AndroidProjects/EssentialReader
@@ -893,7 +893,7 @@ cd eink-lib && git diff --check && git status --short   # 期望干净
 
 预期：全绿；两仓工作区干净（`.zcode/` 为主仓既存未跟踪目录，不计）。
 
-- [ ] **Step 4.4: 交付说明必列的未验证项**
+- [x] **Step 4.4: 交付说明必列的未验证项**
 
 - 真机上 eink 创建的书签 `bookText` 与完整模式创建的逐字一致性（占位符清理口径）——人工比对一次。
 - 真机回归：划线 → 写想法 → 清空想法 → 划线 全程一条记录、实/虚线随重排正确切换；点按标记浮条三键行为不变。
