@@ -8,7 +8,7 @@ import io.legado.app.utils.fromJsonObject
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
-/** 选区定位与上下文提取纯函数（ReaderSelectionEngineImpl.kt 顶层）的行为锚定。 */
+/** 选区定位与上下文提取纯函数（MarksEngineImpl.kt 顶层）的行为锚定。 */
 class ReaderSelectionEngineImplTest {
 
     private val content = buildString {

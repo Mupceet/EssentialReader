@@ -87,7 +87,6 @@ object EInkBridge {
             coverEngine = CoverEngineImpl,
             readerEngine = ReaderEngineImpl,
             appUpdateEngine = AppUpdateEngineImpl,
-            selectionEngine = ReaderSelectionEngineImpl,
             marksEngine = MarksEngineImpl,
             bookshelfGroupEngine = BookshelfGroupEngineImpl,
         )
