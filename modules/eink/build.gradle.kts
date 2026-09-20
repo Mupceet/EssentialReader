@@ -151,6 +151,14 @@ afterEvaluate {
     //         模块自有版本目录 einkLibs 声明、脱离宿主根目录）——单一
     //         坐标服务新旧宿主，消费门槛 AGP ≥ 8.6.0 / K2.3 / Java 17 /
     //         minSdk 21；
+    // 0.7.1 = ReaderSelectionEngine 契约 v2（待发布）：
+    //         saveMarking 拆为 createMarking（仅新选区）+ updateMarkingNote
+    //         (id, note)（唯一状态转换路径，锚点不变，结构性杜绝跨宿主把
+    //         划线⇄想法转换实现成重复添加）；thought 字段删除（类型恒由
+    //         note 派生）；togglePageBookmark 增 ReaderPageBookmarkContent
+    //         载荷（书签显示字段由模块携带，宿主不自定显示语义）；
+    //         ReaderPageLine 增 paragraphBreaksAfter（书签摘录按段落边界
+    //         拼装，与宿主 page.text 口径同构——宿主映射器实现义务）；
     // 孪生坐标 0.5.0-oldstack / 0.6.1-min21（已退役，保留为历史坐标）：
     // 统一前为分开服务旧栈与 minSdk 21 宿主的过渡产物，0.7.0 起主坐标
     // 即覆盖两类消费形态，不再发布孪生；

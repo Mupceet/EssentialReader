@@ -78,7 +78,7 @@
 | `CoverEngine`        | 封面字节抓取（防盗链/源规则/解密/持久缓存） | 纯 Kotlin 签名（`fetchCoverBytes`），不暴露图片框架类型；失败返回 null 不抛异常；非 http(s) 封面不经端口 |
 | `ReaderEngine`       | 阅读会话状态机 + 排版引擎转发面  | 最重的端口：回调注册时序、排版快照读写、页快照映射，逐方法见 KDoc                |
 | `AppUpdateEngine`    | 应用更新检查与下载启动（可选） | `null` = 已是最新（正常结果）；未注册 = 「我的」页入口不渲染；下载走宿主自有管线 |
-| `ReaderSelectionEngine` | 阅读内选区批注与页面书签（可选） | 注册即默认两能力齐备；`supportsMarkings`/`supportsPageBookmark` = false 时对应入口隐藏 |
+| `ReaderSelectionEngine` | 阅读内选区批注与页面书签（可选） | 注册即默认两能力齐备；`supportsMarkings`/`supportsPageBookmark` = false 时对应入口隐藏；契约 v2：笔记转换按 id 走 `updateMarkingNote`（不可重复添加），书签显示载荷由模块携带（含段落边界语义） |
 | `MarksEngine`        | 目录页书签/笔记 Tab 与导出（可选） | `supportsBookmarks`/`supportsMarkings` 粒度声明（两者皆 false 等价不注册）；跳转三分支见 `JumpResolution` |
 | `BookshelfGroupEngine` | 书架分组浏览/切换/选中记忆（可选） | 未注册书架选择器不渲染（书架全量平铺）；分组管理与排序不在端口面内 |
 
