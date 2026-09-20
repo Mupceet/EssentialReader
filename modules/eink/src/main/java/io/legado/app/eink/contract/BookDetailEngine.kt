@@ -49,8 +49,19 @@ sealed interface BookDetailPrefetchResult {
 interface BookDetailEngine {
 
     /**
-     * 按导航参数查找书籍：书架记录优先（书名 + 作者匹配），其次搜索
-     * 结果记录。返回「句柄 + 展示模型」序对，找不到返回 null。
+     * 按导航参数查找书籍，返回「句柄 + 展示模型」序对，找不到返回 null。
+     *
+     * 查找链义务（**bookUrl 是记录主键，优先级不得颠倒**）：书籍表同名
+     * 同作者多记录（不同书源加入同书、换源残留——legado 数据模型下的
+     * 合法状态）时，按 name + author 的单行查询固定命中同一条、与用户
+     * 实际点选的书架条目无关，故：
+     *  1. bookUrl 非空 ─► 先按 bookUrl 精确解析书籍记录（命中即唯一，
+     *     「长按哪个书进哪个详情」的保证）；
+     *  2. 查不到 ─► 按 bookUrl 查搜索结果记录（未入库的搜索书）；
+     *  3. 仍无 ─► 按 name + author 查书籍记录（弱定位兜底，同名多条时
+     *     宿主自担择一规则，如取 DAO 首行——此时无 url 身份可用，歧义
+     *     不可避免，但仅限纯导航参数场景）；
+     *  4. 最后按 name + author 查搜索结果记录。
      */
     suspend fun findBook(
         name: String,
