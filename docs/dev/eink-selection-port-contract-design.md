@@ -1,6 +1,6 @@
 # eink 选区批注端口契约重构设计（ReaderSelectionEngine 契约 v2）
 
-状态：已实施（2026-09-20，eink-lib `eink/lib` 分支 57afda79e..5277b25c6 + 主仓 62623b2da..d5e6f953f；真机项见验证记录）。
+状态：已实施（2026-09-20 两轮：契约 v2 + 端口合并；eink-lib `eink/lib` 分支 57afda79e..4d2952aaf + 主仓 62623b2da..beaaa8c9b；真机项与已知测试缺口见验证记录）。
 日期：2026-09-20。
 关系：修订 [eink-selection-bookmark-marking-design.md](./eink-selection-bookmark-marking-design.md) 定下的
 `ReaderSelectionEngine` 端口契约；**交互语义基本不变**（v2.2 点击式选择、划线/想法类型
