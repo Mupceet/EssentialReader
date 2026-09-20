@@ -101,8 +101,6 @@ private class FakeEngine(gateOpen: Boolean = false) : BookshelfEngine {
     override suspend fun refreshBookToc(bookUrl: String): BookshelfTocRefreshResult =
         BookshelfTocRefreshResult.OK
 
-    override val isCacheRunning: Boolean get() = false
-
     override suspend fun startCacheProcessJob() {
         startCount.incrementAndGet()
         gate.await()

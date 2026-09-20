@@ -102,9 +102,6 @@ interface BookshelfEngine {
      */
     suspend fun refreshBookToc(bookUrl: String): BookshelfTocRefreshResult
 
-    /** 预缓存下载队列是否正在工作（书架页泵状态展示）。 */
-    val isCacheRunning: Boolean
-
     /**
      * 启动预缓存处理循环（挂起至泵结束；模块在书架页按
      * [preDownloadChapterCount][GlobalSettings.preDownloadChapterCount]
