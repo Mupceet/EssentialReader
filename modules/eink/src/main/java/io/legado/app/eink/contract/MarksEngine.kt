@@ -18,9 +18,10 @@ import kotlinx.coroutines.flow.Flow
  *
  * 能力粒度按**特性**不分表面（0.7.1 合并轮，全有全无）：[supportsMarkings]
  * 同时管阅读内保存（长按选择/选区操作条/点按标记）与目录页笔记 Tab/导出；
- * [supportsBookmarks] 同时管阅读内 toggle（下拉书签/顶栏钮/页角标）与
- * 目录页书签 Tab——不存在"阅读内能画线、目录页却无笔记 Tab"的分裂配置。
- * 两者皆 false 等价于不注册本端口。
+ * [supportsBookmarks] 同时管阅读内 toggle（下拉书签/顶栏钮/页角标——角标
+ * 经页快照 bookmarkBadge 供给、模块无条件绘制，声明 false 时宿主不应
+ * 下发）与目录页书签 Tab——不存在"阅读内能画线、目录页却无笔记 Tab"
+ * 的分裂配置。两者皆 false 等价于不注册本端口。
  *
  * 可选端口（同 [EInkEngineRegistry.appUpdateEngine] 先例）：注册表缺失本端口
  * 时，模块降级——长按选择整体不启用（松手无动作、无操作条），下拉书签与

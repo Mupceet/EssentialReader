@@ -1161,8 +1161,8 @@ fun ReaderRoute(
  *   降级宿主不启用）；浮层在场时点按只收它们并吞掉本次点按（选区经
  *   [onSelectionChange] 置空清区、点按标记操作条经 [onMarkingBarDismiss] 收取），
  *   不翻页、不唤操作条，也不查标记（见 readerTapDispatch）；
- * - 长按正文选词（震动反馈；[selectionEnabled] = false 端口缺失时整体
- *   不启用——契约 §3.3 降级语义，不选词不触觉），拖拽延伸选区末端：
+ * - 长按正文选词（震动反馈；[selectionEnabled] = false 笔记能力关闭时
+ *   整体不启用——契约 §3.3 降级语义，不选词不触觉），拖拽延伸选区末端：
  *   拖动期正文铺灰底选中带 + 两侧 pin 把手（高度 = 行高），长按手势内松手
  *   （含拖拽延伸）经 [onSelectionFinalized] 只合成选区、**不落库**，改由
  *   选区操作条（[selectionBarVisible]：新区间 复制/画线/想法；选区已落在
@@ -1180,7 +1180,7 @@ fun ReaderRoute(
  *   （完整版设置"翻页触发距离"，0 = 系统 slop，Compose 版只读不设），
  *   松手前反向回拖取消；无跟手移动，翻页整页立即替换。与竖直下拉书签
  *   （累计下拉 ≥ 80dp toggle 一次，须「下拉添加书签」开（默认关）、向下
- *   强竖直优势且无选区、操作条收起、批注端口在位）经统一仲裁共存，
+ *   强竖直优势且无选区、操作条收起、书签能力在位）经统一仲裁共存，
  *   判据见 ReaderDragArbitration。
  *
  * 选区状态由调用方持有（[selection] / [onSelectionChange]），翻页/重排
@@ -1507,10 +1507,11 @@ internal fun ReaderScreen(
                                 dragMovesStart = false
                                 flipTrigger = null
                                 selectionDragActive = true
-                                // 端口缺失：选择交互整体不启用（契约 §3.3 降级
-                                // 语义）——不选词、不触觉，长按手势整体旁路；
-                                // 点按标记浮条/浮窗同随端口缺失不可达（无端口
-                                // 根本没有选区，松手冻结语义随门控消解）
+                                // 笔记能力关闭：选择交互整体不启用（契约
+                                // §3.3 降级语义）——不选词、不触觉，长按
+                                // 手势整体旁路；点按标记浮条/浮窗同随能力
+                                // 关闭不可达（能力关闭根本没有选区，松手
+                                // 冻结语义随门控消解）
                                 if (!selectionEnabled) {
                                     return@detectDragGesturesAfterLongPress
                                 }
@@ -1751,8 +1752,8 @@ internal fun ReaderScreen(
                 ReaderTopBar(
                     state = state,
                     // 页面书签钮（v2 Task 9，设计 §4）：选中态 = 当前页快照
-                    // bookmarkBadge；批注端口缺失（selectionEnabled = false）
-                    // 时整颗不渲染（契约 §3.3 降级语义）
+                    // bookmarkBadge；书签能力关闭（pageBookmarkEnabled =
+                    // false）时整颗不渲染（契约 §3.3 降级语义）
                     bookmarkEnabled = pageBookmarkEnabled,
                     bookmarkBadge = state.page?.bookmarkBadge == true,
                     onOpenDetail = onOpenDetail,

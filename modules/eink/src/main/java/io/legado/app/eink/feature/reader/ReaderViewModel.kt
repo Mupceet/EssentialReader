@@ -142,9 +142,10 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application),
         get() = EInkEngineRegistry.marksEngine?.supportsMarkings == true
 
     /**
-     * 书签能力（按特性不分表面）：下拉书签手势、顶栏书签钮、页角标、
-     * 「下拉添加书签」开关与目录页书签 Tab 的显隐依据——未注册
-     * marksEngine 或 supportsBookmarks = false 时隐藏。
+     * 书签能力（按特性不分表面）：下拉书签手势、顶栏书签钮、页角标
+     * （bookmarkBadge 由页快照供给、模块无条件绘制，声明 false 时宿主
+     * 不应下发）、「下拉添加书签」开关与目录页书签 Tab 的显隐依据——
+     * 未注册 marksEngine 或 supportsBookmarks = false 时隐藏。
      */
     val pageBookmarkEnabled: Boolean
         get() = EInkEngineRegistry.marksEngine?.supportsBookmarks == true

@@ -99,8 +99,9 @@ internal fun ReaderTopBar(
             // 页面书签切换钮（v2 Task 9，设计 §4）：选中态 = 当前页快照
             // bookmarkBadge（模块不自持书签状态），点击 toggle 当前页书签。
             // 素材对为 bookmark_add / bookmark_remove（未加书签显示「加」、
-            // 已加书签显示「减」），选中只换素材、配色保持白底；批注端口
-            // 缺失时整颗不渲染（契约 §3.3 降级语义）
+            // 已加书签显示「减」），选中只换素材、配色保持白底；书签能力
+            // 关闭（bookmarkEnabled = false，见 pageBookmarkEnabled）时
+            // 整颗不渲染（契约 §3.3 降级语义）
             if (bookmarkEnabled) {
                 EInkOperationBarIcon(
                     icon = painterResource(R.drawable.eink_ic_bookmark_add),

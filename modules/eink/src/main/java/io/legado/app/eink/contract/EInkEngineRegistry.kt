@@ -100,9 +100,9 @@ object EInkEngineRegistry {
         get() = _appUpdateEngine
 
     /**
-     * 书签/笔记端口——**可选**端口：未注册 = 宿主无书签/笔记列表能力，
-     * 目录页书签 / 笔记 Tab 按 [MarksEngine] 接口 KDoc 的降级语义处理，
-     * 不参与 install 必填校验。
+     * 书签/笔记端口——**可选**端口：未注册 = 宿主无书签/笔记能力，
+     * 阅读内批注/书签入口与目录页书签/笔记 Tab 一起降级，见 [MarksEngine]
+     * 接口 KDoc，不参与 install 必填校验。
      */
     val marksEngine: MarksEngine?
         get() = _marksEngine
@@ -138,8 +138,8 @@ object EInkEngineRegistry {
      * @param appUpdateEngine 应用更新端口实现（可选，默认 null：
      *   宿主无更新能力时不传，「我的」页入口不渲染）。
      * @param marksEngine 书签/笔记端口实现（可选，默认 null：
-     *   宿主无书签/笔记列表能力时不传，目录页书签 / 笔记 Tab 按接口
-     *   KDoc 的降级语义处理）。
+     *   宿主无书签/笔记能力时不传，阅读内批注/书签入口与目录页书签/
+     *   笔记 Tab 一起降级，见接口 KDoc）。
      * @param bookshelfGroupEngine 书架分组端口实现（可选，默认 null：
      *   宿主无分组浏览能力时不传，书架选择器不渲染）。
      */
