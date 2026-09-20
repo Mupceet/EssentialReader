@@ -17,6 +17,8 @@ import io.legado.app.model.webBook.WebBook
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.coroutines.cancellation.CancellationException
@@ -117,6 +119,16 @@ internal object TocEngineImpl : TocEngine {
         storeCache(bookUrl, TocSessionCache(chapters = chapters, cachedFileNames = null))
         return chapters
     }
+
+    /**
+     * 章节表流：直接挂 DAO 投影流（chapters 表自带 bookUrl 列，无需像
+     * bookmarks 那样先解析书籍——书不存在/章节清空时自然发空列表，契约
+     * 「解析失败返回空流」义务由空列表投影满足）。不进会话缓存：缓存是
+     * loadChapters 的加速层，流的意义就是跟进变化，两者职责不混。
+     */
+    override fun observeChapters(bookUrl: String): Flow<List<ChapterUiModel>> =
+        appDb.bookChapterDao.getChapterCacheInfoListFlow(bookUrl)
+            .map { list -> list.map { it.toUiModel() } }
 
     override suspend fun fetchChaptersFromSource(bookUrl: String): TocFetchResult {
         val book = appDb.bookDao.getBook(bookUrl) ?: return TocFetchResult.NoSource

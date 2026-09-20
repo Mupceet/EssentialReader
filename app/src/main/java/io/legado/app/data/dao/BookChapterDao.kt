@@ -24,6 +24,9 @@ interface BookChapterDao {
     @Query("select url, title, isVolume, `index` from chapters where bookUrl = :bookUrl order by `index`")
     fun getChapterCacheInfoList(bookUrl: String): List<BookChapterCacheInfo>
 
+    @Query("select url, title, isVolume, `index` from chapters where bookUrl = :bookUrl order by `index`")
+    fun getChapterCacheInfoListFlow(bookUrl: String): Flow<List<BookChapterCacheInfo>>
+
     @Query("select * from chapters where bookUrl = :bookUrl order by `index`")
     fun getChapterListFlow(bookUrl: String): Flow<List<BookChapter>>
 
