@@ -19,11 +19,31 @@ class ReaderPageBookmarkContentTest {
     fun `页文本按行拼接且行间换行`() {
         val page = snapshot(
             title = "章",
-            line("标题行", positions = intArrayOf(0), isTitle = true),
-            line("第一段", positions = intArrayOf(0)),
+            line("标题行", positions = intArrayOf(0), isTitle = true, breaks = 1),
+            line("第一段", positions = intArrayOf(0), breaks = 1),
             line("第二段", positions = intArrayOf(3)),
         )
         assertEquals("标题行\n第一段\n第二段", page.toPageBookmarkContent().pageText)
+    }
+
+    @Test
+    fun `同段折行不插换行`() {
+        val page = snapshot(
+            title = "章",
+            line("第一段前半", positions = intArrayOf(0), breaks = 0),
+            line("后半", positions = intArrayOf(5), breaks = 1),
+        )
+        assertEquals("第一段前半后半", page.toPageBookmarkContent().pageText)
+    }
+
+    @Test
+    fun `空行分隔累积双换行`() {
+        val page = snapshot(
+            title = "章",
+            line("甲段", positions = intArrayOf(0), breaks = 2),
+            line("乙段", positions = intArrayOf(4), breaks = 1),
+        )
+        assertEquals("甲段\n\n乙段", page.toPageBookmarkContent().pageText)
     }
 
     @Test
@@ -45,6 +65,7 @@ class ReaderPageBookmarkContentTest {
         vararg chunks: String,
         positions: IntArray = intArrayOf(0),
         isTitle: Boolean = false,
+        breaks: Int = 0,
     ): ReaderPageLine = ReaderPageLine(
         baseY = 60f,
         isTitle = isTitle,
@@ -53,6 +74,7 @@ class ReaderPageBookmarkContentTest {
         chapterPositions = positions,
         top = 30f,
         bottom = 70f,
+        paragraphBreaksAfter = breaks,
     )
 
     private fun snapshot(title: String, vararg lines: ReaderPageLine) = ReaderPageSnapshot(

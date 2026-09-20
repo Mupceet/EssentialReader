@@ -114,7 +114,8 @@ class ReaderPageBookmarkContent(
     /** 章节标题（= 页快照 title，与宿主 page.chapterTitle 同源）。 */
     val chapterName: String,
 
-    /** 页文本摘录（快照行内 chunks 连接、行间 \n，与宿主 page.text 同构；
-     *  图片页不含 \uFFFC 占位——模块无此字符语义）。 */
+    /** 页文本摘录（行内 chunks 连接；行间按 ReaderPageLine.paragraphBreaksAfter
+     *  插段落换行——同段折行无换行、段末一个、空行累加，与宿主 page.text
+     *  段落边界口径同构；图片页不含 \uFFFC 占位——模块无此字符语义）。 */
     val pageText: String,
 )

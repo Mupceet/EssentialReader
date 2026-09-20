@@ -28,14 +28,21 @@ data class ReaderSelectionUi(
 internal fun lineText(line: ReaderPageLine): String = line.chunks.joinToString("")
 
 /**
- * 页面书签显示载荷（契约 v2）：快照行文本按与宿主 page.text 同构的口径
- * 拼装（行内 chunks 连接、行间 \n）；chapterName 取快照 title（与宿主
- * page.chapterTitle 同源）。书签显示语义归模块，宿主只做存储规范化。
+ * 页面书签显示载荷（契约 v2）：快照行文本按与宿主 page.text 同构的段落
+ * 边界口径拼装（行内 chunks 连接；行间按上一行 paragraphBreaksAfter 插
+ * "\n".repeat(n)——同段折行 0、段末 1、空行累加；末行不计）。chapterName
+ * 取快照 title（与宿主 page.chapterTitle 同源）。书签显示语义归模块，
+ * 宿主只做存储规范化。
  */
 internal fun ReaderPageSnapshot.toPageBookmarkContent(): ReaderPageBookmarkContent =
     ReaderPageBookmarkContent(
         chapterName = title,
-        pageText = lines.joinToString("\n") { lineText(it) },
+        pageText = buildString {
+            lines.forEachIndexed { index, line ->
+                append(lineText(line))
+                if (index < lines.lastIndex) append("\n".repeat(line.paragraphBreaksAfter))
+            }
+        },
     )
 
 /**
