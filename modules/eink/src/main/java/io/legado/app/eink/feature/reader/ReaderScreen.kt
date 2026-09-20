@@ -109,7 +109,6 @@ import io.legado.app.eink.feature.reader.selection.hitTest
 import io.legado.app.eink.feature.reader.selection.imageActionSlotAt
 import io.legado.app.eink.feature.reader.selection.joinSegments
 import io.legado.app.eink.feature.reader.selection.markingIdForSelection
-import io.legado.app.eink.feature.reader.selection.markingThoughtFromNote
 import io.legado.app.eink.feature.reader.selection.mergeSegment
 import io.legado.app.eink.feature.reader.selection.moveEndpoint
 import io.legado.app.eink.feature.reader.selection.offPageHandleIsStart
@@ -128,8 +127,8 @@ private enum class ReaderStyleDialog { Fonts, Info, Margin }
 /**
  * 点按标记浮条状态（v2 Task 6）：命中 markingId + run 派生选区——浮条
  * 锚定（selectionRuns 行内区间 → x 复用）与 COPY/DELETE 动作、定位键共用
- * [selection]；[commitSelection] 为「写想法」提交专用（原文覆写版，见
- * [onMarkingTap]），防止跨行标记按行内截段落库时 upsert 不命中原记录。
+ * [selection]；[commitSelection] 为想法弹层预览专用（完整原文覆写行内截
+ * 段；契约 v2 起更新按 id 提交，不再作为落库选区）。
  */
 @Stable
 private data class ReaderMarkingBar(
@@ -139,16 +138,18 @@ private data class ReaderMarkingBar(
 )
 
 /**
- * 想法弹框草稿（v2.2 统一）：两个入口（选区操作条 / 点按标记操作条）共用
- * **同一个弹框**，唯一差别是 [note] 预填——已有想法带出宿主记录的笔记内容，
- * 划线/新选区为空串；[selection] 是提交选区（点按入口用完整原文覆写行内
- * 截段，见 [onMarkingTap]，防跨行 upsert 不命中）。
+ * 想法弹框草稿（v2.2 统一，契约 v2 加 id 分派）：两个入口（选区操作条 /
+ * 点按标记操作条）共用**同一个弹框**。[markingId] null = 新建（确认走
+ * createMarking）；非空 = 更新已有标记的想法（确认走 updateMarkingNote，
+ * 锚点不变）。[note] 预填——已有想法带出宿主记录的笔记内容，划线/新选区
+ * 为空串；[selection] 是弹层预览选区（点按入口用完整原文覆写行内截段；
+ * 仅新建路径作为提交选区）。
  *
- * 保存时按内容判类型：note 非空 = 想法（虚线），清空 = 划线（实线）——
- * 与「划线 = 实线 + note 空；想法 = 虚线 + note 非空」的类型语言一致。
+ * 保存时按内容判类型：note 非空 = 想法（虚线），清空 = 划线（实线）。
  */
 @Stable
 private data class ReaderThoughtDraft(
+    val markingId: String?,
     val note: String,
     val selection: ReaderSelectionUi,
 )
@@ -223,19 +224,19 @@ fun ReaderRoute(
     // 宿主重排推进 pageVersion 时不清选中带，直到新快照带上该标记
     // （markingRenderedForRange）；装饰呈现/落库失败/区间离页/点按清区即复位
     var committedSelection by remember { mutableStateOf<ReaderSelectionUi?>(null) }
-    // v2 想法弹层（v2.2 统一）：thoughtDraft 非空即弹层打开——两个入口
-    // （选区操作条「想法」/ 点按标记操作条「想法」）共用同一弹框，唯一差别
-    // 是预填的笔记内容；确认提交用其 selection，预览取其 selectedText，
-    // 不经端口解析（设计 §5）
+    // v2 想法弹层（v2.2 统一，契约 v2 加 id 分派）：thoughtDraft 非空即弹层
+    // 打开——两个入口（选区操作条「想法」/ 点按标记操作条「想法」）共用同一
+    // 弹框；markingId 分派新建（createMarking）/更新（updateMarkingNote），
+    // 预览取其 selection.selectedText，不经端口解析（设计 §5）
     var thoughtDraft by remember { mutableStateOf<ReaderThoughtDraft?>(null) }
     // v2 点按标记浮条（Task 6，设计 §4「点已有标记」）：非空 = 点按命中已有
-    // 划线（thought=false），浮条锚定命中 run 几何（无选区/把手/下划线预览），
-    // markingId 供删除键即时可用（松手场景无 id 的时序此处不存在）
+    // 划线或想法（类型由 note 派生），浮条锚定命中 run 几何（无选区/把手/
+    // 下划线预览），markingId 供删除键即时可用（松手场景无 id 的时序此处不存在）
     var markingBar by remember { mutableStateOf<ReaderMarkingBar?>(null) }
     // pageVersion 推进 = 选区所在内容已被替换：选区、冻结态、想法弹层与
     // 点按浮条/浮窗一并清空，浮层随内容变化关闭，不残留幽灵浮层（在途
     // 提交按各自现读现判护栏落失效/失败分支）。松手落划线后的宿主重排
-    // （saveMarking → relayout）受下方待确认门控：仅当新快照真的带上了
+    // （createMarking → relayout）受下方待确认门控：仅当新快照真的带上了
     // 该标记（正式装饰在位）预览才退场，否则按提交区间重锚续显。
     // 续选会话挂起（v2 Task 8，设计 §4）：会话进行中（session != null）
     // 翻页推进 pageVersion 不清选区，而是把**被拖端点**吸附到新页翻页边
@@ -316,7 +317,7 @@ fun ReaderRoute(
         selectionFrozen = true
         committedSelection = target
         scope.launch {
-            if (!viewModel.saveMarking(target, note = "", thought = false)) {
+            if (!viewModel.createMarking(target, note = "")) {
                 Toast.makeText(context, "保存失败", Toast.LENGTH_SHORT).show()
                 clearSelectionState()
             }
@@ -325,8 +326,9 @@ fun ReaderRoute(
 
     // 选区操作条动作分派：动作集由 selectionActions 决定（新区间 复制/画线/
     // 想法；已有标记 复制/想法/删除），这里按动作执行副作用。点击「想法」在
-    // 已有想法时进入编辑（预填 findMarking 的 note），已有划线时转为想法；
-    // 提交文本一律用标记完整原文，防跨行标记按行内截段落库 upsert 不命中。
+    // 已有想法时进入编辑（预填 findMarking 的 note，按 id updateMarkingNote
+    // （锚点不变）提交），已有划线时转为想法；预览文本取标记完整原文（跨行
+    // 标记的行内截段只是浮条锚定口径）。
     val onSelectionAction: (ReaderMarkingAction) -> Unit = { action ->
         val target = selection
         if (target == null) {
@@ -346,15 +348,15 @@ fun ReaderRoute(
 
                 ReaderMarkingAction.THOUGHT -> {
                     if (markingId == null) {
-                        thoughtDraft = ReaderThoughtDraft(note = "", selection = target)
+                        thoughtDraft = ReaderThoughtDraft(markingId = null, note = "", selection = target)
                     } else {
                         scope.launch {
                             when (val detail = viewModel.findMarking(markingId)) {
                                 // 标记失效（换源清理/无会话）：清态，不弹层
                                 null -> clearSelectionState()
-                                // 已有想法带出笔记内容、已有划线为空——弹框同一份，
-                                // 提交选区用标记完整原文覆写行内截段（见 ReaderThoughtDraft）
+                                // 已有想法带出笔记内容、已有划线为空——弹框同一份，按 id 更新
                                 else -> thoughtDraft = ReaderThoughtDraft(
+                                    markingId = markingId,
                                     note = detail.note,
                                     selection = target.copy(selectedText = detail.selectedText),
                                 )
@@ -439,8 +441,8 @@ fun ReaderRoute(
 
     // 点按标记操作条动作（v2 Task 6，设计 §4「点已有标记」）：与选区操作条
     // 同组件同语义（复制/想法/删除）。复制 = 命中 run 文本落剪贴板 + toast +
-    // 收操作条；想法 = 想法弹层（确认后 saveMarking(thought=true) 同锚点
-    // upsert，划线转想法，虚线随宿主重排新快照呈现）；删除 = deleteMarking
+    // 收操作条；想法 = 想法弹层（确认后按 id updateMarkingNote（锚点不变），
+    // 划线转想法，虚线随宿主重排新快照呈现）；删除 = deleteMarking
     // 即时可用（markingId 现成），成功收操作条、失败 toast 保留现场
     val onMarkingAction: (ReaderMarkingAction) -> Unit = { action ->
         // 现读操作条状态：动作发起时已被页变/新点按清空则静默丢弃
@@ -462,6 +464,7 @@ fun ReaderRoute(
                         // 标记失效（换源清理）：收条即可，不弹层
                         detail == null -> markingBar = null
                         else -> thoughtDraft = ReaderThoughtDraft(
+                            markingId = target.markingId,
                             note = detail.note,
                             selection = target.commitSelection,
                         )
@@ -509,11 +512,11 @@ fun ReaderRoute(
             markingBar = ReaderMarkingBar(
                 markingId = markingId,
                 selection = tapped,
-                // 提交选区以标记完整原文（findMarking detail，可跨行）覆写 run
-                // 行内截段：宿主 saveMarking 以 selectedText 在章节全文定位并按
-                // （chapterPosition, selectedText）同锚点 upsert，按截段提交会另
-                // 锚一条新记录；COPY/锚定仍用行内截段，start/end/bodyStart/bodyEnd
-                // 只是宿主窗口搜索的提示位（点按位置在标记内 → 命中原完整区间）
+                // 预览选区以标记完整原文（findMarking detail，可跨行）覆写 run
+                // 行内截段：契约 v2 起弹层预览取完整原文，更新按 id
+                // updateMarkingNote（锚点不变），不再作为落库选区；
+                // COPY/锚定仍用行内截段，start/end/bodyStart/bodyEnd
+                // 只是提示位（点按位置在标记内 → 命中原完整区间）
                 commitSelection = tapped.copy(selectedText = detail.selectedText),
             )
         }
@@ -1086,22 +1089,37 @@ fun ReaderRoute(
                                     context, "选区已失效", Toast.LENGTH_SHORT
                                 ).show()
 
-                                // 内容清空即划线（实线）：类型由内容决定
-                                viewModel.saveMarking(
-                                    target.selection,
-                                    note,
-                                    thought = markingThoughtFromNote(note),
-                                ) -> {
-                                    thoughtDraft = null
-                                    // 操作条不回来：动作已完成（装饰随重排呈现）
-                                    markingBar = null
-                                    selectionFrozen = true
-                                    committedSelection = target.selection
+                                // 新建：内容判类型（空 = 划线实线 / 非空 = 想法虚线）
+                                target.markingId == null -> when {
+                                    viewModel.createMarking(target.selection, note) -> {
+                                        thoughtDraft = null
+                                        // 操作条不回来：动作已完成（装饰随重排呈现）
+                                        markingBar = null
+                                        selectionFrozen = true
+                                        committedSelection = target.selection
+                                    }
+
+                                    else -> Toast.makeText(context, "保存失败", Toast.LENGTH_SHORT).show()
                                 }
 
-                                else -> Toast.makeText(
-                                    context, "保存失败", Toast.LENGTH_SHORT
-                                ).show()
+                                // 更新：按 id 状态转换，锚点不变；null = 标记已失效（清态收层）
+                                else -> when (viewModel.updateMarkingNote(target.markingId, note)) {
+                                    true -> {
+                                        thoughtDraft = null
+                                        markingBar = null
+                                        selectionFrozen = true
+                                        committedSelection = target.selection
+                                    }
+
+                                    false -> Toast.makeText(context, "保存失败", Toast.LENGTH_SHORT).show()
+
+                                    null -> {
+                                        thoughtDraft = null
+                                        markingBar = null
+                                        clearSelectionState()
+                                        Toast.makeText(context, "标记已失效", Toast.LENGTH_SHORT).show()
+                                    }
+                                }
                             }
                         } finally {
                             saving = false

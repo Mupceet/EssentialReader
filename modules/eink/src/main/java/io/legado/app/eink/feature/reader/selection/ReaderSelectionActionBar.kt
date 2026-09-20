@@ -38,7 +38,7 @@ import kotlin.math.roundToInt
 /**
  * 选区/标记操作条动作（v2.1 点击式交互）：
  * - [COPY] 复制：选文落剪贴板；
- * - [LINE] 画线：落一条黑色实线（saveMarking thought=false）；
+ * - [LINE] 画线：落一条黑色实线（createMarking，note 空）；
  * - [THOUGHT] 想法：开想法弹层（新区间 = 新建；已有想法 = 预填编辑）；
  * - [DELETE] 删除：deleteMarking（仅已有标记的区间/点按场景可达）。
  */

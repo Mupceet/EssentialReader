@@ -27,6 +27,7 @@ import io.legado.app.eink.contract.ReaderSyncTrigger
 import io.legado.app.eink.contract.ReaderTapZoneGrid
 import io.legado.app.eink.contract.ReaderTextStyle
 import io.legado.app.eink.feature.reader.selection.ReaderSelectionUi
+import io.legado.app.eink.feature.reader.selection.toPageBookmarkContent
 import io.legado.app.eink.session.ReaderSessionCache
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
@@ -583,32 +584,34 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application),
     // ==================== 选区批注 ====================
 
     /**
-     * 保存划线/想法（v2.1：选区操作条选「画线」与想法弹层确认共用入口）：
-     * [thought] = true
-     * 为想法（宿主写 underlineMode=2 虚线），false 为划线（underlineMode=1
-     * 实线，固定纯黑）；[note] 为想法内容（划线恒空串）。同锚点落库为原地
-     * 更新（SaveMarkingUseCase.save），划线经想法弹层确认即转换为想法。
-     * 宿主落库 book_marks 后自行触发当前章重排（保持页内位置）并经
-     * onContentUpdated 推送带装饰的新快照（pageVersion 随之推进，Route
-     * 效应在装饰真的在页上时清选区收尾，选中带续显不闪断）——模块不请求
-     * 刷新。false = 端口未注册（降级宿主）或落库失败。
-     *
-     * 注意端口只回 Boolean、不返回落库标记的 markingId：删除必须在能拿到
-     * id 的入口进行（点按标记操作条，或选区操作条按快照命中 run 解析 id）
-     * 的 [deleteMarking]。
+     * 新建笔记（契约 v2：仅新选区入口——操作条「画线」与新选区「想法」确认）：
+     * note 空白 = 划线（宿主写 underlineMode=1 实线，固定纯黑），非空白 = 想法
+     * （underlineMode=2 虚线）。宿主落 book_marks 后自行触发当前章重排（保持
+     * 页内位置）并经 onContentUpdated 推送带装饰的新快照——模块不请求刷新。
+     * false = 端口未注册（降级宿主）或落库失败。
      */
-    suspend fun saveMarking(sel: ReaderSelectionUi, note: String, thought: Boolean): Boolean {
+    suspend fun createMarking(sel: ReaderSelectionUi, note: String): Boolean {
         val port = EInkEngineRegistry.selectionEngine ?: return false
-        return port.saveMarking(
+        return port.createMarking(
             ReaderSelectionCommit(
                 chapterIndex = engine.currentChapterIndex,
                 start = sel.bodyStart,
                 end = sel.bodyEnd,
                 selectedText = sel.selectedText,
                 note = note,
-                thought = thought,
             ),
         )
+    }
+
+    /**
+     * 状态转换唯一路径（契约 v2）：按 id 改想法，锚点不变——note 空白 → 划线
+     * （实线），非空白 → 想法（虚线）。null = 标记不存在（换源清理等）；false =
+     * 更新失败。端口未注册理论不可达（弹层仅在选择能力在位时打开），防御性按
+     * 失败处理。
+     */
+    suspend fun updateMarkingNote(markingId: String, note: String): Boolean? {
+        val port = EInkEngineRegistry.selectionEngine ?: return false
+        return port.updateMarkingNote(markingId, note)
     }
 
     /**
@@ -631,16 +634,16 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application),
     }
 
     /**
-     * 当前页书签 toggle（v2 Task 9，设计 §4）：宿主快速书签语义（本页无则
-     * 加、有则删最近一条），落库后宿主自行触发当前章重排，角标随新快照
-     * 推送——模块不自持书签状态。三态：null = 端口未注册（降级宿主）/
-     * 无会话书/当前页无法定位；true = 本次添加；false = 本次移除（删除
-     * 成功 + relayout 后返回）。仅 null 由界面提示「操作失败」，true/false
-     * 均静默成功（角标变化即反馈）。
+     * 当前页书签 toggle（v2 Task 9，设计 §4）：显示载荷（章节名 + 页文本摘录）
+     * 由模块从当前页快照组装（契约 v2——书签显示语义归模块），宿主只负责同页
+     * 判定、存储与重排。三态：null = 端口未注册（降级宿主）/无会话书/无当前页
+     * 快照；true = 本次添加；false = 本次移除。仅 null 由界面提示「操作失败」，
+     * true/false 均静默成功（角标变化即反馈）。
      */
     suspend fun togglePageBookmark(): Boolean? {
         val port = EInkEngineRegistry.selectionEngine ?: return null
-        return port.togglePageBookmark()
+        val page = _uiState.value.page ?: return null
+        return port.togglePageBookmark(page.toPageBookmarkContent())
     }
 
     /**

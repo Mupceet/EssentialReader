@@ -135,15 +135,6 @@ class ReaderSelectionInteractionPolicyTest {
         )
     }
 
-    @Test
-    fun `想法弹框内容清空即变划线`() {
-        assertFalse(markingThoughtFromNote(""))
-        // 仅空白视为清空（宿主落库时 note 会被置空）
-        assertFalse(markingThoughtFromNote("   "))
-        assertFalse(markingThoughtFromNote("\n"))
-        assertTrue(markingThoughtFromNote("记一笔"))
-    }
-
     /** 三行正文页：章内区间 [0, 10)（第一段落 [0,4)、续行 [4,6)、新段落 [7,10)）。 */
     private fun threeLinePage(
         topShift: Float = 0f,

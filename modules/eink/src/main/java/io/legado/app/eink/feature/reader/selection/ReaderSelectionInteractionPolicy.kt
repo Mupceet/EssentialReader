@@ -68,14 +68,6 @@ fun imageActionSlotAt(
 }
 
 /**
- * 想法弹框内容决定落库类型（v2.2 产品规则）：**非空 = 想法（虚线）**，
- * **清空（含仅空白）= 划线（实线）**——想法把内容删空后保存即自动变回划线；
- * 类型语言「划线 = 实线 + note 空 / 想法 = 虚线 + note 非空」由此恒定，
- * 不会出现「没有内容的虚线想法」。
- */
-fun markingThoughtFromNote(note: String): Boolean = note.isNotBlank()
-
-/**
  * 页变（`pageVersion` 推进）后「待确认落库」划线预览的续显选区：非空 =
  * 预览续显（以返回值重锚到新页）；null = 清态（预览退场，正式装饰接管）。
  *

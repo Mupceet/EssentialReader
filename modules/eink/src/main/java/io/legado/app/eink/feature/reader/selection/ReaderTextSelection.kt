@@ -2,6 +2,7 @@ package io.legado.app.eink.feature.reader.selection
 
 import androidx.compose.runtime.Stable
 import io.legado.app.eink.contract.ReaderDecorationRun
+import io.legado.app.eink.contract.ReaderPageBookmarkContent
 import io.legado.app.eink.contract.ReaderPageLine
 import io.legado.app.eink.contract.ReaderPageSnapshot
 import java.text.BreakIterator
@@ -25,6 +26,17 @@ data class ReaderSelectionUi(
 
 /** 行内拼接文本。 */
 internal fun lineText(line: ReaderPageLine): String = line.chunks.joinToString("")
+
+/**
+ * 页面书签显示载荷（契约 v2）：快照行文本按与宿主 page.text 同构的口径
+ * 拼装（行内 chunks 连接、行间 \n）；chapterName 取快照 title（与宿主
+ * page.chapterTitle 同源）。书签显示语义归模块，宿主只做存储规范化。
+ */
+internal fun ReaderPageSnapshot.toPageBookmarkContent(): ReaderPageBookmarkContent =
+    ReaderPageBookmarkContent(
+        chapterName = title,
+        pageText = lines.joinToString("\n") { lineText(it) },
+    )
 
 /**
  * 段首缩进长度：行首连续空白字符数（宿主 `paragraphIndent`，默认两个全角
@@ -86,9 +98,10 @@ fun findDecorationAt(line: ReaderPageLine, charIndex: Int): ReaderDecorationRun?
 /**
  * 点按命中装饰的选区快照（v2 点按流）：run 行内区间 → 选区两端与正文区间
  * （run 即行内拼接文本的字符索引，直接换算），selectedText = run 覆盖的
- * 行内文本段。点按场景 saveMarking 与浮条锚定共用此快照——同锚点落库
- * 命中原标记记录（单行标记精确命中；跨行标记以行内片段为锚点，宿主
- * 窗口搜索以提示位回溯）。
+ * 行内文本段。点按场景的弹层预览与浮条锚定共用此快照——契约 v2 起已有
+ * 标记的更新按 id 提交（updateMarkingNote，锚点不变），选区仅作预览与
+ * 定位提示（单行标记精确命中；跨行标记以行内片段为锚点，宿主窗口搜索
+ * 以提示位回溯）。
  * 行下标越界、run 区间越界钳制后退化为空区间时返回 null（防御宿主映射
  * 脏数据，调用方静默回落分区行为）。
  */
