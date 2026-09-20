@@ -70,8 +70,8 @@ import kotlinx.coroutines.launch
  * - 底栏「定位到当前」回到选中字体所在页（未选/幽灵选中回第一页，写法同
  *   目录页「回到当前」）；「选择字体文件夹」图标（空心描边版）随时可换
  *   文件夹（SAF），列表即时刷新；
- * - 系统栏避让：顶部用菜单层固定避让快照（[topInset]，宿主
- *   rememberStatusBarTop 口径——不跟随状态栏回归动画插值）；左右/底部
+ * - 系统栏避让：顶部用状态栏活值（[topInset]，开关开启期状态栏不在场
+ *   为 0，关闭期为真实栏高）；左右/底部
  *   同 readerSystemBarInsets 口径（displayCutout ∪ systemBars）；
  * - 回退：底栏返回 / 返回键只关本级（一级字体弹层保留）；
  *   全屏本体无背板可点；
