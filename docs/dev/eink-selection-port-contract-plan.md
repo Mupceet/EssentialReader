@@ -817,20 +817,22 @@ git commit -m "refactor(eink): 宿主适配 ReaderSelectionEngine 契约 v2—�
 - Modify: `modules/eink/build.gradle.kts`（0.7.0 版本注释块）
 - Modify: `modules/eink/src/main/java/io/legado/app/eink/contract/README.md`（端口总表第 81 行）
 
-- [ ] **Step 3.1: 0.7.0 版本注释追加本轮条目**
+- [ ] **Step 3.1: 追加 0.7.1 版本注释块（0.7.0 已在远端定版，不并入）**
 
-`build.gradle.kts` 的 `// 0.7.0 = 契约清理轮（待发布）：` 条目列表末尾（`compileSdk 35＝依赖集 AAR 元数据地板` 段之后、孪生坐标注释之前）追加：
+实施期事实：`origin/eink/lib` 的 `0caf7a80e` 已把 0.7.0 定版发布（`version = "0.7.0"`），本地指针落在定版前。本轮条目写成新的 0.7.1 块。`build.gradle.kts` 在 0.7.0 条目块之后（孪生坐标注释之前）追加（若本地无 0.7.0 定版块，则以本地存在的 `0.7.0 = 契约清理轮（待发布）` 注释末尾为插入点，措辞中"0.7.0 起"不受影响）：
 
 ```kotlin
-//         ReaderSelectionEngine 契约 v2（状态机进签名）：
+// 0.7.1 = ReaderSelectionEngine 契约 v2（待发布）：
 //         saveMarking 拆为 createMarking（仅新选区）+ updateMarkingNote
 //         (id, note)（唯一状态转换路径，锚点不变，结构性杜绝跨宿主把
 //         划线⇄想法转换实现成重复添加）；thought 字段删除（类型恒由
 //         note 派生）；togglePageBookmark 增 ReaderPageBookmarkContent
 //         载荷（书签显示字段由模块携带，宿主不自定显示语义）；
+//         ReaderPageLine 增 paragraphBreaksAfter（书签摘录按段落边界
+//         拼装，与宿主 page.text 口径同构——宿主映射器实现义务）；
 ```
 
-注意：`version = "0.6.1"` **不翻**——0.7.0 车列车齐发时统一翻。
+注意：版本号**不翻**（对齐「待发布」先例：注释先行，0.7.1 发布时统一翻）。本地分支与 `origin/eink/lib`（0.7.0 定版）已分叉，rebase/merge 由维护者在推送时决定。
 
 - [ ] **Step 3.2: 端口总表条目补状态机语义**
 
