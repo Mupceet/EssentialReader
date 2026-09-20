@@ -1,6 +1,7 @@
 package io.legado.app.eink.app
 
 import android.app.Application
+import android.content.res.Resources
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -345,33 +346,61 @@ internal fun initialStack(initialReaderBookUrl: String?): List<EInkScreen> =
  * safeDrawing 顶部高度快照（只增不减）：非阅读界面顶部避让用。两个跳动
  * 源都由「跟随活值/从零起步」引发，一并消掉：
  * - 冷启动：第一轮组合早于插图分发到 Compose，快照从 0 起步会让书架先
- *   顶格、次帧随插图到位整体下移——初值改为同步读根视图已持有的系统
- *   插图，首帧即终值；
+ *   顶格、次帧随插图到位整体下移——初值改为同步种子，首帧即终值；
  * - 阅读返回：隐藏状态栏的阅读页退出时系统栏 show() 动画期活值从 0
  *   逐帧回升——只增不减的快照保持满栏高，一步落位。
  *
- * 种子与跟踪都取 safeDrawing 顶（statusBars ∪ cutout 顶），兼顾刘海高于
- * 状态栏的机型。快照挂 EInkApp 根跨屏幕切换存活：阅读期活值回落不冲掉
- * 快照。残余场景：阅读期 recreate 时栏隐藏、种子从低值起步，退出阅读
- * 会随动画补捕跳一次——与阅读页菜单避让的既有取舍一致。
+ * 种子按可用性顺位取值、不做跨源取大（真实插图在场即以其为准，跨源
+ * 取大反而会把备忘陈旧值钉成永久偏大的避让）：根视图现实插图（≥23，
+ * statusBars∪cutout 顶；阅读期栏隐藏时值偏小属预期）→ 框架
+ * status_bar_height 内部 dimen（仅 API<23 无插图派发时，唯一同步来源，
+ * 该分支恰是前插图文件系统栏高语义成立的范围，lint 有据抑制）→ 进程级
+ * 备忘（[SafeDrawingTopMemo]，前两者皆不可用时的地板）。活值跟踪取
+ * safeDrawing 顶，兼顾刘海高于状态栏的机型。快照挂 EInkApp 根跨屏幕
+ * 切换存活：阅读期活值回落不冲掉快照。
  */
 @Composable
 private fun rememberSafeDrawingTopMax(): Dp {
     val density = LocalDensity.current
     val view = LocalView.current
-    val seedTopPx = remember(view) {
-        // ViewCompat 兼容层：API < 23 无插图派发返回 null，种子回落 0
-        //（仅剩的 21/22 机型冷启动首帧退回随插图补位行为）
-        val compat = ViewCompat.getRootWindowInsets(view)
-        maxOf(
-            compat?.getInsets(WindowInsetsCompat.Type.statusBars())?.top ?: 0,
-            compat?.getInsets(WindowInsetsCompat.Type.displayCutout())?.top ?: 0,
-        )
+    val seedDp = remember(view) {
+        val insetsTopPx = ViewCompat.getRootWindowInsets(view)?.let { compat ->
+            maxOf(
+                compat.getInsets(WindowInsetsCompat.Type.statusBars()).top,
+                compat.getInsets(WindowInsetsCompat.Type.displayCutout()).top,
+            )
+        }
+        when {
+            insetsTopPx != null -> with(density) { insetsTopPx.toDp().value }
+            else -> {
+                val legacyPx = legacyStatusBarHeightPx()
+                if (legacyPx > 0) with(density) { legacyPx.toDp().value }
+                else SafeDrawingTopMemo.topDp
+            }
+        }
     }
     val liveTop = WindowInsets.safeDrawing.asPaddingValues().calculateTopPadding()
-    var captured by remember { mutableStateOf(with(density) { seedTopPx.toDp() }) }
+    var captured by remember { mutableStateOf(seedDp.dp) }
     SideEffect {
         if (liveTop > captured) captured = liveTop
+        SafeDrawingTopMemo.topDp = maxOf(SafeDrawingTopMemo.topDp, liveTop.value)
     }
     return captured
+}
+
+/**
+ * API < 23 无插图派发时的唯一同步栏高来源（框架内部 dimen，仅在该分支
+ * 使用；现代 API 的取值风险由「不走上此分支」规避）。lint 两项抑制在此
+ * 收敛，调用面保持干净。
+ */
+@Suppress("DiscouragedApi", "InternalInsetResource")
+private fun legacyStatusBarHeightPx(): Int {
+    val resources = Resources.getSystem()
+    val id = resources.getIdentifier("status_bar_height", "dimen", "android")
+    return if (id > 0) resources.getDimensionPixelSize(id) else 0
+}
+
+/** 进程级备忘：本进程见过的 safeDrawing 顶最大值（dp 值），种子地板。 */
+private object SafeDrawingTopMemo {
+    @Volatile var topDp: Float = 0f
 }
