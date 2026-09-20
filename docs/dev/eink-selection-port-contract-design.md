@@ -21,6 +21,13 @@
 - 2026-09-20（用户确认）：页面书签 toggle 增加载荷 `ReaderPageBookmarkContent(chapterName,
   pageText)`——引用内容（书签显示文本）由模块携带，宿主不再自定；同页判定与"删最近一条"
   仍属宿主分页事实，不进载荷。
+- 2026-09-20（实施期修正，质量审查发现）：初稿"pageText 行间 `\n` 与宿主 `page.text`
+  同构"的事实前提**有误**——宿主只在**段落边界**插 `\n`（`ReaderPaginator`：
+  `appendSeparator = hasFollowingBlock`；同段折行不插），空行分隔为 `\n\n`（Spacer
+  块，有 `ReaderPaginatorTest` 固化）。修正：`ReaderPageLine` 新增
+  `paragraphBreaksAfter: Int`（本行之后的段落边界数，0 = 同段折行续行；1 = 段落
+  结束；空行/占位块累加），宿主映射器从排版块结构填充，模块按
+  `"\n".repeat(breaksAfter)` 拼装——同构口径由此成立，且模块仍自有拼装实现。
 
 ## 背景与问题
 
@@ -77,9 +84,11 @@ interface ReaderSelectionEngine {
 - 新增 `ReaderPageBookmarkContent(chapterName, pageText)`：
   - `chapterName` = 当前页快照 `title`（与宿主 `page.chapterTitle` 同源，已核实
     `ReaderPageSnapshotMapper`：`title = page.chapterTitle`）。
-  - `pageText` = 模块从快照行拼装：行内 `chunks` 连接、行间 `\n`，与宿主 `page.text`
-    同构（`ReaderPaginator`：行间 `'\n'`，图片 `'\uFFFC'` 占位）。图片页模块拼装不含
-    `\uFFFC`（模块无此字符语义），属可接受差异。
+  - `pageText` = 模块从快照行拼装：行内 `chunks` 连接，行间按上一行的
+    `ReaderPageLine.paragraphBreaksAfter` 插 `"\n".repeat(n)`（0 = 同段折行无
+    换行；1 = 段落结束；空行/占位块累加），与宿主 `page.text` 的段落边界口径
+    同构（`ReaderPaginator` 按 `appendSeparator = hasFollowingBlock` 插 `\n`）。
+    图片页模块拼装不含 `\uFFFC` 占位（模块无此字符语义），属可接受差异。
   - 宿主存储时可对自家渲染产物做清理（现有 `[袮꧁]` 占位符剥离 + trim），属存储规范化，
     不构成显示语义。
 
@@ -122,10 +131,15 @@ interface ReaderSelectionEngine {
   `true`。**不走选区定位**；`locateSelectionInContent` 归一化兜底只剩 create 路径需要。
 - `togglePageBookmark(content)`：`chapterName`/`bookText` 改用载荷（`bookText` 落库前仍过
   `[袮꧁]` 清理 + trim），页区间查询与最近删除逻辑不动。
+- 快照映射器为 `ReaderPageLine` 填充 `paragraphBreaksAfter`（新增契约字段，见决策记录
+  实施期修正）：从排版块结构推导（同块折行 0、块末 1、空行/Spacer 块逐个累加）；
+  末行值不参与拼装（对齐宿主 `hasFollowingBlock` 尾行为）。
 - 测试（`ReaderSelectionEngineImplTest`）更新并新增：
   - 划线 → 写想法 → 清空 全程一条记录且 id 不变（状态机回归基线）；
   - `updateMarkingNote` 不存在 → `null`；
-  - 书签落库字段来自载荷。
+  - 书签落库字段来自载荷；
+  - 同构对照门禁：同一排版 fixture 下模块拼装 `pageText` 与宿主 `page.text`
+    断言相等（占位符/`\uFFFC` 按既定差异声明），防拼装口径再次静默漂移。
 
 ## 迁移与兼容
 
@@ -159,7 +173,8 @@ interface ReaderSelectionEngine {
   保证，宿主测试固化）。
 - 笔记列表（`MarksEngine`）、装饰渲染（实线/虚线、纯黑）、删除与失效路径行为不变。
 - 书签落库字段与现行为一致：`chapterName` 同源 `page.chapterTitle`；`pageText` 与宿主
-  `page.text` 同构（行间 `\n`；图片 `\uFFFC` 差异已知可接受）。
+  `page.text` 段落边界口径同构（同段折行无换行、段末一个换行、空行双换行；图片
+  `\uFFFC` 差异已知可接受）。
 - 编辑已存想法不再可能因选区定位失败而「保存失败」（原真机 bug 路径随更新重定位一并
   消除）。
 

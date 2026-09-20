@@ -459,11 +459,119 @@ git diff --check
 
 ---
 
+### Task 1b: eink-lib 子模块仓——书签载荷段落边界修正（Task 1 质量审查 Critical 修复）
+
+质量审查发现：初版 `toPageBookmarkContent` 逐视觉行 `joinToString("\n")` 与宿主
+`page.text` 不同构——宿主只在段落边界插 `\n`（同段折行不插；空行为 `\n\n`，
+`ReaderPaginatorTest:72/133` 固化）。修正方案 a：契约补段落边界信息（设计文档
+决策记录「实施期修正」条目）。
+
+**Files（均在 eink-lib 仓）:**
+- Modify: `modules/eink/src/main/java/io/legado/app/eink/contract/ReaderPageSnapshot.kt`
+- Modify: `modules/eink/src/main/java/io/legado/app/eink/contract/ReaderSelectionEngine.kt`（仅 KDoc）
+- Modify: `modules/eink/src/main/java/io/legado/app/eink/feature/reader/selection/ReaderTextSelection.kt`
+- Test: `modules/eink/src/test/java/io/legado/app/eink/feature/reader/selection/ReaderPageBookmarkContentTest.kt`
+
+- [ ] **Step 1b.1: 先补失败测试**
+
+`ReaderPageBookmarkContentTest.kt`：`line(...)` helper 加 `breaks: Int = 0` 参数并传入
+`paragraphBreaksAfter = breaks`；新增两个用例：
+
+```kotlin
+@Test
+fun `同段折行不插换行`() {
+    val page = snapshot(
+        line("第一段前半", positions = intArrayOf(0), breaks = 0),
+        line("后半", positions = intArrayOf(5), breaks = 1),
+    )
+    assertEquals("第一段前后半", page.toPageBookmarkContent().pageText)
+}
+
+@Test
+fun `空行分隔累积双换行`() {
+    val page = snapshot(
+        line("甲段", positions = intArrayOf(0), breaks = 2),
+        line("乙段", positions = intArrayOf(4), breaks = 1),
+    )
+    assertEquals("甲段\n\n乙段", page.toPageBookmarkContent().pageText)
+}
+```
+
+跑 `./gradlew.bat :modules:eink:testDebugUnitTest --tests "...ReaderPageBookmarkContentTest"`
+确认编译失败（`paragraphBreaksAfter` 未解析）。
+
+- [ ] **Step 1b.2: 契约加字段**
+
+`ReaderPageSnapshot.kt` 的 `ReaderPageLine`，在 `decorations` 之前（`bottom` 之后）加：
+
+```kotlin
+    /**
+     * 本行之后的段落边界数（契约 v2 书签载荷拼装依据，与宿主 page.text
+     * 段落边界口径同构）：0 = 下一行是同段折行续行；1 = 段落在本行结束；
+     * 空行/占位块每个累加 1（如空行分隔 = 2）。末行的值不参与拼装。
+     * 宿主映射器实现义务：从排版块结构填充；缺省 0（旧宿主摘录退化为
+     * 无段落分隔）。
+     */
+    val paragraphBreaksAfter: Int = 0,
+```
+
+- [ ] **Step 1b.3: 拼装改用边界**
+
+`ReaderTextSelection.kt` 的 `toPageBookmarkContent` 替换为：
+
+```kotlin
+/**
+ * 页面书签显示载荷（契约 v2）：快照行文本按与宿主 page.text 同构的段落
+ * 边界口径拼装（行内 chunks 连接；行间按上一行 paragraphBreaksAfter 插
+ * "\n".repeat(n)——同段折行 0、段末 1、空行累加；末行不计）。chapterName
+ * 取快照 title（与宿主 page.chapterTitle 同源）。书签显示语义归模块，
+ * 宿主只做存储规范化。
+ */
+internal fun ReaderPageSnapshot.toPageBookmarkContent(): ReaderPageBookmarkContent =
+    ReaderPageBookmarkContent(
+        chapterName = title,
+        pageText = buildString {
+            lines.forEachIndexed { index, line ->
+                append(lineText(line))
+                if (index < lines.lastIndex) append("\n".repeat(line.paragraphBreaksAfter))
+            }
+        },
+    )
+```
+
+`ReaderSelectionEngine.kt` 中 `ReaderPageBookmarkContent.pageText` 的 KDoc 改为：
+
+```kotlin
+    /** 页文本摘录（行内 chunks 连接；行间按 ReaderPageLine.paragraphBreaksAfter
+     *  插段落换行——同段折行无换行、段末一个、空行累加，与宿主 page.text
+     *  段落边界口径同构；图片页不含 \uFFFC 占位——模块无此字符语义）。 */
+```
+
+- [ ] **Step 1b.4: 跑测试与残留检查（绿）**
+
+```bash
+cd /d/Projects/AndroidProjects/EssentialReader && ./gradlew.bat :modules:eink:testDebugUnitTest
+```
+
+预期全绿（含新增 2 用例）。`git -C eink-lib diff --check` 干净。
+
+- [ ] **Step 1b.5: 提交（eink-lib 仓）**
+
+```bash
+cd /d/Projects/AndroidProjects/EssentialReader/eink-lib
+git add modules/eink/src
+git commit -m "fix(eink): 书签载荷按段落边界拼装——ReaderPageLine 增 paragraphBreaksAfter，对齐宿主 page.text 口径"
+```
+
+---
+
 ### Task 2: 主仓——宿主 bridge 实现
 
 **Files:**
 - Modify: `app/src/main/java/io/legado/app/eink/bridge/ReaderSelectionEngineImpl.kt`
+- Modify: `app/src/main/java/io/legado/app/eink/bridge/ReaderPageSnapshotMapper.kt`（填 paragraphBreaksAfter）
 - Test: `app/src/test/java/io/legado/app/eink/bridge/ReaderSelectionEngineImplTest.kt`
+- Test: `app/src/test/java/io/legado/app/eink/bridge/ReaderPageSnapshotMapperTest.kt`（同构对照门禁）
 
 - [ ] **Step 2.1: 写失败测试**
 
@@ -664,14 +772,34 @@ override suspend fun togglePageBookmark(content: ReaderPageBookmarkContent): Boo
 
 KDoc：方法上方注释把「页文本为标题」的来源改为「显示字段取模块载荷 [content]（存储规范化：占位符剥离 + trim）；同页判定与最近删除按宿主分页事实」。import 区补 `io.legado.app.eink.contract.ReaderPageBookmarkContent`。
 
+(f) 快照映射器填段落边界（Task 1b 契约字段的宿主义务）：
+
+`ReaderPageSnapshotMapper.kt`：为每个映射出的 `ReaderPageLine` 填 `paragraphBreaksAfter`——
+从排版块结构推导：同一文本块的折行续行间 0；块末行为 1；其后每隔一个空行/占位块
+（不产生 ReaderPageLine 的 Spacer 等）累加 1（空行分隔 = 2）。末行填实际边界数即可
+（模块拼装不消费末行值，但填真值保持快照语义完整）。先读
+`ReaderPaginator`（`pageTexts` 的 `append('\n')` 处，约 548/559/921/966 行）与
+`ReaderPaginatorTest`（:72 `甲\n\n乙`、:133 三行同段无 `\n`）确认块结构与分隔口径，
+再实现推导。
+
+- [ ] **Step 2.2b: 同构对照门禁（先红后绿）**
+
+`ReaderPageSnapshotMapperTest.kt` 追加：用 `ReaderPaginatorTest` 同款 fixture（含同段
+折行 + 空行分隔 + 标题行）排出一页，`ReaderPageSnapshotMapper.map` 得快照后断言
+模块拼装摘录与宿主 `page.text` 相等（fixture 选不含占位符与图片的文本，即逐字相等；
+`toPageBookmarkContent` 为模块 internal 扩展，宿主测试不可见——改为对快照行手动按
+`paragraphBreaksAfter` 拼出期望串再与 `page.text` 比对，等价锁定 mapper 填值与宿主
+口径一致）。fixture 需覆盖：同段折行（无 `\n`）、相邻段落（单 `\n`）、空行分隔
+（`\n\n`）、标题行。
+
 - [ ] **Step 2.3: 跑宿主测试与编译（绿）**
 
 ```bash
-cd /d/Projects/AndroidProjects/EssentialReader && ./gradlew.bat :app:testAppDebugUnitTest --tests "io.legado.app.eink.bridge.ReaderSelectionEngineImplTest"
+cd /d/Projects/AndroidProjects/EssentialReader && ./gradlew.bat :app:testAppDebugUnitTest --tests "io.legado.app.eink.bridge.ReaderSelectionEngineImplTest" --tests "io.legado.app.eink.bridge.ReaderPageSnapshotMapperTest"
 ./gradlew.bat :app:compileAppDebugKotlin
 ```
 
-预期：测试全 PASS（原有 12 个 + 新增 2 个）；编译通过（含 `:modules:eink`）。
+预期：测试全 PASS（ReaderSelectionEngineImplTest 原 12 + 新增 2；ReaderPageSnapshotMapperTest 全部含同构门禁）；编译通过（含 `:modules:eink`）。
 
 - [ ] **Step 2.4: 提交（主仓，不含子模块指针）**
 
