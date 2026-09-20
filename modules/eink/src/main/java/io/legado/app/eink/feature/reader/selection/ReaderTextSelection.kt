@@ -40,7 +40,7 @@ internal fun ReaderPageSnapshot.toPageBookmarkContent(): ReaderPageBookmarkConte
         pageText = buildString {
             lines.forEachIndexed { index, line ->
                 append(lineText(line))
-                if (index < lines.lastIndex) append("\n".repeat(line.paragraphBreaksAfter))
+                if (index < lines.lastIndex) append("\n".repeat(line.paragraphBreaksAfter.coerceAtLeast(0)))
             }
         },
     )
