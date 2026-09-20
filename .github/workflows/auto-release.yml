@@ -3,7 +3,7 @@ name: Auto Build
 on:
   push:
     branches:
-      - md3/port/eink
+      - eink/port/md3/modules
     paths:
       - '**'
       # - '!**/assets/**'
@@ -77,7 +77,7 @@ jobs:
             IS_RELEASE="true"
             echo "版本类型: 正式版 (Release), 版本名: $CURRENT_VERSION"
 
-          elif [[ ("${{ github.event_name }}" == "push" || "${{ inputs.publish }}" == "true") && "${{ github.ref }}" == "refs/heads/md3/port/eink" ]]; then
+          elif [[ ("${{ github.event_name }}" == "push" || "${{ inputs.publish }}" == "true") && "${{ github.ref }}" == "refs/heads/eink/port/md3/modules" ]]; then
             # 标记为测试版 (VERSION_SUFFIX=1 或其他/空)，且在发布分支推送
 
             # 查找匹配当前 CURRENT_VERSION 的上一个 BETA TAG (e.g., 3.26.4-beta.X)
@@ -247,7 +247,7 @@ jobs:
   create_release:
     needs: [ prepare, build ]
     # 只有 Release APK workflow 调用时才发布；普通 Auto Build 仍然只构建产物。
-    if: inputs.publish && github.actor == 'Mupceet' && github.ref == 'refs/heads/md3/port/eink'
+    if: inputs.publish && github.actor == 'Mupceet' && github.ref == 'refs/heads/eink/port/md3/modules'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5

@@ -5,6 +5,8 @@ on:
     branches:
       - main
       - master
+      # 当前开发/发布主线（eink 移植轮），直推也跑验证
+      - eink/port/md3/modules
     paths-ignore:
       - '**/modules/web/**'
   pull_request:
