@@ -900,6 +900,316 @@ cd eink-lib && git diff --check && git status --short   # 期望干净
 
 ---
 
+### Task 5: eink-lib 子模块仓——ReaderSelectionEngine 并入 MarksEngine（第二轮）
+
+**Files（均在 eink-lib 仓，分支 eink/lib）:**
+- Rewrite: `modules/eink/src/main/java/io/legado/app/eink/contract/MarksEngine.kt`
+- Delete: `modules/eink/src/main/java/io/legado/app/eink/contract/ReaderSelectionEngine.kt`
+- Modify: `contract/EInkEngineRegistry.kt`（撤 selectionEngine 槽）
+- Modify: `feature/reader/ReaderViewModel.kt`、`feature/reader/ReaderMenus.kt`（消费点切 marksEngine）
+- Modify: `contract/AppUpdateEngine.kt`、`contract/BookshelfGroupEngine.kt`（KDoc 引用）
+- Modify: `contract/EINK-PORTING.md`（可选端口数 4→3）、`contract/README.md`（总表并行）
+- Modify: `modules/eink/build.gradle.kts`（0.7.1 注释补合并条目）
+- Test: `src/test/.../contract/EInkEngineRegistryTest.kt`（撤 selectionEngine 用例）
+
+- [ ] **Step 5.1: MarksEngine.kt 整文件重写**
+
+```kotlin
+package io.legado.app.eink.contract
+
+import androidx.compose.runtime.Stable
+import io.legado.app.eink.arch.EInkImmutable
+import kotlinx.coroutines.flow.Flow
+
+/**
+ * 书签/笔记统一端口：阅读内选区批注（笔记状态机 + 页面书签 toggle）与
+ * 目录页书签/笔记 Tab 的列表、跳转解析、导出。宿主负责锚点构造（上下文
+ * 与哈希）并写 book_marks/bookmarks，模块不复制这些规则。
+ *
+ * 契约 v2（0.7.1 起，状态机进签名）：笔记（划线/想法）是**同一条记录的
+ * 两种状态**——转换只能走 [updateMarkingNote]（按 id，锚点不变），
+ * [createMarking] 仅"新选区"入口可达，结构性杜绝宿主把转换实现成重复
+ * 添加。类型恒由 note 派生：note 空白 = 划线（实线）；非空白 = 想法
+ * （虚线）——契约没有并列的 thought 字段。书签显示字段（章节名 + 页
+ * 文本摘录）由 [ReaderPageBookmarkContent] 携带，宿主不自定显示语义。
+ *
+ * 能力粒度按**特性**不分表面（0.7.1 合并轮，全有全无）：[supportsMarkings]
+ * 同时管阅读内保存（长按选择/选区操作条/点按标记）与目录页笔记 Tab/导出；
+ * [supportsBookmarks] 同时管阅读内 toggle（下拉书签/顶栏钮/页角标）与
+ * 目录页书签 Tab——不存在"阅读内能画线、目录页却无笔记 Tab"的分裂配置。
+ * 两者皆 false 等价于不注册本端口。
+ *
+ * 可选端口（同 [EInkEngineRegistry.appUpdateEngine] 先例）：注册表缺失本端口
+ * 时，模块降级——长按选择整体不启用（松手无动作、无操作条），下拉书签与
+ * 顶栏书签钮隐藏，目录页不显示书签/笔记 Tab（只剩目录），不做假死路径。
+ *
+ * 列表按「书名+作者」跨源聚合（换源后仍可见）；跳转解析封装宿主的
+ * 校验→本地重定位→确认三分支。
+ */
+interface MarksEngine {
+
+    /** 笔记能力：阅读内划线/想法保存 + 目录页笔记 Tab 与导出。 */
+    val supportsMarkings: Boolean get() = true
+
+    /** 书签能力：阅读内页面书签 toggle + 目录页书签 Tab。 */
+    val supportsBookmarks: Boolean get() = true
+
+    // —— 阅读内：笔记状态机与页面书签 ——
+
+    /**
+     * 新建笔记（仅"新选区"入口可达；已有标记上的动作走 [updateMarkingNote]/
+     * [deleteMarking]）。[ReaderSelectionCommit.note] 空白 = 划线（实线），
+     * 非空白 = 想法（虚线）。样式由宿主桥写入 TextProcessStyle
+     * （underlineMode 1/2；颜色固定纯黑，eink 与完整模式显示一致）。
+     * 宿主落库后自行触发当前章重排（保持页内位置），新快照经
+     * onContentUpdated 携带装饰推送——模块不请求刷新。
+     * false = 落库失败（模块提示「保存失败」并恢复现场）。
+     */
+    suspend fun createMarking(commit: ReaderSelectionCommit): Boolean
+
+    /**
+     * 唯一的状态转换路径：按 id 改想法，锚点与选区不变（宿主不做重定位）。
+     * note 空白 → 划线（实线）；非空白 → 想法（虚线）。
+     * null = 标记不存在（换源清理等，模块按标记失效处理）；false = 更新失败；
+     * true = 成功。宿主更新后触发当前章重排（同 createMarking 推送路径）。
+     */
+    suspend fun updateMarkingNote(markingId: String, note: String): Boolean?
+
+    /**
+     * 删除标记。false = 删除失败（模块提示并保留现场）。
+     * 宿主删除后触发当前章重排（同 createMarking 推送路径）。
+     */
+    suspend fun deleteMarking(markingId: String): Boolean
+
+    /**
+     * 读取标记详情（点按想法时浮窗展示与写想法预填）。
+     * null = 标记不存在（换源清理等，模块按标记失效处理，不弹浮窗）。
+     */
+    suspend fun findMarking(markingId: String): ReaderMarkingDetail?
+
+    /**
+     * 当前页书签 toggle（宿主快速书签语义：同页已有多条时删最近一条）。
+     * 显示字段由 [content] 携带（模块从当前页快照组装）：宿主原样落库——
+     * 对自家渲染占位符的清理属存储规范化，不构成显示语义；同页判定（页
+     * 正文区间）与「删最近一条」按宿主分页事实。自动记录：页位置 +
+     * content 引用文本，无编辑层。宿主落库后触发当前章重排（角标随新快照
+     * 推送）。null = 无会话书/当前页无法定位；true = 本次添加；false =
+     * 本次移除。
+     */
+    suspend fun togglePageBookmark(content: ReaderPageBookmarkContent): Boolean?
+
+    // —— 目录页：列表 / 跳转 / 导出 ——
+
+    /**
+     * 订阅书籍的全部页面书签（bookmarks 表，跨源；按 chapterIndex、
+     * chapterPos 升序）。宿主按 bookUrl 解析书籍失败返回空流。
+     */
+    fun observeBookmarks(bookUrl: String): Flow<List<BookmarkUiModel>>
+
+    /**
+     * 订阅书籍的全部划线/想法（book_marks 表，跨源；按 chapterIndex、
+     * **章内正文本位置**升序，同位置按 createdAt）。宿主按 bookUrl 解析书籍
+     * 失败返回空流。
+     *
+     * 用正文本位置而非创建时间：笔记卡按「读到的先后」排列才与正文顺序一致
+     * （补记的划线若按创建时间会排在章末，与阅读顺序割裂）。位置取自锚点
+     * [TextProcessAnchor.chapterPosition]。
+     */
+    fun observeMarkings(bookUrl: String): Flow<List<MarkingUiModel>>
+
+    /**
+     * 解析书签跳转目标：复用宿主校验（源指纹 + 章节标题比对）。
+     * Match → [JumpResolution.Located]；不 Match → [JumpResolution.NeedConfirm]
+     * （fallback = 存储坐标，对齐宿主「仍跳转」语义）；书签/书籍不存在 →
+     * [JumpResolution.Failed]。不执行跳转、不写进度。
+     */
+    suspend fun resolveBookmarkJump(bookmarkId: Long): JumpResolution
+
+    /**
+     * 解析划线/想法跳转目标：校验不 Match 时先本地重定位（选中文本 +
+     * 前后文评分，仅本地已缓存章节，不发起网络）；重定位成功 → 重定位
+     * 坐标；失败 → [JumpResolution.NeedConfirm]（fallback = 存储坐标）。
+     * 标记不存在（换源清理等）→ [JumpResolution.Failed]。
+     */
+    suspend fun resolveMarkingJump(markingId: String): JumpResolution
+
+    /**
+     * 导出当前书全部划线/想法为 Markdown 写入 SAF uri。
+     * @return false = 书籍不存在或无笔记或写失败（模块提示「导出失败」）。
+     */
+    suspend fun exportMarkingsMarkdown(bookUrl: String, uri: String): Boolean
+}
+
+/** 笔记提交载荷（仅新建路径；已有标记的更新走 updateMarkingNote，不重提交选区）。 */
+@Stable
+class ReaderSelectionCommit(
+    /** 选区所在章节下标。 */
+    val chapterIndex: Int,
+
+    /** 章内字符区间 [start, end)（UTF-16、语义正文空间）。 */
+    val start: Int,
+    val end: Int,
+
+    /** 选中文本（按行拼接、段落间隙以换行连接；跨页选区为跨页累计拼接）。
+     *  宿主保存时以其在章节全文窗口搜索定位。 */
+    val selectedText: String,
+
+    /** 初始想法内容：空白 = 划线（实线）；非空白 = 想法（虚线）。 */
+    val note: String,
+)
+
+/** 标记详情（点按浮窗与写想法预填；类型由 note 派生，不再有 thought 字段）。 */
+@Stable
+class ReaderMarkingDetail(
+    /** 划线选中的原文。 */
+    val selectedText: String,
+
+    /** 想法内容（空白 = 划线/实线；非空白 = 想法/虚线）。 */
+    val note: String,
+)
+
+/** 页面书签显示载荷（模块从当前页快照组装，宿主原样落库）。 */
+@Stable
+class ReaderPageBookmarkContent(
+    /** 章节标题（= 页快照 title，与宿主 page.chapterTitle 同源）。 */
+    val chapterName: String,
+
+    /** 页文本摘录（行内 chunks 连接；行间按 ReaderPageLine.paragraphBreaksAfter
+     *  插段落换行——同段折行无换行、段末一个、空行累加，与宿主 page.text
+     *  段落边界口径同构；图片页不含 \uFFFC 占位——模块无此字符语义）。 */
+    val pageText: String,
+)
+```
+
+（`BookmarkUiModel`/`MarkingUiModel`/`JumpResolution` 等既有类型与 KDoc 原样保留在
+本文件中，不在上文中重复——重写时以现文件为底，仅替换接口声明区与 KDoc、追加
+上文迁入的三个载荷类。）
+
+- [ ] **Step 5.2: 删除 ReaderSelectionEngine.kt**
+
+- [ ] **Step 5.3: EInkEngineRegistry.kt 撤槽**
+
+删除：`_selectionEngine` 字段、`selectionEngine` getter 及其 KDoc 块、install 的
+`selectionEngine` 参数与赋值、`@param selectionEngine` 文档；KDoc 中可选端口清单
+（约 :18、:95 两处）从"appUpdateEngine / selectionEngine / marksEngine /
+bookshelfGroupEngine"改为"appUpdateEngine / marksEngine / bookshelfGroupEngine"，
+"四个可选端口"改"三个可选端口"。
+
+- [ ] **Step 5.4: 消费点切换**
+
+`ReaderViewModel.kt`：
+- `selectionEnabled`：`EInkEngineRegistry.selectionEngine?.supportsMarkings == true` →
+  `EInkEngineRegistry.marksEngine?.supportsMarkings == true`，KDoc 改为"未注册
+  marksEngine 或宿主声明不支持笔记（阅读内 + 目录页两表面一起）的合法降级态"。
+- `pageBookmarkEnabled`：`selectionEngine?.supportsPageBookmark` →
+  `marksEngine?.supportsBookmarks`，KDoc 同步（书签特性不分表面）。
+- 五个端口方法内 `EInkEngineRegistry.selectionEngine` → `EInkEngineRegistry.marksEngine`。
+
+`ReaderMenus.kt` 约 682 行：
+`EInkEngineRegistry.selectionEngine?.supportsPageBookmark == true` →
+`EInkEngineRegistry.marksEngine?.supportsBookmarks == true`。
+
+`AppUpdateEngine.kt:7` KDoc 可选端口清单去 `ReaderSelectionEngine`；
+`BookshelfGroupEngine.kt:37` "同 [MarksEngine] / [ReaderSelectionEngine]" → "同 [MarksEngine]"。
+
+- [ ] **Step 5.5: 文档与版本注释**
+
+- `EINK-PORTING.md` §1："可选端口 4 个"改"可选端口 3 个"（grep 定位精确措辞），
+  如有逐一点名处一并更新。
+- `contract/README.md`：`ReaderSelectionEngine` 与 `MarksEngine` 两行并为一行：
+
+```markdown
+| `MarksEngine` | 书签/笔记统一端口：阅读内批注与页面书签 + 目录页列表/跳转/导出（可选） | 注册即默认两特性齐备；`supportsMarkings`/`supportsBookmarks` = false 时对应特性在阅读内与目录页两表面一起隐藏；契约 v2：笔记转换按 id 走 `updateMarkingNote`（不可重复添加），书签显示载荷由模块携带（含段落边界语义） |
+```
+
+- `build.gradle.kts` 0.7.1 注释块末尾追加：
+
+```kotlin
+//         ReaderSelectionEngine 并入 MarksEngine（能力位按特性全有全无：
+//         supportsMarkings/supportsBookmarks 各管阅读内 + 目录页两表面，
+//         两同名不同义的能力位与 KDoc 免责声明消亡；注册表撤
+//         selectionEngine 槽）；
+```
+
+- [ ] **Step 5.6: 注册表测试更新**
+
+`EInkEngineRegistryTest.kt`：删除 `` `aa_selectionEngine 为可选端口未注册返回 null` ``
+用例与相关 fake/参数（`installDefaults` 如有 selectionEngine 形参一并删）；
+`marksEngine` 可选性与取回用例保留原样。
+
+- [ ] **Step 5.7: 跑模块测试与残留检查（绿）**
+
+```bash
+cd /d/Projects/AndroidProjects/EssentialReader && ./gradlew.bat :modules:eink:testDebugUnitTest
+grep -rn "ReaderSelectionEngine\|selectionEngine" /d/Projects/AndroidProjects/EssentialReader/eink-lib/modules/eink/src --include="*.kt"
+```
+
+预期：全绿；grep 零命中（KDoc 历史注记除外——如有提及需逐一改写或删除）。
+
+- [ ] **Step 5.8: 提交（eink-lib 仓）**
+
+```bash
+cd /d/Projects/AndroidProjects/EssentialReader/eink-lib
+git add -A modules/eink
+git commit -m "refactor(eink)!: ReaderSelectionEngine 并入 MarksEngine——能力位按特性全有全无，注册表撤 selectionEngine 槽"
+git diff --check
+```
+
+---
+
+### Task 6: 主仓——宿主实现合并与指针推进（第二轮）
+
+**Files（主仓）:**
+- Modify: `app/src/main/java/io/legado/app/eink/bridge/MarksEngineImpl.kt`（吸收全部阅读内方法与纯函数伴生件）
+- Delete: `app/src/main/java/io/legado/app/eink/bridge/ReaderSelectionEngineImpl.kt`
+- Modify: `app/src/main/java/io/legado/app/eink/bridge/EInkBridge.kt`（删 selectionEngine 安装行）
+- Test: `app/src/test/java/io/legado/app/eink/bridge/ReaderSelectionEngineImplTest.kt`（文件头 KDoc 改指 MarksEngineImpl.kt 顶层；用例不动）
+
+- [ ] **Step 6.1: 吸收实现**
+
+`ReaderSelectionEngineImpl.kt` 的全部内容迁入 `MarksEngineImpl.kt`：顶层常量与纯函数
+（CONTEXT_CHARS/CONTEXT_SEARCH_WINDOW/CONTENT_WAIT_*、EINK_MARKING_COLOR、
+einkMarkingStyle、locateInContent、uniqueOccurrence、locateSelectionInContent、
+extractContext、BOOK_TEXT_MARKS、withEinkNote、bookmarkDisplayText）原样迁为
+MarksEngineImpl.kt 顶层；object `MarksEngineImpl` 增加依赖注入
+（bookMarkingGateway/saveMarkingUseCase/bookmarkRepository）与私有伴生
+（toggleMutex、BOOK_TEXT_MARKS 若已在顶层则去重、semanticContent/awaitSemanticContent/
+displayTitle），实现六个新方法（createMarking/updateMarkingNote/deleteMarking/
+findMarking/togglePageBookmark 从 ReaderSelectionEngineImpl 逐字迁移，仅 `override`
+所属接口随合并变化）。object KDoc 更新为"eink 书签/笔记统一端口实现：阅读内批注
+状态机 + 页面书签 toggle + 列表流 + 跳目标解析 + Markdown 导出"。然后删除
+ReaderSelectionEngineImpl.kt。
+
+- [ ] **Step 6.2: EInkBridge 与测试**
+
+EInkBridge.kt 删除 `selectionEngine = ReaderSelectionEngineImpl,` 行（marksEngine 安装
+行保留，此时实现已含全部方法）。ReaderSelectionEngineImplTest.kt 文件头注释
+"（ReaderSelectionEngineImpl.kt 顶层）"改"（MarksEngineImpl.kt 顶层）"——纯函数
+同包迁移，用例应零改动通过；如编译报缺失即说明迁移不完整，回查。
+
+- [ ] **Step 6.3: 全量验证**
+
+```bash
+cd /d/Projects/AndroidProjects/EssentialReader
+./gradlew.bat :app:testAppDebugUnitTest --tests "io.legado.app.eink.bridge.ReaderSelectionEngineImplTest" --tests "io.legado.app.eink.bridge.MarksEngineImplTest" --tests "io.legado.app.eink.bridge.ReaderPageSnapshotMapperTest"
+./gradlew.bat testAppDebugUnitTest lintAppDebug verifyConfigArchitecture --continue --no-configuration-cache
+```
+
+预期：全绿；lint 对改动文件零新告警。
+
+- [ ] **Step 6.4: 提交（主仓，app 文件 + 子模块指针一起）**
+
+```bash
+cd /d/Projects/AndroidProjects/EssentialReader
+git add app/src/main/java/io/legado/app/eink/bridge/MarksEngineImpl.kt app/src/main/java/io/legado/app/eink/bridge/EInkBridge.kt app/src/test/java/io/legado/app/eink/bridge/ReaderSelectionEngineImplTest.kt eink-lib
+git rm --cached --quiet app/src/main/java/io/legado/app/eink/bridge/ReaderSelectionEngineImpl.kt 2>/dev/null || rm app/src/main/java/io/legado/app/eink/bridge/ReaderSelectionEngineImpl.kt
+git add -A app/src/main/java/io/legado/app/eink/bridge/
+git commit -m "refactor(eink): 宿主合并书签/笔记端口实现——MarksEngineImpl 吸收 ReaderSelectionEngineImpl，推进子模块指针至合并轮"
+git diff --check
+```
+
+---
+
 ## 计划自审记录
 
 - **Spec 覆盖**：契约形状（Task 1.4）、三不变量（1.4/1.6/1.7/2.2）、部分重叠行为变化（1.7(c) 按 id 更新即实现）、宿主测试三件（2.1）、双仓提交与指针（1.11/2.4/3.3/4.2）、文档同步（3.1/3.2/4.1）、版本列车不翻号（3.1）、行为基线验证（4.3/4.4）——设计文档各节均有对应任务。

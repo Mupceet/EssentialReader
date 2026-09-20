@@ -28,6 +28,12 @@
   `paragraphBreaksAfter: Int`（本行之后的段落边界数，0 = 同段折行续行；1 = 段落
   结束；空行/占位块累加），宿主映射器从排版块结构填充，模块按
   `"\n".repeat(breaksAfter)` 拼装——同构口径由此成立，且模块仍自有拼装实现。
+- 2026-09-20（用户确认，**第二轮：端口合并**）：`ReaderSelectionEngine` 与 `MarksEngine`
+  合并为单一 `MarksEngine`（保留 `marksEngine` 注册槽）。动机：能力粒度按表面拆分
+  （阅读内保存 vs 目录列表）不是产品目标，两面不一致才是问题——**能力位按特性
+  全有全无**：`supportsMarkings` 同时管阅读内保存与目录笔记 Tab/导出，
+  `supportsBookmarks` 同时管阅读内 toggle 与目录书签 Tab。两个"同名不同义"的
+  `supportsMarkings` 及其 KDoc 免责声明消亡。合并折进未发布的 0.7.1，不新开版本。
 
 ## 背景与问题
 
@@ -98,6 +104,23 @@ interface ReaderSelectionEngine {
 2. **类型单事实源**——划线/想法恒等于 `note.isNotBlank()`，契约不再有两个字段一份不变量。
 3. **书签显示归模块**——`chapterName`/`pageText` 模块提供，宿主原样（除自家渲染产物清理）
    落库。
+
+### 端口合并（第二轮修订，并入 0.7.1）
+
+上文的 `ReaderSelectionEngine` 接口整体并入 `MarksEngine`（见决策记录第二轮条目），
+`ReaderSelectionEngine.kt` 文件删除、载荷类型（`ReaderSelectionCommit`/
+`ReaderMarkingDetail`/`ReaderPageBookmarkContent`）随迁；注册表撤 `selectionEngine`
+槽，只留 `marksEngine`。合并后的能力位语义（按特性不分表面）：
+
+- `supportsMarkings`：阅读内保存（长按选择/选区操作条/点按标记）+ 目录笔记 Tab/导出；
+- `supportsBookmarks`：阅读内 toggle（下拉书签/顶栏钮/页角标）+ 目录书签 Tab；
+- 两者皆 false 等价于不注册；未注册 = 两表面一起降级（长按选择不启用、下拉书签
+  与顶栏钮隐藏、目录只剩目录）。
+
+模块消费点切换：`ReaderViewModel`（`selectionEnabled`/`pageBookmarkEnabled`/五个端口
+方法）与 `ReaderMenus`（下拉书签开关显隐）改读 `marksEngine`；`TocViewModel` 与
+`ReaderSessionCache` 本就读 `marksEngine` 能力位，语义自然拓宽、零改动。宿主侧
+`MarksEngineImpl` 吸收 `ReaderSelectionEngineImpl` 全部方法与纯函数伴生件。
 
 ## 模块侧改动（eink-lib）
 
@@ -195,7 +218,8 @@ git diff --check   # 两仓各自
 
 ## 范围外
 
-- `MarksEngine` / `MarkingUiModel.thought`（列表端口的派生字段）不动。
-- 端口不拆分、不改名；`EInkEngineRegistry` 注册结构不动。
+- `MarkingUiModel.thought`（列表条目的派生字段）不动。
+- 合并后不再进一步拆分或新增端口；除撤 `selectionEngine` 槽外 `EInkEngineRegistry`
+  结构不动。
 - 选区交互、想法弹层形态、书签手势等 UI 行为不变。
 - 锚点存储模型（`TextProcessAnchor`、`SaveMarkingUseCase` 的 upsert 键）不动。
