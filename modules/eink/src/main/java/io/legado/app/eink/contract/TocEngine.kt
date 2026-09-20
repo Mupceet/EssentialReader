@@ -1,5 +1,8 @@
 package io.legado.app.eink.contract
 
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flow
+
 
 /**
  * [TocEngine.fetchChaptersFromSource] 的结果。
@@ -37,6 +40,8 @@ sealed interface TocFetchResult {
  *                  │          ├─ Success(chapters) ─► 渲染目录
  *                  │          └─ NoSource / Failure ─► 错误文案
  *                  └─ 非空 ─► 渲染目录
+ *       └─ observeChapters(bookUrl) ─► 章节表后续变化跟进
+ *                                      （阅读页追更入库后目录自动更新）
  *  cachedChapterFileNames(bookUrl) ─► 章节缓存标记
  *  点击章节 ─► saveReadingProgress(bookUrl, index, title) ─► 跳转阅读页
  * ```
@@ -55,6 +60,23 @@ interface TocEngine {
 
     /** 已入库的目录章节（可能为空——由模块决定是否发起联网拉取）。 */
     suspend fun loadChapters(bookUrl: String): List<ChapterUiModel>
+
+    /**
+     * 订阅书籍的已入库目录章节（按章节下标升序）。
+     *
+     * 为什么是流：[loadChapters] 是一次性快照，阅读页追更
+     * （[ReaderEngine.refreshToc]）拉到新章节入库后存在陈旧窗口——目录页
+     * 与阅读会话预热缓存据此跟进章节表变化。
+     *
+     * 默认实现 = 单发 [loadChapters] 的 flow（旧宿主零改动）：首个值后
+     * 不再有更新，目录页表现为进入时快照，与流式宿主的无更新期行为一致。
+     *
+     * 宿主实现义务：按 bookUrl 解析书籍失败返回空流（对齐
+     * [MarksEngine.observeBookmarks] 先例）；下发口径（排序、元素投影）
+     * 与 [loadChapters] 同构。
+     */
+    fun observeChapters(bookUrl: String): Flow<List<ChapterUiModel>> =
+        flow { emit(loadChapters(bookUrl)) }
 
     /**
      * 从书源拉取目录并入库：缺目录地址时先拉书籍详情；成功后更新

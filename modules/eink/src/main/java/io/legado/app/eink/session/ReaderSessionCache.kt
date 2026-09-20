@@ -78,9 +78,10 @@ internal class ReaderSessionStore {
 }
 
 /**
- * 阅读会话预热缓存（切片 1）：进阅读页、**首章出页之后**再预热当前会话书的
+ * 阅读会话预热缓存（切片 1）：进阅读页、**首章出页之后**再订阅当前会话书的
  * 目录 / 书签 / 笔记，目录页与笔记 Tab 打开时直读快照——首帧即完整，
- * 不再等 Room 流往返与章节列表查询。
+ * 不再等 Room 流往返与章节列表查询；三条订阅常驻，章节表后续变化
+ * （阅读页追更入库等）经 observeChapters 流推进缓存保鲜。
  *
  * 与既有 `CacheBookPump` 同一条纪律：
  *  - 进程级作用域承载订阅，**随会话启停、不常驻**（[stop] 取消订阅并清空）；
@@ -123,7 +124,7 @@ internal object ReaderSessionCache {
         val markingsAvailable = marks?.supportsMarkings == true
         store.begin(bookUrl, bookmarksAvailable, markingsAvailable)
         sessionJob = scope.launch {
-            launch { warmChapters(bookUrl) }
+            launch { observeChapters(bookUrl) }
             if (bookmarksAvailable) {
                 launch { marks!!.observeBookmarks(bookUrl).collect { store.setBookmarks(bookUrl, it) } }
             }
@@ -142,11 +143,16 @@ internal object ReaderSessionCache {
         store.clear()
     }
 
-    /** 目录列表：一次性查询（目录缺失时阅读页的 prepareBookData 已保证入库）。 */
-    private suspend fun warmChapters(bookUrl: String) {
-        val chapters = runCatching { EInkEngineRegistry.tocEngine.loadChapters(bookUrl) }
-            .getOrNull()
-            ?: return
-        if (chapters.isNotEmpty()) store.setChapters(bookUrl, chapters)
+    /**
+     * 订阅章节表流写入缓存（契约 observeChapters）：流式宿主上阅读页追更
+     * 拉到新章节入库后缓存自动保鲜；默认单发流 = 原一次性预热行为。空列表
+     * 不写入（预热未就绪保持 null，目录页按原路径自加载）。
+     */
+    private suspend fun observeChapters(bookUrl: String) {
+        runCatching {
+            EInkEngineRegistry.tocEngine.observeChapters(bookUrl).collect { chapters ->
+                if (chapters.isNotEmpty()) store.setChapters(bookUrl, chapters)
+            }
+        }
     }
 }

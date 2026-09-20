@@ -26,6 +26,7 @@ import kotlinx.coroutines.launch
  */
 data class TocUiState(
     val book: TocBookUiModel? = null,
+    /** 章节列表（首帧 loadChapters/预热快照；后续由 observeChapters 流跟进更新）。 */
     val chapters: List<ChapterUiModel> = emptyList(),
     val isLoading: Boolean = true,
     val isReversed: Boolean = false,
@@ -127,6 +128,18 @@ class TocViewModel(application: Application) : AndroidViewModel(application) {
             if (book == null) {
                 _uiState.update { it.copy(isLoading = false, error = "书籍不存在") }
                 return@launch
+            }
+            // 章节表跟流（契约 observeChapters）：进书自动追更（refreshToc）
+            // 拉到新章节入库、换源重拉等章节表变化自动推进目录页，不再依赖
+            // 用户重进。首帧仍由 warm 快照/loadChapters 即时给出；空列表不
+            // 覆盖（降级宿主默认单发流首值空、fetch 在途窗口——不清已有目录，
+            // 也不把预热未就绪误渲染成空态）
+            viewModelScope.launch {
+                engine.observeChapters(book.bookUrl).collect { list ->
+                    if (list.isNotEmpty()) {
+                        _uiState.update { it.copy(chapters = list) }
+                    }
+                }
             }
             // 阅读会话预热命中（进阅读页首章出页后已预热）：直读快照——目录/书签/
             // 笔记首帧即完整，不再等 Room 流往返与章节查询；随后跟会话流跟进更新。
