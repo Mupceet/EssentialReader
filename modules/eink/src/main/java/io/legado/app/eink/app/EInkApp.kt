@@ -4,20 +4,29 @@ import android.app.Application
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.safeDrawingPadding
+import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveableStateHolder
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.HasDefaultViewModelProviderFactory
 import androidx.lifecycle.ViewModelProvider
@@ -79,6 +88,10 @@ fun EInkApp(
         controller.pop()
     }
 
+    // 非阅读界面顶部避让快照（只增不减，见 rememberSafeDrawingTopMax）：
+    // 状态栏在非阅读界面恒显示，栏高是常量，返回书架时一步落位不跳动
+    val safeDrawingTopMax = rememberSafeDrawingTopMax()
+
     // when 分支切换会整体卸载离屏内容，rememberSaveable 状态随之丢失；
     // 用 SaveableStateHolder 按"导航栈条目"（entryId）保留：
     // pop 返回复用同一 entryId（保留状态），重新 push 则为新 entryId（即首次进入）。
@@ -109,8 +122,9 @@ fun EInkApp(
     stateHolder.SaveableStateProvider(key = entryId) {
         CompositionLocalProvider(LocalViewModelStoreOwner provides viewModelStoreOwner) {
             if (screen is EInkScreen.Reader) {
-                // 阅读界面自管系统栏避让（见 ReaderScreen）：页眉紧贴状态栏下方，
-                // 后续支持收起状态栏时，该区域即页眉区域，正文始终从页眉之下开始
+                // 阅读界面自管系统栏避让与状态栏显隐（「隐藏状态栏」开关
+                // 恒定语义，见 ReaderScreen 沉浸效应），不经本层 safeDrawing
+                // 避让——页眉区域顶到屏幕上缘
                 ReaderRoute(
                     bookUrl = screen.bookUrl,
                     onBack = { controller.pop() },
@@ -127,11 +141,20 @@ fun EInkApp(
                     },
                 )
             } else {
-                // 其余界面统一避让系统栏（Edge-to-Edge 下系统栏透明覆盖在背景上）
+                // 其余界面统一避让系统栏（Edge-to-Edge 下系统栏透明覆盖在
+                // 背景上）。顶部取状态栏快照：从阅读页（隐藏状态栏）返回时
+                // 系统栏 show() 动画期间活值从 0 逐帧回升，跟随活值会让书架
+                // 整体跳动一次，快照一步落位；左右/底部（刘海/导航栏/IME）
+                // 不经历阅读页 show/hide，仍跟随活值
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
-                        .safeDrawingPadding()
+                        .padding(top = safeDrawingTopMax)
+                        .windowInsetsPadding(
+                            WindowInsets.safeDrawing.only(
+                                WindowInsetsSides.Horizontal + WindowInsetsSides.Bottom
+                            )
+                        )
                 ) {
                     when (screen) {
                         is EInkScreen.Home -> {
@@ -313,3 +336,24 @@ internal fun initialStack(initialReaderBookUrl: String?): List<EInkScreen> =
     } else {
         listOf(EInkScreen.Home, EInkScreen.Reader(initialReaderBookUrl))
     }
+
+/**
+ * safeDrawing 顶部高度快照（只增不减）：非阅读界面顶部避让用——从阅读页
+ * （隐藏状态栏）返回时系统栏 show() 动画期间活值从 0 逐帧回升，跟随活值
+ * 会让书架等界面整体跳动一次；改取快照一步落位。
+ *
+ * 取 safeDrawing 顶（statusBars ∪ cutout 顶）而非裸 statusBars，兼顾刘海
+ * 高于状态栏的机型。挂在 EInkApp 根跨屏幕切换存活：进入阅读前已捕获满
+ * 栏高，阅读期活值回落（仅剩 cutout 顶）不冲掉快照，返回首帧即为终值。
+ * Activity recreate 时若正处阅读页，快照从低值重新捕获，退出阅读会随
+ * 动画补捕跳一次——与阅读页菜单避让的既有取舍一致。
+ */
+@Composable
+private fun rememberSafeDrawingTopMax(): Dp {
+    val liveTop = WindowInsets.safeDrawing.asPaddingValues().calculateTopPadding()
+    var captured by remember { mutableStateOf(0.dp) }
+    SideEffect {
+        if (liveTop > captured) captured = liveTop
+    }
+    return captured
+}
