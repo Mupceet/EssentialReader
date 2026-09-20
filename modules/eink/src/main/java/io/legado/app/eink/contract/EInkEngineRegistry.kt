@@ -15,7 +15,7 @@ import io.legado.app.eink.contract.EInkEngineRegistry.keyEventHub
  * ```text
  * 宿主入口 attachBaseContext
  *    └─ onInstallEngines() ──► 宿主 bridge（如 EInkBridge.install()）
- *                                └─ install(8 个必填端口实现 + 可选 appUpdateEngine / selectionEngine / marksEngine / bookshelfGroupEngine)
+ *                                └─ install(8 个必填端口实现 + 可选 appUpdateEngine / marksEngine / bookshelfGroupEngine)
  *                                      └─ 静态注册表整体替换（last-wins）
  *                                             │ keyEventHub 一并重建
  *                                             ▼
@@ -52,7 +52,6 @@ object EInkEngineRegistry {
     private var _coverEngine: CoverEngine? = null
     private var _readerEngine: ReaderEngine? = null
     private var _appUpdateEngine: AppUpdateEngine? = null
-    private var _selectionEngine: ReaderSelectionEngine? = null
     private var _marksEngine: MarksEngine? = null
     private var _bookshelfGroupEngine: BookshelfGroupEngine? = null
 
@@ -92,21 +91,13 @@ object EInkEngineRegistry {
         get() = require(_readerEngine, "ReaderEngine")
 
     /**
-     * 应用更新端口——四个可选端口之一（其余为 [selectionEngine] /
-     * [marksEngine] / [bookshelfGroupEngine]）：未注册 = 宿主无 app 级
+     * 应用更新端口——三个可选端口之一（其余为 [marksEngine] /
+     * [bookshelfGroupEngine]）：未注册 = 宿主无 app 级
      * 更新能力（companion 宿主的合法状态），「我的」页检查更新入口随之
      * 不渲染，不参与 install 必填校验。
      */
     val appUpdateEngine: AppUpdateEngine?
         get() = _appUpdateEngine
-
-    /**
-     * 选区批注端口——**可选**端口：未注册 = 宿主无批注落库能力，
-     * 阅读页按 [ReaderSelectionEngine] 接口 KDoc 的降级语义处理，
-     * 不参与 install 必填校验。
-     */
-    val selectionEngine: ReaderSelectionEngine?
-        get() = _selectionEngine
 
     /**
      * 书签/笔记端口——**可选**端口：未注册 = 宿主无书签/笔记列表能力，
@@ -146,8 +137,6 @@ object EInkEngineRegistry {
      * @param readerEngine 阅读端口实现。
      * @param appUpdateEngine 应用更新端口实现（可选，默认 null：
      *   宿主无更新能力时不传，「我的」页入口不渲染）。
-     * @param selectionEngine 选区批注端口实现（可选，默认 null：
-     *   宿主无批注落库能力时不传，阅读页按接口 KDoc 的降级语义处理）。
      * @param marksEngine 书签/笔记端口实现（可选，默认 null：
      *   宿主无书签/笔记列表能力时不传，目录页书签 / 笔记 Tab 按接口
      *   KDoc 的降级语义处理）。
@@ -164,7 +153,6 @@ object EInkEngineRegistry {
         coverEngine: CoverEngine,
         readerEngine: ReaderEngine,
         appUpdateEngine: AppUpdateEngine? = null,
-        selectionEngine: ReaderSelectionEngine? = null,
         marksEngine: MarksEngine? = null,
         bookshelfGroupEngine: BookshelfGroupEngine? = null,
     ) {
@@ -177,7 +165,6 @@ object EInkEngineRegistry {
         _coverEngine = coverEngine
         _readerEngine = readerEngine
         _appUpdateEngine = appUpdateEngine
-        _selectionEngine = selectionEngine
         _marksEngine = marksEngine
         _bookshelfGroupEngine = bookshelfGroupEngine
         _keyEventHub = EInkKeyEventHub()

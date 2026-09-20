@@ -159,6 +159,10 @@ afterEvaluate {
     //         载荷（书签显示字段由模块携带，宿主不自定显示语义）；
     //         ReaderPageLine 增 paragraphBreaksAfter（书签摘录按段落边界
     //         拼装，与宿主 page.text 口径同构——宿主映射器实现义务）；
+    //         ReaderSelectionEngine 并入 MarksEngine（能力位按特性全有全无：
+    //         supportsMarkings/supportsBookmarks 各管阅读内 + 目录页两表面，
+    //         两同名不同义的能力位与 KDoc 免责声明消亡；注册表撤
+    //         selectionEngine 槽）；
     // 孪生坐标 0.5.0-oldstack / 0.6.1-min21（已退役，保留为历史坐标）：
     // 统一前为分开服务旧栈与 minSdk 21 宿主的过渡产物，0.7.0 起主坐标
     // 即覆盖两类消费形态，不再发布孪生；

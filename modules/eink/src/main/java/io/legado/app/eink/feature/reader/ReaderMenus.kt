@@ -677,9 +677,9 @@ internal fun ReaderOtherPanel(
     onOpenTapZones: () -> Unit,
 ) {
     ToggleRow(label = "隐藏状态栏", checked = state.hideStatusBar, onToggle = onToggleHideStatusBar)
-    // 能力门控（0.6.0）：宿主未声明页面书签能力时隐藏下拉书签开关，
+    // 能力门控（0.6.0）：宿主未声明书签能力时隐藏下拉书签开关，
     // 未声明段评能力时隐藏段评开关——不留点了无效的死开关
-    if (io.legado.app.eink.contract.EInkEngineRegistry.selectionEngine?.supportsPageBookmark == true) {
+    if (io.legado.app.eink.contract.EInkEngineRegistry.marksEngine?.supportsBookmarks == true) {
         ToggleRow(label = "下拉添加书签", checked = state.pullDownBookmark, onToggle = onTogglePullDownBookmark)
     }
     if (io.legado.app.eink.contract.EInkEngineRegistry.globalSettings.supportsReviewBubbles) {

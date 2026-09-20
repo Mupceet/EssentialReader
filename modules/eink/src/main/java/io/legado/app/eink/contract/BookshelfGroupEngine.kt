@@ -34,7 +34,7 @@ data class BookshelfGroupUiModel(
 )
 
 /**
- * 书架分组端口——**可选**端口（同 [MarksEngine] / [ReaderSelectionEngine]）：
+ * 书架分组端口——**可选**端口（同 [MarksEngine]）：
  * 未注册 = 宿主无分组浏览能力，书架选择器整体不渲染（书架维持全量平铺），
  * 不参与 install 必填校验。
  *

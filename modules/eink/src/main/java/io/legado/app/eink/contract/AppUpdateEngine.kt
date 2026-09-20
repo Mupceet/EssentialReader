@@ -3,8 +3,8 @@ package io.legado.app.eink.contract
 import kotlinx.coroutines.flow.StateFlow
 
 /**
- * 应用更新端口 —— 四个**可选**端口之一（其余三个为
- * [ReaderSelectionEngine] / [MarksEngine] / [BookshelfGroupEngine]；
+ * 应用更新端口 —— 三个**可选**端口之一（其余两个为
+ * [MarksEngine] / [BookshelfGroupEngine]；
  * 可选端口与能力裁剪的完整语义见本目录 README §5）。
  *
  * ## 职责边界

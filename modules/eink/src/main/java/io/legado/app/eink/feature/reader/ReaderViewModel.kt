@@ -134,20 +134,20 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application),
     }
 
     /**
-     * 划线/想法能力：未注册 [EInkEngineRegistry.selectionEngine] 或宿主声明
-     * 不支持划线（supportsMarkings = false）的合法降级态——长按选择整体
-     * 不启用（无选词/无触觉/无操作条标记动作），不做假死路径。
+     * 划线/想法能力：未注册 marksEngine 或宿主声明不支持笔记（阅读内保存 +
+     * 目录页笔记 Tab 两表面一起降级）的合法降级态——长按选择整体不启用
+     * （无选词/无触觉/无操作条标记动作），不做假死路径。
      */
     val selectionEnabled: Boolean
-        get() = EInkEngineRegistry.selectionEngine?.supportsMarkings == true
+        get() = EInkEngineRegistry.marksEngine?.supportsMarkings == true
 
     /**
-     * 页面书签能力（0.6.0 能力粒度）：下拉书签手势、顶栏书签钮、页角标与
-     * 「下拉添加书签」开关的显隐依据——未注册选区端口或宿主声明
-     * supportsPageBookmark = false 时隐藏。
+     * 书签能力（按特性不分表面）：下拉书签手势、顶栏书签钮、页角标、
+     * 「下拉添加书签」开关与目录页书签 Tab 的显隐依据——未注册
+     * marksEngine 或 supportsBookmarks = false 时隐藏。
      */
     val pageBookmarkEnabled: Boolean
-        get() = EInkEngineRegistry.selectionEngine?.supportsPageBookmark == true
+        get() = EInkEngineRegistry.marksEngine?.supportsBookmarks == true
 
     private val _uiState = MutableStateFlow(
         run {
@@ -591,7 +591,7 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application),
      * false = 端口未注册（降级宿主）或落库失败。
      */
     suspend fun createMarking(sel: ReaderSelectionUi, note: String): Boolean {
-        val port = EInkEngineRegistry.selectionEngine ?: return false
+        val port = EInkEngineRegistry.marksEngine ?: return false
         return port.createMarking(
             ReaderSelectionCommit(
                 chapterIndex = engine.currentChapterIndex,
@@ -610,7 +610,7 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application),
      * 失败处理。
      */
     suspend fun updateMarkingNote(markingId: String, note: String): Boolean? {
-        val port = EInkEngineRegistry.selectionEngine ?: return false
+        val port = EInkEngineRegistry.marksEngine ?: return false
         return port.updateMarkingNote(markingId, note)
     }
 
@@ -619,7 +619,7 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application),
      * markingId 现成，无落库时序）。false = 端口未注册或删除失败。
      */
     suspend fun deleteMarking(markingId: String): Boolean {
-        val port = EInkEngineRegistry.selectionEngine ?: return false
+        val port = EInkEngineRegistry.marksEngine ?: return false
         return port.deleteMarking(markingId)
     }
 
@@ -629,7 +629,7 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application),
      * 静默回落点按分区行为，不弹浮条/浮窗。
      */
     suspend fun findMarking(markingId: String): ReaderMarkingDetail? {
-        val port = EInkEngineRegistry.selectionEngine ?: return null
+        val port = EInkEngineRegistry.marksEngine ?: return null
         return port.findMarking(markingId)
     }
 
@@ -641,7 +641,7 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application),
      * true/false 均静默成功（角标变化即反馈）。
      */
     suspend fun togglePageBookmark(): Boolean? {
-        val port = EInkEngineRegistry.selectionEngine ?: return null
+        val port = EInkEngineRegistry.marksEngine ?: return null
         val page = _uiState.value.page ?: return null
         return port.togglePageBookmark(page.toPageBookmarkContent())
     }
