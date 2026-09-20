@@ -26,8 +26,12 @@ import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
 import androidx.lifecycle.HasDefaultViewModelProviderFactory
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.ViewModelStore
@@ -338,20 +342,34 @@ internal fun initialStack(initialReaderBookUrl: String?): List<EInkScreen> =
     }
 
 /**
- * safeDrawing 顶部高度快照（只增不减）：非阅读界面顶部避让用——从阅读页
- * （隐藏状态栏）返回时系统栏 show() 动画期间活值从 0 逐帧回升，跟随活值
- * 会让书架等界面整体跳动一次；改取快照一步落位。
+ * safeDrawing 顶部高度快照（只增不减）：非阅读界面顶部避让用。两个跳动
+ * 源都由「跟随活值/从零起步」引发，一并消掉：
+ * - 冷启动：第一轮组合早于插图分发到 Compose，快照从 0 起步会让书架先
+ *   顶格、次帧随插图到位整体下移——初值改为同步读根视图已持有的系统
+ *   插图，首帧即终值；
+ * - 阅读返回：隐藏状态栏的阅读页退出时系统栏 show() 动画期活值从 0
+ *   逐帧回升——只增不减的快照保持满栏高，一步落位。
  *
- * 取 safeDrawing 顶（statusBars ∪ cutout 顶）而非裸 statusBars，兼顾刘海
- * 高于状态栏的机型。挂在 EInkApp 根跨屏幕切换存活：进入阅读前已捕获满
- * 栏高，阅读期活值回落（仅剩 cutout 顶）不冲掉快照，返回首帧即为终值。
- * Activity recreate 时若正处阅读页，快照从低值重新捕获，退出阅读会随
- * 动画补捕跳一次——与阅读页菜单避让的既有取舍一致。
+ * 种子与跟踪都取 safeDrawing 顶（statusBars ∪ cutout 顶），兼顾刘海高于
+ * 状态栏的机型。快照挂 EInkApp 根跨屏幕切换存活：阅读期活值回落不冲掉
+ * 快照。残余场景：阅读期 recreate 时栏隐藏、种子从低值起步，退出阅读
+ * 会随动画补捕跳一次——与阅读页菜单避让的既有取舍一致。
  */
 @Composable
 private fun rememberSafeDrawingTopMax(): Dp {
+    val density = LocalDensity.current
+    val view = LocalView.current
+    val seedTopPx = remember(view) {
+        // ViewCompat 兼容层：API < 23 无插图派发返回 null，种子回落 0
+        //（仅剩的 21/22 机型冷启动首帧退回随插图补位行为）
+        val compat = ViewCompat.getRootWindowInsets(view)
+        maxOf(
+            compat?.getInsets(WindowInsetsCompat.Type.statusBars())?.top ?: 0,
+            compat?.getInsets(WindowInsetsCompat.Type.displayCutout())?.top ?: 0,
+        )
+    }
     val liveTop = WindowInsets.safeDrawing.asPaddingValues().calculateTopPadding()
-    var captured by remember { mutableStateOf(0.dp) }
+    var captured by remember { mutableStateOf(with(density) { seedTopPx.toDp() }) }
     SideEffect {
         if (liveTop > captured) captured = liveTop
     }
