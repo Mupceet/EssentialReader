@@ -32,7 +32,11 @@ import java.text.DecimalFormat
  *  - 划线/高亮样式（ReaderTextStyle.underline/backgroundArgb）折叠为行内
  *    装饰 run（相邻且样式签名 + markingId 全等的段合并——run.markingId 是
  *    模块点按命中的定位键，不同标记不并入同一 run）；字体色标记不产生
- *    装饰，颜色一律不跨桥。
+ *    装饰，颜色一律不跨桥；
+ *  - 段落边界（paragraphBreaksAfter）从排版块结构推导：元素携带块序号
+ *    （paragraphIndex），同一文本块的折行续行间 0、块末行 1、其后每个
+ *    空行/占位块（Spacer 等，不产生行）累加 1——与分页器拼 pageText 的
+ *    `append('\n')` 口径（段末/空行各一个）同构。
  *
  * 画笔规格只拷贝测量耦合参数（字号/字距/字体/可变字重）——快照坐标
  * 是引擎按这些参数测量的，模块必须按同值绘制才不错位；阴影/斜体等纯
@@ -72,17 +76,37 @@ internal object ReaderPageSnapshotMapper {
         bookmarkBadge: Boolean = false,
         imageLoader: (Book, String) -> (Int, Int) -> Bitmap?,
     ): ReaderPageSnapshot {
-        val lines = ArrayList<ReaderPageLine>()
+        val staged = ArrayList<LineBuffer>()
         val images = ArrayList<ReaderImageSlot>()
         var buffer: LineBuffer? = null
+        // 段落边界推导状态（见类 KDoc）：元素 paragraphIndex 是分页器写入的块序号
+        var lastTextBlockIndex: Int? = null
+        var pendingBlankLines = 0
+        var trailingBlockElement = false
 
         for (element in page.elements) {
             when (element) {
                 is ReaderElement.Text -> {
+                    val blockIndex = element.paragraphIndex
+                    if (blockIndex != lastTextBlockIndex) {
+                        if (lastTextBlockIndex == null) {
+                            // 页首空行：宿主 page.text 的前导 \n（拼装侧被 trim），不计入任何行
+                            pendingBlankLines = 0
+                        } else {
+                            // 新文本块开始 = 上一个文本块已收尾：残留 buffer 的末行先落盘，
+                            // 其段末边界 = 1 + 其后累计的空行块数
+                            buffer?.flushInto(staged)
+                            buffer = null
+                            staged.lastOrNull()?.let { it.breaksAfter = 1 + pendingBlankLines }
+                            pendingBlankLines = 0
+                        }
+                        lastTextBlockIndex = blockIndex
+                    }
+                    trailingBlockElement = false
                     var line = buffer
                     // 同一视觉行的元素共享行顶 y（分页器逐行使用同一 y 值）
                     if (line != null && element.bounds.top != line.top) {
-                        line.flushInto(lines)
+                        line.flushInto(staged)
                         line = null
                     }
                     if (line == null) {
@@ -111,8 +135,10 @@ internal object ReaderPageSnapshotMapper {
                 }
 
                 is ReaderElement.Image -> {
-                    buffer?.flushInto(lines)
+                    buffer?.flushInto(staged)
                     buffer = null
+                    // 独立图片块：其前的文本块已收尾（pageText 里段末 \n 先于 \uFFFC）
+                    trailingBlockElement = true
                     val book = sessionBook
                     images.add(
                         ReaderImageSlot(
@@ -135,22 +161,38 @@ internal object ReaderPageSnapshotMapper {
                     )
                 }
 
+                is ReaderElement.Spacer ->
+                    // 空行块（BlankLine）：宿主 pageText 为它单独补一个 \n，
+                    // 累加进上一个文本块的段末边界（空行分隔 = 2）
+                    pendingBlankLines++
+
+                is ReaderElement.Rule ->
+                    // 分隔线是独立块：其前的文本块已收尾（pageText 补过段末 \n），
+                    // 自身不产生行也不补 \n，仅作末行段末证据
+                    trailingBlockElement = true
+
                 else -> Unit // 评论/动作/装饰等元素：E-Ink 不渲染（同 View 画布 else 分支）
             }
         }
-        buffer?.flushInto(lines)
+        buffer?.flushInto(staged)
+        // 末行按页内可见结构填实际边界：空行累计 +（其后还有独立非文本块时的）段末 1；
+        // 页尾无任何后续元素时无法区分「同段续行跨页」与「块在页底收尾」，按续行 0 填
+        // （末行值不参与模块拼装，见契约 ReaderPageLine.paragraphBreaksAfter）
+        staged.lastOrNull()?.let {
+            it.breaksAfter = pendingBlankLines + if (pendingBlankLines > 0 || trailingBlockElement) 1 else 0
+        }
         return ReaderPageSnapshot(
             title = page.chapterTitle,
             readProgress = readProgress,
             titleSpec = titleSpec,
             contentSpec = contentSpec,
-            lines = lines,
+            lines = staged.map { it.toLine() },
             images = images,
             bookmarkBadge = bookmarkBadge,
         )
     }
 
-    /** 行内累积中的文本段；flush 时按「行 → 段」结构落盘。 */
+    /** 行内累积中的文本段；flush 落盘到暂存区，边界确定后经 [toLine] 物化。 */
     private class LineBuffer {
         val chunks = ArrayList<String>()
         val xs = ArrayList<Float>()
@@ -166,6 +208,12 @@ internal object ReaderPageSnapshotMapper {
         var bottom = 0f
         var baseY = 0f
         var isTitle = false
+
+        /** 本行之后的段落边界数（映射主循环按块结构回填，见类 KDoc）。 */
+        var breaksAfter = 0
+
+        /** flush 时构建的行内装饰 run（构建逻辑与合并键见 [buildDecorations]）。 */
+        private var decorations: List<ReaderDecorationRun> = emptyList()
 
         /** flush 时把相邻同签名段合并为行内装饰 run（行内拼接文本 UTF-16 索引）。
          *  合并键 = (underlineMode, highlight, markingId) 三元组全等：
@@ -212,21 +260,24 @@ internal object ReaderPageSnapshotMapper {
             return runs
         }
 
-        fun flushInto(lines: MutableList<ReaderPageLine>) {
+        fun flushInto(lines: MutableList<LineBuffer>) {
             if (chunks.isEmpty()) return
-            lines.add(
-                ReaderPageLine(
-                    baseY = baseY,
-                    isTitle = isTitle,
-                    chunks = chunks,
-                    x = xs.toFloatArray(),
-                    chapterPositions = chapterPositions.toIntArray(),
-                    top = top,
-                    bottom = bottom,
-                    decorations = buildDecorations(),
-                )
-            )
+            decorations = buildDecorations()
+            lines.add(this)
         }
+
+        /** 边界回填完成后物化为契约行（paragraphBreaksAfter 见映射主循环）。 */
+        fun toLine(): ReaderPageLine = ReaderPageLine(
+            baseY = baseY,
+            isTitle = isTitle,
+            chunks = chunks,
+            x = xs.toFloatArray(),
+            chapterPositions = chapterPositions.toIntArray(),
+            top = top,
+            bottom = bottom,
+            paragraphBreaksAfter = breaksAfter,
+            decorations = decorations,
+        )
     }
 
     /**

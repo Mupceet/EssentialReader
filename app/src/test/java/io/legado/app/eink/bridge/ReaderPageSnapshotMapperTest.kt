@@ -6,6 +6,11 @@ import io.legado.app.data.entities.Book
 import io.legado.app.eink.contract.ReaderDecorationRun
 import io.legado.app.eink.contract.ReaderPaintSpec
 import io.legado.app.eink.contract.ReaderUnderlineGeometry
+import io.legado.app.feature.reader.core.layout.ReaderMeasuredBlock
+import io.legado.app.feature.reader.core.layout.ReaderMeasuredInlineItem
+import io.legado.app.feature.reader.core.layout.ReaderPaginator
+import io.legado.app.feature.reader.core.layout.ReaderPaginationConfig
+import io.legado.app.feature.reader.core.layout.ReaderTextAlignment
 import io.legado.app.feature.reader.core.model.ReaderElement
 import io.legado.app.feature.reader.core.model.ReaderPage
 import io.legado.app.feature.reader.core.model.ReaderPageId
@@ -522,6 +527,71 @@ class ReaderPageSnapshotMapperTest {
                 chapterIndex = 1, localPageIndex = 0, chapterPageCount = 1, chapterSize = 2,
             ),
         )
+    }
+
+    // ==== 段落边界同构门禁（契约 v2 书签载荷拼装口径）====
+
+    @Test
+    fun `快照行重构与宿主 page text 段落边界同构`() {
+        // ReaderPaginatorTest 同款 fixture：内容区宽 40f、每字 10f → 4 字/行
+        val style = ReaderTextStyle(colorArgb = 0xff111111.toInt(), fontSizePx = 10f)
+        fun paragraph(value: String, emphasized: Boolean = false) =
+            ReaderMeasuredBlock.InlineParagraph(
+                items = value.mapIndexed { index, ch ->
+                    ReaderMeasuredInlineItem.Text(ch.toString(), 10f, style, index)
+                },
+                indentCharacters = 0,
+                alignment = ReaderTextAlignment.START,
+                lineHeightPx = 20f,
+                baselineOffsetPx = 15f,
+                baseTextSizePx = 10f,
+                emphasized = emphasized,
+            )
+        val page = ReaderPaginator.paginateBlocks(
+            listOf(
+                paragraph("卷题", emphasized = true),        // 标题行
+                paragraph("甲乙丙丁戊己"),                    // 同段折行（折成 4+2 两行，行间无 \n）
+                paragraph("庚辛"),                            // 相邻段落（无空行，边界 1）
+                ReaderMeasuredBlock.BlankLine(9, 20f, 1.5f),  // 空行分隔（边界 2）
+                paragraph("子丑"),
+            ),
+            ReaderPaginationConfig(
+                chapterIndex = 0,
+                chapterTitle = "章",
+                viewportWidthPx = 40,
+                viewportHeightPx = 300,
+                paddingLeftPx = 0f,
+                paddingTopPx = 0f,
+                paddingRightPx = 0f,
+                paddingBottomPx = 5f,
+                lineHeightPx = 20f,
+                baselineOffsetPx = 15f,
+            ),
+        ).single()
+        // 宿主真值先行锚定：分页器按「段末/空行各补一个 \n、同段折行不补」拼 page.text
+        assertEquals("卷题\n甲乙丙丁戊己\n庚辛\n\n子丑", page.text)
+
+        val snapshot = ReaderPageSnapshotMapper.mapWithSpecs(
+            page = page,
+            titleSpec = titleSpec,
+            contentSpec = contentSpec,
+            sdkInt = 34,
+            sessionBook = null,
+            readProgress = "0.0%",
+            imageLoader = { _, _ -> { _, _ -> null } },
+        )
+        // 模块 internal 扩展 toPageBookmarkContent 对宿主测试不可见，按同口径在测试内
+        // 复刻拼装：行内 chunks 连接，行间按上一行 paragraphBreaksAfter 插 "\n".repeat(n)，
+        // 末行不计
+        val assembled = buildString {
+            snapshot.lines.forEachIndexed { index, line ->
+                append(line.chunks.joinToString(""))
+                if (index < snapshot.lines.lastIndex) append("\n".repeat(line.paragraphBreaksAfter))
+            }
+        }
+        // 先 trim 再逐字比对：宿主 page.text 在页底完成段带尾随 \n、空行落页首带前导 \n，
+        // 与「末行不计」差这层（bookmarkDisplayText 落库前的 trim 即该存储语义）
+        assertEquals(page.text.trim(), assembled.trim())
     }
 
     // ==== 画笔规格拷贝（Robolectric：需要 android.graphics 原生行为）====

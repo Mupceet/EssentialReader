@@ -1,6 +1,10 @@
 package io.legado.app.eink.bridge
 
+import io.legado.app.data.entities.BookMarking
 import io.legado.app.domain.model.BookContentProcessEngine
+import io.legado.app.domain.model.TextProcessStyle
+import io.legado.app.utils.GSON
+import io.legado.app.utils.fromJsonObject
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
@@ -122,5 +126,33 @@ class ReaderSelectionEngineImplTest {
         assertEquals(2, style.underlineMode)
         assertEquals(0xFF000000.toInt(), style.underlineColor)
         assertEquals(null, style.bgColor)
+    }
+
+    @Test
+    fun `状态转换保留身份与锚点并按内容翻样式`() {
+        val anchorJson = """{"chapterIndex":3,"chapterPosition":12,"selectedText":"原文","normalizedTextHash":"h"}"""
+        val mark = BookMarking(
+            id = "m-1", bookUrl = "u", bookName = "n", bookAuthor = "a",
+            chapterIndex = 3, anchorJson = anchorJson,
+            styleJson = """{"underlineMode":1}""", note = "",
+            chapterName = "c", enabled = true, createdAt = 100L, updatedAt = 100L,
+        )
+        // 写想法 → 虚线；id/锚点/createdAt 原地不动（转换不是重建）
+        val thought = mark.withEinkNote("记一笔", now = 200L)
+        assertEquals("m-1", thought.id)
+        assertEquals(anchorJson, thought.anchorJson)
+        assertEquals(100L, thought.createdAt)
+        assertEquals("记一笔", thought.note)
+        assertEquals(2, GSON.fromJsonObject<TextProcessStyle>(thought.styleJson).getOrNull()!!.underlineMode)
+        // 清空想法（含仅空白）→ 划线，note 归一空串
+        val line = thought.withEinkNote("   ", now = 300L)
+        assertEquals("", line.note)
+        assertEquals(1, GSON.fromJsonObject<TextProcessStyle>(line.styleJson).getOrNull()!!.underlineMode)
+    }
+
+    @Test
+    fun `书签显示文本剥离渲染占位符并 trim`() {
+        assertEquals("正文摘录", bookmarkDisplayText("正文摘录 袮꧁  "))
+        assertEquals("", bookmarkDisplayText(" 袮 ꧁ "))
     }
 }

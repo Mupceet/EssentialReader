@@ -2,6 +2,7 @@ package io.legado.app.eink.bridge
 
 import android.os.SystemClock
 import io.legado.app.constant.AppLog
+import io.legado.app.data.entities.BookMarking
 import io.legado.app.data.entities.Bookmark
 import io.legado.app.data.repository.BookmarkRepository
 import io.legado.app.domain.gateway.BookMarkingGateway
@@ -10,6 +11,7 @@ import io.legado.app.domain.model.BookContentProcessEngine
 import io.legado.app.domain.model.TextProcessStyle
 import io.legado.app.domain.usecase.SaveMarkingUseCase
 import io.legado.app.eink.contract.ReaderMarkingDetail
+import io.legado.app.eink.contract.ReaderPageBookmarkContent
 import io.legado.app.eink.contract.ReaderSelectionCommit
 import io.legado.app.eink.contract.ReaderSelectionEngine
 import io.legado.app.model.ReadBook
@@ -51,6 +53,26 @@ internal fun einkMarkingStyle(thought: Boolean): TextProcessStyle =
         underlineColor = EINK_MARKING_COLOR,
     )
 
+/** 与宿主 ReadBookmarkDelegate/ReadBookController.addBookmark 一致：剔除正文里的排版占位符。 */
+private val BOOK_TEXT_MARKS = Regex("[袮꧁]")
+
+/**
+ * 笔记状态转换（契约 v2 updateMarkingNote 的纯函数核）：按 note 派生类型并
+ * 重写 styleJson——空白 = 划线（实线，note 归一空串）；非空白 = 想法（虚线）。
+ * id、锚点、章节、createdAt 一律不动（原地更新，不是重建）。
+ */
+internal fun BookMarking.withEinkNote(note: String, now: Long): BookMarking {
+    val hasThought = note.isNotBlank()
+    return copy(
+        note = if (hasThought) note else "",
+        styleJson = GSON.toJson(einkMarkingStyle(hasThought)),
+        updatedAt = now,
+    )
+}
+
+/** 书签显示文本（契约 v2）：模块载荷落库前的存储规范化——剥离自家渲染占位符并 trim。 */
+internal fun bookmarkDisplayText(pageText: String): String = pageText.replace(BOOK_TEXT_MARKS, "").trim()
+
 /**
  * 在章节全文中定位选中文本：窗口口径基于 MarkingDelegate.selectionContext；
  * 按契约两级搜索（先提示位精确后窗口回搜），仍不命中时最后做一次
@@ -87,13 +109,13 @@ internal fun uniqueOccurrence(content: String, text: String): Int {
  * 宿主渲染层的同一把尺 [BookContentProcessEngine.resolveRange]（按非空白字符
  * 序列匹配 + 就近提示位）。
  *
- * 为什么需要兜底：存锚点时 `SaveMarkingUseCase` 会走
- * [BookContentProcessEngine.normalizeProcessText]，它**逐行 trim**——部分书源
- * 正文自带段首缩进（全角空格）会被裁掉；新建标记时模块提交的是原文（能逐字
- * 命中），而**编辑已有标记**（点标记 → 想法 → 保存）提交的是宿主存回来的这份
- * 文本，与正文不再逐字相等 → 逐字搜索与"全文唯一命中"全失配 → 上层报
- * 「保存失败」（真机：笔记 Tab 里看得见、点进去改想法保存失败）。用渲染层同款
- * 解析兜底后，「能画出来的标记就一定编辑得了」——两者用的是同一份锚点解析。
+ * 为什么需要兜底：选区文本与正文可能不逐字相等——跨空行/跨段选区按「正文
+ * 间隙补一个换行」拼接，而正文里的段落分隔是逐字的；存锚点时
+ * [BookContentProcessEngine.normalizeProcessText] 又会**逐行 trim**（部分书源
+ * 正文自带段首缩进/全角空格被裁掉），与拼接口径再错开一层，逐字搜索与
+ * 「全文唯一命中」全失配 → 上层报「保存失败」。编辑已不再走本路径（契约 v2
+ * 按 id 更新，不重定位）；兜底此时仅剩 create 路径需要——用渲染层同款解析
+ * 兜底后，逐字失配的选区仍能落锚。
  */
 internal fun locateSelectionInContent(content: String, expectedStart: Int, text: String): Int {
     locateInContent(content, expectedStart, text).takeIf { it >= 0 }?.let { return it }
@@ -117,10 +139,11 @@ internal fun extractContext(content: String, start: Int, length: Int): Pair<Stri
 }
 
 /**
- * 选区批注端口实现：把模块提交的正文空间选区在章节全文中定位、构造
- * 锚点并落库 book_marks 表。定位在 saveMarking 时以提示位置为锚做窗口
- * 搜索（含标题的选区在正文空间本就找不到文本，模块侧按设计 §3.4 不落
- * 划线静默忽略，不会提交到本端口）。
+ * 选区批注端口实现（契约 v2）：把模块提交的正文空间选区在章节全文中定位、构造
+ * 锚点并落库 book_marks 表；已有标记的状态转换走 updateMarkingNote（按 id，
+ * 不重定位）。定位在 createMarking 时以提示位置为锚做窗口搜索（含标题的选区
+ * 在正文空间本就找不到文本，模块侧按设计 §3.4 不落划线静默忽略，不会提交到
+ * 本端口）。
  */
 internal object ReaderSelectionEngineImpl : ReaderSelectionEngine, KoinComponent {
 
@@ -134,9 +157,6 @@ internal object ReaderSelectionEngineImpl : ReaderSelectionEngine, KoinComponent
      * 读-查-写整段后，两次触发退化成正确的两次 toggle（加一条再删一条）。
      */
     private val toggleMutex = Mutex()
-
-    /** 与宿主 ReadBookmarkDelegate/ReadBookController.addBookmark 一致：剔除正文里的排版占位符。 */
-    private val BOOK_TEXT_MARKS = Regex("[袮꧁]")
 
     /** 当前会话章节的语义正文（章节不匹配返回 null）。 */
     private fun semanticContent(chapterIndex: Int): String? =
@@ -166,28 +186,35 @@ internal object ReaderSelectionEngineImpl : ReaderSelectionEngine, KoinComponent
     private fun displayTitle(): String =
         ReadBook.readerChapterInputWindow.current?.displayTitle.orEmpty()
 
-    override suspend fun saveMarking(commit: ReaderSelectionCommit): Boolean {
+    /**
+     * 新建笔记（契约 v2，仅新选区入口；已有标记上的动作走 updateMarkingNote/
+     * deleteMarking）：等正文就绪 → 定位 → 锚点构造 → 落库 → 重排。
+     * 类型由 note 派生：空白 = 划线（实线，note 归一空串），非空白 = 想法
+     * （虚线）。归一化兜底与选区失效从严见 [locateSelectionInContent]。
+     */
+    override suspend fun createMarking(commit: ReaderSelectionCommit): Boolean {
         val book = ReadBook.book ?: run {
-            AppLog.put("eink saveMarking: 无会话书")
+            AppLog.put("eink createMarking: 无会话书")
             return false
         }
         val content = awaitSemanticContent(commit.chapterIndex) ?: run {
-            AppLog.put("eink saveMarking: 章节内容未就绪 chapter=${commit.chapterIndex}")
+            AppLog.put("eink createMarking: 章节内容未就绪 chapter=${commit.chapterIndex}")
             return false
         }
-        // 归一化兜底：编辑已有标记时提交的是宿主存回的锚点文本（段首缩进等
-        // 已被逐行 trim），与正文不逐字相等，需走渲染层同款解析（见函数 KDoc）
+        // 归一化兜底：编辑已不再走本路径（契约 v2 按 id 更新），跨段/跨空行选区
+        // 的拼接口径与正文不逐字相等，需走渲染层同款解析（见函数 KDoc）
         val located = locateSelectionInContent(content, commit.start, commit.selectedText)
         // 选区失效从严：标记是文本锚点，定位不到即视为失效，不回退提示位
         if (located < 0) {
             AppLog.put(
-                "eink saveMarking: 选区定位失败 chapter=${commit.chapterIndex} " +
+                "eink createMarking: 选区定位失败 chapter=${commit.chapterIndex} " +
                     "start=${commit.start} len=${commit.selectedText.length} " +
                     "text=${commit.selectedText.take(24)}"
             )
             return false
         }
         val (before, after) = extractContext(content, located, commit.selectedText.length)
+        val hasThought = commit.note.isNotBlank()
         return try {
             saveMarkingUseCase.save(
                 bookName = book.name,
@@ -196,9 +223,9 @@ internal object ReaderSelectionEngineImpl : ReaderSelectionEngine, KoinComponent
                 chapterIndex = commit.chapterIndex,
                 chapterPosition = located,
                 selectedText = commit.selectedText,
-                style = einkMarkingStyle(commit.thought),
+                style = einkMarkingStyle(hasThought),
                 chapterName = displayTitle(),
-                note = if (commit.thought) commit.note else "",
+                note = if (hasThought) commit.note else "",
                 contextBefore = before,
                 contextAfter = after,
             )
@@ -209,9 +236,27 @@ internal object ReaderSelectionEngineImpl : ReaderSelectionEngine, KoinComponent
             throw e
         } catch (e: Exception) {
             // save 成功但 relayout 抛异常时误报失败——标记已落库（锚点 upsert 幂等，重试安全），将在下次成功重排时出现
-            AppLog.put("eink saveMarking failed: ${e.message}", e)
+            AppLog.put("eink createMarking failed: ${e.message}", e)
             false
         }
+    }
+
+    /**
+     * 状态转换唯一路径（契约 v2）：按 id 改 note + 样式，锚点不动、**不做选区
+     * 重定位**（编辑已存标记不再可能因定位失败而保存失败）。null = 无会话书/
+     * 标记不存在；false = 更新失败。成功后 relayout，新快照带新样式装饰推送。
+     */
+    override suspend fun updateMarkingNote(markingId: String, note: String): Boolean? = try {
+        ReadBook.book ?: return null
+        val mark = bookMarkingGateway.getById(markingId) ?: return null
+        bookMarkingGateway.upsert(mark.withEinkNote(note, System.currentTimeMillis()))
+        ReaderEngineImpl.relayout()
+        true
+    } catch (e: CancellationException) {
+        throw e
+    } catch (e: Exception) {
+        AppLog.put("eink updateMarkingNote failed: ${e.message}", e)
+        false
     }
 
     /** 按 id 删 book_marks 后触发当前章重排（新快照经 onContentUpdated 推送）。 */
@@ -229,27 +274,27 @@ internal object ReaderSelectionEngineImpl : ReaderSelectionEngine, KoinComponent
         }
     }
 
-    /** 按 id 读 book_marks 映射详情（只读，不触发重排）。null = 标记不存在。 */
+    /** 按 id 读 book_marks 映射详情（只读，不触发重排；类型由 note 派生）。null = 标记不存在。 */
     override suspend fun findMarking(markingId: String): ReaderMarkingDetail? {
         ReadBook.book ?: return null
         val mark = bookMarkingGateway.getById(markingId) ?: return null
         val anchor = GSON.fromJsonObject<TextProcessAnchor>(mark.anchorJson).getOrNull()
-        val style = GSON.fromJsonObject<TextProcessStyle>(mark.styleJson).getOrNull()
         return ReaderMarkingDetail(
             selectedText = anchor?.selectedText.orEmpty(),
             note = mark.note,
-            thought = style?.underlineMode == 2,
         )
     }
 
     /**
-     * 当前页书签 toggle（v2 Task 9，设计 §7）：宿主快速书签语义镜像
+     * 当前页书签 toggle（契约 v2，设计 §7）：宿主快速书签语义镜像
      * （ReadBookmarkDelegate.toggleForCurrentPage）——本页区间无书签则存一条
      * （页位置 + 页文本为标题，无编辑层），有则删离当前阅读位置最近的一条；
-     * 成功后触发当前章重排，角标随新快照推送。null = 无会话书/当前页无法
-     * 定位/落库异常；true = 本次添加；false = 本次移除。
+     * 成功后触发当前章重排，角标随新快照推送。显示字段来源改为模块载荷
+     * [content]（存储规范化：占位符剥离 + trim）；同页判定（页正文区间）与
+     * 「删最近一条」按宿主分页事实。null = 无会话书/当前页无法定位/落库异常；
+     * true = 本次添加；false = 本次移除。
      */
-    override suspend fun togglePageBookmark(): Boolean? = try {
+    override suspend fun togglePageBookmark(content: ReaderPageBookmarkContent): Boolean? = try {
         toggleMutex.withLock {
             val book = ReadBook.book ?: return@withLock null
             val meta = ReaderEngineImpl.currentPageMeta() ?: return@withLock null
@@ -267,9 +312,9 @@ internal object ReaderSelectionEngineImpl : ReaderSelectionEngine, KoinComponent
                         bookAuthor = book.author,
                         bookUrl = book.bookUrl,
                         chapterIndex = meta.chapterIndex,
-                        chapterName = meta.chapterTitle,
+                        chapterName = content.chapterName,
                         chapterPos = ReadBook.durChapterPos,
-                        bookText = meta.text.replace(BOOK_TEXT_MARKS, "").trim(),
+                        bookText = bookmarkDisplayText(content.pageText),
                         content = "",
                     )
                 )
