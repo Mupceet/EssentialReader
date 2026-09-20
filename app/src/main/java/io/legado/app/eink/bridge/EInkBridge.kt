@@ -10,7 +10,6 @@ import io.legado.app.domain.gateway.OtherSettingsGateway
 import io.legado.app.domain.gateway.ReadSettingsGateway
 import io.legado.app.eink.contract.EInkEngineRegistry
 import io.legado.app.eink.contract.GlobalSettings
-import io.legado.app.eink.contract.ReaderTapZoneGrid
 import io.legado.app.help.config.AppConfigStore
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -21,7 +20,7 @@ import org.koin.core.component.inject
 import splitties.init.appCtx
 
 /**
- * E-InK 自有偏好（readerTapZones/pullDownBookmark）的存储位。
+ * E-InK 自有偏好（readerTapZonesEncoding/pullDownBookmark）的存储位。
  *
  * 历史存储位是宿主默认 prefs 文件（`<packageName>_preferences`），而该
  * 文件正是 DataStore「settings」的 MIGRATE_ALL_KEYS 迁移源
@@ -35,7 +34,7 @@ internal object EinkLegacyPrefsStore {
     /** E-InK 自有偏好的专属 prefs 文件（独立于 DataStore 迁移源）。 */
     const val FILE_NAME = "eink_preferences"
 
-    /** readerTapZones 的自有键（9 位编码，见 ReaderTapZoneGrid）。 */
+    /** readerTapZonesEncoding 的自有键（9 位编码整键，格式见模块侧）。 */
     const val KEY_TAP_ZONES = "einkReaderTapZones"
 
     /** pullDownBookmark 的自有键（默认关）。 */
@@ -115,13 +114,13 @@ internal val einkSettingsWriteScope =
  * changeSourceCheckAuthor 经 ChangeSourceSettingsGateway；
  * useDefaultCover（「我的」页可写）为本对象持有的 Compose 快照状态 +
  * CoverSettingsGateway 异步落盘——组合内读取订阅变化，切换后开关行与
- * 书架/详情可见封面立即重组；readerTapZones、pullDownBookmark
- * （均为阅读菜单设置、E-InK 自有偏好、完整模式无对应设置；readerTapZones
- * 不转发完整模式 clickAction* 键：值域只有三动作，转发会让两侧配置互相
- * 覆盖）同走
+ * 书架/详情可见封面立即重组；readerTapZonesEncoding、pullDownBookmark
+ * （均为阅读菜单设置、E-InK 自有偏好、完整模式无对应设置；
+ * readerTapZonesEncoding 不转发完整模式 clickAction* 键：值域只有三动作，
+ * 转发会让两侧配置互相覆盖）同走
  * EinkLegacyPrefsStore 专属 prefs 文件不经设置网关（默认 prefs 文件是
- * DataStore 迁移源、启动即被整文件清空，不可作存储位）：readerTapZones
- * （9 位编码整键存取，见 ReaderTapZoneGrid）与 pullDownBookmark
+ * DataStore 迁移源、启动即被整文件清空，不可作存储位）：readerTapZonesEncoding
+ * （9 位编码整键原样存取，编码语义在模块侧）与 pullDownBookmark
  * （下拉添加书签，默认关）为自有键；syncReadingProgress（「我的」页
  * 可写）经 BackupSettingsGateway 转发宿主「同步阅读进度」主键，写时
  * 带宿主设置页同款父子联动。
@@ -165,13 +164,11 @@ private object GlobalSettingsImpl : GlobalSettings, KoinComponent {
                 .putBoolean(EinkLegacyPrefsStore.KEY_PULL_DOWN_BOOKMARK, value).apply()
         }
 
-    override var readerTapZones: ReaderTapZoneGrid
-        get() = ReaderTapZoneGrid.decodeOrDefault(
-            einkLegacyPrefs.getString(EinkLegacyPrefsStore.KEY_TAP_ZONES, null)
-        )
+    override var readerTapZonesEncoding: String?
+        get() = einkLegacyPrefs.getString(EinkLegacyPrefsStore.KEY_TAP_ZONES, null)
         set(value) {
             einkLegacyPrefs.edit()
-                .putString(EinkLegacyPrefsStore.KEY_TAP_ZONES, value.encode()).apply()
+                .putString(EinkLegacyPrefsStore.KEY_TAP_ZONES, value).apply()
         }
 
     override val threadCount: Int
