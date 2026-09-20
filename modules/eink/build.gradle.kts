@@ -138,7 +138,7 @@ afterEvaluate {
     // 0.6.1 = ReaderStyleParam 新增 Presets（协议预设档集、无
     //         自定义滑条——字重行 allowCustom = false 时隐藏
     //         「自定义」按钮与滑条）；
-    // 0.7.0 = 契约清理轮（待发布）：PendingJumpConfirm 迁出 contract 包
+    // 0.7.0 = 契约清理轮（2026-09-20 发布）：PendingJumpConfirm 迁出 contract 包
     //         （模块内部类型，宿主零引用）；移除 BookshelfEngine.
     //         setCacheWorkingState（模块不再调用，契约面不留废弃成员）；
     //         CoverEngine 改纯 Kotlin 字节端口 fetchCoverBytes——签名不再
@@ -166,7 +166,7 @@ afterEvaluate {
     // 孪生坐标 0.5.0-oldstack / 0.6.1-min21（已退役，保留为历史坐标）：
     // 统一前为分开服务旧栈与 minSdk 21 宿主的过渡产物，0.7.0 起主坐标
     // 即覆盖两类消费形态，不再发布孪生；
-                version = "0.6.1"
+                version = "0.7.0"
             }
         }
     }
