@@ -20,6 +20,27 @@ import kotlin.coroutines.cancellation.CancellationException
 internal class BookHandleImpl(val book: Book) : BookHandle
 
 /**
+ * 详情页书籍解析查找链（bookUrl 主键优先，规格见契约 findBook KDoc）。
+ * 同名同作者多条书籍记录（不同书源同书、换源残留——合法状态）下，
+ * name+author 单行查询固定命中 DAO 首行、与用户点选的书架条目无关，
+ * 故 bookUrl 非空时必须先精确解析；name+author 仅兜底「无 url 身份」
+ * 的纯导航参数场景。四个查找步骤惰性求值：前一步命中即短路。
+ */
+internal fun findBookCandidate(
+    bookUrl: String,
+    byUrl: () -> Book?,
+    byUrlSearch: () -> Book?,
+    byNameAuthor: () -> Book?,
+    bySearchNameAuthor: () -> Book?,
+): Book? {
+    if (bookUrl.isNotBlank()) {
+        byUrl()?.let { return it }
+        byUrlSearch()?.let { return it }
+    }
+    return byNameAuthor() ?: bySearchNameAuthor()
+}
+
+/**
  * 书籍详情端口实现：查找链转发 + 目录预取管线（对齐 View 版
  * 详情页的拉取时机）。
  *
@@ -44,13 +65,15 @@ internal object BookDetailEngineImpl : BookDetailEngine {
         author: String,
         bookUrl: String,
     ): Pair<BookHandle, BookDetailUiModel>? {
-        val book = appDb.bookDao.getBook(name, author)
-            ?: bookUrl.takeIf { it.isNotBlank() }?.let { url ->
-                appDb.bookDao.getBook(url)
-                    ?: appDb.searchBookDao.getSearchBook(url)?.toBook()
-            }
-            ?: appDb.searchBookDao.getFirstByNameAuthor(name, author)?.toBook()
-            ?: return null
+        val book = findBookCandidate(
+            bookUrl = bookUrl,
+            byUrl = { appDb.bookDao.getBook(bookUrl) },
+            byUrlSearch = { appDb.searchBookDao.getSearchBook(bookUrl)?.toBook() },
+            byNameAuthor = { appDb.bookDao.getBook(name, author) },
+            bySearchNameAuthor = {
+                appDb.searchBookDao.getFirstByNameAuthor(name, author)?.toBook()
+            },
+        ) ?: return null
         return BookHandleImpl(book) to book.toUiModel()
     }
 
@@ -107,6 +130,8 @@ internal object BookDetailEngineImpl : BookDetailEngine {
             if (book.order == 0) {
                 book.order = appDb.bookDao.minOrder - 1
             }
+            // 同名进度合并取 DAO 首行：同名同作者多条记录（合法状态）下
+            // 「与哪本合并」无既有消解规则，对齐 View 版 saveBook 同款语义
             appDb.bookDao.getBook(book.name, book.author)?.let {
                 book.durChapterIndex = it.durChapterIndex
                 book.durChapterPos = it.durChapterPos
