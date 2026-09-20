@@ -38,8 +38,6 @@ import io.legado.app.eink.R
 import io.legado.app.eink.contract.ReaderStyleCatalog
 import io.legado.app.eink.contract.ReaderStyleParamIds as Ids
 import io.legado.app.eink.contract.ReaderTextStyle
-import io.legado.app.eink.contract.ReaderTapZoneAction
-import io.legado.app.eink.contract.ReaderTapZoneGrid
 import io.legado.app.eink.designsystem.content.EInkHorizontalDivider
 import io.legado.app.eink.designsystem.content.EInkText
 import io.legado.app.eink.designsystem.control.EInkButton

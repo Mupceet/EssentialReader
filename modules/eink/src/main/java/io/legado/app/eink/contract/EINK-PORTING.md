@@ -237,8 +237,9 @@ Koin / 无 AppConfigStore。
   自动升版、模块代码运行于宿主版本。需要模块使用更新 API 时走 toml
   头部的升档协议，不在宿主侧适配。
 - **SharedPreferences**：模块零自有存储——全部设置经 GlobalSettings
-  端口。E-Ink 自有偏好（`readerTapZones` 整键 9 位编码、
-  `pullDownBookmark`）以 `einkReaderTapZones` / `einkReaderPullDownBookmark`
+  端口。E-Ink 自有偏好（`readerTapZonesEncoding` 端口字符串整键原样
+  存取（9 位编码，编解码在模块侧）、`pullDownBookmark`）以
+  `einkReaderTapZones` / `einkReaderPullDownBookmark`
   落宿主侧**专属** prefs 文件（本仓为 `eink_preferences`，键名历史继承）。
   勿落宿主默认 prefs 文件——被 DataStore MIGRATE_ALL_KEYS 迁移接管的默认
   文件进程启动即被整文件清空，自有键会随每次重启反复重置。

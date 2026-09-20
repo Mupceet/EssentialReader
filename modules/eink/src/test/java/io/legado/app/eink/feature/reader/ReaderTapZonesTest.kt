@@ -1,4 +1,4 @@
-package io.legado.app.eink.contract
+package io.legado.app.eink.feature.reader
 
 import org.junit.Assert.assertEquals
 import org.junit.Test

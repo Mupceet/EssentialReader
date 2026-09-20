@@ -1,4 +1,4 @@
-package io.legado.app.eink.contract
+package io.legado.app.eink.feature.reader
 
 /**
  * 阅读页点击区域动作（九宫格简化版，仅三动作）。

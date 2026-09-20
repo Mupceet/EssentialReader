@@ -80,8 +80,6 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import io.legado.app.eink.contract.EInkEngineRegistry
 import io.legado.app.eink.contract.ReaderFontSelection
 import io.legado.app.eink.contract.ReaderPageSnapshot
-import io.legado.app.eink.contract.ReaderTapZoneAction
-import io.legado.app.eink.contract.ReaderTapZoneGrid
 import io.legado.app.eink.designsystem.content.EInkText
 import io.legado.app.eink.designsystem.control.EInkDialog
 import io.legado.app.eink.designsystem.interaction.einkClickable

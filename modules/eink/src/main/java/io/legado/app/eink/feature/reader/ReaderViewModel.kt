@@ -24,7 +24,6 @@ import io.legado.app.eink.contract.ReaderSelectionCommit
 import io.legado.app.eink.contract.ReaderStyleCatalog
 import io.legado.app.eink.contract.ReaderStyleParamIds as Ids
 import io.legado.app.eink.contract.ReaderSyncTrigger
-import io.legado.app.eink.contract.ReaderTapZoneGrid
 import io.legado.app.eink.contract.ReaderTextStyle
 import io.legado.app.eink.feature.reader.selection.ReaderSelectionUi
 import io.legado.app.eink.feature.reader.selection.toPageBookmarkContent
@@ -157,7 +156,9 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application),
                 pullDownBookmark = EInkEngineRegistry.globalSettings.pullDownBookmark,
                 hideStatusBar = EInkEngineRegistry.globalSettings.hideStatusBar,
                 showReviewBubbles = EInkEngineRegistry.globalSettings.showReviewBubbles,
-                tapZones = EInkEngineRegistry.globalSettings.readerTapZones,
+                tapZones = ReaderTapZoneGrid.decodeOrDefault(
+                    EInkEngineRegistry.globalSettings.readerTapZonesEncoding
+                ),
                 // 与完整模式共用宿主 autoReadSpeed 配置（默认 10）
                 autoPlayIntervalSec = engine.autoReadIntervalSec
                     .coerceIn(MIN_AUTO_INTERVAL_SEC, MAX_AUTO_INTERVAL_SEC),
@@ -876,7 +877,7 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application),
      * 分发快照，即时生效——纯手势语义，不触发重排。
      */
     fun applyTapZones(zones: ReaderTapZoneGrid) {
-        EInkEngineRegistry.globalSettings.readerTapZones = zones
+        EInkEngineRegistry.globalSettings.readerTapZonesEncoding = zones.encode()
         _uiState.update { it.copy(tapZones = zones) }
     }
 

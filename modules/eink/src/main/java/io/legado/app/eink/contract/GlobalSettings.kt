@@ -18,7 +18,7 @@ package io.legado.app.eink.contract
  *
  * 收录 E-Ink VM 编排与「我的」页/阅读菜单真正读写的键——含转发宿主
  * 设置的键（与完整模式共享同一存储）与 E-InK 自有偏好（如
- * [readerTapZones]、[pullDownBookmark]）。嵌入式宿主与完整模式共享
+ * [readerTapZonesEncoding]、[pullDownBookmark]）。嵌入式宿主与完整模式共享
  * 存储（自有偏好键落宿主侧自有 prefs 文件），插件宿主可用自有 DataStore。
  *
  * 写入语义分档（宿主实现须遵守，模块 UI 按档位做乐观更新）：
@@ -115,25 +115,27 @@ interface GlobalSettings {
     val supportsReviewBubbles: Boolean get() = true
 
     /**
-     * 阅读页点击分区（3×3 九宫格简化版，完整模式「点击区域设置」的
-     * E-Ink 子集，见 [ReaderTapZoneGrid]）：中心格固定菜单不可改，
-     * 其余 8 格仅 上一页/下一页 两态。
+     * 阅读页点击分区的存储编码（E-Ink 自有偏好，完整模式无对应设置）。
      *
-     * E-Ink 自有偏好，**不转发**完整模式 clickAction* 键：完整模式单格
-     * 可配 15 种动作，本键值域只有三种，转发会让两侧配置互相覆盖
-     * （eink 蒙层三值写回会静默清掉完整模式的 下一章/书签 等配置）。
-     * 嵌入式宿主以历史风格自有键落默认 prefs 文件，整键存 9 位编码
-     * （[ReaderTapZoneGrid.encode]）。
+     * 端口面只承载透明字符串：9 位数字编码（行主序，每格 0/1/2，中心位
+     * 恒 0），null = 未存储。九宫格几何、中心格固定菜单、脏数据回落等
+     * 语义全部在模块侧 ReaderTapZoneGrid（feature/reader，非契约类型），
+     * 宿主按整键原样存取即可，不解读、不校验内容。
      *
-     * 读取：阅读 VM 构造时装载进 UiState，点按分发实时消费；写入
-     * （点击区域蒙层退出时）：fire-and-forget 落盘 + 调用方同步更新
+     * **不转发**完整模式 clickAction* 键：完整模式单格可配 15 种动作，
+     * 本键值域只有三种，转发会让两侧配置互相覆盖（eink 蒙层三值写回会
+     * 静默清掉完整模式的 下一章/书签 等配置）。嵌入式宿主以历史风格
+     * 自有键 `einkReaderTapZones` 落专属 prefs 文件（默认 prefs 文件是
+     * DataStore 迁移源，不可作存储位，见 EINK-PORTING.md）。
+     *
+     * 可写（点击区域蒙层退出时）：fire-and-forget 落盘 + 调用方同步更新
      * UiState 快照——蒙层退出即生效，纯手势语义不触发重排。
      *
-     * 默认分区 = 中心格菜单、其余格下一页。默认实现（旧宿主）getter
-     * 恒返回默认分区、写入丢弃：行为不回退，新设置不可持久化。
+     * 默认实现（旧宿主）getter 恒返回 null、写入丢弃：模块回落默认
+     * 分区，行为不回退，新设置不可持久化。
      */
-    var readerTapZones: ReaderTapZoneGrid
-        get() = ReaderTapZoneGrid()
+    var readerTapZonesEncoding: String?
+        get() = null
         set(value) {}
 
     /**
