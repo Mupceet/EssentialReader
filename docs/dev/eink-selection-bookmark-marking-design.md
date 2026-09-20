@@ -262,6 +262,15 @@
   `locateInContent` 返回 -1、新路径给出起点；提示位漂移（超窗口）时也按就近
   命中纠偏。
 
+- 2026-09-20（用户确认，**端口契约 v2**，交互不变）：`ReaderSelectionEngine`
+  契约重构——saveMarking 拆 createMarking / updateMarkingNote(id, note)（转换按
+  id、锚点不变，不再重定位）；thought 字段删除，类型恒由 note 派生；
+  togglePageBookmark 增显示载荷（章节名 + 页文本由模块携带，ReaderPageLine 增
+  paragraphBreaksAfter 表达段落边界）。唯一边界行为变化：部分重叠选区的「想法」
+  不再另落重叠记录，转为按 id 更新被交叠标记。版本列车 0.7.1（0.7.0 已于
+  origin/eink/lib 定版）。详见
+  [eink-selection-port-contract-design.md](./eink-selection-port-contract-design.md)。
+
 ## 1. 背景
 
 宿主 MD3 阅读器的笔记为「划线体系」：`book_marks` 表，锚点 `TextProcessAnchor`
