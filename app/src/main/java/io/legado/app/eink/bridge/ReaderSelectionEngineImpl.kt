@@ -255,6 +255,8 @@ internal object ReaderSelectionEngineImpl : ReaderSelectionEngine, KoinComponent
     } catch (e: CancellationException) {
         throw e
     } catch (e: Exception) {
+        // upsert 成功但 relayout 抛异常时误报 false——更新已落库（按 id 幂等，重试安全），
+        // 将在下次成功重排时呈现
         AppLog.put("eink updateMarkingNote failed: ${e.message}", e)
         false
     }

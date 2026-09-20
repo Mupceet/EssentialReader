@@ -142,11 +142,15 @@ class ReaderSelectionEngineImplTest {
         assertEquals("m-1", thought.id)
         assertEquals(anchorJson, thought.anchorJson)
         assertEquals(100L, thought.createdAt)
+        assertEquals(200L, thought.updatedAt)
+        assertEquals(true, thought.enabled)
+        assertEquals("c", thought.chapterName)
         assertEquals("记一笔", thought.note)
         assertEquals(2, GSON.fromJsonObject<TextProcessStyle>(thought.styleJson).getOrNull()!!.underlineMode)
         // 清空想法（含仅空白）→ 划线，note 归一空串
         val line = thought.withEinkNote("   ", now = 300L)
         assertEquals("", line.note)
+        assertEquals(300L, line.updatedAt)
         assertEquals(1, GSON.fromJsonObject<TextProcessStyle>(line.styleJson).getOrNull()!!.underlineMode)
     }
 

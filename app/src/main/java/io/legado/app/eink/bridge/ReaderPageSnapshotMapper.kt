@@ -90,7 +90,7 @@ internal object ReaderPageSnapshotMapper {
                     val blockIndex = element.paragraphIndex
                     if (blockIndex != lastTextBlockIndex) {
                         if (lastTextBlockIndex == null) {
-                            // 页首空行：宿主 page.text 的前导 \n（拼装侧被 trim），不计入任何行
+                            // 页首空行：宿主 page.text 的前导 \n（宿主落库 `bookmarkDisplayText` 的 trim 消化该前导），不计入任何行
                             pendingBlankLines = 0
                         } else {
                             // 新文本块开始 = 上一个文本块已收尾：残留 buffer 的末行先落盘，
