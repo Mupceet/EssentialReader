@@ -531,7 +531,11 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application),
 
     // ==================== 顶部操作条动作 ====================
 
-    /** 刷新当前章节：清除缓存后重新加载。 */
+    /**
+     * 刷新当前章节：清除缓存后重新加载（正文损坏/乱码排障用）。
+     * 与目录追更检查无关——那是进书自动触发的 refreshToc
+     * （10 分钟限频、静默无反馈，规格见 ReaderEngine 契约 KDoc）。
+     */
     fun refreshChapter() {
         viewModelScope.launch(Dispatchers.IO) {
             engine.refreshCurrentChapter()

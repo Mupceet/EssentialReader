@@ -117,9 +117,12 @@ internal fun ReaderTopBar(
                 enabled = !state.isLocalBook,
                 onClick = onChangeSource,
             )
+            // 「刷新」= 当前章正文清缓存重载（内容损坏排障用），不是目录
+            // 追更检查——后者由进书自动触发 refreshToc（静默无反馈，限频
+            // 规格见契约 KDoc），模块侧无对应菜单动作
             EInkOperationBarIcon(
                 icon = painterResource(R.drawable.eink_ic_refresh_black_24dp),
-                contentDescription = "刷新",
+                contentDescription = "刷新本章",
                 onClick = onRefresh,
             )
             EInkOperationBarIcon(
