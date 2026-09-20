@@ -481,15 +481,17 @@ git diff --check
 @Test
 fun `同段折行不插换行`() {
     val page = snapshot(
+        title = "章",
         line("第一段前半", positions = intArrayOf(0), breaks = 0),
         line("后半", positions = intArrayOf(5), breaks = 1),
     )
-    assertEquals("第一段前后半", page.toPageBookmarkContent().pageText)
+    assertEquals("第一段前半后半", page.toPageBookmarkContent().pageText)
 }
 
 @Test
 fun `空行分隔累积双换行`() {
     val page = snapshot(
+        title = "章",
         line("甲段", positions = intArrayOf(0), breaks = 2),
         line("乙段", positions = intArrayOf(4), breaks = 1),
     )
