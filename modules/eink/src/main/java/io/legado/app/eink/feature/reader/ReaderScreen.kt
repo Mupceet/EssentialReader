@@ -161,7 +161,8 @@ private data class ReaderThoughtDraft(
  * 职责：
  * - 按设置保持屏幕常亮；
  * - 返回键：面板 → 控件 → 退出阅读 的逐级回退；面板/弹框外空白区
- *   点击则一次性收起到干净阅读界面；
+ *   点击则一次性收起到干净阅读界面；退出时未加书架的书经「加入书架」
+ *   弹框提示（确认 = 加入并退出，取消 = 直接退出）；
  * - 一次性消息 → Toast；
  * - 页内长按选区状态在此持有：翻页/重排（pageVersion 推进）自动清空。
  *   v2.1 点击式（设计 §3.5/§4）：长按选词 → 灰底选中带 + pin 把手；松手
@@ -199,8 +200,10 @@ fun ReaderRoute(
     // 自持返回键（蒙层内 BackHandler 后组合优先于 Route 链）；退出即
     // 落盘生效，面板状态保留——关闭后回到其它面板展开态
     var tapZoneEditor by remember { mutableStateOf(false) }
-    // 移出书架二次确认（顶栏切换钮在架态点击只打开确认框）
-    var showRemoveConfirm by remember { mutableStateOf(false) }
+    // 退出阅读的「加入书架」提示：未加书架的书经任一出口（系统返回 /
+    // 操作条返回）离开时弹出，形态对齐详情页「移出书架」确认框；
+    // 确认 = 加入并退出，取消 = 直接退出
+    var showAddToShelfPrompt by remember { mutableStateOf(false) }
 
     // 页内长按选区（Screen 无状态渲染，选区状态在此持有）：选区坐标绑定
     // 单页快照，pageVersion 推进（翻页/重排/批注落库重绘）即自动清空，
@@ -672,6 +675,17 @@ fun ReaderRoute(
         }
     }
 
+    // 退出阅读统一出口：书籍已装载（bookUrl 有值；装载中/加载失败不提示，
+    // 避免空书名弹框）且未加书架时先弹「加入书架」提示，其余直接退出。
+    // 去目录/换源/详情不算退出——会话延续，回来继续读
+    val exitReader = {
+        if (uiState.bookUrl.isNotEmpty() && !uiState.inBookshelf) {
+            showAddToShelfPrompt = true
+        } else {
+            onBack()
+        }
+    }
+
     // 返回键逐级回退：排版弹层 → 设置面板 → 收起操作条 → 退出阅读
     // （弹层期间排版面板保留，返回即回到排版展开态）
     BackHandler {
@@ -679,7 +693,7 @@ fun ReaderRoute(
             styleDialog != null -> styleDialog = null
             panel != null -> panel = null
             uiState.controlsVisible -> viewModel.hideControls()
-            else -> onBack()
+            else -> exitReader()
         }
     }
 
@@ -691,7 +705,7 @@ fun ReaderRoute(
     // 排版弹层期间操作条整体隐藏（保证调参实时可见），其首级返回
     // 由系统返回键/点击弹框外区域承担，关闭后回到排版展开态
     val onBarBack = {
-        if (panel != null) panel = null else onBack()
+        if (panel != null) panel = null else exitReader()
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
@@ -714,7 +728,8 @@ fun ReaderRoute(
                 }
             },
             onContentSized = viewModel::updateViewSize,
-            onBack = onBack,
+            // 加载失败页的退出按钮同走退出门控（装载失败 bookUrl 为空即直退）
+            onBack = exitReader,
             onBarBack = onBarBack,
             // 换源后路由参数已失效（旧书行连同章节被删、新书换了 bookUrl），
             // 与 onOpenDetail 同一取值：优先会话书的当前 bookUrl。目录据此
@@ -739,8 +754,6 @@ fun ReaderRoute(
             },
             onRefresh = viewModel::refreshChapter,
             onOpenCachePanel = { panel = ReaderPanel.CACHE },
-            onAddToBookshelf = viewModel::addToBookshelf,
-            onRemoveFromBookshelf = { showRemoveConfirm = true },
             onTogglePageBookmark = onPageBookmarkToggle,
             selectedPanel = panel,
             onOpenPanel = { target ->
@@ -1007,19 +1020,36 @@ fun ReaderRoute(
             )
         }
 
-        // 移出书架二次确认：确认后执行移出（后果与详情页一致——下次进
-        // 书架时该记录被物理删除、阅读进度丢失）
-        if (showRemoveConfirm) {
+        // 退出阅读「加入书架」提示（形态对齐详情页移出书架确认框）：
+        // 确认 = 加入落库完成后退出（await——Route 卸载即 VM 清理，发即弃
+        // 的加架协程会在退出导航瞬间被取消）；取消/返回/点外 = 直接退出。
+        // exiting 防重入：慢速墨水屏确认回显延迟期间的双击只执行一次
+        var exitingWithShelf by remember { mutableStateOf(false) }
+        if (showAddToShelfPrompt) {
             EInkDialog(
-                onDismiss = { showRemoveConfirm = false },
-                title = "移出书架",
+                onDismiss = {
+                    showAddToShelfPrompt = false
+                    onBack()
+                },
+                title = "加入书架",
+                confirmText = "加入",
                 onConfirm = {
-                    showRemoveConfirm = false
-                    viewModel.removeFromBookshelf()
+                    if (!exitingWithShelf) {
+                        exitingWithShelf = true
+                        scope.launch {
+                            val added = viewModel.addToBookshelfAwait()
+                            Toast.makeText(
+                                context,
+                                if (added) "已加入书架" else "操作失败",
+                                Toast.LENGTH_SHORT
+                            ).show()
+                            onBack()
+                        }
+                    }
                 },
             ) {
                 EInkText(
-                    text = "确定要将《${uiState.bookName}》移出书架吗？",
+                    text = "《${uiState.bookName}》尚未加入书架，是否加入？",
                     style = EInkTheme.typography.bodyMedium
                 )
             }
@@ -1195,8 +1225,6 @@ internal fun ReaderScreen(
     onOpenDetail: () -> Unit,
     onRefresh: () -> Unit,
     onOpenCachePanel: () -> Unit,
-    onAddToBookshelf: () -> Unit,
-    onRemoveFromBookshelf: () -> Unit,
     onTogglePageBookmark: () -> Unit,
     selectedPanel: ReaderPanel?,
     onOpenPanel: (ReaderPanel) -> Unit,
@@ -1743,8 +1771,6 @@ internal fun ReaderScreen(
                     onChangeSource = onChangeSource,
                     onRefresh = onRefresh,
                     onOpenCachePanel = onOpenCachePanel,
-                    onAddToBookshelf = onAddToBookshelf,
-                    onRemoveFromBookshelf = onRemoveFromBookshelf,
                     onToggleBookmark = onTogglePageBookmark,
                 )
             }

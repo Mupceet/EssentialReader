@@ -69,7 +69,9 @@ internal val ReaderBottomBarInset = BarHeight + 1.dp
 private const val MarginTickStep = 8
 
 // ====================================================================
-// 顶部操作条：书签 / 换源 / 刷新 / 缓存 / 加书架或移出书架（切换钮）
+// 顶部操作条：书签 / 换源 / 刷新 / 缓存。加/移书架不设入口：未加书架的
+// 书在退出阅读时经「加入书架」弹框提示（见 Route 退出门控），在架管理
+// 走详情页
 // ====================================================================
 
 @Composable
@@ -81,8 +83,6 @@ internal fun ReaderTopBar(
     onChangeSource: () -> Unit,
     onRefresh: () -> Unit,
     onOpenCachePanel: () -> Unit,
-    onAddToBookshelf: () -> Unit,
-    onRemoveFromBookshelf: () -> Unit,
     onToggleBookmark: () -> Unit,
 ) {
     // 通用顶栏（贴右动作模式）：书名可点击进详情（按压反色、背景贴
@@ -128,15 +128,6 @@ internal fun ReaderTopBar(
                 contentDescription = "缓存",
                 enabled = !state.isLocalBook,
                 onClick = onOpenCachePanel,
-            )
-            // 书架切换钮：未架显示加入，在架显示移出（点击经确认弹框）
-            EInkOperationBarIcon(
-                icon = painterResource(
-                    if (state.inBookshelf) R.drawable.eink_ic_book_remove
-                    else R.drawable.eink_ic_book_add
-                ),
-                contentDescription = if (state.inBookshelf) "移出书架" else "加入书架",
-                onClick = if (state.inBookshelf) onRemoveFromBookshelf else onAddToBookshelf,
             )
         },
     )

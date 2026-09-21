@@ -41,6 +41,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 
 
@@ -557,34 +558,14 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application),
         }
     }
 
-    /** 加入书架（仅未加书架的书）。 */
-    fun addToBookshelf() {
-        viewModelScope.launch(Dispatchers.IO) {
-            when (engine.addSessionBookToShelf()) {
-                true -> {
-                    _uiState.update { it.copy(inBookshelf = true) }
-                    _messages.emit(UserMessage.from(R.string.eink_added_to_bookshelf))
-                }
-
-                false -> _messages.emit(UserMessage.from(R.string.eink_operation_failed))
-                null -> Unit
-            }
-        }
-    }
-
-    /** 移出书架（仅已在书架的书；UI 侧先经 EInkDialog 二次确认）。 */
-    fun removeFromBookshelf() {
-        viewModelScope.launch(Dispatchers.IO) {
-            when (engine.removeSessionBookFromShelf()) {
-                true -> {
-                    _uiState.update { it.copy(inBookshelf = false) }
-                    _messages.emit(UserMessage.from(R.string.eink_removed_from_bookshelf))
-                }
-
-                false -> _messages.emit(UserMessage.from(R.string.eink_operation_failed))
-                null -> Unit
-            }
-        }
+    /**
+     * 加入书架并等待落库完成（退出阅读提示专用）：Route 卸载即 VM 清理，
+     * 发即弃的加架协程会在退出导航瞬间被取消，确认路径必须同步等结果。
+     * true = 已加入或无需处理（引擎 null：已在架/无会话书）；false = 落库失败。
+     * 反馈不走 messages 流——退出后已无收集方，Toast 由调用方直发。
+     */
+    suspend fun addToBookshelfAwait(): Boolean = withContext(Dispatchers.IO) {
+        engine.addSessionBookToShelf() != false
     }
 
     // ==================== 选区批注 ====================
