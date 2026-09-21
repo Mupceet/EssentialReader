@@ -40,6 +40,9 @@ internal object EinkLegacyPrefsStore {
     /** pullDownBookmark 的自有键（默认关）。 */
     const val KEY_PULL_DOWN_BOOKMARK = "einkReaderPullDownBookmark"
 
+    /** 最近文件字体历史的自有键（换行分隔 path 列表，格式见模块侧）。 */
+    const val KEY_RECENT_FONTS = "einkRecentFontPaths"
+
     fun prefs(): SharedPreferences =
         appCtx.getSharedPreferences(FILE_NAME, Context.MODE_PRIVATE)
 }
@@ -109,8 +112,8 @@ internal val einkSettingsWriteScope =
  * DownloadCacheSettingsGateway（与旧 AppConfig 门面同键同默认值的
  * 快照）；autoRefreshBook/defaultToRead（「我的」页可写）经
  * OtherSettingsGateway、volumeKeyPage、hideStatusBar 与
- * showReviewBubbles（后两者为阅读菜单开关、转发宿主阅读设置键，与
- * 完整模式共享同一存储）经 ReadSettingsGateway、
+ * showReviewBubbles（后三者为阅读界面其它设置开关、转发宿主阅读设置
+ * 键，与完整模式共享同一存储）经 ReadSettingsGateway、
  * changeSourceCheckAuthor 经 ChangeSourceSettingsGateway；
  * useDefaultCover（「我的」页可写）为本对象持有的 Compose 快照状态 +
  * CoverSettingsGateway 异步落盘——组合内读取订阅变化，切换后开关行与
@@ -120,7 +123,8 @@ internal val einkSettingsWriteScope =
  * 转发会让两侧配置互相覆盖）同走
  * EinkLegacyPrefsStore 专属 prefs 文件不经设置网关（默认 prefs 文件是
  * DataStore 迁移源、启动即被整文件清空，不可作存储位）：readerTapZonesEncoding
- * （9 位编码整键原样存取，编码语义在模块侧）与 pullDownBookmark
+ * （9 位编码整键原样存取，编码语义在模块侧）、recentFontPathsEncoding
+ * （换行分隔 path 列表原样存取，编码语义在模块侧）与 pullDownBookmark
  * （下拉添加书签，默认关）为自有键；syncReadingProgress（「我的」页
  * 可写）经 BackupSettingsGateway 转发宿主「同步阅读进度」主键，写时
  * 带宿主设置页同款父子联动。
@@ -169,6 +173,13 @@ private object GlobalSettingsImpl : GlobalSettings, KoinComponent {
         set(value) {
             einkLegacyPrefs.edit()
                 .putString(EinkLegacyPrefsStore.KEY_TAP_ZONES, value).apply()
+        }
+
+    override var recentFontPathsEncoding: String
+        get() = einkLegacyPrefs.getString(EinkLegacyPrefsStore.KEY_RECENT_FONTS, "") ?: ""
+        set(value) {
+            einkLegacyPrefs.edit()
+                .putString(EinkLegacyPrefsStore.KEY_RECENT_FONTS, value).apply()
         }
 
     override val threadCount: Int
