@@ -111,7 +111,7 @@ fun BookshelfStylePanel(
                         label = "封面宽度",
                         value = style.gridCoverWidth,
                         valueRange = 40..150,
-                        thumbLabel = { "${it}dp" },
+                        thumbLabel = { "$it" },
                         onSetValue = { onStyleChange(style.copy(gridCoverWidth = it)) },
                         labelWidth = 80.dp,
                     )

@@ -119,7 +119,7 @@ internal fun ReaderInfoConfigDialog(
                                 label = null,
                                 value = style.titleSize ?: catalog.defaultInt(Ids.TITLE_SIZE),
                                 valueRange = catalog.intRange(Ids.TITLE_SIZE),
-                                thumbLabel = { "${it}sp" },
+                                thumbLabel = { "$it" },
                                 onSetValue = onSetTitleSize,
                             )
                         }
@@ -182,7 +182,7 @@ internal fun ReaderInfoConfigDialog(
                             label = null,
                             value = style.footerSize ?: catalog.defaultInt(Ids.FOOTER_SIZE),
                             valueRange = catalog.intRange(Ids.FOOTER_SIZE),
-                            thumbLabel = { "${it}sp" },
+                            thumbLabel = { "$it" },
                             onSetValue = onSetTipSize,
                         )
                     }

@@ -308,7 +308,7 @@ private fun PageProgressRow(
             valueRange = 0..(if (maxPage > 0) maxPage else 0),
             modifier = Modifier.weight(1f),
             enabled = maxPage > 0,
-            thumbLabel = { "${it + 1}" },
+            thumbLabel = { "${it + 1}/${maxPage + 1}" },
         )
         EInkButton(
             text = "下一章",
@@ -444,7 +444,7 @@ internal fun ReaderLayoutPanel(
         label = "字号",
         value = style.textSize,
         valueRange = catalog.intRange(Ids.BODY_SIZE),
-        thumbLabel = { "${it}sp" },
+        thumbLabel = { "$it" },
         onSetValue = onSetTextSize,
     )
     val lsRange = catalog.floatStepIndexRange(Ids.BODY_LETTER_SPACING, LETTER_SPACING_STEP)
@@ -597,28 +597,28 @@ private fun MarginRows(
         label = "上边距",
         value = topDp,
         valueRange = 0..maxVertical,
-        thumbLabel = { "${it}dp" },
+        thumbLabel = { "$it" },
         onSetValue = onSetTop,
     )
     EInkSliderRow(
         label = "下边距",
         value = bottomDp,
         valueRange = 0..maxVertical,
-        thumbLabel = { "${it}dp" },
+        thumbLabel = { "$it" },
         onSetValue = onSetBottom,
     )
     EInkSliderRow(
         label = "左边距",
         value = leftDp,
         valueRange = 0..maxHorizontal,
-        thumbLabel = { "${it}dp" },
+        thumbLabel = { "$it" },
         onSetValue = onSetLeft,
     )
     EInkSliderRow(
         label = "右边距",
         value = rightDp,
         valueRange = 0..maxHorizontal,
-        thumbLabel = { "${it}dp" },
+        thumbLabel = { "$it" },
         onSetValue = onSetRight,
     )
 }
