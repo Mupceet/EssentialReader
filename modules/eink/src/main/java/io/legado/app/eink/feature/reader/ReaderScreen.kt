@@ -550,6 +550,8 @@ fun ReaderRoute(
 
     // 字体文件列表：字体弹层打开时拉取（SAF 换文件夹后由 VM 刷新）
     val fontOptions by viewModel.fontOptions.collectAsStateWithLifecycle()
+    // 最近文件字体历史（快捷行数据源；fire-and-forget 写入，VM 乐观状态背书）
+    val recentFontPaths by viewModel.recentFontPaths.collectAsStateWithLifecycle()
     LaunchedEffect(styleDialog) {
         if (styleDialog == ReaderStyleDialog.Fonts) {
             viewModel.loadFontOptions()
@@ -972,6 +974,7 @@ fun ReaderRoute(
                 catalog = viewModel.styleCatalog,
                 style = uiState.style,
                 fontOptions = fontOptions,
+                recentFontPaths = recentFontPaths,
                 onSetFont = viewModel::setReaderFont,
                 onSetBodyWeight = viewModel::setBodyWeight,
                 onSetTitleWeight = viewModel::setTitleWeight,

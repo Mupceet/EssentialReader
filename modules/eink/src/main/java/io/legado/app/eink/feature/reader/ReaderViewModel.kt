@@ -114,6 +114,12 @@ data class ReaderUiState(
         }
 }
 
+/** 最近文件字体历史编码：换行符分隔 path 列表（列表形态留扩展余地），空串 = 无历史。 */
+internal fun decodeRecentFontPaths(encoding: String): List<String> =
+    encoding.split('\n').filter { it.isNotEmpty() }
+
+internal fun encodeRecentFontPaths(paths: List<String>): String = paths.joinToString("\n")
+
 /**
  * 阅读器 ViewModel。
  *
@@ -738,13 +744,21 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application),
 
     /** 统一字体：正文/标题/页眉（页脚经 applyHeaderStyle 跟随页眉）完全
      *  一致——选字体时正文直写、标题/页眉归位「跟随正文」，由桥展开为
-     *  同一路径；正文选系统预设时跟随者回落空串（宿主语义）。 */
-    fun setReaderFont(selection: ReaderFontSelection) = applyStyleChange {
-        it.copy(
-            bodyFont = selection,
-            titleFont = ReaderFontSelection.FollowBody,
-            headerFont = ReaderFontSelection.FollowBody,
-        )
+     *  同一路径；正文选系统预设时跟随者回落空串（宿主语义）。
+     *  选中文件字体时同步记录最近选择（弹框反显数据源）。 */
+    fun setReaderFont(selection: ReaderFontSelection) {
+        if (selection is ReaderFontSelection.File) {
+            _recentFontPaths.value = listOf(selection.path)
+            EInkEngineRegistry.globalSettings.recentFontPathsEncoding =
+                encodeRecentFontPaths(_recentFontPaths.value)
+        }
+        applyStyleChange {
+            it.copy(
+                bodyFont = selection,
+                titleFont = ReaderFontSelection.FollowBody,
+                headerFont = ReaderFontSelection.FollowBody,
+            )
+        }
     }
 
     fun setBodyWeight(value: Int) = applyStyleChange {
@@ -821,6 +835,13 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application),
             _fontOptions.value = engine.availableFonts()
         }
     }
+
+    /** 最近选中的文件字体（至多一个）：弹框反显数据源。写路径 fire-and-forget
+     *  （getter 不保证立即可见新值），展示以本乐观状态背书。 */
+    private val _recentFontPaths = MutableStateFlow(
+        decodeRecentFontPaths(EInkEngineRegistry.globalSettings.recentFontPathsEncoding)
+    )
+    val recentFontPaths: StateFlow<List<String>> = _recentFontPaths.asStateFlow()
 
     /** 下拉添加书签开关（E-InK 自有偏好，默认关）：写入 + 乐观更新，手势侧实时读 UiState。 */
     fun togglePullDownBookmark() {

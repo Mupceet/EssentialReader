@@ -29,17 +29,18 @@ import io.legado.app.eink.designsystem.theme.EInkSpacing
 /**
  * 字体配置弹层（一级，固定面板无滚动）：统一字体原则——正文/标题/页眉
  * （页脚经 applyHeaderStyle 跟随页眉）字体完全一致。系统预设一行三钮；
- * 条件行反显当前选中文件字体（选中反色，点击进二级）+ 入口按钮——
- * 文件夹枚举为空（未选过文件夹/空文件夹）时显示「选择字体文件夹」
- * 直开 SAF，否则「更多字体…（N）」进二级浮层 [ReaderFontPickerOverlay]
- * 分页选择（换文件夹在二级底栏图标，重复选择即换）；正文字重与标题字重
- * 各为「细体/常规/粗体/自定义」四选，仅自定义显示拖动条（100..900）。
+ * 条件行反显最近选中的文件字体（历史 ∩ 当前枚举，幽灵剔除——切回系统
+ * 预设后一键可回；无历史不默认展示，入口独占整行）；入口：枚举空（未选
+ * 过文件夹/空文件夹）为「选择字体文件夹」直开 SAF，非空为「更多字体…（N）」
+ * 进二级浮层 [ReaderFontPickerOverlay]。正文字重与标题字重各为
+ * 「细体/常规/粗体/自定义」四选，仅自定义显示拖动条（100..900）。
  */
 @Composable
 internal fun ReaderFontConfigDialog(
     catalog: ReaderStyleCatalog,
     style: ReaderTextStyle,
     fontOptions: List<ReaderFontOption>,
+    recentFontPaths: List<String>,
     onSetFont: (ReaderFontSelection) -> Unit,
     onOpenFontPicker: () -> Unit,
     onSetBodyWeight: (Int) -> Unit,
@@ -58,10 +59,11 @@ internal fun ReaderFontConfigDialog(
         Column(
             verticalArrangement = Arrangement.spacedBy(EInkSpacing.xs),
         ) {
-            // 当前选中的文件字体（须仍在文件夹枚举中：换过文件夹的幽灵选中不显示）
-            val selectedFileOption = (style.bodyFont as? ReaderFontSelection.File)
-                ?.path
-                ?.let { path -> fontOptions.firstOrNull { it.path == path } }
+            // 反显数据源：最近选中的文件字体 ∩ 当前枚举（幽灵 path 剔除）；
+            // 无历史不默认展示枚举字体
+            val recentOption = recentFontPaths.firstNotNullOfOrNull { path ->
+                fontOptions.firstOrNull { it.path == path }
+            }
             // 标签在左（按需占宽保证完整显示，同字重行；垂直居中对齐
             // 首行网格按钮），网格居右；顶部加呼吸边距与标题区拉开层次
             Row(
@@ -117,20 +119,30 @@ internal fun ReaderFontConfigDialog(
                             role = Role.Button,
                         )
                     }
-                    // 条件行：选中文件字体反显（选中反色，点击进二级）+
-                    // 「更多字体…（N）」入口；无文件字体选中时入口独占整行
+                    // 条件行：最近选中的文件字体反显（若有）与入口同排等分；
+                    // 无反显时入口独占整行。入口：枚举空 = 首选动作选文件夹
+                    // 直开 SAF；非空「更多字体…（N）」进二级
+                    val entryLabel = if (fontOptions.isEmpty()) {
+                        "选择字体文件夹"
+                    } else {
+                        "更多字体…（${fontOptions.size}）"
+                    }
+                    val entryAction = if (fontOptions.isEmpty()) onPickFolder else onOpenFontPicker
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(EInkSpacing.xs),
                     ) {
-                        if (selectedFileOption != null) {
+                        if (recentOption != null) {
                             EInkButton(
-                                // 显示名去除扩展名（.ttf/.otf），选中身份按 path 比对；
-                                // 长名占满半宽，留横向内边距防贴边（默认 0dp）
-                                text = selectedFileOption.name.substringBeforeLast("."),
-                                onClick = onOpenFontPicker,
+                                // 显示名去除扩展名（.ttf/.otf）；长名单行省略，
+                                // 触控目标不缩
+                                text = recentOption.name.substringBeforeLast("."),
+                                onClick = {
+                                    onSetFont(ReaderFontSelection.File(recentOption.path))
+                                },
                                 modifier = Modifier.weight(1f),
-                                selected = true,
+                                selected = (style.bodyFont as? ReaderFontSelection.File)
+                                    ?.path == recentOption.path,
                                 height = 44.dp,
                                 style = EInkTheme.typography.bodyMedium,
                                 role = Role.Button,
@@ -138,15 +150,13 @@ internal fun ReaderFontConfigDialog(
                             )
                         }
                         EInkButton(
-                            // 空枚举（未选过文件夹/空文件夹）= 首选动作是选文件夹：
-                            // 直开 SAF；选过则显示数量进二级
-                            text = if (fontOptions.isEmpty()) {
-                                "选择字体文件夹"
+                            text = entryLabel,
+                            onClick = entryAction,
+                            modifier = if (recentOption == null) {
+                                Modifier.fillMaxWidth()
                             } else {
-                                "更多字体…（${fontOptions.size}）"
+                                Modifier.weight(1f)
                             },
-                            onClick = if (fontOptions.isEmpty()) onPickFolder else onOpenFontPicker,
-                            modifier = Modifier.weight(1f),
                             height = 44.dp,
                             style = EInkTheme.typography.bodyMedium,
                             role = Role.Button,
