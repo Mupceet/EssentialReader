@@ -916,6 +916,7 @@ fun ReaderRoute(
                     ) {
                         ReaderOtherPanel(
                             state = uiState,
+                            onToggleVolumeKeyPage = viewModel::toggleVolumeKeyPage,
                             onTogglePullDownBookmark = viewModel::togglePullDownBookmark,
                             onToggleHideStatusBar = viewModel::toggleHideStatusBar,
                             onToggleShowReviewBubbles = viewModel::toggleShowReviewBubbles,

@@ -664,11 +664,14 @@ internal fun PanelTabRow(labels: List<String>, selected: Int, onSelect: (Int) ->
 @Composable
 internal fun ReaderOtherPanel(
     state: ReaderUiState,
+    onToggleVolumeKeyPage: () -> Unit,
     onTogglePullDownBookmark: () -> Unit,
     onToggleHideStatusBar: () -> Unit,
     onToggleShowReviewBubbles: () -> Unit,
     onOpenTapZones: () -> Unit,
 ) {
+    // 音量键翻页纯按键语义（阅读页按键处理器实时读端口值），切换不触发重排
+    ToggleRow(label = "音量键翻页", checked = state.volumeKeyPage, onToggle = onToggleVolumeKeyPage)
     ToggleRow(label = "隐藏状态栏", checked = state.hideStatusBar, onToggle = onToggleHideStatusBar)
     // 能力门控（0.6.0）：宿主未声明书签能力时隐藏下拉书签开关，
     // 未声明段评能力时隐藏段评开关——不留点了无效的死开关

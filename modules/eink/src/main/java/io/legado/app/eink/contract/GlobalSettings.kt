@@ -53,8 +53,8 @@ interface GlobalSettings {
     /**
      * 音量键翻页。
      *
-     * 可写（「我的」页开关）：fire-and-forget 写入；实时生效——阅读页
-     * 按键处理器每次按键时读取，无一致性窗口。
+     * 可写（阅读界面「其它设置」面板开关）：fire-and-forget 写入；实时
+     * 生效——阅读页按键处理器每次按键时读取，无一致性窗口。
      */
     var volumeKeyPage: Boolean
 
