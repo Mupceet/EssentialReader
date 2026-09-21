@@ -32,8 +32,9 @@ import io.legado.app.eink.designsystem.theme.EInkSpacing
  * 条件行反显最近选中的文件字体（历史 ∩ 当前枚举，幽灵剔除——切回系统
  * 预设后一键可回；无历史不默认展示，入口独占整行）；入口：枚举空（未选
  * 过文件夹/空文件夹）为「选择字体文件夹」直开 SAF，非空为「更多字体…（N）」
- * 进二级浮层 [ReaderFontPickerOverlay]。正文字重与标题字重各为
- * 「细体/常规/粗体/自定义」四选，仅自定义显示拖动条（100..900）。
+ * 进二级浮层 [ReaderFontPickerOverlay]。正文字重与标题字重：预设行
+ * 「细体/常规/粗体」三选 + 独立自定义行（点击原地替换为拖动条，点预设
+ * 复原，窄屏四枚一行显示不完整），拖动条值域 100..900。
  */
 @Composable
 internal fun ReaderFontConfigDialog(
@@ -211,10 +212,11 @@ internal fun ReaderFontConfigDialog(
 }
 
 /**
- * 字重设置行：标签在左（按需占宽、垂直对齐按钮行），右侧纵列为
- * 「细体/常规/粗体/自定义」四选与（仅自定义时）其下的拖动条——拖动条
- * 只占按钮区域宽度，不延伸到标签下方。文字样式统一（bodyMedium，
- * 与排版面板滑条标签同风格）。
+ * 字重设置行：标签在左（按需占宽、垂直对齐按钮行），右侧纵列两行——
+ * 预设行「细体/常规/粗体」三选 + 第二行「自定义/拖动条」原地二态：
+ * 点自定义整行原地替换为拖动条（100..900），点任一预设复原为自定义
+ * 按钮（窄屏四枚一行显示不完整，故自定义独立成行）。文字样式统一
+ * （bodyMedium，与排版面板滑条标签同风格）。
  * 进入自定义时按当前档位映射等效值（0→400/1→900/2→300，与宿主
  * resolveWeight 同口径），不写死默认。
  */
@@ -224,12 +226,12 @@ private fun WeightSettingRow(
     value: Int,
     valueRange: IntRange,
     onSetWeight: (Int) -> Unit,
-    // false = 预设档宿主（ReaderStyleParam.Presets）：隐藏「自定义」按钮
-    // 与滑条，仅三预设可选
+    // false = 预设档宿主（ReaderStyleParam.Presets）：隐藏「自定义」行
+    // 与拖动条，仅三预设可选
     allowCustom: Boolean = true,
 ) {
     val isCustom = value !in 0..2
-    // 标签与按钮统一 bodyMedium（与滑条标签同风格，轻一级）
+    // 标签与按钮统一 bodyMedium（与排版面板滑条标签同风格，轻一级）
     val buttonStyle = EInkTheme.typography.bodyMedium
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -244,7 +246,7 @@ private fun WeightSettingRow(
                 text = label,
                 style = buttonStyle,
                 // 按需占宽不设上限：标签（正文字重/标题字重）保证完整显示，
-                // 空间压力由右侧四枚等宽按钮吸收（极端字号下按钮省略兜底）
+                // 空间压力由右侧等宽按钮吸收（极端字号下按钮省略兜底）
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
@@ -253,6 +255,7 @@ private fun WeightSettingRow(
             modifier = Modifier.weight(1f),
             verticalArrangement = Arrangement.spacedBy(EInkSpacing.xs),
         ) {
+            // 预设行：三枚等分（自定义移出本行，保窄屏完整显示）
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -272,27 +275,38 @@ private fun WeightSettingRow(
                         role = Role.Tab,
                     )
                 }
-                if (allowCustom) {
-                    EInkButton(
-                        text = "自定义",
-                        onClick = { if (!isCustom) onSetWeight(presetToCustom(value)) },
-                        modifier = Modifier.weight(1f),
-                        selected = isCustom,
-                        height = 40.dp,
-                        style = buttonStyle,
-                        contentPadding = PaddingValues(horizontal = 2.dp),
-                        role = Role.Tab,
-                    )
-                }
             }
-            if (isCustom && allowCustom) {
-                EInkSliderRow(
-                    label = null,
-                    value = value.coerceIn(valueRange.first, valueRange.last),
-                    valueRange = valueRange,
-                    thumbLabel = { it.toString() },
-                    onSetValue = onSetWeight,
-                )
+            if (allowCustom) {
+                // 第二行原地二态：自定义态显示拖动条；点预设按钮态复原。
+                // 容器定高 48dp（= EInkSliderRow 行高）：按钮态 40dp 垂直
+                // 居中，二态切换不产生纵向跳动
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(48.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    if (isCustom) {
+                        EInkSliderRow(
+                            label = null,
+                            value = value.coerceIn(valueRange.first, valueRange.last),
+                            valueRange = valueRange,
+                            thumbLabel = { it.toString() },
+                            onSetValue = onSetWeight,
+                        )
+                    } else {
+                        EInkButton(
+                            text = "自定义",
+                            // 按钮仅在非自定义态在场，点击即进自定义（映射等效值）
+                            onClick = { onSetWeight(presetToCustom(value)) },
+                            modifier = Modifier.fillMaxWidth(),
+                            height = 40.dp,
+                            style = buttonStyle,
+                            contentPadding = PaddingValues(horizontal = 2.dp),
+                            role = Role.Tab,
+                        )
+                    }
+                }
             }
         }
     }
