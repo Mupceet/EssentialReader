@@ -37,8 +37,8 @@ import io.legado.app.eink.designsystem.theme.EInkTheme
  * 结构: [返回] 标题(单行省略) …… 动作区，底部一条分隔线。
  * 原E-Ink TopActionBar 已并入（规范 §29 禁止顶栏变体增殖）：带右侧
  * 图标动作的界面传 [actionsFillMax] = true，动作区贴右屏、按钮高度
- * 撑满顶栏、宽度收敛上限降为 [TopBarWidthRatio] 倍高度；仅标题+返回
- * 或文本动作的简单顶栏保持默认内边距模式。
+ * 撑满顶栏、宽度收敛为 [TopBarWidthRatio] 倍高度（方形触摸区）；
+ * 仅标题+返回或文本动作的简单顶栏保持默认内边距模式。
  *
  * 标题可点击（[onTitleClick]，如阅读页书名进详情）：标题区整体作为
  * 无边框按钮（EInkButton 直角按压块）撑满顶栏高度，按压瞬时反色且
@@ -132,7 +132,7 @@ fun EInkTopBar(
                 }
             }
             if (actionsFillMax) {
-                // 顶栏动作按钮比底部操作栏窄：收敛宽度降为 TopBarWidthRatio 倍高度
+                // 顶栏动作按钮方形（宽度收敛 = 高度）：TopBarWidthRatio = 1.0
                 CompositionLocalProvider(LocalOperationBarWidthRatio provides TopBarWidthRatio) {
                     actions()
                 }

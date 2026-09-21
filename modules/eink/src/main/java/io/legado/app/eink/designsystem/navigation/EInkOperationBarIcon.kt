@@ -29,7 +29,7 @@ import io.legado.app.eink.designsystem.interaction.rememberImmediatePressState
  * （均分结果超过收敛上限）时收敛为「高度 × [LocalOperationBarWidthRatio]」，
  * 避免宽屏上按钮过宽。收敛倍数默认 1.7（约 95dp，底部操作栏规格）；
  * 顶栏（EInkTopBar 动作模式）经该环境值降为 [TopBarWidthRatio]
- * （1.2 倍，约 67dp）。
+ * （1 倍，宽度与高度一致的方形触摸区）。
  *
  * 分层反馈（规范 §35/§42）：
  *  - 选中：提供 [selectedIcon] 填充变体素材（`_e`/`_s` 素材对）时，
@@ -64,7 +64,8 @@ fun EInkOperationBarIcon(
     )
     // 宽度自适应：min(屏幕宽 / 5, 收敛倍数 × 高度)。手机类窄屏均分
     // 屏宽（触控目标仍 ≥48dp），宽屏收敛为固定规格；收敛倍数由所属
-    // 操作条经 [LocalOperationBarWidthRatio] 覆写（顶栏 1.2、底栏默认 1.7）。
+    // 操作条经 [LocalOperationBarWidthRatio] 覆写（顶栏 1.0 方形、底栏
+    // 默认 1.7）。
     // 屏宽优先取操作栏实测布局宽（LocalOperationBarAvailableWidth，旋转
     // 即时更新）；栏外（顶栏动作等）回落 Configuration——其受收敛上限
     // 约束，configChanges 下滞后值不致溢出
@@ -109,8 +110,8 @@ private const val DefaultWidthRatio = 1.7f
 /** 底部操作栏图标按钮的宽度收敛上限，供响应式槽位计算封顶（与组件内规则同源）。 */
 internal val OperationBarIconButtonMaxWidth: Dp = DefaultHeight * DefaultWidthRatio
 
-/** 顶栏动作按钮宽度收敛倍数：按钮较底部操作栏更窄（1.2 × 56dp ≈ 67dp）。 */
-const val TopBarWidthRatio = 1.2f
+/** 顶栏动作按钮宽度收敛倍数：1.0 即宽度与高度一致的方形触摸区（56 × 56dp）。 */
+const val TopBarWidthRatio = 1.0f
 
 /** 宽度收敛倍数的环境覆写：所属操作条（顶栏/底栏）经 CompositionLocalProvider 提供，默认 [DefaultWidthRatio]。 */
 val LocalOperationBarWidthRatio = staticCompositionLocalOf { DefaultWidthRatio }
