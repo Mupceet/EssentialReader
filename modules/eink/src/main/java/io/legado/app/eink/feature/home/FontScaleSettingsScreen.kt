@@ -124,7 +124,6 @@ fun FontScaleSettingsRoute(onBack: () -> Unit) {
                 valueRange = FONT_SCALE_MIN..FONT_SCALE_MAX,
                 modifier = Modifier.weight(1f),
                 thumbLabel = { "${it / 10f}x" },
-                tickStep = 2,
                 markerStep = FONT_SCALE_NEUTRAL,
                 markerLabel = "默认",
             )

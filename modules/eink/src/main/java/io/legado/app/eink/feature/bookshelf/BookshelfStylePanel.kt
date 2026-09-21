@@ -112,7 +112,6 @@ fun BookshelfStylePanel(
                         value = style.gridCoverWidth,
                         valueRange = 40..150,
                         thumbLabel = { "${it}dp" },
-                        tickStep = 5,
                         onSetValue = { onStyleChange(style.copy(gridCoverWidth = it)) },
                         labelWidth = 80.dp,
                     )
@@ -121,7 +120,6 @@ fun BookshelfStylePanel(
                         value = style.titleMaxLines,
                         valueRange = 1..5,
                         thumbLabel = { "${it}行" },
-                        tickStep = 1,
                         onSetValue = { onStyleChange(style.copy(titleMaxLines = it)) },
                         labelWidth = 80.dp,
                     )

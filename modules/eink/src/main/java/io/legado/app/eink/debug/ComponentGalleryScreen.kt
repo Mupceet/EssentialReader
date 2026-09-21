@@ -440,7 +440,6 @@ private fun SliderSample() {
             onValueChange = { preview = it },
             onValueChangeFinished = { committed = preview },
             valueRange = 0..100,
-            tickStep = 25,
             markerStep = SliderDefault,
             markerLabel = "默认",
         )

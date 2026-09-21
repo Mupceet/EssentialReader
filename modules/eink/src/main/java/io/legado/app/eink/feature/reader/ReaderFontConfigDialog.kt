@@ -281,7 +281,6 @@ private fun WeightSettingRow(
                     value = value.coerceIn(valueRange.first, valueRange.last),
                     valueRange = valueRange,
                     thumbLabel = { it.toString() },
-                    tickStep = 100,
                     onSetValue = onSetWeight,
                 )
             }

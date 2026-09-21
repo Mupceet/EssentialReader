@@ -52,8 +52,8 @@ import kotlin.math.roundToInt
  *    column still lets the scroll win.
  *
  * Visuals follow the design system: flat track (filled segment + mid-gray
- * remainder + optional ruler ticks), solid black thumb with the value in
- * white, no ripple, no shadow, no animation.
+ * remainder), solid black thumb with the value in white, no ripple, no shadow,
+ * no animation.
  *
  * The value axis is integer steps of [valueRange]; callers map their real
  * units (dp, sp, floats) onto it and format [thumbLabel] for display.
@@ -70,7 +70,6 @@ import kotlin.math.roundToInt
  * @param modifier Modifier for the slider (sizing, weight)
  * @param enabled Whether the slider accepts input
  * @param thumbLabel Formats the value printed on the thumb
- * @param tickStep Ruler tick interval in steps; 0 draws no ticks
  * @param onValueChangeFinished Invoked once per gesture when the finger lifts
  *   after a non-rejected press/drag (also after a tap that didn't change the
  *   step); null keeps the apply-as-you-drag behavior
@@ -86,7 +85,6 @@ fun EInkSteppedSlider(
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
     thumbLabel: (Int) -> String = { it.toString() },
-    tickStep: Int = 0,
     onValueChangeFinished: (() -> Unit)? = null,
     markerStep: Int? = null,
     markerLabel: String? = null,
@@ -214,23 +212,6 @@ fun EInkSteppedSlider(
         val fillColor = if (enabled) scheme.primary else inactiveColor
         Canvas(modifier = Modifier.matchParentSize()) {
             val y = size.height / 2f
-            // 刻度尺:整条轨道静态绘制(被填充段和滑块覆盖处不可见),
-            // 避免滑块移动时刻度出现/消失带来的额外刷新
-            if (tickStep > 0 && steps > 0) {
-                val halfTick = TickLength.toPx() / 2f
-                val tickThickness = TickThickness.toPx()
-                for (s in 0..steps) {
-                    if (s % tickStep != 0) continue
-                    val x = thumbWidthPx / 2f + stepPx * s
-                    drawLine(
-                        color = inactiveColor,
-                        start = Offset(x, y - halfTick),
-                        end = Offset(x, y + halfTick),
-                        strokeWidth = tickThickness,
-                        cap = StrokeCap.Square,
-                    )
-                }
-            }
             drawLine(
                 color = inactiveColor,
                 start = Offset(0f, y),
@@ -288,7 +269,7 @@ fun EInkSteppedSlider(
         }
 
         // 滑条上方的静态标识（如「默认」）：与 markerStep 档位中心对齐，
-        // 几何复用轨道刻度的换算（thumbWidth/2 + stepPx × 档位偏移）
+        // 几何复用轨道档位的换算（thumbWidth/2 + stepPx × 档位偏移）
         if (hasMarker && steps > 0) {
             val markerCenterX = thumbWidthPx / 2f + stepPx * (markerStep!! - start)
             EInkText(
@@ -333,7 +314,3 @@ internal fun sliderThumbWidth(density: Density): Dp =
 private val FilledTrackThickness = 4.dp
 
 private val EmptyTrackThickness = 2.dp
-
-private val TickLength = 8.dp
-
-private val TickThickness = 1.dp

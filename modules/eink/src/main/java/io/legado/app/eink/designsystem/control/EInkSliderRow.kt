@@ -39,7 +39,6 @@ fun EInkSliderRow(
     value: Int,
     valueRange: IntRange,
     thumbLabel: (Int) -> String,
-    tickStep: Int,
     onSetValue: (Int) -> Unit,
     labelWidth: Dp = SliderLabelWidth,
 ) {
@@ -72,7 +71,6 @@ fun EInkSliderRow(
             valueRange = valueRange,
             modifier = Modifier.weight(1f),
             thumbLabel = thumbLabel,
-            tickStep = tickStep,
         )
         EInkButton(
             text = "＋",

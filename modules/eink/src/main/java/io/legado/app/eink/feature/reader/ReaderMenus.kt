@@ -65,9 +65,6 @@ private val BarHeight = 56.dp
 /** 底部操作条总占位（操作条 + 顶部分隔线），面板/弹框覆盖层据此避让，保持操作条可见可点。 */
 internal val ReaderBottomBarInset = BarHeight + 1.dp
 
-/** 边距滑条刻度间隔（dp）。 */
-private const val MarginTickStep = 8
-
 // ====================================================================
 // 顶部操作条：书签 / 换源 / 刷新 / 缓存。加/移书架不设入口：未加书架的
 // 书在退出阅读时经「加入书架」弹框提示（见 Route 退出门控），在架管理
@@ -264,7 +261,6 @@ internal fun ReaderProgressPanel(
                 value = autoIntervalStepOf(state.autoPlayIntervalSec),
                 valueRange = 0..AutoIntervalStepsSec.lastIndex,
                 thumbLabel = { "${AutoIntervalStepsSec[it]}s" },
-                tickStep = 0,
                 onSetValue = { step -> onSetAutoInterval(AutoIntervalStepsSec[step]) },
             )
         }
@@ -310,7 +306,6 @@ private fun PageProgressRow(
             modifier = Modifier.weight(1f),
             enabled = maxPage > 0,
             thumbLabel = { "${it + 1}" },
-            tickStep = 0,
         )
         EInkButton(
             text = "下一章",
@@ -447,7 +442,6 @@ internal fun ReaderLayoutPanel(
         value = style.textSize,
         valueRange = catalog.intRange(Ids.BODY_SIZE),
         thumbLabel = { "${it}sp" },
-        tickStep = 4,
         onSetValue = onSetTextSize,
     )
     val lsRange = catalog.floatStepIndexRange(Ids.BODY_LETTER_SPACING, LETTER_SPACING_STEP)
@@ -457,7 +451,6 @@ internal fun ReaderLayoutPanel(
             .coerceIn(lsRange.first, lsRange.last),
         valueRange = lsRange,
         thumbLabel = { "%.2f".format(it * LETTER_SPACING_STEP) },
-        tickStep = 2,
         onSetValue = onSetLetterSpacing,
     )
     EInkSliderRow(
@@ -465,7 +458,6 @@ internal fun ReaderLayoutPanel(
         value = style.indentChars,
         valueRange = catalog.intRange(Ids.BODY_INDENT),
         thumbLabel = { "${it}字" },
-        tickStep = 1,
         onSetValue = onSetIndent,
     )
     EInkSliderRow(
@@ -473,7 +465,6 @@ internal fun ReaderLayoutPanel(
         value = style.lineSpacing,
         valueRange = catalog.intRange(Ids.BODY_LINE_SPACING),
         thumbLabel = { "%.1f倍".format(it / 10f) },
-        tickStep = 2,
         onSetValue = onSetLineSpacing,
     )
     EInkSliderRow(
@@ -481,7 +472,6 @@ internal fun ReaderLayoutPanel(
         value = style.paragraphSpacing,
         valueRange = catalog.intRange(Ids.BODY_PARAGRAPH_SPACING),
         thumbLabel = { "%.1f行".format(it / 10f) },
-        tickStep = 2,
         onSetValue = onSetParagraphSpacing,
     )
     val entries = buildList {
@@ -605,7 +595,6 @@ private fun MarginRows(
         value = topDp,
         valueRange = 0..maxVertical,
         thumbLabel = { "${it}dp" },
-        tickStep = MarginTickStep,
         onSetValue = onSetTop,
     )
     EInkSliderRow(
@@ -613,7 +602,6 @@ private fun MarginRows(
         value = bottomDp,
         valueRange = 0..maxVertical,
         thumbLabel = { "${it}dp" },
-        tickStep = MarginTickStep,
         onSetValue = onSetBottom,
     )
     EInkSliderRow(
@@ -621,7 +609,6 @@ private fun MarginRows(
         value = leftDp,
         valueRange = 0..maxHorizontal,
         thumbLabel = { "${it}dp" },
-        tickStep = MarginTickStep,
         onSetValue = onSetLeft,
     )
     EInkSliderRow(
@@ -629,7 +616,6 @@ private fun MarginRows(
         value = rightDp,
         valueRange = 0..maxHorizontal,
         thumbLabel = { "${it}dp" },
-        tickStep = MarginTickStep,
         onSetValue = onSetRight,
     )
 }
