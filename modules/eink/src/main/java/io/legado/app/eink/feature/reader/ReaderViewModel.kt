@@ -538,6 +538,10 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application),
                         _messages.emit(UserMessage.from(R.string.eink_reader_auto_page_end))
                         break
                     }
+                    // 翻页即清条：满条与清空落在同一帧窗口，渲染层最多闪现一帧
+                    // 即回零——否则 100% 满条要挂到下一个整秒 tick 才消失，
+                    // 用户看到整行黑条持续一秒
+                    _uiState.update { it.copy(autoPlayProgress = 0f) }
                 }
             }
         }
