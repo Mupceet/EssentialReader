@@ -2,13 +2,15 @@ package io.legado.app.eink.feature.home
 
 import android.content.Context
 import android.widget.Toast
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.runtime.Composable
@@ -19,16 +21,22 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import io.legado.app.eink.BuildConfig
+import io.legado.app.eink.R
 import io.legado.app.eink.app.EInkAppUpdateViewModel
 import io.legado.app.eink.app.UpdateCheckState
 import io.legado.app.eink.contract.EInkEngineRegistry
 import io.legado.app.eink.designsystem.content.EInkHorizontalDivider
 import io.legado.app.eink.designsystem.content.EInkText
 import io.legado.app.eink.designsystem.control.EInkButton
+import io.legado.app.eink.designsystem.interaction.eInkActionColors
+import io.legado.app.eink.designsystem.interaction.einkClickable
+import io.legado.app.eink.designsystem.interaction.rememberImmediatePressState
 import io.legado.app.eink.designsystem.pager.EInkListPagerState
 import io.legado.app.eink.designsystem.pager.EInkPageSwipe
 import io.legado.app.eink.designsystem.theme.EInkSpacing
@@ -131,7 +139,7 @@ internal fun MineScreen(
         item {
             MineToggleRow(
                 label = "总是使用默认封面",
-                description = "总是显示默认封面（不显示网络封面）",
+                description = "关闭后显示网络封面",
                 // 端口 getter 由宿主快照状态背书：此处读取订阅变化，切换后
                 // 开关行与书架/详情可见封面立即重组，无需本地乐观状态
                 checked = globalSettings.useDefaultCover,
@@ -217,8 +225,9 @@ private fun Context.readAppVersionName(): String =
     packageManager.getPackageInfo(packageName, 0).versionName ?: "?"
 
 /**
- * 设置项行：左侧主信息（设置名）+ 副信息（当前值，弱化色小字），右侧
- * ">" 跳转标识，整行点击进入设置页。
+ * 设置项行：左侧主信息（设置名）+ 副信息（当前值，弱化色小字），尾部
+ * 右箭头图标（[R.drawable.eink_ic_keyboard_arrow_right]）为跳转标识，
+ * 整行点击进入设置页。
  */
 @Composable
 private fun MineEntry(
@@ -226,29 +235,40 @@ private fun MineEntry(
     onClick: () -> Unit,
     sublabel: String? = null
 ) {
+    // 按压瞬时反色（规范 §35）：共享配色解析 + 120ms 最短保持——裸
+    // clickable 在全局禁涟漪下按压零反馈
+    val press = rememberImmediatePressState()
+    val colors = eInkActionColors(pressed = press.isPressed)
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick)
+            .then(press.modifier)
+            .background(colors.containerColor)
+            .einkClickable(role = Role.Button, onClick = onClick)
             .padding(horizontal = EInkSpacing.m, vertical = EInkSpacing.m),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Column(modifier = Modifier.weight(1f)) {
-            EInkText(text = label, style = EInkTheme.typography.titleMedium)
+            EInkText(
+                text = label,
+                style = EInkTheme.typography.titleMedium,
+                color = colors.contentColor
+            )
             if (sublabel != null) {
                 EInkText(
                     text = sublabel,
                     style = EInkTheme.typography.bodyMedium,
-                    color = EInkTheme.colorScheme.onSurfaceVariant,
+                    color = colors.secondaryContentColor,
                     modifier = Modifier.padding(top = EInkSpacing.xxs)
                 )
             }
         }
         Spacer(modifier = Modifier.padding(start = EInkSpacing.s))
-        EInkText(
-            text = ">",
-            style = EInkTheme.typography.titleLarge,
-            color = EInkTheme.colorScheme.onSurfaceVariant
+        Image(
+            painter = painterResource(R.drawable.eink_ic_keyboard_arrow_right),
+            contentDescription = null,
+            modifier = Modifier.size(24.dp),
+            colorFilter = ColorFilter.tint(colors.secondaryContentColor)
         )
     }
 }

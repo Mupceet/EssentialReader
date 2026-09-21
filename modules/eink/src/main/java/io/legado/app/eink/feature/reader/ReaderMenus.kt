@@ -1,6 +1,7 @@
 package io.legado.app.eink.feature.reader
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -18,6 +19,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
@@ -30,6 +32,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.Dp
@@ -853,10 +856,11 @@ private fun OptionRow(label: String, onClick: () -> Unit) {
             color = colors.contentColor,
         )
         Spacer(modifier = Modifier.weight(1f))
-        EInkText(
-            text = "›",
-            style = EInkTheme.typography.titleLarge,
-            color = colors.secondaryContentColor,
+        Image(
+            painter = painterResource(R.drawable.eink_ic_keyboard_arrow_right),
+            contentDescription = null,
+            modifier = Modifier.size(24.dp),
+            colorFilter = ColorFilter.tint(colors.secondaryContentColor),
         )
     }
 }

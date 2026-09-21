@@ -50,7 +50,7 @@ fun EInkPageArrows(
         verticalAlignment = Alignment.CenterVertically
     ) {
         PageArrowIcon(
-            iconRes = R.drawable.eink_ic_keyboard_arrow_up,
+            iconRes = R.drawable.eink_ic_keyboard_arrow_left,
             enabled = pageUpEnabled,
             contentDescription = "上一页",
             onClick = onPageUp
@@ -62,7 +62,7 @@ fun EInkPageArrows(
                 .background(scheme.outline)
         )
         PageArrowIcon(
-            iconRes = R.drawable.eink_ic_keyboard_arrow_down,
+            iconRes = R.drawable.eink_ic_keyboard_arrow_right,
             enabled = pageDownEnabled,
             contentDescription = "下一页",
             onClick = onPageDown
