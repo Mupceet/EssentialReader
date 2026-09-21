@@ -395,6 +395,12 @@ internal object ReaderEngineImpl : ReaderEngine, KoinComponent {
 
     override suspend fun refreshCurrentChapter() {
         val book = ReadBook.book ?: return
+        // 对齐宿主菜单刷新（ReadBookViewModel MenuRefreshDur 先 clearTextChapter
+        // 再删缓存重拉）：清内存章（输入窗口 + 分页快照）让正文区立即让位
+        // 加载提示，旧正文不得回闪；eink 分页缓存同步失效当前章（见
+        // ReaderChapterPager.invalidateCurrentChapter）
+        ReadBook.clearTextChapter()
+        chapterPager.invalidateCurrentChapter()
         appDb.bookChapterDao.getChapter(book.bookUrl, ReadBook.durChapterIndex)?.let { chapter ->
             BookHelp.delContent(book, chapter)
         }

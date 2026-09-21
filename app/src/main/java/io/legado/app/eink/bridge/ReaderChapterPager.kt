@@ -163,6 +163,23 @@ internal class ReaderChapterPager(
         requestPagination()
     }
 
+    /**
+     * 刷新当前章（桥接 refreshCurrentChapter，宿主菜单刷新 clearTextChapter
+     * 的同步语义）：丢弃当前章缓存产物并取消在途分页——「下载完成回调 →
+     * 重分页落地」窗口内 upContent 先于新页 commit 到达，hasPages 若仍
+     * 命中旧产物会把已作废的旧页回闪出去。相邻章缓存保留：重载输入的
+     * 内容哈希不变，预排页键命中可继续复用。
+     */
+    fun invalidateCurrentChapter() {
+        paginateJob?.cancel()
+        paginateJob = null
+        inFlightKey = null
+        val index = ReadBook.durChapterIndex
+        if (chapters.containsKey(index)) {
+            chapters = chapters - index
+        }
+    }
+
     /** 换书/换会话：丢弃缓存并停止在途分页。重排与注销不清缓存——
      *  重排是否需要由缓存键判定，注销后返回阅读页要靠热缓存即时恢复。 */
     fun clear() {
