@@ -580,24 +580,28 @@ fun ReaderRoute(
         onDispose { window?.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON) }
     }
 
-    // 隐藏状态栏（转发完整模式同键设置）：显示状态严格跟随开关值，不随
-    // 菜单/排版弹层开合翻转——页眉（时间/电量）在阅读页恒定接管顶部
-    // 信息，与状态栏不存在重叠渲染，排版弹层的页眉调参因此可实时预览，
-    // 开关在菜单中切换也即时生效；状态栏临时查看走边缘下滑（TRANSIENT
-    // 浮层，不占用插图）。与完整模式的刻意差异：View 版沉浸条件为
-    // 「开关开启 && 操作条收起」（ReadBookController 的 toolBarHide &&
-    // hideStatusBar，菜单展开期恢复显示）——那是「菜单/状态栏二选一占
-    // 顶栏」的产物，需页眉让位透明与菜单层高度快照避让配合；本模块页眉
-    // 自身承载顶部信息，取恒定语义后整套配合机制一并省去。顶部避让由
-    // readerSystemBarInsets 显式置零且只跟随开关本身，正文排版区域尺寸
-    // 不随菜单开合变化（规范 §15）。旧平台（API < 30）legacy 布局标记
+    // 隐藏状态栏（转发完整模式同键设置）：显示状态跟随开关值，唯一例外
+    // 是顶部操作条在场时强制显示——墨水屏固件的状态栏未必随
+    // insetsController.hide() 真正退场（常驻绘制或保留顶部触控拦截），
+    // 操作条顶格排版时图标落进状态栏区域内不可操作；强制显示后操作条经
+    // 插图消费链自动下移让位（见顶部操作条 safeDrawing 顶避让）。二级
+    // 菜单（面板/排版弹层，操作条不在场）不受例外影响，保持跟随开关——
+    // 排版弹层的页眉调参实时预览语义不变。对齐完整模式沉浸条件「开关
+    // 开启 && 操作条收起」（ReadBookController 的 toolBarHide &&
+    // hideStatusBar，菜单展开期恢复显示）；与完整模式的差异只剩正文侧：
+    // 顶部避让仍只跟随开关本身置零，正文排版区域尺寸不随菜单开合变化
+    // （规范 §15），页眉（时间/电量）仍恒定承载顶部信息、无让位透明与
+    // 菜单层高度快照避让配合。状态栏临时查看走边缘下滑（TRANSIENT
+    // 浮层，不占用插图）。旧平台（API < 30）legacy 布局标记
     // LAYOUT_STABLE 下系统栏插图冻结在「栏可见」尺寸、不随 hide() 归零，
     // 不能依赖 safeDrawing 自动收缩。离开阅读页（含去目录/换源）时恢复
     // 显示，其余界面不受影响。
-    DisposableEffect(uiState.hideStatusBar) {
+    val topBarShown = uiState.controlsVisible && panel == null
+    val statusBarHidden = uiState.hideStatusBar && !topBarShown
+    DisposableEffect(statusBarHidden) {
         val controller = (view.context as? Activity)?.window
             ?.let { WindowCompat.getInsetsController(it, view) }
-        if (uiState.hideStatusBar) {
+        if (statusBarHidden) {
             controller?.systemBarsBehavior =
                 WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
             controller?.hide(WindowInsetsCompat.Type.statusBars())
@@ -697,8 +701,9 @@ fun ReaderRoute(
         }
     }
 
-    // 状态栏活值（浮层避让用）：显示严格跟随开关，无 show/hide 往返——
-    // 开关关闭期为真实栏高，开启期状态栏不在场恒 0，无需高度快照
+    // 状态栏活值（浮层避让用）：跟随真实显隐——开关关闭期为真实栏高；
+    // 开关开启且顶部操作条不在场时状态栏隐藏恒 0；操作条在场强制显示时
+    // 即真实栏高（消费方字体浮层/想法弹框均只在操作条不在场的界面态打开）
     val statusBarTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
 
     // 操作条返回图标：关闭设置面板 → 退出阅读。
@@ -1756,10 +1761,15 @@ internal fun ReaderScreen(
                 modifier = Modifier
                     .align(Alignment.TopCenter)
                     .fillMaxWidth()
-                    // surface 从屏幕上缘铺起：开关关闭期垫在（Edge-to-Edge
-                    // 下透明的）状态栏图标后方形成实底条带，同时盖住下方的
-                    // 页眉条带；开关开启期状态栏不在场，顶栏即顶格
+                    // surface 先铺：开关开启期状态栏被强制显示（见
+                    // statusBarHidden），实底从屏幕上缘垫在状态栏图标后方，
+                    // 盖住其后透出的正文首行；随后的 safeDrawing 顶避让经
+                    // 插图消费链取真实栏高——外层已按开关消费 safeDrawing 顶
+                    // （开关关闭期）时此处读到已消费的 0，不二次避让；外层
+                    // 置零（开关开启期）时此处取满栏高，操作条内容落在
+                    // 状态栏下方（图标不再落进状态栏区域不可操作）
                     .background(EInkTheme.colorScheme.surface)
+                    .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Top))
             ) {
                 ReaderTopBar(
                     state = state,
