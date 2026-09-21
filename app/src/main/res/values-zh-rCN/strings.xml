@@ -546,6 +546,11 @@
     <string name="page_anim_simulation">仿真</string>
     <string name="page_anim_scroll">滚动</string>
     <string name="page_anim_none">无动画</string>
+    <string name="page_anim_speed">翻页动画速度</string>
+    <string name="page_anim_speed_fastest">极速</string>
+    <string name="page_anim_speed_fast">快速</string>
+    <string name="page_anim_speed_moderate">适中</string>
+    <string name="page_anim_speed_elegant">优雅</string>
     <string name="up_change_source_last_chapter_t">后台更新换源最新章节</string>
     <string name="up_change_source_last_chapter_s">开启则会在软件打开 1 分钟后开始更新</string>
     <string name="behavior_main_t">书架工具栏自动隐藏</string>
@@ -852,6 +857,7 @@
     <string name="chapter_rule">章节正则</string>
     <string name="volume_rule">分卷正则</string>
     <string name="highlight_rule_config">高亮规则</string>
+    <string name="highlight_rule_presets">预设规则</string>
     <string name="new_rule">新增规则</string>
     <string name="edit_rule">编辑规则</string>
     <string name="rule_info">规则信息</string>
@@ -3334,4 +3340,16 @@
     <string name="feature_bookmarks_no_matching_notes">没有找到相关笔记</string>
     <string name="feature_bookmarks_no_notes">暂无笔记</string>
     <string name="feature_bookmarks_chapter_fallback">第 %1$d 章</string>
+
+    <string name="bookshelf_conflict_title">检测到可能重复的作品</string>
+    <string name="bookshelf_conflict_existing_title">书架中已有的作品</string>
+    <string name="bookshelf_conflict_open_hint">点击卡片查看该作品详情</string>
+    <string name="bookshelf_conflict_coexist">共存</string>
+    <string name="bookshelf_conflict_migrate">迁移</string>
+    <string name="bookshelf_conflict_options_title">要携带的数据</string>
+    <string name="bookshelf_conflict_actions_hint">共存：把勾选的数据从已有作品复制到新加入的书。迁移：用勾选的数据以新书替换已有作品。</string>
+    <string name="bookshelf_conflict_coexist_done">已作为另一本加入书架</string>
+    <string name="bookshelf_conflict_migrate_done">已迁移到新的书源</string>
+    <string name="bookshelf_conflict_resolve_failed">处理失败，请重试</string>
+    <string name="bookshelf_conflict_toc_failed">获取目录失败，已取消迁移，请重试</string>
 </resources>

@@ -576,6 +576,11 @@
     <string name="page_anim_simulation">Simulation</string>
     <string name="page_anim_scroll">Scroll</string>
     <string name="page_anim_none">None</string>
+    <string name="page_anim_speed">Flip Speed</string>
+    <string name="page_anim_speed_fastest">Fastest</string>
+    <string name="page_anim_speed_fast">Fast</string>
+    <string name="page_anim_speed_moderate">Moderate</string>
+    <string name="page_anim_speed_elegant">Elegant</string>
     <string name="up_change_source_last_chapter_t">Update the latest chapter after changed origin in the background</string>
     <string name="up_change_source_last_chapter_s">If enabled,the update will start 1 minute later when the software is run</string>
     <string name="behavior_main_t">Auto Hide Toolbar</string>
@@ -883,6 +888,7 @@
     <string name="chapter_rule">Chapter Regex</string>
     <string name="volume_rule">Volume Regex</string>
     <string name="highlight_rule_config">Highlight Rules</string>
+    <string name="highlight_rule_presets">Preset Rules</string>
     <string name="new_rule">New Rule</string>
     <string name="edit_rule">Edit Rule</string>
     <string name="rule_info">Rule Info</string>
@@ -2010,6 +2016,7 @@
     <string name="tool_bar_style">Tool bar style</string>
     <string name="bookshelf_total_count">%1$d books</string>
     <string name="bookshelf_selected_count">%1$d selected</string>
+    <string name="bookshelf_edit_subtitle">%1$s · %2$s</string>
     <string name="bookshelf_empty_global_search">No books here. Try global search.</string>
     <string name="global_search">Global search</string>
     <string name="cache_management">Cache management</string>
@@ -3339,4 +3346,16 @@
     <string name="feature_bookmarks_no_matching_notes">No matching notes</string>
     <string name="feature_bookmarks_no_notes">No notes</string>
     <string name="feature_bookmarks_chapter_fallback">Chapter %1$d</string>
+
+    <string name="bookshelf_conflict_title">Possible Duplicate</string>
+    <string name="bookshelf_conflict_existing_title">Already on bookshelf</string>
+    <string name="bookshelf_conflict_open_hint">Tap a book to open its details</string>
+    <string name="bookshelf_conflict_coexist">Keep Both</string>
+    <string name="bookshelf_conflict_migrate">Migrate</string>
+    <string name="bookshelf_conflict_options_title">Data to Carry Over</string>
+    <string name="bookshelf_conflict_actions_hint">Keep both: copy the selected fields from the existing book to the new one. Migrate: replace the existing book with the new one using the selected fields.</string>
+    <string name="bookshelf_conflict_coexist_done">Added as another copy</string>
+    <string name="bookshelf_conflict_migrate_done">Migrated to the new source</string>
+    <string name="bookshelf_conflict_resolve_failed">Could not finish the operation</string>
+    <string name="bookshelf_conflict_toc_failed">Could not load the table of contents. Migration cancelled, please retry.</string>
 </resources>
