@@ -8,6 +8,8 @@
     <string name="eink_reader_auto_page_end">已是最后一页，自动翻页已停止</string>
     <string name="eink_reader_cache_started">开始缓存章节</string>
     <string name="eink_reader_local_no_cache">本地书籍无需缓存</string>
+    <string name="eink_reader_no_next_page">没有下一页</string>
+    <string name="eink_reader_no_prev_page">没有上一页</string>
     <string name="eink_change_source_failed">换源失败</string>
     <string name="eink_change_source_no_result">未找到其它可用书源</string>
 </resources>

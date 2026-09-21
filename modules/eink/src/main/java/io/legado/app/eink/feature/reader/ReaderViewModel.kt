@@ -6,6 +6,7 @@ import android.content.IntentFilter
 import android.net.ConnectivityManager
 import android.net.Network
 import android.os.BatteryManager
+import android.os.SystemClock
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import io.legado.app.eink.R
@@ -181,8 +182,12 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application),
     )
     val uiState: StateFlow<ReaderUiState> = _uiState.asStateFlow()
 
-    private val _messages = MutableSharedFlow<UserMessage>()
+    // 无缓冲流上同步 tryEmit 遇挂起订阅者会静默丢弃；低频提示留 4 格缓冲即可
+    private val _messages = MutableSharedFlow<UserMessage>(extraBufferCapacity = 4)
     val messages: SharedFlow<UserMessage> = _messages.asSharedFlow()
+
+    /** 边界提示节流锚点（[notifyPageBoundary]） */
+    private var lastBoundaryMessageAt = 0L
 
     /** 引擎当前会话已加载的书籍（换源后与路由参数不同，用于识别并采用新书） */
     private var loadedBookUrl: String? = null
@@ -389,14 +394,32 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application),
 
     fun nextPage(): Boolean {
         val moved = engine.nextPage()
-        if (moved) restartAutoPlayCountdown()
+        if (moved) restartAutoPlayCountdown() else notifyPageBoundary(forward = true)
         return moved
     }
 
     fun prevPage(): Boolean {
         val moved = engine.prevPage()
-        if (moved) restartAutoPlayCountdown()
+        if (moved) restartAutoPlayCountdown() else notifyPageBoundary(forward = false)
         return moved
+    }
+
+    /**
+     * 书首/书末再翻的边界提示，对照宿主 `ReadBookController.showComposePageBoundary`
+     * （旧 `PageDelegate` 的 Snackbar）：同款 1.5s 节流防连点连弹——墨水屏上 Toast
+     * 刷新比 Snackbar 更贵，连按音量键不应逐次弹。引擎翻页失败只剩书首/书末一种
+     * 成因（章内无页时会落到翻章，翻章失败即无邻章），无误报窗口。
+     */
+    private fun notifyPageBoundary(forward: Boolean) {
+        val now = SystemClock.uptimeMillis()
+        if (now - lastBoundaryMessageAt < BOUNDARY_MESSAGE_INTERVAL_MS) return
+        lastBoundaryMessageAt = now
+        _messages.tryEmit(
+            UserMessage.from(
+                if (forward) R.string.eink_reader_no_next_page
+                else R.string.eink_reader_no_prev_page
+            )
+        )
     }
 
     /** 跳转到当前章指定页（页内进度条）。 */
@@ -1181,6 +1204,9 @@ internal const val RELAYOUT_DEBOUNCE_MS = 200L
 
 /** 周期进度备份间隔（毫秒），宿主 startBackupJob 同值。 */
 internal const val PROGRESS_BACKUP_INTERVAL_MS = 5 * 60 * 1000L
+
+/** 书首/书末边界提示的节流窗口（毫秒），宿主 boundaryMessageIntervalMillis 同值。 */
+internal const val BOUNDARY_MESSAGE_INTERVAL_MS = 1_500L
 
 /** 自动翻页间隔可调区间（秒），与宿主 autoReadSpeed（默认 10）一致。 */
 internal const val DEFAULT_AUTO_INTERVAL_SEC = 10
