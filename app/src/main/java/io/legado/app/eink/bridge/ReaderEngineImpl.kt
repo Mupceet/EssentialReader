@@ -345,11 +345,25 @@ internal object ReaderEngineImpl : ReaderEngine, KoinComponent {
 
     // ---- 翻页 ----
 
-    override fun nextPage(): Boolean =
-        ReadBook.moveToNextPage() || ReadBook.moveToNextChapter(upContent = true)
+    // 页内翻页只落进度（moveToNextPage/moveToPrevPage 内部的 saveRead），
+    // curPageChanged 携带的阅读时长与预下载由 onComposeManualPageCommitted 补齐
+    // （与宿主 Compose 画布修复的缺口同源）；章末翻章的 moveToNextChapter/
+    // moveToPrevChapter 内部已调 curPageChanged，无需重复补
+    override fun nextPage(): Boolean {
+        if (ReadBook.moveToNextPage()) {
+            ReadBook.onComposeManualPageCommitted()
+            return true
+        }
+        return ReadBook.moveToNextChapter(upContent = true)
+    }
 
-    override fun prevPage(): Boolean =
-        ReadBook.moveToPrevPage() || ReadBook.moveToPrevChapter(upContent = true, toLast = true)
+    override fun prevPage(): Boolean {
+        if (ReadBook.moveToPrevPage()) {
+            ReadBook.onComposeManualPageCommitted()
+            return true
+        }
+        return ReadBook.moveToPrevChapter(upContent = true, toLast = true)
+    }
 
     override fun skipToPage(pageIndex: Int) {
         ReadBook.skipToPage(pageIndex)
