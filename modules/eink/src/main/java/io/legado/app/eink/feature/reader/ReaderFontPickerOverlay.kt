@@ -66,10 +66,9 @@ import kotlinx.coroutines.launch
  *   边距）；选中行按 DS §42 用左侧实心竖条 + 名称加粗（大面积持久反色
  *   残影重），按压仍瞬时反色（§35）；
  * - 打开时定位到当前选中字体所在页（jumpToItemAligned），定位完成前以
- *   surface 色遮盖列表防闪现第一页（同目录页 positioned 先例）；
- * - 底栏「定位到当前」回到选中字体所在页（未选/幽灵选中回第一页，写法同
- *   目录页「回到当前」）；「选择字体文件夹」图标（空心描边版）随时可换
- *   文件夹（SAF），列表即时刷新；
+ *   surface 色遮盖列表防闪现第一页（同目录页 positioned 先例）；打开即
+ *   已在选中位置，底栏不设「定位到当前」入口；「选择字体文件夹」图标
+ *   （空心描边版）随时可换文件夹（SAF），列表即时刷新；
  * - 系统栏避让：顶部用状态栏活值（[topInset]，开关开启期状态栏不在场
  *   为 0，关闭期为真实栏高）；左右/底部
  *   同 readerSystemBarInsets 口径（displayCutout ∪ systemBars）；
@@ -120,16 +119,6 @@ internal fun ReaderFontPickerOverlay(
         {
             scope.launch { pager.pageDown(fontOptions.size) }
             refresh.requestRefresh(EInkRefreshIntent.PageTurn)
-        }
-    }
-
-    // 定位到当前选中字体（未选/幽灵选中回第一页）；写法同目录页「回到当前」
-    // （jumpToItemAligned，不带翻页刷新意图）
-    val locateCurrent: () -> Unit = remember(pager, fontOptions, selectedPath, scope) {
-        {
-            scope.launch {
-                pager.jumpToItemAligned(selectedFontIndex(fontOptions, selectedPath))
-            }
         }
     }
 
@@ -214,11 +203,6 @@ internal fun ReaderFontPickerOverlay(
                 )
             },
             actions = {
-                EInkOperationBarIcon(
-                    icon = painterResource(R.drawable.eink_ic_toc_locate),
-                    contentDescription = "定位到当前字体",
-                    onClick = locateCurrent,
-                )
                 EInkOperationBarIcon(
                     icon = painterResource(R.drawable.eink_ic_folder),
                     contentDescription = "选择字体文件夹",
