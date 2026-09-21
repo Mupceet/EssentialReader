@@ -210,7 +210,7 @@ private fun GroupChip(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         EInkText(
-            text = "${group.name}·${group.bookCount}本",
+            text = "${group.name}(${group.bookCount})",
             style = EInkTheme.typography.bodyMedium,
             color = if (selected) colors.background else colors.onSurface,
             maxLines = 1,
