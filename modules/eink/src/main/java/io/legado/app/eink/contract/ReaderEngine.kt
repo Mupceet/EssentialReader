@@ -412,6 +412,13 @@ interface ReaderEngine {
      * 清除当前章内容缓存并重新加载（正文损坏/编码错乱时用户触发）。
      * 只作用于当前章正文，与追更检查（[refreshToc]）无关——阅读页菜单
      * 的「刷新」动作绑定本方法；目录更新由进书自动触发（[refreshToc]）。
+     *
+     * 宿主实现义务（对齐宿主菜单刷新 MenuRefreshDur 的 clearTextChapter
+     * 语义）：触发即清内存章并使当前章既有分页产物失效——调用返回后
+     * [hasLaidOutPages] 应为 false，直到新内容重排完成经
+     * [ReaderEngineCallback.onContentUpdated] 推送。模块侧在触发时同步
+     * 切入加载态（清页显示「加载数据中…」），若旧分页仍可命中会出现
+     * 「加载提示一闪后旧正文回闪」的中间帧。
      */
     suspend fun refreshCurrentChapter()
 

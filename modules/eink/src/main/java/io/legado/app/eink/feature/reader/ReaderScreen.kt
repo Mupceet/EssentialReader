@@ -71,6 +71,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -1724,14 +1725,22 @@ internal fun ReaderScreen(
                     modifier = Modifier.fillMaxSize(),
                     contentAlignment = Alignment.Center,
                 ) {
+                    // 正文区占位提示随正文字号与文案（宿主 data_loading）：
+                    // 宿主占位/消息页用正文画笔排版，切换正文时字号不跳变
                     EInkText(
-                        text = "加载中…",
+                        text = "加载数据中…",
+                        fontSize = state.style.textSize.sp,
                         color = EInkTheme.colorScheme.onSurfaceVariant,
                     )
                 }
             }
             if (state.error != null) {
-                ErrorView(message = state.error, onRetry = onRetry, onBack = onBack)
+                ErrorView(
+                    message = state.error,
+                    tipFontSize = state.style.textSize.sp,
+                    onRetry = onRetry,
+                    onBack = onBack,
+                )
             }
             }
         if (state.headerVisible) {
@@ -2063,7 +2072,12 @@ private fun AutoPlayProgressBar(active: Boolean, progress: Float) {
 }
 
 @Composable
-private fun ErrorView(message: String, onRetry: () -> Unit, onBack: () -> Unit) {
+private fun ErrorView(
+    message: String,
+    tipFontSize: TextUnit,
+    onRetry: () -> Unit,
+    onBack: () -> Unit,
+) {
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -2071,12 +2085,15 @@ private fun ErrorView(message: String, onRetry: () -> Unit, onBack: () -> Unit) 
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
+        // 正文区错误文案随正文字号（宿主把获取失败等消息当正文排版），
+        // 重试/返回是操作按钮，保持设计系统默认字号
         EInkText(
             text = "加载失败",
-            style = EInkTheme.typography.titleMedium,
+            fontSize = tipFontSize,
         )
         EInkText(
             text = message,
+            fontSize = tipFontSize,
             color = EInkTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(vertical = 8.dp),
         )

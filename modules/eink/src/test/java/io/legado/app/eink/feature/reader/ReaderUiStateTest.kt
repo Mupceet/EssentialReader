@@ -1,5 +1,7 @@
 package io.legado.app.eink.feature.reader
 
+import io.legado.app.eink.contract.ReaderPageSnapshot
+import io.legado.app.eink.contract.ReaderPaintSpec
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -53,5 +55,25 @@ class ReaderUiStateTest {
         assertEquals(10, DEFAULT_AUTO_INTERVAL_SEC)
         assertTrue(MIN_AUTO_INTERVAL_SEC >= 1)
         assertTrue(MAX_AUTO_INTERVAL_SEC >= DEFAULT_AUTO_INTERVAL_SEC)
+    }
+
+    @Test
+    fun `无可渲染页时翻页不可用（刷新与装载窗口）`() {
+        fun page() = ReaderPageSnapshot(
+            title = "章", readProgress = "1/1",
+            titleSpec = ReaderPaintSpec(20f, 0f, null, null),
+            contentSpec = ReaderPaintSpec(20f, 0f, null, null),
+            lines = emptyList(), images = emptyList(),
+        )
+        // 默认态（装载中）：无页 → 翻页动作整体静默
+        assertEquals(false, ReaderUiState().pageTurnAvailable)
+        // isLoading 与无页并存（刷新触发的加载窗口）同样以 page 判据为准
+        assertEquals(false, ReaderUiState(isLoading = true).pageTurnAvailable)
+        // 有可渲染页即恢复翻页
+        assertEquals(true, ReaderUiState(page = page()).pageTurnAvailable)
+        assertEquals(
+            true,
+            ReaderUiState(page = page(), isLoading = false).pageTurnAvailable,
+        )
     }
 }

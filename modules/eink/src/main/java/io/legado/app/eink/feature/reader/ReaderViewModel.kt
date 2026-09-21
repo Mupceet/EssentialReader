@@ -104,6 +104,15 @@ data class ReaderUiState(
     val pageIndicator: String
         get() = if (pageCount > 0) "${pageIndex + 1}/$pageCount" else ""
 
+    /**
+     * 正文区是否存在可渲染页。false = 刷新/装载窗口（引擎内存章与分页
+     * 快照已清）：点按/滑动/自动翻页的翻页动作整体静默——此刻引擎空分页
+     * 下翻章会弃当前重载目标章，边界提示也会误导（对齐宿主：加载消息页
+     * 吞掉导航手势）。
+     */
+    val pageTurnAvailable: Boolean
+        get() = page != null
+
     /** 页数及进度（View 版 pageAndTotal 格式），如 "3/15  12.3%" */
     val pageAndTotal: String
         get() = buildString {
@@ -393,12 +402,15 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application),
     // ==================== 翻页 ====================
 
     fun nextPage(): Boolean {
+        // 刷新/装载窗口（无可渲染页）：静默不翻（判据见 pageTurnAvailable）
+        if (!_uiState.value.pageTurnAvailable) return false
         val moved = engine.nextPage()
         if (moved) restartAutoPlayCountdown() else notifyPageBoundary(forward = true)
         return moved
     }
 
     fun prevPage(): Boolean {
+        if (!_uiState.value.pageTurnAvailable) return false
         val moved = engine.prevPage()
         if (moved) restartAutoPlayCountdown() else notifyPageBoundary(forward = false)
         return moved
@@ -532,6 +544,12 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application),
                 _uiState.update { it.copy(autoPlayProgress = progress) }
                 if (elapsedSec >= interval) {
                     elapsedSec = 0
+                    // 刷新/装载窗口无可渲染页：本拍不翻页、清条重新起算——
+                    // 直连引擎翻章会弃当前重载目标章（判据见 pageTurnAvailable）
+                    if (!_uiState.value.pageTurnAvailable) {
+                        _uiState.update { it.copy(autoPlayProgress = 0f) }
+                        continue
+                    }
                     // 直连引擎而非 nextPage()：自动翻页不触发倒计时重置
                     if (!engine.nextPage()) {
                         stopAutoPlay()
@@ -573,8 +591,16 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application),
      * 刷新当前章节：清除缓存后重新加载（正文损坏/乱码排障用）。
      * 与目录追更检查无关——那是进书自动触发的 refreshToc
      * （10 分钟限频、静默无反馈，规格见 ReaderEngine 契约 KDoc）。
+     *
+     * 对齐宿主菜单刷新（MenuRefreshDur 先 clearTextChapter）：触发即让
+     * 正文区让位「加载数据中…」提示（清页、清错误、进加载态），新内容
+     * 就绪后经 [onContentUpdated] 原位换回——引擎侧同步清内存章与旧分页，
+     * 刷新全程不再是零反馈的死屏。
      */
     fun refreshChapter() {
+        // 无会话书（进书前置失败的错误态）：引擎刷新为空操作，不进加载态
+        if (engine.sessionBook == null) return
+        _uiState.update { it.copy(isLoading = true, page = null, error = null) }
         viewModelScope.launch(Dispatchers.IO) {
             engine.refreshCurrentChapter()
         }
