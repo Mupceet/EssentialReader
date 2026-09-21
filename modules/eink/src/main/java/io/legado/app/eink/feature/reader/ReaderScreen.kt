@@ -11,6 +11,7 @@ import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
@@ -1760,19 +1761,37 @@ internal fun ReaderScreen(
         }
 
         if (topBarVisible) {
+            // 顶避让取「忽略可见性」的固定栏高而非 safeDrawing：show(statusBars)
+            // 的插图回调晚于重组一帧以上，可见性感知的 safeDrawing 在栏显示前
+            // 读 0——顶栏会先画在屏幕顶端、栏高到达后再被顶下来（打开菜单的
+            // 可见跳动）。getInsetsIgnoringVisibility 与状态栏显隐无关，顶栏
+            // 一次定位；刘海顶取恒定的 displayCutout 与之取 max。仅开关开启
+            // （外层 readerSystemBarInsets 置零）时自避让——开关关闭期外层已
+            // 消费 safeDrawing 顶，此处不重复垫
+            val topBarView = LocalView.current
+            val forcedStatusBarTopPx = remember(topBarView) {
+                ViewCompat.getRootWindowInsets(topBarView)
+                    ?.getInsetsIgnoringVisibility(WindowInsetsCompat.Type.statusBars())
+                    ?.top ?: 0
+            }
+            val forcedStatusBarTop = maxOf(
+                WindowInsets.displayCutout.only(WindowInsetsSides.Top)
+                    .asPaddingValues().calculateTopPadding(),
+                with(density) { forcedStatusBarTopPx.toDp() },
+            )
             Box(
                 modifier = Modifier
                     .align(Alignment.TopCenter)
                     .fillMaxWidth()
                     // surface 先铺：开关开启期状态栏被强制显示（见
                     // statusBarHidden），实底从屏幕上缘垫在状态栏图标后方，
-                    // 盖住其后透出的正文首行；随后的 safeDrawing 顶避让经
-                    // 插图消费链取真实栏高——外层已按开关消费 safeDrawing 顶
-                    // （开关关闭期）时此处读到已消费的 0，不二次避让；外层
-                    // 置零（开关开启期）时此处取满栏高，操作条内容落在
-                    // 状态栏下方（图标不再落进状态栏区域不可操作）
+                    // 盖住其后透出的正文首行；随后的固定栏高避让把操作条
+                    // 内容落在状态栏下方（图标不再落进状态栏区域不可操作）
                     .background(EInkTheme.colorScheme.surface)
-                    .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Top))
+                    .then(
+                        if (state.hideStatusBar) Modifier.padding(top = forcedStatusBarTop)
+                        else Modifier
+                    )
             ) {
                 ReaderTopBar(
                     state = state,
