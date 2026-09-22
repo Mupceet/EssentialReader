@@ -41,6 +41,26 @@ internal fun findBookCandidate(
 }
 
 /**
+ * 详情页展示书源名解析（优先级锚定）：
+ * 1. 书籍记录自带的 [Book.originName]（换源/入库时随源写入）；
+ * 2. 书源表按 origin 现查的 bookSourceName（旧记录未回填 originName 的兜底）；
+ * 3. origin 原值（书源 URL，仅最后手段）——本地书（loc_book）不展示，
+ *    返回 null，模块侧跳过该行。
+ */
+internal fun resolveDisplaySource(
+    originName: String,
+    origin: String,
+    lookedUpSourceName: String?,
+): String? = when {
+    originName.isNotBlank() -> originName
+    !lookedUpSourceName.isNullOrBlank() -> lookedUpSourceName
+    // 本地书 origin 可能带路径后缀（loc_book/...），按前缀判别（同
+    // BookDao 本地/网络源的判别口径），网络源 URL 不受影响
+    origin.isNotBlank() && !origin.startsWith(BookType.localTag) -> origin
+    else -> null
+}
+
+/**
  * 书籍详情端口实现：查找链转发 + 目录预取管线（对齐 View 版
  * 详情页的拉取时机）。
  *
@@ -55,6 +75,16 @@ internal object BookDetailEngineImpl : BookDetailEngine {
         displayAuthor = getRealAuthor(),
         displayCover = getDisplayCover(),
         displayIntro = getDisplayIntro(),
+        displaySource = resolveDisplaySource(
+            originName = originName,
+            origin = origin,
+            // originName 已有时不查库：预取管线每次回包都会重映射
+            lookedUpSourceName = if (originName.isBlank()) {
+                appDb.bookSourceDao.getBookSource(origin)?.bookSourceName
+            } else {
+                null
+            },
+        ),
         latestChapterTitle = latestChapterTitle,
         currentChapterTitle = durChapterTitle,
         origin = origin,

@@ -1,5 +1,6 @@
 package io.legado.app.eink.bridge
 
+import io.legado.app.constant.BookType
 import io.legado.app.data.entities.Book
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -93,5 +94,56 @@ class BookDetailEngineImplTest {
         )
         assertNull(result)
         assertEquals(listOf("url", "urlSearch", "nameAuthor", "searchNameAuthor"), steps.calls)
+    }
+
+    @Test
+    fun `书源名优先取记录自带originName`() {
+        assertEquals(
+            "记录名",
+            resolveDisplaySource(
+                originName = "记录名",
+                origin = "https://a.example",
+                lookedUpSourceName = "书源表名",
+            ),
+        )
+    }
+
+    @Test
+    fun `originName空白回退书源表名再回退origin`() {
+        assertEquals(
+            "书源表名",
+            resolveDisplaySource(
+                originName = "",
+                origin = "https://a.example",
+                lookedUpSourceName = "书源表名",
+            ),
+        )
+        assertEquals(
+            "https://a.example",
+            resolveDisplaySource(
+                originName = " ",
+                origin = "https://a.example",
+                lookedUpSourceName = null,
+            ),
+        )
+    }
+
+    @Test
+    fun `本地书不展示书源行`() {
+        assertNull(
+            resolveDisplaySource(
+                originName = "",
+                origin = BookType.localTag,
+                lookedUpSourceName = null,
+            ),
+        )
+        // 本地导入 origin 可能带路径后缀，同样不展示
+        assertNull(
+            resolveDisplaySource(
+                originName = "",
+                origin = "${BookType.localTag}/Books/local.txt",
+                lookedUpSourceName = null,
+            ),
+        )
     }
 }
