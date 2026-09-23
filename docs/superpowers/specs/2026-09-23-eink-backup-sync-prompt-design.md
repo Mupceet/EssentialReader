@@ -51,7 +51,7 @@ data class CloudBackupNewer(
 - `restoreBackup(fileName)`：下载+解压+恢复入 DB（宿主 `WebDavBackupUseCase.restore`，内部 `BackupRestoreLock` 串行）。失败抛异常，message 面向用户，模块直接展示。
 - 模块侧零宿主类型渗透：快照全基元。
 
-注册位：`EInkEngineRegistry.install(...)` 追加 `backupSyncEngine: BackupSyncEngine? = null`（可选参数默认 null，源兼容）；宿主 `EInkBridge.install()` 注册实现。模块版本 0.8.0 起（新能力端口，minor 递增；旧宿主不注册即无行为）。
+注册位：`EInkEngineRegistry.install(...)` 追加 `backupSyncEngine: BackupSyncEngine? = null`（可选参数默认 null；纯新增类型 + 可选参数，无既有成员变更，旧宿主零改动源兼容）；宿主 `EInkBridge.install()` 注册实现。模块版本号随发版流程另行推进，本切片不单独 bump。判定阈值对齐宿主 `android.text.format.DateUtils.MINUTE_IN_MILLIS`（60000ms，框架类型不进纯函数，以字面常量表达）。
 
 ## 3. 宿主实现：BackupSyncEngineImpl + BackupSyncCheckPolicy
 
