@@ -2,19 +2,19 @@ package io.legado.app.eink.bridge
 
 import io.legado.app.constant.AppLog
 import io.legado.app.constant.AppPattern
-import io.legado.app.constant.BookType
 import io.legado.app.data.appDb
 import io.legado.app.data.entities.BookSource
 import io.legado.app.data.entities.SearchBook
-import io.legado.app.domain.gateway.OtherSettingsGateway
-import io.legado.app.domain.gateway.ReadSettingsGateway
+import io.legado.app.domain.gateway.ChangeSourceSettingsGateway
+import io.legado.app.domain.usecase.ChangeBookSourceUseCase
+import io.legado.app.domain.usecase.WebDavBackupUseCase
 import io.legado.app.eink.contract.BookHandle
 import io.legado.app.eink.contract.ChangeSourceBookUiModel
 import io.legado.app.eink.contract.ChangeSourceEngine
 import io.legado.app.eink.contract.ChangeSourceResultUiModel
 import io.legado.app.eink.contract.SearchResultHandle
 import io.legado.app.eink.contract.SourceHandle
-import io.legado.app.help.book.removeType
+import io.legado.app.help.coroutine.Coroutine
 import io.legado.app.model.ReadBook
 import io.legado.app.model.webBook.WebBook
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -36,15 +36,20 @@ internal class SearchResultHandleImpl(val searchBook: SearchBook) : SearchResult
  * 换源端口实现。
  *
  * 本上游差异：searchBookAwait filter 为三参 (name, author, kind: String?)
- * （kind 不参与判定）；migrateTo 需显式传 replaceEnableDefault 与
- * chineseConverterType（对齐 View 版 ChangeBookSourceDialog）；
- * getChapterListAwait 返回 Result。
+ * （kind 不参与判定）；getChapterListAwait 返回 Result。
+ *
+ * 换源落地复用宿主 Compose 换源同一条链（[ChangeBookSourceUseCase.changeTo]，
+ * 迁移项取「换源选项」设置）：migrateInto 迁移（含 remark、进度索引钳制）+
+ * 缓存目录搬移 + 事务化替换 + 阅读时长会话改挂，替代 View 版 migrateTo
+ * 旧管线的对应缺口。
  */
 internal object ChangeSourceEngineImpl : ChangeSourceEngine, KoinComponent {
 
-    private val otherSettingsGateway: OtherSettingsGateway by inject()
+    private val changeSourceSettingsGateway: ChangeSourceSettingsGateway by inject()
 
-    private val readSettingsGateway: ReadSettingsGateway by inject()
+    private val changeBookSourceUseCase: ChangeBookSourceUseCase by inject()
+    private val webDavBackupUseCase: WebDavBackupUseCase by inject()
+
     private val _bookChanged = MutableSharedFlow<String>(extraBufferCapacity = 8)
     override val bookChanged: SharedFlow<String> = _bookChanged.asSharedFlow()
 
@@ -112,28 +117,42 @@ internal object ChangeSourceEngineImpl : ChangeSourceEngine, KoinComponent {
             }
             val toc = WebBook.getChapterListAwait(source, newBook).getOrThrow()
 
-            oldBook.migrateTo(
-                newBook,
-                toc,
-                otherSettingsGateway.currentSettings.replaceEnableDefault,
-                readSettingsGateway.currentSettings.chineseConverterType,
+            changeBookSourceUseCase.changeTo(
+                oldBook = oldBook,
+                newBook = newBook,
+                chapters = toc,
+                options = changeSourceSettingsGateway.currentSettings.migrationOptions(),
             )
-            newBook.removeType(BookType.updateError)
-            oldBook.delete()
-            appDb.bookDao.insert(newBook)
-            appDb.bookChapterDao.insert(*toc.toTypedArray())
 
             // 重载引擎会话；阅读页返回时会采用引擎当前书籍
             ReadBook.resetData(newBook)
             ReadBook.loadContent(resetPageOffset = true)
             // 通知栈下方的详情等界面按新 bookUrl 跟随刷新
             _bookChanged.tryEmit(newBook.bookUrl)
+            refreshCloudBackupAfterChange()
             Result.success(BookHandleImpl(newBook))
         } catch (e: CancellationException) {
             throw e
         } catch (e: Throwable) {
             AppLog.put("换源失败\n${e.localizedMessage}", e)
             Result.failure(e)
+        }
+    }
+
+    /**
+     * 换源即替换：旧源记录此刻已删。云端备份若仍停留在换源前，恢复合并
+     * （按 bookUrl 对齐、只增不删）会把旧源记录当新书插回，书架出现同名
+     * 多本。换源成功后立即走手动备份同链路刷新云端（不受 autoBack 每日
+     * 一闸限制）。WebDAV 不可达（未配置/网络不可用）静默跳过；失败仅记
+     * 日志，不影响换源结果与界面返回。
+     */
+    private fun refreshCloudBackupAfterChange() {
+        Coroutine.async {
+            runCatching { webDavBackupUseCase.getLatestBackup() }.getOrNull()
+                ?: return@async
+            webDavBackupUseCase.backup()
+        }.onError {
+            AppLog.put("换源后刷新云端备份失败\n${it.localizedMessage}", it)
         }
     }
 }
