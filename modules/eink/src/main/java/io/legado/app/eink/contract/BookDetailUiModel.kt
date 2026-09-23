@@ -15,7 +15,7 @@ import io.legado.app.eink.arch.EInkImmutable
  *
  * 宿主实现义务：展示类计算在映射时一次完成——[displayAuthor] 与
  * [displayCover] 是宿主规则下的最终值，模块不再加工；[displayIntro]
- * 无简介时传 null。
+ * 无简介时传 null；[displaySource] 同为映射期终值（本地书传 null）。
  */
 @EInkImmutable
 data class BookDetailUiModel(
@@ -33,6 +33,12 @@ data class BookDetailUiModel(
 
     /** 展示简介（映射期已清洗；无简介为 null）。 */
     val displayIntro: String?,
+
+    /**
+     * 展示书源名（originName 优先、回落书源表名与 origin；本地书/解析不出为 null）。
+     * 2026-09 详情页暂不展示书源（展示位置待定），字段与宿主映射链保留。
+     */
+    val displaySource: String?,
 
     /** 最新章节标题（无则 null）。 */
     val latestChapterTitle: String?,
