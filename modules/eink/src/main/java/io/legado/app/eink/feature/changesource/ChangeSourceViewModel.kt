@@ -51,6 +51,8 @@ data class ChangeSourceUiState(
  * 复用 View 版换源链路（引擎侧迁移管线经 ChangeSourceEngine 端口）：
  * 跨书源并发搜索书名（校验作者）→ 选中后由宿主迁移进度并重载阅读会话。
  * VM 保留并发编排（信号量限流、超时、按到达顺序追加、去重）。
+ * 进入时先读引擎侧历史搜索缓存（对齐宿主 initData 语义），命中即
+ * 直接展示、不重搜；刷新仍走全量搜索。
  */
 class ChangeSourceViewModel(application: Application) : AndroidViewModel(application) {
 
@@ -84,7 +86,23 @@ class ChangeSourceViewModel(application: Application) : AndroidViewModel(applica
             val (handle, book) = found
             bookHandle = handle
             _uiState.update { it.copy(book = book) }
-            startSearch()
+            // 对齐宿主 initData：先读历史搜索缓存，命中即直接展示、不重搜
+            //（换源 VM 随导航条目销毁，缓存是跨进入次数的唯一记忆；
+            // 顶栏刷新仍可强制重新搜索）；未命中才发起全新搜索
+            val cached = engine.cachedSourceBooks(
+                name = book.name,
+                author = book.author,
+                checkAuthor = settings.changeSourceCheckAuthor,
+            )
+            if (cached.isEmpty()) {
+                startSearch()
+            } else {
+                val seen = HashSet<String>()
+                val results = cached.filter {
+                    it.bookUrl != book.bookUrl && seen.add(it.deduplicationKey)
+                }
+                _uiState.update { state -> state.copy(results = results) }
+            }
         }
     }
 
