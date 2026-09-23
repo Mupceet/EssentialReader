@@ -2,6 +2,7 @@ package io.legado.app.eink.app
 
 import android.app.Application
 import android.content.res.Resources
+import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -86,6 +87,23 @@ fun EInkApp(
     // 直接跳过，进行中的检查由 VM 状态承接
     LaunchedEffect(Unit) {
         EInkEngineRegistry.appUpdateEngine?.let(updateViewModel::autoCheckOnStart)
+    }
+
+    // 云端备份启动检查状态的 Activity 级 VM（与 updateViewModel 同作用域）：
+    // 宿主完整模式 MainActivity.backupSync 的 eink 同链——判定/标记全在
+    // 宿主端口侧，未注册端口（companion 宿主）静默跳过
+    val backupSyncViewModel: EInkBackupSyncViewModel = viewModel()
+
+    LaunchedEffect(Unit) {
+        EInkEngineRegistry.backupSyncEngine?.let(backupSyncViewModel::checkOnStart)
+    }
+
+    // 恢复结果一次性 toast：VM 只持状态，展示归组合层
+    val toastContext = LocalContext.current
+    LaunchedEffect(backupSyncViewModel.oneShotNotice) {
+        val notice = backupSyncViewModel.oneShotNotice ?: return@LaunchedEffect
+        Toast.makeText(toastContext, notice, Toast.LENGTH_SHORT).show()
+        backupSyncViewModel.clearNotice()
     }
 
     // 单 Activity 架构：系统返回键优先 pop 导航栈，根页面时交还系统（退出应用）
@@ -331,6 +349,43 @@ fun EInkApp(
                 }
             }
         )
+    }
+
+    // 云端新备份确认弹层：根层渲染、覆盖任意屏幕（宿主 backupSync 的
+    // Activity 级 alert 同形态）；恢复只写 DB，书架流响应式自动刷新，
+    // 不动导航与当前阅读会话
+    val backupSyncEngine = EInkEngineRegistry.backupSyncEngine
+    val backupPrompt = backupSyncViewModel.prompt
+    if (backupPrompt != null && backupSyncEngine != null) {
+        val busy = backupPrompt is BackupSyncPromptState.Restoring
+        val failed = backupPrompt as? BackupSyncPromptState.Failed
+        EInkDialog(
+            onDismiss = { backupSyncViewModel.dismiss() },
+            title = "发现云端新备份",
+            confirmText = when {
+                busy -> "恢复中…"
+                failed != null -> "重试"
+                else -> "恢复"
+            },
+            // 恢复中无确认动作：禁用态承担「忙」提示，收起走「取消」
+            onConfirm = if (busy) null else {
+                { backupSyncViewModel.confirmRestore(backupSyncEngine) }
+            },
+        ) {
+            val info = when (backupPrompt) {
+                is BackupSyncPromptState.Newer -> backupPrompt.info
+                is BackupSyncPromptState.Restoring -> backupPrompt.info
+                is BackupSyncPromptState.Failed -> backupPrompt.info
+            }
+            EInkText(
+                text = buildString {
+                    append("云端备份比本地新，是否恢复？\n")
+                    append("设备：${info.deviceName.ifBlank { "未命名" }}  日期：${info.dateText}")
+                    if (failed != null) append("\n恢复失败：${failed.reason}")
+                },
+                style = EInkTheme.typography.bodyMedium,
+            )
+        }
     }
 }
 
