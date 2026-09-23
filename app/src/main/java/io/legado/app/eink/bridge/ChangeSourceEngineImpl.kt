@@ -38,6 +38,10 @@ internal class SearchResultHandleImpl(val searchBook: SearchBook) : SearchResult
  * 本上游差异：searchBookAwait filter 为三参 (name, author, kind: String?)
  * （kind 不参与判定）；getChapterListAwait 返回 Result。
  *
+ * 搜索缓存与完整模式换源 Sheet 同源同表（searchBooks）：逐源搜索结果
+ * REPLACE 落库，cachedSourceBooks 读同表历史记录——两边的换源互为对方
+ * 预热缓存。
+ *
  * 换源落地复用宿主 Compose 换源同一条链（[ChangeBookSourceUseCase.changeTo]，
  * 迁移项取「换源选项」设置）：migrateInto 迁移（含 remark、进度索引钳制）+
  * 缓存目录搬移 + 事务化替换 + 阅读时长会话改挂，替代 View 版 migrateTo
@@ -73,6 +77,18 @@ internal object ChangeSourceEngineImpl : ChangeSourceEngine, KoinComponent {
             .filter { !it.bookSourceUrl.isBlank() }
             .map { SourceHandleImpl(it) }
 
+    override suspend fun cachedSourceBooks(
+        name: String,
+        author: String,
+        checkAuthor: Boolean,
+    ): List<ChangeSourceResultUiModel> {
+        // 宿主换源 Sheet initData 同语义：读该书名的历史搜索记录，
+        // 只含当前启用书源（DAO 内联过滤）；不校验作者时作者不参与匹配
+        val matchAuthor = if (checkAuthor) author.replace(AppPattern.authorRegex, "") else ""
+        return appDb.searchBookDao.changeSourceByGroup(name, matchAuthor, "")
+            .map { it.toUiModel() }
+    }
+
     override suspend fun searchSourceBook(
         source: SourceHandle,
         name: String,
@@ -81,26 +97,33 @@ internal object ChangeSourceEngineImpl : ChangeSourceEngine, KoinComponent {
     ): List<ChangeSourceResultUiModel> {
         val bookSource = (source as SourceHandleImpl).source
         val strippedAuthor = author.replace(AppPattern.authorRegex, "")
-        return WebBook.searchBookAwait(
+        val searchBooks = WebBook.searchBookAwait(
             bookSource,
             name,
             filter = { fName, fAuthor, _ ->
                 fName == name && (!checkAuthor || fAuthor.contains(strippedAuthor))
             }
-        ).map { searchBook ->
+        ).onEach { searchBook ->
             searchBook.releaseHtmlData()
-            ChangeSourceResultUiModel(
-                handle = SearchResultHandleImpl(searchBook),
-                bookUrl = searchBook.bookUrl,
-                name = searchBook.name,
-                author = searchBook.author,
-                origin = searchBook.origin,
-                originName = searchBook.originName,
-                latestChapter = searchBook.latestChapterTitle,
-                deduplicationKey = searchBook.primaryStr(),
-            )
         }
+        // 逐源结果落库（REPLACE），作为下次进入换源页的历史缓存，
+        // 也与完整模式换源 Sheet 共享同一份缓存数据
+        if (searchBooks.isNotEmpty()) {
+            appDb.searchBookDao.insert(searchBooks)
+        }
+        return searchBooks.map { it.toUiModel() }
     }
+
+    private fun SearchBook.toUiModel(): ChangeSourceResultUiModel = ChangeSourceResultUiModel(
+        handle = SearchResultHandleImpl(this),
+        bookUrl = bookUrl,
+        name = name,
+        author = author,
+        origin = origin,
+        originName = originName,
+        latestChapter = latestChapterTitle,
+        deduplicationKey = primaryStr(),
+    )
 
     override suspend fun changeBookSource(
         bookHandle: BookHandle,
