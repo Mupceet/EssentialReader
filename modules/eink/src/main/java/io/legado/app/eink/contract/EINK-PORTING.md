@@ -42,8 +42,8 @@ EssentialReader 的 fontVariationSettings API 26 处理）。
 │    宿主只实现 onInstallEngines / onExitToFullMode 两钩子，另有可选
 │    UI 字体钩子 uiFontFamily）+ 必填端口 8 个（GlobalSettings 设置端口 +
 │    Bookshelf / Search / Toc / BookDetail / ChangeSource / Cover /
-│    Reader 业务端口，及各自伴生回调与结果类型）+ 可选端口 3 个
-│    （AppUpdate / Marks / BookshelfGroup）+
+│    Reader 业务端口，及各自伴生回调与结果类型）+ 可选端口 4 个
+│    （AppUpdate / Marks / BookshelfGroup / BackupSync）+
 │    EngineHandles（不透明句柄）+ ReaderPageSnapshot（排版产物快照系）+
 │    ReaderTextStyle / ReaderStyleCatalog（排版参数快照与协商目录）
 ├─ app/                             EInkKeyEventHub 按键枢纽 + EInkApp 根
@@ -58,7 +58,7 @@ app/.../eink/（宿主 = 入口子类 + 桥接层，移植时按目标引擎重�
 ├─ EinkMainActivity.kt              入口子类（两钩子 + 可选字体钩子，约 50 行）
 └─ bridge/                          ★ 唯一需要重写的部分：端口实现 + 快照映射
      EInkBridge.kt          装配入口（Registry.install + 设置快照对齐）
-     *EngineImpl（11 个）    各端口实现（3 个可选端口随宿主能力取舍）
+     *EngineImpl（12 个）    各端口实现（4 个可选端口随宿主能力取舍）
      快照映射与支撑          ReaderPageSnapshotMapper、HostStyleCatalog、
                             BookshelfUiMapper / Sorter / StyleMapper、
                             ReaderProgressSyncer / Policy、ReaderStyleMutations、

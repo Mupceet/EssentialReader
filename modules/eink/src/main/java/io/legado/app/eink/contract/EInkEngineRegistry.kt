@@ -15,7 +15,7 @@ import io.legado.app.eink.contract.EInkEngineRegistry.keyEventHub
  * ```text
  * 宿主入口 attachBaseContext
  *    └─ onInstallEngines() ──► 宿主 bridge（如 EInkBridge.install()）
- *                                └─ install(8 个必填端口实现 + 可选 appUpdateEngine / marksEngine / bookshelfGroupEngine)
+ *                                └─ install(8 个必填端口实现 + 可选 appUpdateEngine / marksEngine / bookshelfGroupEngine / backupSyncEngine)
  *                                      └─ 静态注册表整体替换（last-wins）
  *                                             │ keyEventHub 一并重建
  *                                             ▼
@@ -54,6 +54,7 @@ object EInkEngineRegistry {
     private var _appUpdateEngine: AppUpdateEngine? = null
     private var _marksEngine: MarksEngine? = null
     private var _bookshelfGroupEngine: BookshelfGroupEngine? = null
+    private var _backupSyncEngine: BackupSyncEngine? = null
 
     /** 模块自有的按键枢纽（非宿主端口）：每次 install 重置，丢弃陈旧 handler。 */
     private var _keyEventHub = EInkKeyEventHub()
@@ -114,6 +115,14 @@ object EInkEngineRegistry {
     val bookshelfGroupEngine: BookshelfGroupEngine?
         get() = _bookshelfGroupEngine
 
+    /**
+     * 云端备份端口——**可选**端口：未注册 = 宿主无云端备份能力
+     * （companion 宿主的合法状态），启动「发现新备份」检查静默跳过，
+     * 不参与 install 必填校验。
+     */
+    val backupSyncEngine: BackupSyncEngine?
+        get() = _backupSyncEngine
+
     /** 模块自有按键枢纽（入口基类分发、阅读页注册处理器；恒可用）。 */
     val keyEventHub: EInkKeyEventHub
         get() = _keyEventHub
@@ -142,6 +151,8 @@ object EInkEngineRegistry {
      *   笔记 Tab 一起降级，见接口 KDoc）。
      * @param bookshelfGroupEngine 书架分组端口实现（可选，默认 null：
      *   宿主无分组浏览能力时不传，书架选择器不渲染）。
+     * @param backupSyncEngine 云端备份端口实现（可选，默认 null：
+     *   宿主无备份能力时不传，启动「发现云端新备份」检查静默跳过）。
      */
     fun install(
         globalSettings: GlobalSettings,
@@ -155,6 +166,7 @@ object EInkEngineRegistry {
         appUpdateEngine: AppUpdateEngine? = null,
         marksEngine: MarksEngine? = null,
         bookshelfGroupEngine: BookshelfGroupEngine? = null,
+        backupSyncEngine: BackupSyncEngine? = null,
     ) {
         _globalSettings = globalSettings
         _bookshelfEngine = bookshelfEngine
@@ -167,6 +179,7 @@ object EInkEngineRegistry {
         _appUpdateEngine = appUpdateEngine
         _marksEngine = marksEngine
         _bookshelfGroupEngine = bookshelfGroupEngine
+        _backupSyncEngine = backupSyncEngine
         _keyEventHub = EInkKeyEventHub()
     }
 
