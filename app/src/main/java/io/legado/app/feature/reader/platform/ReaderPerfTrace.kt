@@ -10,29 +10,76 @@ import java.util.concurrent.atomic.AtomicInteger
  */
 internal object ReaderPerfTrace {
     private val nextAsyncCookie = AtomicInteger()
+
+    // 纯 JVM 单测里 android.os.Trace 未 mock，首次调用直接抛 RuntimeException。
+    // 追踪只做观测，任何环境都不允许它拖垮被测/调用路径，失败一次后整体降级为 no-op。
+    @Volatile
+    private var tracingUsable = true
+
+    @PublishedApi
+    internal fun begin(name: String) {
+        if (!tracingUsable) return
+        try {
+            Trace.beginSection(name)
+        } catch (e: RuntimeException) {
+            tracingUsable = false
+        }
+    }
+
+    @PublishedApi
+    internal fun end() {
+        if (!tracingUsable) return
+        try {
+            Trace.endSection()
+        } catch (e: RuntimeException) {
+            tracingUsable = false
+        }
+    }
+
+    @PublishedApi
+    internal fun beginAsync(name: String, cookie: Int) {
+        if (!tracingUsable || Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return
+        try {
+            Trace.beginAsyncSection(name, cookie)
+        } catch (e: RuntimeException) {
+            tracingUsable = false
+        }
+    }
+
+    @PublishedApi
+    internal fun endAsync(name: String, cookie: Int) {
+        if (!tracingUsable || Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return
+        try {
+            Trace.endAsyncSection(name, cookie)
+        } catch (e: RuntimeException) {
+            tracingUsable = false
+        }
+    }
+
     inline fun <T> section(name: String, block: () -> T): T {
-        Trace.beginSection("reader.$name")
+        begin("reader.$name")
         return try {
             block()
         } finally {
-            Trace.endSection()
+            end()
         }
     }
 
     suspend fun <T> suspendSection(name: String, block: suspend () -> T): T {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return block()
         val cookie = nextAsyncCookie.incrementAndGet()
-        Trace.beginAsyncSection("reader.$name", cookie)
+        beginAsync("reader.$name", cookie)
         return try {
             block()
         } finally {
-            Trace.endAsyncSection("reader.$name", cookie)
+            endAsync("reader.$name", cookie)
         }
     }
 
     fun marker(name: String) {
-        Trace.beginSection("reader.$name")
-        Trace.endSection()
+        if (!tracingUsable) return
+        begin("reader.$name")
+        end()
     }
 
     fun isEnabled(): Boolean = Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && Trace.isEnabled()
