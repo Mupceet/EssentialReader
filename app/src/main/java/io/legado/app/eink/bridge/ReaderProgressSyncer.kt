@@ -3,6 +3,7 @@ package io.legado.app.eink.bridge
 import android.util.Log
 import io.legado.app.BuildConfig
 import io.legado.app.constant.AppLog
+import io.legado.app.data.appDb
 import io.legado.app.data.entities.Book
 import io.legado.app.data.entities.BookProgress
 import io.legado.app.domain.gateway.BackupSettingsGateway
@@ -33,6 +34,9 @@ private const val LOG_TAG = "EInkProgressSync"
  *
  * 与宿主的等价性要点：
  * - 拉取/上传走 ReadingProgressGateway 的两个 UseCase（不直连 AppWebDav）；
+ * - 同章位置微差不触发确认框：仅章节级超前才弹（宿主字典序把同章 pos
+ *   超前也当冲突提示，形成「每次进书都弹、恢复落在同一页无感」的循环
+ *   ——2026-09-23 eink 侧收口，见 ReaderProgressSyncPolicy.CloudPosAhead）；
  * - ReaderPaused 的「同步+自动备份」整段 DEBUG 构建跳过（宿主 handleOnPause
  *   同位），但 saveRead 无条件先行；BackupTimer 无 DEBUG gate（宿主
  *   startBackupJob 同位）；
@@ -95,7 +99,14 @@ internal class ReaderProgressSyncer(
 
     fun applyCloudProgress(progress: ReaderCloudProgress) {
         scope.launch {
-            val book = ReadBook.book ?: return@launch
+            val book = ReadBook.book ?: run {
+                log("恢复云端：无会话书，放弃")
+                return@launch
+            }
+            log(
+                "恢复云端：应用第${progress.chapterIndex + 1}章 位置${progress.chapterPos}" +
+                    "（本地第${ReadBook.durChapterIndex + 1}章 位置${ReadBook.durChapterPos}）"
+            )
             ReadBook.setProgress(
                 BookProgress(
                     name = book.name,
@@ -145,19 +156,10 @@ internal class ReaderProgressSyncer(
         scope.launch {
             val cloud = fetchCloudProgress(book)
             when (ReaderProgressSyncPolicy.relation(cloud, ReadBook.durChapterIndex, ReadBook.durChapterPos)) {
-                ProgressRelation.CloudAhead -> {
-                    if (!ReaderProgressSyncPolicy.chapterIndexInBounds(
-                            cloud!!.durChapterIndex, book.simulatedTotalChapterNum()
-                        )
-                    ) {
-                        log("进书同步：云端章节越界（${cloud.durChapterIndex}/${book.simulatedTotalChapterNum()}），放弃")
-                        return@launch
-                    }
-                    log("进书同步：云端超前（第${cloud.durChapterIndex + 1}章），弹确认框")
-                    onCloudProgressNewer?.invoke(
-                        ReaderCloudProgress(cloud.durChapterIndex, cloud.durChapterPos)
-                    )
-                }
+                ProgressRelation.CloudAhead ->
+                    notifyCloudAheadOrDrop("进书同步", cloud!!, book)
+                ProgressRelation.CloudPosAhead ->
+                    log("进书同步：云端仅同章位置超前（云端${cloud!!.durChapterPos}/本地${ReadBook.durChapterPos}），忽略")
                 // 相等不动（宿主自动路径无 toast）
                 ProgressRelation.CloudMissing, ProgressRelation.LocalAhead -> {
                     log("进书同步：${if (cloud == null) "云端无进度" else "本地超前"}，上传")
@@ -190,6 +192,8 @@ internal class ReaderProgressSyncer(
                     uploadCurrentProgress()
                 }
                 ProgressRelation.CloudAhead -> log("暂停同步：云端超前，放弃（留待进书确认）")
+                ProgressRelation.CloudPosAhead ->
+                    log("暂停同步：云端仅同章位置超前，不上传（保留云端更靠前位置）")
                 ProgressRelation.Equal -> log("暂停同步：进度一致，不上传")
             }
             Backup.autoBack(appCtx)
@@ -216,19 +220,10 @@ internal class ReaderProgressSyncer(
         scope.launch {
             val cloud = fetchCloudProgress(book)
             when (ReaderProgressSyncPolicy.relation(cloud, ReadBook.durChapterIndex, ReadBook.durChapterPos)) {
-                ProgressRelation.CloudAhead -> {
-                    if (!ReaderProgressSyncPolicy.chapterIndexInBounds(
-                            cloud!!.durChapterIndex, book.simulatedTotalChapterNum()
-                        )
-                    ) {
-                        log("网络恢复同步：云端章节越界，放弃")
-                        return@launch
-                    }
-                    log("网络恢复同步：云端超前（第${cloud.durChapterIndex + 1}章），弹确认框")
-                    onCloudProgressNewer?.invoke(
-                        ReaderCloudProgress(cloud.durChapterIndex, cloud.durChapterPos)
-                    )
-                }
+                ProgressRelation.CloudAhead ->
+                    notifyCloudAheadOrDrop("网络恢复同步", cloud!!, book)
+                ProgressRelation.CloudPosAhead ->
+                    log("网络恢复同步：云端仅同章位置超前，忽略")
                 ProgressRelation.CloudMissing, ProgressRelation.LocalAhead -> {
                     log("网络恢复同步：本地超前或无云端，上传")
                     uploadCurrentProgress()
@@ -249,6 +244,27 @@ internal class ReaderProgressSyncer(
     }
 
     // ---- 内部工具 ----
+
+    /**
+     * 云端超前统一出口（进书/网络恢复两处弹框位）：门槛上界取「模拟阅读
+     * 上界与实时章节行数」的较小值——与 setProgress 的应用守卫同源，只看
+     * 书记录 totalChapterNum 会弹一个确认后应用必被吞掉的恢复框。越界记
+     * 日志放弃，否则通知模块弹确认框。
+     */
+    private fun notifyCloudAheadOrDrop(scene: String, cloud: ReadingProgress, book: Book) {
+        val bound = ReaderProgressSyncPolicy.promptChapterBound(
+            simulatedTotalChapterNum = book.simulatedTotalChapterNum(),
+            liveChapterCount = appDb.bookChapterDao.getChapterCount(book.bookUrl),
+        )
+        if (!ReaderProgressSyncPolicy.chapterIndexInBounds(cloud.durChapterIndex, bound)) {
+            log("$scene：云端章节越界（第${cloud.durChapterIndex + 1}章/共${bound}章），放弃")
+            return
+        }
+        log("$scene：云端超前（第${cloud.durChapterIndex + 1}章），弹确认框")
+        onCloudProgressNewer?.invoke(
+            ReaderCloudProgress(cloud.durChapterIndex, cloud.durChapterPos)
+        )
+    }
 
     private fun consumeChapterJumped(): Boolean {
         val jumped = chapterJumpedSinceEntry
