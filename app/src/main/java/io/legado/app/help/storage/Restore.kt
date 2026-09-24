@@ -85,6 +85,28 @@ object Restore : KoinComponent {
     // 恢复时须归一化，否则同一本书会因 deviceId 不同而显示为两条记录。
     private const val LOCAL_READ_RECORD_DEVICE_ID = ""
 
+    /**
+     * 会话导入判重（纯函数，供单测）：现有行与导入批共用一个已见集，导入
+     * 批内同样去重（幂等）。现有行原样参与比较——与逐条查库时期按本地
+     * deviceId 精确匹配的语义一致，远端分区的同身份行不拦截导入。
+     */
+    internal fun filterPendingReadRecordSessions(
+        existing: List<ReadRecordSession>,
+        incoming: List<ReadRecordSession>,
+    ): List<ReadRecordSession> {
+        val seen = HashSet<String>(existing.size + incoming.size)
+        existing.forEach { seen.add(it.stableFingerprint) }
+        return incoming
+            .map { session ->
+                session.copy(
+                    deviceId = LOCAL_READ_RECORD_DEVICE_ID,
+                    bookName = ReadRecordIdentity.bookName(session.bookName),
+                    bookAuthor = ReadRecordIdentity.author(session.bookAuthor),
+                )
+            }
+            .filter { seen.add(it.stableFingerprint) }
+    }
+
     suspend fun restore(context: Context, uri: Uri) {
         BackupRestoreLock.withLock {
             LogUtils.d(TAG, "开始恢复备份 uri:$uri")
@@ -288,8 +310,8 @@ object Restore : KoinComponent {
                 fileToListT<ReadRecordDetail>(path, "readRecordDetail.json")?.forEach { detail ->
                     try { restoreReadRecordDetail(detail) } catch (_: SQLiteConstraintException) { }
                 }
-                fileToListT<ReadRecordSession>(path, "readRecordSession.json")?.forEach { session ->
-                    try { restoreReadRecordSession(session) } catch (_: SQLiteConstraintException) { }
+                fileToListT<ReadRecordSession>(path, "readRecordSession.json")?.let {
+                    restoreReadRecordSessions(it)
                 }
             }
             reconcileReadRecordAliases()
@@ -465,24 +487,21 @@ object Restore : KoinComponent {
         )
     }
 
-    /** 导入会话时统一到本地分区，并按完整会话身份跳过已有副本。 */
-    private suspend fun restoreReadRecordSession(session: ReadRecordSession) {
-        val localSession = session.copy(
-            deviceId = LOCAL_READ_RECORD_DEVICE_ID,
-            bookName = ReadRecordIdentity.bookName(session.bookName),
-            bookAuthor = ReadRecordIdentity.author(session.bookAuthor)
+    /**
+     * 批量导入会话：统一本地分区后按完整会话身份跳过已有副本。身份判重
+     * 经 [filterPendingReadRecordSessions] 一次读入内存集——readRecordSession
+     * 表无二级索引，逐条查库判重是边插边扫的 O(n²) 全表扫描，数千条会话
+     * 在墨水屏 SoC 上需数十秒。逐条插入保留约束吞掉，单条异常不回滚整批。
+     */
+    private fun restoreReadRecordSessions(sessions: List<ReadRecordSession>) {
+        val pending = filterPendingReadRecordSessions(
+            existing = appDb.readRecordDao.allSession,
+            incoming = sessions,
         )
-        val existing = appDb.readRecordDao.getSession(
-            localSession.deviceId,
-            localSession.bookName,
-            localSession.bookAuthor,
-            localSession.bookUrl,
-            localSession.startTime,
-            localSession.endTime,
-            localSession.words
-        )
-        if (existing == null) {
-            appDb.readRecordDao.insertSession(localSession)
+        pending.forEach { session ->
+            try {
+                appDb.readRecordDao.insertSession(session)
+            } catch (_: SQLiteConstraintException) { }
         }
     }
 
