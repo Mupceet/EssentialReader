@@ -12,12 +12,15 @@ import io.legado.app.eink.contract.TocBookUiModel
 import io.legado.app.eink.contract.TocFetchResult
 import io.legado.app.eink.session.ReaderSessionCache
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
@@ -140,6 +143,18 @@ class TocViewModel(application: Application) : AndroidViewModel(application) {
                         _uiState.update { it.copy(chapters = list) }
                     }
                 }
+            }
+            // 章节缓存落盘跟进（契约 chapterCacheSaved）：持续缓存（CacheBook
+            // 每章成功一发）期间目录页开着也能刷新缓存标记——同书过滤 +
+            // 防抖重枚举（连发时只在实际间隔超过窗口后拉一次，对齐宿主目录
+            // _cachedChapterIndices 的跟进语义）
+            viewModelScope.launch {
+                engine.chapterCacheSaved
+                    .filter { it == book.bookUrl }
+                    .collectLatest {
+                        delay(CHAPTER_CACHE_REFRESH_DEBOUNCE_MS)
+                        refreshCacheFiles()
+                    }
             }
             // 阅读会话预热命中（进阅读页首章出页后已预热）：直读快照——目录/书签/
             // 笔记首帧即完整，不再等 Room 流往返与章节查询；随后跟会话流跟进更新。
@@ -329,3 +344,6 @@ class TocViewModel(application: Application) : AndroidViewModel(application) {
         _uiState.update { it.copy(pendingJump = null) }
     }
 }
+
+/** 缓存标记跟进的防抖窗口（毫秒）：持续缓存连发事件合并为一次重枚举。 */
+internal const val CHAPTER_CACHE_REFRESH_DEBOUNCE_MS = 500L

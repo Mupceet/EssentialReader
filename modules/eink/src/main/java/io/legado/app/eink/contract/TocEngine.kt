@@ -1,6 +1,7 @@
 package io.legado.app.eink.contract
 
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.flow
 
 
@@ -90,6 +91,16 @@ interface TocEngine {
      * 本地书返回空集合（模块视为全部已缓存）。
      */
     suspend fun cachedChapterFileNames(bookUrl: String): Set<String>
+
+    /**
+     * 章节缓存落盘事件流（值 = bookUrl）：缓存管线（CacheBook）每章成功
+     * 一发。目录页过滤同书后防抖重拉 [cachedChapterFileNames]，持续缓存
+     * 期间缓存标记实时跟进——对齐宿主目录 `_cachedChapterIndices` 的同位
+     * 语义（宿主增量维护索引集合，这里防抖整体重枚举）。
+     *
+     * 默认实现 = 空流（旧宿主零改动：标记保持进页快照语义）。
+     */
+    val chapterCacheSaved: Flow<String> get() = emptyFlow()
 
     /**
      * 写回阅读进度到指定章节：更新章节下标与标题、写回章内位置、
