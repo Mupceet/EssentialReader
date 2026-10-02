@@ -1904,13 +1904,15 @@ private fun ReaderHeader(
     extentPx: Float,
 ) {
     val textColor = EInkTheme.colorScheme.onSurfaceVariant
+    val tipTypeface = EInkEngineRegistry.readerEngine.headerFooterTypefaces().header
     val tipStyle = configuredTipTextStyle(
         availablePx = extentPx -
             state.style.headerPaddingTop.dpPx() -
             state.style.headerPaddingBottom.dpPx(),
         configuredSizeSp = state.style.headerSize,
+        typeface = tipTypeface,
     )
-    val tipStyleWithFont = EInkEngineRegistry.readerEngine.headerFooterTypefaces().header
+    val tipStyleWithFont = tipTypeface
         ?.let { tipStyle.copy(fontFamily = FontFamily(it)) }
         ?: tipStyle
     // fillMaxSize：容器已按宿主页眉预留高度定高，行撑满预留区、文字
@@ -1949,13 +1951,15 @@ private fun ReaderHeader(
 private fun ReaderFooter(state: ReaderUiState, extentPx: Float) {
     // 进度条 2dp 是模块自有装饰，不在宿主预留预算内，需先扣减；
     // 字号与页眉统一——按配置字号直接渲染（非 14/20 推导）
+    val tipTypeface = EInkEngineRegistry.readerEngine.headerFooterTypefaces().footer
     val tipStyle = configuredTipTextStyle(
         availablePx = extentPx - 2.dpPx() -
             state.style.footerPaddingTop.dpPx() -
             state.style.footerPaddingBottom.dpPx(),
         configuredSizeSp = state.style.footerSize,
+        typeface = tipTypeface,
     )
-    val tipStyleWithFont = EInkEngineRegistry.readerEngine.headerFooterTypefaces().footer
+    val tipStyleWithFont = tipTypeface
         ?.let { tipStyle.copy(fontFamily = FontFamily(it)) }
         ?: tipStyle
     // fillMaxSize：容器已按宿主页脚预留高度定高，文字行在剩余空间内
@@ -1995,48 +1999,103 @@ private fun ReaderFooter(state: ReaderUiState, extentPx: Float) {
 private fun Int.dpPx(): Float = with(LocalDensity.current) { dp.toPx() }
 
 /**
- * 页眉/页脚文字样式：排版装饰语义——**行高从容器可用高度推导**（宿主
- * 预留 − 配置边距 − 模块进度条），字号按 14/20 的字面/行高比缩放。
- * 两个不变量：
- *  - 恰好放得下：宿主预留的文字预算是按宿主字体度量算的，与本模块
- *    字体无关；行高锚定可用高度保证任何配置（页脚字号/边距/字体缩放）
- *    下都不超出，文字底部不再被裁；
+ * 页眉/页脚文字样式：排版装饰语义——**行盒回归字体自然高度**（lineHeight
+ * 显式 Unspecified，覆盖主题 bodyMedium 钉住的 24sp），字号按 14/20 的
+ * 字面/行高比缩放、再按渲染字体行需求钳制。不变量：
+ *  - 字形完整：固定 lineHeight 小于字体自然行高时，长文本（章节标题
+ *    被 weight 压宽）走 StaticLayout 路径、行盒按 lineHeight 收窄，字形
+ *    下缘被裁（短文本走 BoringLayout、高度即自然行高故完整——同一条带
+ *    左槽被裁右槽正常的根因）。不设 lineHeight 后两条布局路径行为一致，
+ *    字号钳制（[clampTipFontSizeToAvailablePx]）保证自然行高 ≤ 条带
+ *    可用高度，文字垂直居中由容器（Row CenterVertically）完成；
  *  - 像素锚定不随字体缩放：用 Dp.toSp() 换算，应用内字体缩放不放大
  *    页眉/页脚（同正文；正文排版坐标是引擎测量像素）。宿主预留随其
  *    页眉/页脚字号设置变化时，模块文字同步伸缩。
  * 刻意不走 EInkText：其 14sp 下限按 sp 语义钳制，与像素锚定冲突。
  */
 @Composable
-private fun tipTextStyle(availablePx: Float): TextStyle {
+private fun tipTextStyle(
+    availablePx: Float,
+    fontLineRequirementRatio: Float? = null,
+): TextStyle {
     val density = LocalDensity.current
-    val linePx = availablePx.takeIf { it > 0f } ?: with(density) { 23.dp.toPx() }
+    val available = availablePx.takeIf { it > 0f } ?: with(density) { 23.dp.toPx() }
+    val fontPx = clampTipFontSizeToAvailablePx(
+        requestedFontSizePx = available * 14f / 20f,
+        availablePx = available,
+        fontLineRequirementRatio = fontLineRequirementRatio,
+    )
     return EInkTheme.typography.bodyMedium.copy(
-        fontSize = with(density) { (linePx * 14f / 20f).toDp().toSp() },
-        lineHeight = with(density) { linePx.toDp().toSp() },
+        fontSize = with(density) { fontPx.toDp().toSp() },
+        lineHeight = TextUnit.Unspecified,
     )
 }
 
 /**
  * 页眉/页脚文字样式（配置字号渲染）：协商目录字号可见后按配置字号
- * 渲染（配置值按 dp 像素锚定，不随应用内字体缩放），行高锚定条带
- * 可用高度、行内垂直居中——页眉与页脚用同一配置字号（eink 统一写入
- * 两侧），视觉上严格同字号。宿主 extent 本就按同字号的字体度量预留
- * （padding+fontLine+divider），配置字号按构造放得下；模块渲染字体与
- * 宿主字体度量不同时可能轻微越界，但 lineHeight 不裁字形、居中对称，
- * 观感安全。字号缺失或非正（旧宿主桥/极端配置）时回落 [tipTextStyle]
- * 推导。
+ * 渲染（配置值按 dp 像素锚定，不随应用内字体缩放）；行盒回归字体自然
+ * 高度（见 [tipTextStyle]：固定 lineHeight 是同条带左右槽裁切差异的
+ * 根因），配置字号经 [clampTipFontSizeToAvailablePx] 按渲染字体行需求
+ * 钳制，保证自然行高 ≤ 条带可用高度、字形完整。页眉与页脚用同一配置
+ * 字号（eink 统一写入两侧），视觉上严格同字号。字号缺失或非正（旧宿
+ * 主桥/极端配置）时回落 [tipTextStyle] 推导。
  */
 @Composable
-private fun configuredTipTextStyle(availablePx: Float, configuredSizeSp: Int?): TextStyle {
+private fun configuredTipTextStyle(
+    availablePx: Float,
+    configuredSizeSp: Int?,
+    typeface: android.graphics.Typeface?,
+): TextStyle {
     val density = LocalDensity.current
+    // 无字体（"系统默认"且正文/预设均未回落）时，BasicText 用主题默认
+    // （bodyMedium 无 fontFamily → 平台 sans-serif）渲染，按同一字体测行需求。
+    val lineRatio = remember(typeface) {
+        (typeface ?: android.graphics.Typeface.SANS_SERIF).fontLineRequirementRatio()
+    }
     if (configuredSizeSp != null && configuredSizeSp > 0) {
-        val linePx = availablePx.takeIf { it > 0f } ?: with(density) { 23.dp.toPx() }
+        val available = availablePx.takeIf { it > 0f } ?: with(density) { 23.dp.toPx() }
+        val fontPx = clampTipFontSizeToAvailablePx(
+            requestedFontSizePx = with(density) { configuredTipFontSizeSp(configuredSizeSp, density).toPx() },
+            availablePx = available,
+            fontLineRequirementRatio = lineRatio,
+        )
         return EInkTheme.typography.bodyMedium.copy(
-            fontSize = configuredTipFontSizeSp(configuredSizeSp, density),
-            lineHeight = with(density) { linePx.toDp().toSp() },
+            fontSize = with(density) { fontPx.toDp().toSp() },
+            lineHeight = TextUnit.Unspecified,
         )
     }
-    return tipTextStyle(availablePx)
+    return tipTextStyle(availablePx, lineRatio)
+}
+
+/**
+ * 渲染字体的行需求比：每 1px 字号对应的 (bottom − top)——BoringLayout
+ * 与 StaticLayout 的自然行高口径（含 fontPadding 语义），比宿主 extent
+ * 的 (descent − ascent) 更保守，钳制取大口径不会裁字形。测量失败返回 0
+ * （调用侧视为不可钳制，保持请求字号）。
+ */
+internal fun android.graphics.Typeface.fontLineRequirementRatio(): Float = runCatching {
+    val probe = Paint().apply {
+        typeface = this@fontLineRequirementRatio
+        textSize = 100f
+    }
+    (probe.fontMetrics.bottom - probe.fontMetrics.top) / 100f
+}.getOrDefault(0f)
+
+/**
+ * 页眉/页脚字号按渲染字体行需求钳制：行盒高度锚定条带可用高度（宿主预留 −
+ * 模块装饰 − 配置边距），渲染字体（"系统默认"回落正文字体）行需求可超过
+ * 宿主度量字体的预留（外加 2dp 进度条透支），不钳制时单行文字下缘被裁。
+ * 钳制后 行需求 ≤ 可用高度；预算内的字体不受影响。
+ */
+internal fun clampTipFontSizeToAvailablePx(
+    requestedFontSizePx: Float,
+    availablePx: Float,
+    fontLineRequirementRatio: Float?,
+): Float {
+    if (availablePx <= 0f) return requestedFontSizePx
+    val ratio = fontLineRequirementRatio ?: return requestedFontSizePx
+    if (ratio <= 0f) return requestedFontSizePx
+    return minOf(requestedFontSizePx, availablePx / ratio)
 }
 
 /**
