@@ -17,6 +17,7 @@ import io.legado.app.eink.contract.SourceHandle
 import io.legado.app.help.coroutine.Coroutine
 import io.legado.app.model.ReadBook
 import io.legado.app.model.webBook.WebBook
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
@@ -42,12 +43,15 @@ internal class SearchResultHandleImpl(val searchBook: SearchBook) : SearchResult
  * REPLACE 落库，cachedSourceBooks 读同表历史记录——两边的换源互为对方
  * 预热缓存。
  *
- * 换源落地复用宿主 Compose 换源同一条链（[ChangeBookSourceUseCase.changeTo]，
- * 迁移项取「换源选项」设置）：migrateInto 迁移（含 remark、进度索引钳制）+
- * 缓存目录搬移 + 事务化替换 + 阅读时长会话改挂，替代 View 版 migrateTo
- * 旧管线的对应缺口。
+ * 换源落地复用宿主 Compose 换源同一条链（[ChangeBookSourceUseCase.changeTo]）：
+ * 迁移项与正文缓存删留完全按「换源选项」设置（默认删除已下载章节，见
+ * ChangeSourceSettings），migrateInto 迁移（含 remark、进度索引钳制）+
+ * 事务化替换 + 阅读时长会话改挂，替代 View 版 migrateTo 旧管线的对应缺口。
  */
 internal object ChangeSourceEngineImpl : ChangeSourceEngine, KoinComponent {
+
+    /** 换源后目录拉取与首章正文之间的错峰间隔（ms）。 */
+    private const val SOURCE_CHANGE_FIRST_LOAD_GAP_MS = 1_000L
 
     private val changeSourceSettingsGateway: ChangeSourceSettingsGateway by inject()
 
@@ -149,6 +153,10 @@ internal object ChangeSourceEngineImpl : ChangeSourceEngine, KoinComponent {
 
             // 重载引擎会话；阅读页返回时会采用引擎当前书籍
             ReadBook.resetData(newBook)
+            // 错峰：换源前的全源搜索是请求突发，紧接着的首章正文请求常撞上
+            // 源端限流窗口而失败（须手动刷新）。目录拉取与首章正文之间让出
+            // 一个间隔，降低首载失败率；阅读页此刻不在前台，延迟不可见。
+            delay(SOURCE_CHANGE_FIRST_LOAD_GAP_MS)
             ReadBook.loadContent(resetPageOffset = true)
             // 通知栈下方的详情等界面按新 bookUrl 跟随刷新
             _bookChanged.tryEmit(newBook.bookUrl)
