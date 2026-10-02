@@ -606,6 +606,37 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application),
         }
     }
 
+    /** 已自动重试过的失败位置（bookUrl to chapterIndex），同位置只自动重试一次。 */
+    private var autoRetriedFailure: Pair<String, Int>? = null
+
+    private var autoRetryJob: Job? = null
+
+    /**
+     * 正文加载失败自动重试一次：换源/进书后的首章请求常撞上源端限流窗口
+     * （换源前的全源搜索是请求突发），单发重试即可恢复，省掉用户手动刷新。
+     * 仅对正文加载类错误生效（判定见 [ContentRetryPolicy]）；同一书同一章
+     * 只自动重试一次，再失败停在错误态等用户手动处理。
+     */
+    private fun scheduleContentAutoRetry(errorMessage: String) {
+        if (!ContentRetryPolicy.shouldRetry(errorMessage)) return
+        val bookUrl = engine.sessionBookUrl ?: return
+        val chapterIndex = engine.currentChapterIndex
+        if (autoRetriedFailure == bookUrl to chapterIndex) return
+        autoRetriedFailure = bookUrl to chapterIndex
+        autoRetryJob?.cancel()
+        autoRetryJob = viewModelScope.launch {
+            delay(ContentRetryPolicy.RETRY_DELAY_MS)
+            // 仍在同一失败位置且仍无内容页才重试：等待期间用户可能已翻走
+            // 或手动恢复
+            if (engine.sessionBookUrl == bookUrl &&
+                engine.currentChapterIndex == chapterIndex &&
+                !engine.hasLaidOutPages
+            ) {
+                refreshChapter()
+            }
+        }
+    }
+
     /**
      * 缓存章节（当前章起往后）。
      * @param count 向后缓存的章节数；[CACHE_ALL] 表示全本
@@ -1036,6 +1067,7 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application),
             val msg = engine.engineMessage
             if (msg != null) {
                 _uiState.update { it.copy(isLoading = false, error = msg) }
+                scheduleContentAutoRetry(msg)
             }
             success?.invoke()
             return
