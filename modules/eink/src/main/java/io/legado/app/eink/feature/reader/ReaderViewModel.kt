@@ -380,7 +380,9 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application),
      *   内容为 时间（左）+ 电量%（右）
      * - 页脚：默认显示（footerMode 1 隐藏），内容为 章节标题（左）+ 页数及进度（右）
      *
-     * 时间/电量随页面状态更新刷新（翻页时刻），不做周期性重组。
+     * 时间/电量除页面事件（翻页/出页/样式变更）外，由分钟对齐的页眉时钟
+     * 周期刷新（[startHeaderClock]，Activity RESUMED 期间运行）——不翻页
+     * 时页眉时间也会走字。
      */
     private fun updateTipInfo() {
         val app = getApplication<Application>()
@@ -396,6 +398,24 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application),
                 headerTime = engine.formatTimeNow(),
                 batteryPercent = battery,
             )
+        }
+    }
+
+    /**
+     * 页眉时钟：分钟边界对齐周期调用 [updateTipInfo]（时间 HH:mm 随分钟走字，
+     * 电量顺带跟上）。宿主同位是 TIME_TICK 广播（onResume 注册/onPause 注销），
+     * 这里以 Activity RESUMED 门控的协程替代；StateFlow 值去重保证页眉隐藏
+     * 或字段无变化时不触发重组，e-ink 刷新代价为每分钟至多一次页眉小区域。
+     */
+    private var headerClockJob: Job? = null
+
+    private fun startHeaderClock() {
+        if (headerClockJob?.isActive == true) return
+        headerClockJob = viewModelScope.launch {
+            while (isActive) {
+                delay(millisUntilNextMinute(System.currentTimeMillis()))
+                updateTipInfo()
+            }
         }
     }
 
@@ -1145,6 +1165,7 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application),
         super.onCleared()
         stopAutoPlay()
         progressBackupJob?.cancel()
+        headerClockJob?.cancel()
         unregisterNetworkWatcher()
         // 会话缓存随阅读条目一起退场（本 VM 按导航条目作用域：目录/换源压栈时
         // 条目仍在、缓存仍在；条目被 pop/替换时清理订阅，不常驻）
@@ -1166,12 +1187,14 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application),
         activityResumedMark = true
         engine.syncCloudProgress(ReaderSyncTrigger.ReaderResumed)
         registerNetworkWatcher()
+        startHeaderClock()
     }
 
     /** Activity 级暂停（ON_PAUSE）：取消周期备份、同步/上传进度、关初始窗口、停网络监听。 */
     fun onActivityPaused() {
         activityResumedMark = false
         progressBackupJob?.cancel()
+        headerClockJob?.cancel()
         engine.syncCloudProgress(ReaderSyncTrigger.ReaderPaused)
         syncGate.onPaused()
         unregisterNetworkWatcher()
@@ -1277,3 +1300,12 @@ internal const val MAX_AUTO_INTERVAL_SEC = 120
 
 /** 字距档位滑条的实际步进（实际字距 = 步进索引 × [LETTER_SPACING_STEP]）。 */
 internal const val LETTER_SPACING_STEP = 0.05f
+
+/**
+ * 当前时刻到下一分钟边界的延迟（页眉时钟对齐用）：整分时刻不零延迟
+ * （避免同分钟连刷两次），时钟回拨/异常输入钳制在 (0, 60s]。
+ */
+internal fun millisUntilNextMinute(nowMillis: Long): Long {
+    val nextMinute = (nowMillis / 60_000L + 1L) * 60_000L
+    return (nextMinute - nowMillis).coerceIn(1L, 60_000L)
+}
