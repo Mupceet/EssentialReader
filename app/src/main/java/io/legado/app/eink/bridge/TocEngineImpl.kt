@@ -165,6 +165,10 @@ internal object TocEngineImpl : TocEngine {
         return files
     }
 
+    /** 章节缓存落盘事件（对齐宿主目录 _cachedChapterIndices 的事件源）。 */
+    override val chapterCacheSaved: Flow<String> =
+        CacheBook.cacheSuccessFlow.map { it.bookUrl }
+
     override suspend fun saveReadingProgress(
         bookUrl: String,
         chapterIndex: Int,
