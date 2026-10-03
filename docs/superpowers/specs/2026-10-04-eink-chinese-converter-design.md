@@ -87,12 +87,17 @@ eink-lib 侧（路径 `eink-lib/modules/eink/src/main/java/io/legado/app/eink/`�
 └────────────────────────────┘
 ```
 
-- `EInkDialog(onDismiss, title = "简繁转换", onClose = onDismiss, showActions = false)`，
-  content 插槽组合三个单选行（◉/○ 指示符 + 标签，整行 `einkClickable`）。
+- 弹窗组合在 `ReaderScreen` 根 Box 层——`EInkDialog` 组合契约要求全屏容器子级（放进
+  面板卡片等受限容器会使满宽覆盖层被裁剪、点击拦截范围错误）。可见性为 Screen 层
+  `remember` 布尔状态，面板入口行经 `onOpenChineseConverter` 回调置位（`tapZoneEditor`
+  先例）；关闭后回到其它面板展开态（`styleDialog` 同款逐级回退口径）。
+- 弹窗本体 `ReaderChineseConverterDialog`（`ReaderMenus.kt` 组合件，不进 designsystem）：
+  `EInkDialog(onDismiss, title = "简繁转换", onClose, onBackdropClick = dismissToCleanReading,
+  showActions = false)` + content 插槽三个满宽 `EInkButton` 选项行，当前档 `selected`
+  实心反白——字体配置弹窗选项行同款形态，不引入自绘 ◉/○ 新视觉词汇。
 - **点选项即生效并关弹窗**（无确定/取消）——与宿主下拉「选中即应用」语义一致，单选无需确认
-  回路，少一次整屏闪烁。系统返回/×/点弹框外 = `onDismiss` 不改值。
-- 单选行为 `ReaderMenus.kt` 面板私有组合件，不进 designsystem。
-- 弹窗开关状态为面板内 `remember` 局部状态（瞬态 UI 状态，不上提 UiState）。
+  回路，少一次整屏闪烁。系统返回/× = `onDismiss` 回面板不改值；点弹框外空白 =
+  `onBackdropClick` 一次性收起到干净阅读界面（面板一并收起）。
 - 文案统一一套全称（入口行与弹窗共用同一映射函数）：`0 → 关闭`、`1 → 繁体转简体`、
   `2 → 简体转繁体`（与宿主 `values-zh-rCN/arrays.xml` 的 chinese_mode 对齐）。
 
@@ -167,8 +172,12 @@ setChineseConverterType → 写 globalSettings（宿主 pending-overlay 即时�
 ## 8. 测试与验证
 
 - eink-lib 单测（`:modules:eink:testDebugUnitTest`）：
-  - VM：设值 → 写端口 + UiState 更新 + 重排调度；同值短路不触发重排。
-  - 纯函数：档位文案映射（0/1/2 → 关闭/繁体转简体/简体转繁体）。
+  - 契约兼容守护（`ReaderSyncContractCompatTest` 同款）：手写 Legacy fake 只实现既有成员面
+    （编译通过 = 新成员带默认实现零破坏），断言降级语义——恒 0 档、能力 false、写入丢弃
+    不抛。
+  - 纯函数：档位文案映射（0/1/2 → 关闭/繁体转简体/简体转繁体；未识别值回落关闭）。
+  - VM 设值逻辑不落单测——模块无 ReaderViewModel 实例化测试先例（VM 直读注册表），
+    覆盖 = 编译 + 全量模块测试 + 真机；同值短路/重排调度随真机复核。
   - `supportsChineseConverter = false` 的入口行显隐是单行条件渲染，不单测，真机/宿主覆写
     `true` 的事实由装配保证。
 - 宿主主验证集：`.\gradlew.bat testAppDebugUnitTest lintAppDebug verifyConfigArchitecture assembleAppDebug --continue --no-configuration-cache`。
