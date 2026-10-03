@@ -660,18 +660,13 @@ internal fun ReaderOtherPanel(
     onToggleShowReviewBubbles: () -> Unit,
     onOpenTapZones: () -> Unit,
 ) {
+    // 行序按功能域分组：翻页交互 → 界面显示 → 阅读区手势（点击区域设置
+    // 是面板内唯一的子界面入口行，箭头样式与开关行不同，固定收尾避免
+    // 异质样式插在中间；能力门控产生的洞在各宿主上仍保持组结构完整）
     // 音量键翻页纯按键语义（阅读页按键处理器实时读端口值），切换不触发重排
     ToggleRow(label = "音量键翻页", checked = state.volumeKeyPage, onToggle = onToggleVolumeKeyPage)
-    ToggleRow(label = "隐藏状态栏", checked = state.hideStatusBar, onToggle = onToggleHideStatusBar)
-    // 能力门控（0.6.0）：宿主未声明书签能力时隐藏下拉书签开关，
-    // 未声明段评能力时隐藏段评开关——不留点了无效的死开关
-    if (io.legado.app.eink.contract.EInkEngineRegistry.marksEngine?.supportsBookmarks == true) {
-        ToggleRow(label = "下拉添加书签", checked = state.pullDownBookmark, onToggle = onTogglePullDownBookmark)
-    }
-    if (io.legado.app.eink.contract.EInkEngineRegistry.globalSettings.supportsReviewBubbles) {
-        ToggleRow(label = "显示段评气泡", checked = state.showReviewBubbles, onToggle = onToggleShowReviewBubbles)
-    }
-    // 水波纹翻页档位：宿主未注册波纹端口或设备不支持时隐藏（同上能力门控）
+    // 水波纹翻页档位：宿主未注册波纹端口或设备不支持时隐藏（能力门控，
+    // 同下书签/段评——不留点了无效的死开关）
     if (io.legado.app.eink.contract.EInkEngineRegistry.pageTurnEffectEngine?.supported == true) {
         CycleValueRow(
             label = "水波纹翻页动画",
@@ -680,6 +675,14 @@ internal fun ReaderOtherPanel(
                 io.legado.app.eink.contract.PageTurnRippleMode.OFF,
             onClick = onCyclePageTurnRippleMode,
         )
+    }
+    ToggleRow(label = "隐藏状态栏", checked = state.hideStatusBar, onToggle = onToggleHideStatusBar)
+    if (io.legado.app.eink.contract.EInkEngineRegistry.globalSettings.supportsReviewBubbles) {
+        ToggleRow(label = "显示段评气泡", checked = state.showReviewBubbles, onToggle = onToggleShowReviewBubbles)
+    }
+    // 能力门控（0.6.0）：宿主未声明书签能力时隐藏下拉书签开关
+    if (io.legado.app.eink.contract.EInkEngineRegistry.marksEngine?.supportsBookmarks == true) {
+        ToggleRow(label = "下拉添加书签", checked = state.pullDownBookmark, onToggle = onTogglePullDownBookmark)
     }
     OptionRow(label = "点击区域设置", onClick = onOpenTapZones)
 }
