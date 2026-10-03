@@ -58,6 +58,18 @@ data class BookInfoUiState(
     /** 加入书架时发现的疑似重复；非空时由冲突 Sheet 决定共存还是迁移。 */
     val shelfConflict: BookshelfConflict? = null,
     val isResolvingShelfConflict: Boolean = false,
+
+    /**
+     * 书架里同一部作品的**其他**副本（不含本书自身）。
+     *
+     * 两种用途：
+     * - 本书**未入架**且非空：入架会弹冲突 Sheet，书架按钮提前标成冲突态；
+     * - 本书**已入架**且非空：由删除 Sheet 列出，供用户确认没删错副本 / 切到另一个副本。
+     *
+     * 判定口径与 [shelfConflict] 完全一致（同一个用例），因此「按钮是冲突态」⟺「点击真的会
+     * 弹冲突 Sheet」；具体是哪几本仍由点击后的 Sheet 给出。
+     */
+    val shelfDuplicates: ImmutableList<ConflictBookSummary> = persistentListOf(),
     /** 本书是否私密（单本标记 ∪ 所属私密分组）；菜单里"标记/取消私密"读它 */
     val bookPrivate: Boolean = false,
     /** 进入本页时这本书是否需要验证（页面内刚标记私密不会立刻脱敏） */
@@ -90,7 +102,19 @@ data class BookInfoBookUi(
     val durChapterPos: Int,
     val remark: String?,
     val intro: String?,
-)
+) {
+    fun toConflictSummary(): ConflictBookSummary = ConflictBookSummary(
+        bookUrl = bookUrl,
+        name = name,
+        author = author,
+        coverUrl = coverPath,
+        customCoverUrl = null,
+        origin = origin,
+        sourceName = originName.ifBlank { origin },
+        totalChapterNum = totalChapterNum,
+        latestChapterTitle = latestChapterTitle,
+    )
+}
 
 @Stable
 data class BookInfoSourceUi(
@@ -130,6 +154,9 @@ sealed interface BookInfoSheet {
     data object None : BookInfoSheet
     data object CoverPicker : BookInfoSheet
     data object GroupPicker : BookInfoSheet
+
+    /** 已入架书籍的删除 Sheet：其他副本 / 分组 / 删除确认。 */
+    data object ShelfDelete : BookInfoSheet
     data class SourcePicker(val oldBook: Book) : BookInfoSheet
     data object ReadRecord : BookInfoSheet
     data class WebFiles(val openAfterImport: Boolean) : BookInfoSheet
@@ -142,7 +169,6 @@ sealed interface BookInfoSheet {
 }
 
 sealed interface BookInfoDialog {
-    data class DeleteBook(val isLocal: Boolean) : BookInfoDialog
     data class EditRemark(val remark: String?) : BookInfoDialog
     data class PhotoPreview(val path: String) : BookInfoDialog
     data class UnsupportedWebFile(
@@ -186,7 +212,6 @@ sealed interface BookInfoIntent {
     data object ReadRecordClick : BookInfoIntent
     data object RemarkClick : BookInfoIntent
     data class SaveCover(val path: String) : BookInfoIntent
-    data class ConfirmDelete(val deleteOriginal: Boolean) : BookInfoIntent
     data class UpdateRemark(val remark: String) : BookInfoIntent
     data class SelectGroup(val groupId: Long) : BookInfoIntent
     data class SelectCover(val coverUrl: String) : BookInfoIntent
@@ -203,6 +228,12 @@ sealed interface BookInfoIntent {
 
     data object DismissShelfConflict : BookInfoIntent
     data class OpenShelfConflictBook(val summary: ConflictBookSummary) : BookInfoIntent
+
+    /** 删除 Sheet：切到同名同作者的其他副本。 */
+    data class OpenShelfDuplicate(val summary: ConflictBookSummary) : BookInfoIntent
+
+    /** 删除 Sheet：确认删除本书（Sheet 即确认框，不再弹二次确认）。 */
+    data class ShelfDeleteConfirm(val deleteOriginal: Boolean) : BookInfoIntent
     data class CoexistWithShelfConflict(
         val existingBookUrl: String,
         val options: ChangeSourceMigrationOptions,

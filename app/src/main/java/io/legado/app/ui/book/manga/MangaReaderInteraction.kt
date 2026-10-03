@@ -152,3 +152,99 @@ internal fun shouldForceMangaChapterPosition(
 ): Boolean =
     !hasPages || isLoading || currentBookUrl != targetBookUrl ||
         pendingExplicitChapterIndex == targetChapterIndex
+
+/** 条漫预取跟随滑动中的可见页，不提前提交业务阅读进度。 */
+internal fun mangaImagePrefetchIndex(scrollMode: Int, current: Int, visible: Int?): Int =
+    if (scrollMode == io.legado.app.ui.book.manga.config.MangaScrollMode.WEBTOON ||
+        scrollMode == io.legado.app.ui.book.manga.config.MangaScrollMode.WEBTOON_WITH_GAP
+    ) visible ?: current
+    else current
+
+/** 列表可同时含前后章节；只准备实际当前章，当前页及附近页先执行，剩余页持续排队。 */
+internal fun mangaChapterPrefetchPages(
+    items: List<MangaReaderItemUi>, current: Int, fallbackChapter: Int,
+): List<MangaReaderItemUi.Page> {
+    val visible = items.getOrNull(current) as? MangaReaderItemUi.Page
+    val chapter = visible?.chapterIndex ?: fallbackChapter
+    val pages =
+        items.filterIsInstance<MangaReaderItemUi.Page>().filter { it.chapterIndex == chapter }
+    val anchor = visible?.pageIndex ?: pages.firstOrNull()?.pageIndex ?: return emptyList()
+    return pages.sortedWith(compareBy<MangaReaderItemUi.Page> { kotlin.math.abs(it.pageIndex - anchor) }
+        .thenBy { if (it.pageIndex >= anchor) 0 else 1 })
+}
+
+/** 缩放后的滚动偏移保留手势下的原图坐标；未知占位和固定高度章节项不按图片缩放。 */
+internal fun mangaWebtoonZoomAnchor(
+    visible: List<Triple<String, Int, Int>>,
+    focalY: Float,
+    knownSizes: Set<String>,
+    zoomRatio: Float,
+    panY: Float = 0f,
+): Pair<String, Int>? {
+    if (!zoomRatio.isFinite() || zoomRatio <= 0f || !focalY.isFinite() || !panY.isFinite()) return null
+    val item = visible.firstOrNull {
+        it.first in knownSizes && focalY >= it.second && focalY < it.second.toLong() + it.third
+    } ?: return null
+    val offset = (focalY - item.second) * zoomRatio - focalY - panY
+    return item.first to kotlin.math.round(offset).toInt()
+}
+
+/** 高度改变前保持视口中已有图片的位置；未知占位没有可保持的图片内容。 */
+internal fun mangaWebtoonResizeAnchor(
+    visible: List<Triple<String, Int, Int>>,
+    center: Int,
+    knownSizes: Set<String>,
+): Pair<String, Int>? {
+    val candidates = visible.filter { it.first in knownSizes }
+    val anchor = candidates.firstOrNull { center >= it.second && center < it.second + it.third }
+        ?: candidates.minByOrNull { kotlin.math.abs(it.second + it.third / 2 - center) }
+        ?: return null
+    return anchor.first to -anchor.second
+}
+
+/** 滑动期间冻结可见项高度；离屏项仍可准备尺寸，停手后一次重测并恢复锚点。 */
+internal class MangaWebtoonResizeQueue {
+    private val pending = mutableMapOf<String, () -> Unit>()
+
+    fun update(
+        key: String,
+        scrolling: Boolean,
+        visible: Boolean,
+        resize: () -> Unit,
+        apply: (() -> Unit) -> Unit
+    ) {
+        if (scrolling && visible) {
+            pending[key] = resize
+        } else {
+            pending.remove(key)
+            apply(resize)
+        }
+    }
+
+    fun flush(validKeys: Set<String>, apply: (() -> Unit) -> Unit) {
+        val changes = pending.filterKeys { it in validKeys }.values.toList()
+        pending.clear()
+        if (changes.isNotEmpty()) apply { changes.forEach { it() } }
+    }
+}
+
+internal enum class MangaBackAction {
+    DISMISS_DIALOG,
+    DISMISS_SHEET,
+    CLOSE_SETTINGS,
+    HIDE_MENU,
+    CLOSE_READER,
+}
+
+internal fun resolveMangaBackAction(
+    hasActiveDialog: Boolean,
+    hasActiveSheet: Boolean,
+    hasSettingsCategory: Boolean,
+    menuVisible: Boolean,
+): MangaBackAction = when {
+    hasActiveDialog -> MangaBackAction.DISMISS_DIALOG
+    hasActiveSheet -> MangaBackAction.DISMISS_SHEET
+    hasSettingsCategory -> MangaBackAction.CLOSE_SETTINGS
+    menuVisible -> MangaBackAction.HIDE_MENU
+    else -> MangaBackAction.CLOSE_READER
+}

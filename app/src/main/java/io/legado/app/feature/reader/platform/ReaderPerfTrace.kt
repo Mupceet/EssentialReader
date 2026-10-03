@@ -76,8 +76,16 @@ internal object ReaderPerfTrace {
         }
     }
 
+    /**
+     * 归因打点。`marker` 会被放在 composable 体内，每次重组都执行；未开 tracing 时必须尽早
+     * 返回，否则每条 marker 都是两次 `Trace` 静态调用乘以重组次数。
+     * 注意：API < 29 没有 `Trace.isEnabled()`，这里随之整体跳过（与 suspendSection 一致）。
+     */
     fun marker(name: String) {
-        if (!tracingUsable) return
+        // isEnabled 前置（上游：marker 在 composable 体内每次重组执行，未开 tracing 时
+        // 尽早返回省两次 Trace 静态调用；纯 JVM 单测 SDK_INT=0 在此短路）。begin/end
+        // 内部保留失效软化，Trace 异常环境降级为 no-op 而不拖垮调用方。
+        if (!isEnabled()) return
         begin("reader.$name")
         end()
     }

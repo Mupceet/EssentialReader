@@ -37,6 +37,7 @@ class ChangeSourceSettingsRepository : ChangeSourceSettingsGateway {
                 KEY_MIGRATE_COVER to options.migrateCover,
                 KEY_MIGRATE_CATEGORY to options.migrateCategory,
                 KEY_MIGRATE_REMARK to options.migrateRemark,
+                KEY_MIGRATE_AUTHOR to options.migrateAuthor,
                 KEY_MIGRATE_READ_CONFIG to options.migrateReadConfig,
                 KEY_DELETE_DOWNLOADED_CHAPTERS to options.deleteDownloadedChapters,
             )
@@ -56,6 +57,7 @@ internal fun Preferences.toChangeSourceSettings() = ChangeSourceSettings(
     migrateCover = compatDsBoolean(KEY_MIGRATE_COVER) ?: true,
     migrateCategory = compatDsBoolean(KEY_MIGRATE_CATEGORY) ?: true,
     migrateRemark = compatDsBoolean(KEY_MIGRATE_REMARK) ?: true,
+    migrateAuthor = compatDsBoolean(KEY_MIGRATE_AUTHOR) ?: true,
     migrateReadConfig = compatDsBoolean(KEY_MIGRATE_READ_CONFIG) ?: true,
     // 默认 true：正文缓存按「序号-标题」命中（与源无关），换源搬移会沿用旧源
     // 正文（含坏章）；与 ChangeSourceSettings 数据类默认保持一致
@@ -74,6 +76,7 @@ internal fun ChangeSourceSettings.toPrefMap(): Map<String, Any?> = mapOf(
     KEY_MIGRATE_COVER to migrateCover,
     KEY_MIGRATE_CATEGORY to migrateCategory,
     KEY_MIGRATE_REMARK to migrateRemark,
+    KEY_MIGRATE_AUTHOR to migrateAuthor,
     KEY_MIGRATE_READ_CONFIG to migrateReadConfig,
     KEY_DELETE_DOWNLOADED_CHAPTERS to deleteDownloadedChapters,
 )
@@ -84,5 +87,6 @@ private const val KEY_MIGRATE_GROUP = "migrateGroup"
 private const val KEY_MIGRATE_COVER = "migrateCover"
 private const val KEY_MIGRATE_CATEGORY = "migrateCategory"
 private const val KEY_MIGRATE_REMARK = "migrateRemark"
+private const val KEY_MIGRATE_AUTHOR = "migrateAuthor"
 private const val KEY_MIGRATE_READ_CONFIG = "migrateReadConfig"
 private const val KEY_DELETE_DOWNLOADED_CHAPTERS = "deleteDownloadedChapters"

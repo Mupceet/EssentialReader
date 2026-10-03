@@ -39,23 +39,39 @@ import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.boundsInRoot
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.core.graphics.withSave
 import coil3.compose.AsyncImage
 import coil3.request.ImageRequest
+import io.legado.app.core.ui.morph.BookCoverMorphAnchors
 import io.legado.app.ui.theme.LegadoTheme
 import io.legado.app.ui.theme.LocalAppUiConfiguration
 import org.koin.compose.koinInject
 import io.legado.app.model.BookCover as BookCoverModel
 
 private const val SharedCoverRadiusCacheMaxSize = 256
-private const val DefaultCoverPath = "use_default_cover"
+
+/** 用户在换封面页选的“默认封面”，与空地址一样表示这本书没有真实封面。 */
+internal const val DefaultCoverPath = "use_default_cover"
 private val sharedCoverRadiusCache = mutableStateMapOf<String, Dp>()
+
+/**
+ * 这本书是否有真实封面地址可加载。
+ *
+ * 与 [usesDefaultBookCover] 的区别：这里只看地址本身，不读 Compose 配置，
+ * 因此预热这类非组合场景也能复用同一判定。
+ */
+internal fun isDefaultCoverPath(path: String?): Boolean =
+    path.isNullOrBlank() || path == DefaultCoverPath
 
 /**
  * 封面在源页面的圆角缓存读取入口：封面离开源页面（Visible→Visible 定格）时写入，
@@ -66,9 +82,7 @@ internal fun sharedCoverSourceRadius(sharedCoverKey: String?): Dp? =
 
 @Composable
 internal fun usesDefaultBookCover(path: String?): Boolean {
-    return LocalAppUiConfiguration.current.cover.useDefaultCover ||
-            path.isNullOrBlank() ||
-            path == DefaultCoverPath
+    return LocalAppUiConfiguration.current.cover.useDefaultCover || isDefaultCoverPath(path)
 }
 
 @OptIn(ExperimentalSharedTransitionApi::class)
@@ -189,9 +203,11 @@ fun BookCoverImage(
                     sourceOrigin = sourceOrigin,
                     loadOnlyWifi = coverSettings.loadOnlyOnWifi,
                     crossfade = showLoadingPlaceholder,
-                    memoryCacheKey = sharedCoverKey?.let {
-                        "$it:cover:${memoryCacheKey ?: finalPath}"
-                    } ?: memoryCacheKey ?: finalPath,
+                    memoryCacheKey = coverMemoryCacheKey(
+                        sharedCoverKey = sharedCoverKey,
+                        explicitKey = memoryCacheKey,
+                        path = finalPath,
+                    ),
                     bookUrl = bookUrl,
                     preferCache = preferCache,
                     configure = requestBuilder,
@@ -255,6 +271,9 @@ fun CoilBookCover(
      * 放成兄弟节点的话转场时不会被 overlay 带走，会出现"装饰停在原地、只有封面在飞"。
      */
     overlayContent: (@Composable BoxScope.() -> Unit)? = null,
+    badgeText: String? = null,
+    showBadgeDot: Boolean = false,
+    leftBottomText: String? = null,
 ) {
     val coverSettings = LocalAppUiConfiguration.current.cover
     val isNight = LegadoTheme.isDark
@@ -296,9 +315,30 @@ fun CoilBookCover(
         Modifier
     }
 
+    val coilDensity = LocalDensity.current
     Box(
         modifier = modifier
             .aspectRatio(5f / 7f)
+            .graphicsLayer {
+                alpha = if (BookCoverMorphAnchors.isOriginCoverHidden(sharedCoverKey)) 0f else 1f
+            }
+            .onGloballyPositioned { coordinates ->
+                if (sharedCoverKey != null) {
+                    BookCoverMorphAnchors.report(
+                        key = sharedCoverKey,
+                        bounds = coordinates.boundsInRoot(),
+                        cornerRadiusPx = with(coilDensity) { transitionRadius.toPx() },
+                        bookName = name,
+                        author = author,
+                        coverPath = finalPath ?: path,
+                        sourceOrigin = sourceOrigin,
+                        bookUrl = bookUrl,
+                        badgeText = badgeText,
+                        showBadgeDot = showBadgeDot,
+                        leftBottomText = leftBottomText,
+                    )
+                }
+            }
             .then(
                 with(sharedTransitionScope) {
                     if (this != null && animatedVisibilityScope != null && sharedCoverKey != null) {

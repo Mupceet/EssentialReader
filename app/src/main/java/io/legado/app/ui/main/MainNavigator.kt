@@ -88,6 +88,8 @@ object MainNavigator {
             is MainRouteBookSourceDebug,
             is MainRouteRssSourceDebug -> backStack.add(route)
 
+            MainRouteReadAloudPlayer -> backStack.add(route)
+
             MainRouteHome -> {
                 backStack.clear()
                 backStack.add(MainRouteHome)
@@ -176,18 +178,6 @@ object MainNavigator {
 
             is MainRouteSearchContent -> {
                 backStack.add(route)
-            }
-
-            MainRouteReadAloudPlayer -> {
-                // 单例语义：已在栈上则回到那一层，避免重复按媒体键叠出多个播放界面
-                val existingPlayerIndex = backStack.indexOfLast { it is MainRouteReadAloudPlayer }
-                if (existingPlayerIndex >= 0) {
-                    while (backStack.lastIndex > existingPlayerIndex) {
-                        backStack.removeAt(backStack.lastIndex)
-                    }
-                } else {
-                    backStack.add(route)
-                }
             }
 
             is MainRouteSearch -> {
@@ -345,32 +335,34 @@ object MainNavigator {
         tracker?.onBackStackChanged(backStack)
     }
 
-    fun navigateBack(activity: Activity, backStack: MutableList<NavKey>) {
-        navigateBack(activity, backStack, null)
-    }
-
-    /** [tracker] 非空时同步栈顶快照，供 Activity 级叠层立即重算显隐。 */
     fun navigateBack(
         activity: Activity,
         backStack: MutableList<NavKey>,
-        tracker: MainNavRouteTracker?,
-    ) {
-        if (backNavigationInProgress) {
-            return
+        tracker: MainNavRouteTracker? = null,
+        fromRoute: NavKey? = null,
+    ): Boolean {
+        if (fromRoute != null) {
+            if (backStack.lastOrNull() != fromRoute) {
+                return false
+            }
+        } else if (backNavigationInProgress) {
+            return false
         }
         if (backStack.size > 1) {
             backNavigationInProgress = true
             backStack.removeLastOrNull()
             tracker?.onBackStackChanged(backStack)
+            return true
         } else {
             activity.finish()
+            return true
         }
     }
 
     fun onBackStackChanged() {
         backNavigationResetJob?.cancel()
         backNavigationResetJob = navigationScope.launch {
-            delay(500)
+            delay(100)
             backNavigationInProgress = false
         }
     }

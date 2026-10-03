@@ -2749,6 +2749,7 @@
     <string name="long_press_select_mode">点按项目选择，返回退出</string>
     <string name="confirm_delete_read_record">删除阅读记录？</string>
     <string name="delete_read_record_message">确定要删除这条记录吗？</string>
+    <string name="delete_reading_period_message">确定要删除这个阅读时段吗？该行连续的所有会话（包括其他设备的会话）都会被删除。</string>
     <string name="delete_selected_read_records_message">确定要删除选中的 %1$d 条阅读记录吗？</string>
     <string name="clear_read_records">清空阅读记录</string>
     <string name="clear_read_records_summary">删除全部阅读记录、每日明细和时间线阅读时段记录</string>
@@ -2771,6 +2772,14 @@
     <string name="read_record_repair">修复阅读记录</string>
     <string name="read_record_repair_summary">合并可确定归属的记录，并清理字段完全相同的阅读时段记录</string>
     <string name="operation_failed">操作失败</string>
+    <string name="do_not_remind_again_this_page">本次打开不再提示</string>
+    <string name="do_not_remind_again_long_term">今后不再提醒</string>
+    <string name="restore_delete_confirmation">恢复删除确认</string>
+    <string name="restore_delete_confirmation_summary">删除阅读记录前再次进行确认</string>
+    <string name="delete_confirmation_restored">已恢复删除确认</string>
+    <string name="read_record_deleted">已删除阅读记录</string>
+    <string name="read_records_cleared">已清空阅读记录</string>
+    <string name="read_records_merged">已合并阅读记录</string>
     <string name="merge_read_records_message">将选中的阅读记录合并到“%1$s”/%2$s。</string>
     <string name="merge_read_record_candidate">%1$s / %2$s（%3$s）</string>
     <string name="no_merge_candidates">没有可合并的其它阅读记录</string>
@@ -2937,7 +2946,7 @@
     <string name="clear_voice_binding">清除声音绑定</string>
     <string name="http_tts">HTTP TTS</string>
     <string name="show_read_aloud_capsule">显示朗读胶囊</string>
-    <string name="show_read_aloud_capsule_summary">朗读时在阅读页显示封面、暂停和关闭按钮</string>
+    <string name="show_read_aloud_capsule_summary">在应用内显示朗读控制，授权悬浮窗后可在其他应用上使用。</string>
     <string name="read_aloud_keep_on_exit">退出阅读时继续朗读</string>
     <string name="read_aloud_keep_on_exit_summary">关闭阅读界面后不停朗读，继续在后台播放</string>
     <string name="reset_read_aloud_capsule_position">重置朗读胶囊位置</string>
@@ -3277,7 +3286,7 @@
     <string name="manga_reader_right_to_left">从右到左</string>
     <string name="manga_reader_top_to_bottom">从上到下</string>
     <string name="manga_reader_side_padding">条漫侧边留白</string>
-    <string name="manga_reader_preload_pages">预加载页数</string>
+    <string name="manga_reader_preload_chapter">预加载当前章图片</string>
     <string name="manga_reader_red">红</string>
     <string name="manga_reader_green">绿</string>
     <string name="manga_reader_blue">蓝</string>
@@ -3394,6 +3403,14 @@
     <string name="feature_bookmarks_chapter_fallback">第 %1$d 章</string>
 
     <string name="bookshelf_conflict_title">检测到可能重复的作品</string>
+    <!-- 详情页「加入书架」按钮的冲突态文案（按钮上的文字 / 读屏描述） -->
+    <string name="bookshelf_conflict_hint">疑似重复</string>
+    <string name="bookshelf_conflict_hint_desc">疑似重复，点击加入书架</string>
+    <!-- 已入架书籍的删除 Sheet：其他副本提示与跳转 -->
+    <string name="shelf_duplicate_count">其他 %1$d 个副本</string>
+    <string name="shelf_delete_other_copies_hint">书架中仍保留有该书的其他 %1$d 个副本（来自【%2$s】），删除当前副本不影响其他副本。</string>
+    <string name="shelf_delete_view_copy">查看该副本</string>
+    <string name="shelf_delete_view_copies">查看副本 (%1$d)</string>
     <string name="bookshelf_conflict_existing_title">书架中已有的作品</string>
     <string name="bookshelf_conflict_open_hint">点击卡片查看该作品详情</string>
     <string name="bookshelf_conflict_coexist">共存</string>
@@ -3404,4 +3421,11 @@
     <string name="bookshelf_conflict_migrate_done">已迁移到新的书源</string>
     <string name="bookshelf_conflict_resolve_failed">处理失败，请重试</string>
     <string name="bookshelf_conflict_toc_failed">获取目录失败，已取消迁移，请重试</string>
+    <string name="read_aloud_overlay_permission">允许胶囊显示在其他应用上层</string>
+    <string name="read_aloud_overlay_granted">已授权。朗读运行时可在桌面和其他应用上使用胶囊。</string>
+    <string name="read_aloud_overlay_required">授权后可在桌面和其他应用上使用胶囊，未授权不影响应用内胶囊。</string>
+    <string name="read_aloud_overlay_unavailable">此设备无法打开悬浮窗权限设置。</string>
+    <string name="home_capsule_restore_navigation">恢复导航栏</string>
+    <string name="home_capsule_expand_controls">展开播放控制</string>
+    <string name="home_capsule_chapter">第 %d 章</string>
 </resources>

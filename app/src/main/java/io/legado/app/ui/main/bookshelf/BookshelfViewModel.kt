@@ -28,6 +28,7 @@ import io.legado.app.domain.model.isPrivateBook
 import io.legado.app.domain.model.settings.PrivateAccessSettings
 import io.legado.app.domain.usecase.AddBookUseCase
 import io.legado.app.domain.usecase.BatchCacheDownloadUseCase
+import io.legado.app.domain.usecase.DeleteBooksUseCase
 import io.legado.app.domain.usecase.ExportBookshelfUseCase
 import io.legado.app.domain.usecase.ImportBookshelfUseCase
 import io.legado.app.domain.usecase.RefreshTocUseCase
@@ -93,6 +94,7 @@ class BookshelfViewModel(
     private val updateBooksGroupUseCase: UpdateBooksGroupUseCase,
     private val refreshTocUseCase: RefreshTocUseCase,
     private val addBookUseCase: AddBookUseCase,
+    private val deleteBooksUseCase: DeleteBooksUseCase,
     private val importBookshelfUseCase: ImportBookshelfUseCase,
     private val exportBookshelfUseCase: ExportBookshelfUseCase,
     private val bookshelfSettingsGateway: BookshelfSettingsGateway,
@@ -174,8 +176,9 @@ class BookshelfViewModel(
         }
         .shareIn(viewModelScope, SharingStarted.WhileSubscribed(5000), replay = 1)
 
+    // 与 uiState 同理：常驻订阅，返回书架时首帧就是最新分组，避免补一次跳动
     val allGroupsFlow: StateFlow<List<BookGroup>> = bookGroupRepository.flowAll()
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
     /**
      * 解锁态：进程内有效，重启应用即回到锁定。Eagerly 是为了点击时能同步读到当前值，
@@ -718,9 +721,14 @@ class BookshelfViewModel(
             themeColor = themeSettings.themeColor,
             pendingUploadUrl = pendingUploadUrl,
         )
+        // 常驻订阅：进入阅读页后 UI 停止收集，若让上游在超时后停掉，返回书架的前几帧
+        // 读到的仍是「阅读前」那一版排序，等 Room 重新查询到达再跳一次，重排就发生在
+        // 书架已经可见之后。管道挂在 viewModelScope（ViewModel 随返回栈条目存活），
+        // 因此返回首帧即是最新排序。与 komikku 的 LibraryScreenModel 同思路：
+        // 状态管道由 ScreenModel/ViewModel 自己持有，不随 UI 订阅启停。
     }.stateIn(
         viewModelScope,
-        SharingStarted.WhileSubscribed(5000),
+        SharingStarted.Eagerly,
         BookshelfUiState(
             settings = initialSettings,
             selectedGroupId = initialSettings.saveTabPosition,
@@ -798,6 +806,7 @@ class BookshelfViewModel(
             is BookshelfIntent.SetInFolderRoot -> setInFolderRoot(intent.value)
             is BookshelfIntent.MoveBooksToGroup -> moveBooksToGroup(intent.bookUrls, intent.groupId)
             is BookshelfIntent.DownloadBooks -> downloadBooks(intent.bookUrls, intent.allChapters)
+            is BookshelfIntent.DeleteBooks -> deleteBooks(intent.bookUrls, intent.deleteOriginal)
             is BookshelfIntent.RefreshBooks -> refreshBooks(intent.books)
             is BookshelfIntent.StartDragging -> startDraggingBooks(intent.books)
             is BookshelfIntent.MoveDragging -> moveDraggingBook(intent.from, intent.to, intent.books)
@@ -1081,6 +1090,21 @@ class BookshelfViewModel(
             }
         }.onError {
             showMessage("批量缓存失败\n${it.localizedMessage}")
+        }
+    }
+
+    fun deleteBooks(bookUrls: Set<String>, deleteOriginal: Boolean) {
+        if (bookUrls.isEmpty()) return
+        execute {
+            deleteBooksUseCase.execute(bookUrls, deleteOriginal)
+        }.onSuccess { deletedBookUrls ->
+            // 已经删掉的书不能继续留在选中集合里，否则下一次批量操作会带上幽灵 url
+            val remaining = selectedBookUrlsFlow.value - deletedBookUrls.toSet()
+            if (remaining.size != selectedBookUrlsFlow.value.size) {
+                selectedBookUrlsFlow.value = remaining
+            }
+        }.onError {
+            showMessage(context.getString(R.string.delete_failed) + "\n" + it.localizedMessage)
         }
     }
 
