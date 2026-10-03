@@ -13,6 +13,7 @@ import io.legado.app.eink.R
 import io.legado.app.eink.arch.UserMessage
 import io.legado.app.eink.contract.EInkEngineRegistry
 import io.legado.app.eink.contract.FallbackReaderStyleCatalog
+import io.legado.app.eink.contract.PageTurnRippleMode
 import io.legado.app.eink.contract.ReaderBookSnapshot
 import io.legado.app.eink.contract.ReaderCloudProgress
 import io.legado.app.eink.contract.ReaderEngineCallback
@@ -80,6 +81,13 @@ data class ReaderUiState(
     val volumeKeyPage: Boolean = false,
     /** 阅读区竖直下拉添加书签开关（E-InK 自有偏好，默认关；关闭时下拉手势只吞并不动作）。 */
     val pullDownBookmark: Boolean = false,
+    /**
+     * 水波纹翻页档位（E-InK 自有偏好，默认关）：开启档位下前进/后退
+     * 翻页分别以不同方向的硬件波纹刷新。能力门控——宿主未注册
+     * PageTurnEffectEngine 或声明不支持时，档位行不渲染、本字段恒为
+     * 存储值且翻页不触发效果。
+     */
+    val pageTurnRippleMode: PageTurnRippleMode = PageTurnRippleMode.OFF,
     /** 隐藏状态栏（转发完整模式同键阅读设置；开启后页眉接管 时间/电量）。 */
     val hideStatusBar: Boolean = false,
     /** 段评气泡参与排版（转发完整模式同键阅读设置；切换触发重排）。 */
@@ -174,6 +182,7 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application),
             ReaderUiState(
                 volumeKeyPage = EInkEngineRegistry.globalSettings.volumeKeyPage,
                 pullDownBookmark = EInkEngineRegistry.globalSettings.pullDownBookmark,
+                pageTurnRippleMode = EInkEngineRegistry.globalSettings.pageTurnRippleMode,
                 hideStatusBar = EInkEngineRegistry.globalSettings.hideStatusBar,
                 showReviewBubbles = EInkEngineRegistry.globalSettings.showReviewBubbles,
                 tapZones = ReaderTapZoneGrid.decodeOrDefault(
@@ -424,6 +433,7 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application),
     fun nextPage(): Boolean {
         // 刷新/装载窗口（无可渲染页）：静默不翻（判据见 pageTurnAvailable）
         if (!_uiState.value.pageTurnAvailable) return false
+        preparePageTurnEffect(forward = true)
         val moved = engine.nextPage()
         if (moved) restartAutoPlayCountdown() else notifyPageBoundary(forward = true)
         return moved
@@ -431,9 +441,25 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application),
 
     fun prevPage(): Boolean {
         if (!_uiState.value.pageTurnAvailable) return false
+        preparePageTurnEffect(forward = false)
         val moved = engine.prevPage()
         if (moved) restartAutoPlayCountdown() else notifyPageBoundary(forward = false)
         return moved
+    }
+
+    /**
+     * 水波纹翻页效果（档位非关且宿主声明支持时）：必须在 engine 翻页的
+     * 状态提交**之前**调用——强制波形只作用于下一个提交帧（契约见
+     * [io.legado.app.eink.contract.PageTurnEffectEngine]）。已知局限：书
+     * 首/书末再翻不落新页时效果被随后的边界提示帧消费；章界翻章先落
+     * 装载占位帧时同样会被中间帧消费（qianshang 同款行为，真机复核项）。
+     */
+    private fun preparePageTurnEffect(forward: Boolean) {
+        val mode = _uiState.value.pageTurnRippleMode
+        if (mode == PageTurnRippleMode.OFF) return
+        EInkEngineRegistry.pageTurnEffectEngine
+            ?.takeIf { it.supported }
+            ?.preparePageTurn(forward, mode)
     }
 
     /**
@@ -571,6 +597,8 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application),
                         continue
                     }
                     // 直连引擎而非 nextPage()：自动翻页不触发倒计时重置
+                    //（水波纹效果仍按页触发，与手动翻页一致）
+                    preparePageTurnEffect(forward = true)
                     if (!engine.nextPage()) {
                         stopAutoPlay()
                         _messages.emit(UserMessage.from(R.string.eink_reader_auto_page_end))
@@ -953,6 +981,17 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application),
             EInkEngineRegistry.globalSettings.pullDownBookmark = !it.pullDownBookmark
             it.copy(pullDownBookmark = !it.pullDownBookmark)
         }
+    }
+
+    /**
+     * 水波纹翻页档位（E-InK 自有偏好，默认关）：写入 + 乐观更新，翻页时
+     * 实时读 UiState。点按循环 关闭→慢速→标准→快速→关闭。
+     */
+    fun cyclePageTurnRippleMode() {
+        val current = EInkEngineRegistry.globalSettings.pageTurnRippleMode
+        val next = PageTurnRippleMode.entries[(current.ordinal + 1) % PageTurnRippleMode.entries.size]
+        EInkEngineRegistry.globalSettings.pageTurnRippleMode = next
+        _uiState.update { it.copy(pageTurnRippleMode = next) }
     }
 
     /**

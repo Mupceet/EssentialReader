@@ -79,6 +79,27 @@ interface GlobalSettings {
     var pullDownBookmark: Boolean
 
     /**
+     * 水波纹翻页档位（E-InK 自有界面偏好，完整模式无对应设置）。
+     *
+     * 四档：关闭（默认）/慢速/标准/快速（[PageTurnRippleMode]）。开启
+     * 档位下前进/后退翻页分别以不同扫入方向的硬件波纹刷新；能力门控
+     * ——宿主未注册 [PageTurnEffectEngine] 或设备不支持时，档位行不
+     * 渲染，本键读写不被触达。
+     *
+     * 可写（阅读界面「其它设置」面板档位行循环切换）：同步落盘写入；
+     * 消费在阅读 VM 翻页时实时读 UiState 快照（切换乐观更新），无
+     * 一致性窗口。嵌入式宿主以自有键 `einkPageTurnRippleMode`
+     * （存储值 "off"/"slow"/"standard"/"fast"）存宿主侧自有 prefs
+     * 文件（同 [pullDownBookmark] 的存储位约定）。
+     *
+     * 默认实现（旧宿主）getter 恒返回 OFF、写入丢弃：行为不回退，
+     * 设置不持久化（档位行本就不渲染）。
+     */
+    var pageTurnRippleMode: PageTurnRippleMode
+        get() = PageTurnRippleMode.OFF
+        set(value) {}
+
+    /**
      * 阅读页隐藏系统状态栏（转发宿主阅读设置，与完整模式「隐藏状态栏」
      * 同键共享存储）。
      *

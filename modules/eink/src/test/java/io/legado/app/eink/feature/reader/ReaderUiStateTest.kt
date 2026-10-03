@@ -1,5 +1,6 @@
 package io.legado.app.eink.feature.reader
 
+import io.legado.app.eink.contract.PageTurnRippleMode
 import io.legado.app.eink.contract.ReaderPageSnapshot
 import io.legado.app.eink.contract.ReaderPaintSpec
 import org.junit.Assert.assertEquals
@@ -55,6 +56,11 @@ class ReaderUiStateTest {
         assertEquals(10, DEFAULT_AUTO_INTERVAL_SEC)
         assertTrue(MIN_AUTO_INTERVAL_SEC >= 1)
         assertTrue(MAX_AUTO_INTERVAL_SEC >= DEFAULT_AUTO_INTERVAL_SEC)
+    }
+
+    @Test
+    fun `水波纹翻页档位默认关`() {
+        assertEquals(PageTurnRippleMode.OFF, ReaderUiState().pageTurnRippleMode)
     }
 
     @Test

@@ -655,6 +655,7 @@ internal fun ReaderOtherPanel(
     state: ReaderUiState,
     onToggleVolumeKeyPage: () -> Unit,
     onTogglePullDownBookmark: () -> Unit,
+    onCyclePageTurnRippleMode: () -> Unit,
     onToggleHideStatusBar: () -> Unit,
     onToggleShowReviewBubbles: () -> Unit,
     onOpenTapZones: () -> Unit,
@@ -670,7 +671,55 @@ internal fun ReaderOtherPanel(
     if (io.legado.app.eink.contract.EInkEngineRegistry.globalSettings.supportsReviewBubbles) {
         ToggleRow(label = "显示段评气泡", checked = state.showReviewBubbles, onToggle = onToggleShowReviewBubbles)
     }
+    // 水波纹翻页档位：宿主未注册波纹端口或设备不支持时隐藏（同上能力门控）
+    if (io.legado.app.eink.contract.EInkEngineRegistry.pageTurnEffectEngine?.supported == true) {
+        CycleValueRow(
+            label = "水波纹翻页动画",
+            value = pageTurnRippleModeLabel(state.pageTurnRippleMode),
+            selected = state.pageTurnRippleMode !=
+                io.legado.app.eink.contract.PageTurnRippleMode.OFF,
+            onClick = onCyclePageTurnRippleMode,
+        )
+    }
     OptionRow(label = "点击区域设置", onClick = onOpenTapZones)
+}
+
+/** 水波纹档位界面文案（枚举 → 关/慢速/标准/快速；关闭档与面板其它开关行的「关」一致）。 */
+private fun pageTurnRippleModeLabel(mode: io.legado.app.eink.contract.PageTurnRippleMode): String =
+    when (mode) {
+        io.legado.app.eink.contract.PageTurnRippleMode.OFF -> "关"
+        io.legado.app.eink.contract.PageTurnRippleMode.SLOW -> "慢速"
+        io.legado.app.eink.contract.PageTurnRippleMode.STANDARD -> "标准"
+        io.legado.app.eink.contract.PageTurnRippleMode.FAST -> "快速"
+    }
+
+/**
+ * 循环档位行：形态同 [ToggleRow]——标签在左（纯展示），档位按钮在右
+ * （[EInkButton]，文案随当前档位，如 关/慢速/标准/快速），点按按钮
+ * 循环切下一档；选中态（实心反白）= 非关闭档。
+ */
+@Composable
+private fun CycleValueRow(label: String, value: String, selected: Boolean, onClick: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(48.dp)
+            .padding(start = EInkSpacing.m, end = EInkSpacing.m + EInkSpacing.s),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        EInkText(
+            text = label,
+            modifier = Modifier.weight(1f),
+            style = EInkTheme.typography.bodyMedium,
+        )
+        EInkButton(
+            text = value,
+            onClick = onClick,
+            modifier = Modifier.width(64.dp),
+            height = 44.dp,
+            selected = selected,
+        )
+    }
 }
 
 // ====================================================================
