@@ -44,7 +44,7 @@ sealed interface TocFetchResult {
  *       └─ observeChapters(bookUrl) ─► 章节表后续变化跟进
  *                                      （阅读页追更入库后目录自动更新）
  *  cachedChapterFileNames(bookUrl) ─► 章节缓存标记
- *  点击章节 ─► saveReadingProgress(bookUrl, index, title) ─► 跳转阅读页
+ *  点击章节 ─► jumpTarget（与书签/笔记同链路）─► 先落库，再直跳/导航
  * ```
  *
  * 职责边界：模块目录页 VM 保留加载状态机与错误文案；宿主实现负责
@@ -106,7 +106,9 @@ interface TocEngine {
      * 写回阅读进度到指定章节：更新章节下标与标题、写回章内位置、
      * 刷新阅读时间（书架排序依据）。
      *
-     * [chapterPos] 为无会话路径的书签/笔记跳转落点，0 = 重置到章首。
+     * [chapterPos] 为跳转落点（0 = 重置到章首）。有活动会话的直跳路径
+     * 也先经本方法落库（suspend 完成后才执行跳转与导航）：保证阅读页
+     * 重挂载重读进度时必得新值，跳章不被回滚。
      */
     suspend fun saveReadingProgress(
         bookUrl: String,

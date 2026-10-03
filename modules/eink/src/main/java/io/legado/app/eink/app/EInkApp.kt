@@ -254,19 +254,10 @@ fun EInkApp(
                             TocRoute(
                                 bookUrl = screen.bookUrl,
                                 onBack = { controller.pop() },
-                                onOpenReader = { bookUrl ->
-                                    if (screen.fromReader) {
-                                        // 复用下方既有阅读页：弹出目录即可，
-                                        // 阅读页重新挂载时按新保存的进度跳章
-                                        controller.pop()
-                                    } else {
-                                        // 详情页等路径：目录出栈、阅读页入栈，返回回到详情页
-                                        controller.replaceTop(EInkScreen.Reader(bookUrl))
-                                    }
-                                },
-                                // 书签跳转：引擎动作已由 TocRoute 完成，此处只做导航
-                                //（书签 / 划线 / 想法同一条链路；fromReader 同
-                                // onOpenReader 的复用语义）
+                                // 章节 / 书签 / 划线 / 想法共用同一条跳转链路：
+                                // 引擎动作（先落库、有会话再直跳）已由 TocRoute
+                                // 完成，此处只做导航（fromReader 复用下方既有
+                                // 阅读页；详情等路径目录出栈、阅读页入栈）
                                 onJumpToLocation = {
                                     if (screen.fromReader) {
                                         controller.pop()

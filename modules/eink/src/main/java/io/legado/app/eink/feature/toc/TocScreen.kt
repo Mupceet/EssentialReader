@@ -23,7 +23,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -135,7 +134,6 @@ private val CardBodyGap = EInkSpacing.s
 fun TocRoute(
     bookUrl: String,
     onBack: () -> Unit,
-    onOpenReader: (String) -> Unit = {},
     onJumpToLocation: (JumpResolution.Located) -> Unit = {},
     viewModel: TocViewModel = viewModel(),
 ) {
@@ -209,20 +207,22 @@ fun TocRoute(
         }
     }
 
-    // 跳转目标：有会话即时跳章；无会话（详情等路径进入）落进度含章内位置，
-    // 导航后阅读页装载时落位；引擎动作完成后 [onJumpToLocation] 只做导航
+    // 跳转目标（章节 / 书签 / 划线 / 想法同一条链路）：先落库（suspend
+    // 完成后才继续），再按会话直跳或仅落库，最后交 [onJumpToLocation]
+    // 做纯导航。顺序关键：ReadBook.openChapter 内部的进度落库是异步
+    // 投递，若不先同步落库，pop 后阅读页 attach 的 resolveBook 可能读到
+    // 旧进度，把内存直跳回滚成原章节——这正是「点目录跳不过去」的
+    // 竞态根因之一
     LaunchedEffect(viewModel, bookUrl, onJumpToLocation) {
         viewModel.jumpTarget.collect { target ->
-            val reader = EInkEngineRegistry.readerEngine
-            if (reader.sessionBookUrl == bookUrl) {
-                reader.jumpToPosition(target.chapterIndex, target.chapterPos)
-            } else {
-                val chapterTitle = viewModel.uiState.value.chapters
-                    .getOrNull(target.chapterIndex)?.title ?: ""
-                EInkEngineRegistry.tocEngine.saveReadingProgress(
-                    bookUrl, target.chapterIndex, chapterTitle, target.chapterPos,
-                )
-            }
+            val chapterTitle = viewModel.uiState.value.chapters
+                .getOrNull(target.chapterIndex)?.title ?: ""
+            EInkEngineRegistry.tocEngine.saveReadingProgress(
+                bookUrl, target.chapterIndex, chapterTitle, target.chapterPos,
+            )
+            EInkEngineRegistry.readerEngine
+                .takeIf { it.sessionBookUrl == bookUrl }
+                ?.jumpToPosition(target.chapterIndex, target.chapterPos)
             onJumpToLocation(target)
         }
     }
@@ -377,11 +377,7 @@ fun TocRoute(
                 }
             }
         },
-        onChapterClick = { index ->
-            viewModel.openChapter(index) {
-                onOpenReader(bookUrl)
-            }
-        },
+        onChapterClick = viewModel::onChapterClick,
         onToggleReverse = viewModel::toggleReverse,
         onTabSelect = viewModel::selectTab,
         onBookmarkClick = viewModel::onBookmarkClick,
@@ -600,9 +596,10 @@ private fun ChapterList(
     onPageDown: () -> Unit,
     onChapterClick: (Int) -> Unit,
 ) {
-    // 展示项携带真实索引，避免倒序/过滤后索引错位
-    val display: List<Pair<Int, ChapterUiModel>> = state.displayChapters
-        .mapIndexed { index, chapter -> index to chapter }
+    // 展示项自带真实章节号（ChapterUiModel.index）：搜索过滤后的列表下标
+    // 与真实章节号错位（mapIndexed 给的是过滤列表内位置），倒序只影响
+    // 展示顺序不改章节号
+    val display: List<ChapterUiModel> = state.displayChapters
         .let { if (state.isReversed) it.asReversed() else it }
 
     // 不支持自由滚动：上下滑动手势识别为整页翻页，与底部 ▲▼ 按钮同一动作
@@ -617,15 +614,15 @@ private fun ChapterList(
                 onPageDown = onPageDown
             )
     ) {
-        itemsIndexed(display, key = { _, (_, chapter) -> chapter.url }) { _, (realIndex, chapter) ->
+        items(display, key = { it.url }) { chapter ->
             ChapterItem(
                 chapter = chapter,
-                isCurrent = realIndex == state.currentChapterIndex,
+                isCurrent = chapter.index == state.currentChapterIndex,
                 // 本地书与卷章节视为已缓存（与 View 版一致）
                 cached = state.isLocalBook
                         || chapter.isVolume
                         || state.cachedFileNames.contains(chapter.fileName),
-                onClick = { onChapterClick(realIndex) }
+                onClick = { onChapterClick(chapter.index) }
             )
         }
     }

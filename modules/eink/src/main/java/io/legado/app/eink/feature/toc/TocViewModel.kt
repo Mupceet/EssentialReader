@@ -274,18 +274,29 @@ class TocViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     /**
-     * 跳转到指定章节：经端口写回进度（从第 1 页开始，重置页内位置），
-     * 完成后回调（用于进入阅读页，保证阅读页读取到已更新的进度）。
+     * 章节点按：经 [jumpTarget] 与书签/笔记同一条链路分发，Route 层统一
+     * 执行「先落库 →（有活动会话）直跳 → 导航」。
+     *
+     * 原实现落库后回调导航，落库与阅读页重挂载重读进度之间无序：迟到的
+     * 暂停同步回写（旧实体整行落库）或重挂载重读旧进度，都会把跳章覆盖
+     * 回原章节，表现为「点目录跳不过去」。
+     *
+     * 校验失败给用户可见提示（原静默返回无任何反馈）。
      */
-    fun openChapter(index: Int, onSaved: (() -> Unit)? = null) {
-        if (_uiState.value.book == null) return
-        val bookUrl = _uiState.value.book!!.bookUrl
-        viewModelScope.launch(Dispatchers.IO) {
-            val chapter = _uiState.value.chapters.getOrNull(index) ?: return@launch
-            engine.saveReadingProgress(bookUrl, index, chapter.title)
-            _uiState.update { it.copy(book = it.book?.copy(currentChapterIndex = index)) }
-            onSaved?.invoke()
+    fun onChapterClick(index: Int) {
+        val state = _uiState.value
+        if (state.book == null) {
+            _messages.tryEmit("目录尚未加载完成")
+            return
         }
+        if (state.chapters.getOrNull(index) == null) {
+            _messages.tryEmit("章节不可用")
+            return
+        }
+        // 乐观跟进当前章高亮（与书签点按后的即时反馈一致）
+        _uiState.update { it.copy(book = it.book?.copy(currentChapterIndex = index)) }
+        // pos = 0：章节跳转重置到章首（原 openChapter 落库语义）
+        _jumpTarget.tryEmit(JumpResolution.Located(chapterIndex = index, chapterPos = 0))
     }
 
     /** 底部操作栏 Tab 切换。 */
