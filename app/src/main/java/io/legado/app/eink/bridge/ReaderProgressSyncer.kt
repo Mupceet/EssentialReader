@@ -14,7 +14,6 @@ import io.legado.app.eink.bridge.ReaderProgressSyncPolicy.ProgressRelation
 import io.legado.app.eink.contract.ReaderCloudProgress
 import io.legado.app.eink.contract.ReaderSyncTrigger
 import io.legado.app.help.book.simulatedTotalChapterNum
-import io.legado.app.help.book.update
 import io.legado.app.help.storage.Backup
 import io.legado.app.model.ReadBook
 import io.legado.app.utils.NetworkUtils
@@ -297,8 +296,11 @@ internal class ReaderProgressSyncer(
             .onFailure { log("上传进度失败\n${it.localizedMessage}") }
             .getOrNull()
         if (uploadTime != null) {
+            // 只窄写 syncTime：整行回写会话内存里的旧 Book 实体会把外部
+            // 进度写入（目录跳章落库等）覆盖回旧章节——上传链路是异步的，
+            // 与进目录触发的暂停同步存在竞态，表现为「点目录跳不过去」
+            appDb.bookDao.upSyncTime(book.bookUrl, uploadTime)
             book.syncTime = uploadTime
-            book.update()
             log("上传进度成功《${book.name}》第${ReadBook.durChapterIndex + 1}章 位置${ReadBook.durChapterPos}")
         } else {
             log("上传进度未生效（未配置 WebDAV/开关关/网络不可用，UseCase 返回 null）")
