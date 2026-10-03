@@ -23,6 +23,7 @@ import androidx.core.view.WindowCompat
 import androidx.lifecycle.lifecycleScope
 import io.legado.app.eink.app.EInkApp
 import io.legado.app.eink.designsystem.theme.EInkTheme
+import io.legado.app.eink.feature.bookshelf.prewarmFirstScreenCovers
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
@@ -48,6 +49,7 @@ import kotlinx.coroutines.launch
  * onCreate
  *  ├─ 启动清理                  ← IO 协程：deleteBooksNotInBookshelf()
  *  ├─ 直达最近阅读解析          ← defaultToRead 开启时 lastReadBookUrl()
+ *  ├─ 首屏封面预热              ← IO 协程：第一页封面进内存缓存（与组合并行）
  *  └─ setContent ─► EInkTheme(深浅 State, uiFontFamily()) { EInkRoot }
  *                        └─ EInkApp 初始栈：[书架] 或 [书架, 阅读页]
  *
@@ -167,6 +169,12 @@ abstract class EInkHostActivity : AppCompatActivity() {
         // 直达阅读同样预取（书架点击路径见 EInkApp.onBookClick）：内容装载
         // 与首帧组合并行，阅读页 attach 时直接消费
         lastReadBookUrl?.let { EInkEngineRegistry.readerEngine.prefetchOpen(it) }
+        // 首屏封面预热（对齐完整模式 BookshelfCoverPreloader 的启动期抢跑）：
+        // 与组合启动并行把书架第一页封面解码进内存缓存，条目组合时走同步
+        // 命中快路径——冷启动少一轮「文字占位→到位重绘」的全页刷新
+        lifecycleScope.launch(Dispatchers.IO) {
+            prewarmFirstScreenCovers(this@EInkHostActivity)
+        }
         setContent {
             EInkTheme(
                 darkTheme = systemDarkTheme.value,
