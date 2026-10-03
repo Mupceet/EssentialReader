@@ -72,17 +72,22 @@ internal class LatestChapterTaskScheduler<K>(
     private fun startLocked(key: K, entry: Entry, request: Request) {
         val token = Any()
         val job = scope.launch(context, start = CoroutineStart.LAZY) {
+            // 终态信号统一在 finally 的簿记之后发出：complete/cancel 先行会让
+            // await() 在 onTaskFinished 清账前恢复，慢速调度器上调用方能观测到
+            // 「任务已完成但 stateOf 仍 running」的窗口（CI 机器人真实可复现）。
+            var signal: ((CompletableDeferred<Unit>) -> Unit)? = null
             try {
                 request.block(this)
-                request.result.complete(Unit)
+                signal = { it.complete(Unit) }
             } catch (error: CancellationException) {
-                request.result.cancel(error)
+                signal = { it.cancel(error) }
                 throw error
             } catch (error: Throwable) {
-                request.result.completeExceptionally(error)
                 onError(key, error)
+                signal = { it.completeExceptionally(error) }
             } finally {
                 onTaskFinished(key, token)
+                signal?.invoke(request.result)
             }
         }
         entry.running = Running(token = token, job = job)
