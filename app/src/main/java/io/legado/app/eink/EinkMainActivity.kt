@@ -2,6 +2,7 @@ package io.legado.app.eink
 
 import android.content.Context
 import android.content.Intent
+import android.content.res.Configuration
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.text.font.FontFamily
@@ -9,6 +10,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.legado.app.constant.PreferKey
 import io.legado.app.domain.gateway.AppUiConfigurationGateway
 import io.legado.app.eink.bridge.EInkBridge
+import io.legado.app.eink.bridge.PageTurnEffectEngineImpl
 import io.legado.app.eink.contract.EInkHostActivity
 import io.legado.app.help.config.AppConfigStore
 import io.legado.app.ui.main.MainIntent
@@ -48,6 +50,21 @@ class EInkMainActivity : EInkHostActivity() {
     override fun onStop() {
         EInkBridge.detachHostActivity(this)
         super.onStop()
+    }
+
+    // ============ 旋转获取链路验证读数（调试） ============
+    // 入口 Manifest 声明了 orientation|screenSize configChanges（旋转不重建），
+    // 且入口包装冻结 resources.configuration——旋转正确性取决于 Display 实时
+    // 查询。这两个钩子在任何设备（含不支持水波纹的）上可触发，logcat 过滤
+    // TAG「PageTurnRipple」查看；R8 release 剥离 Log，仅 debug/noR8 构建输出。
+    override fun onResume() {
+        super.onResume()
+        PageTurnEffectEngineImpl.debugLogRotation("onResume")
+    }
+
+    override fun onConfigurationChanged(newConfig: Configuration) {
+        super.onConfigurationChanged(newConfig)
+        PageTurnEffectEngineImpl.debugLogRotation("onConfigurationChanged")
     }
 
     /**

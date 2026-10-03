@@ -10,6 +10,7 @@ import io.legado.app.domain.gateway.OtherSettingsGateway
 import io.legado.app.domain.gateway.ReadSettingsGateway
 import io.legado.app.eink.contract.EInkEngineRegistry
 import io.legado.app.eink.contract.GlobalSettings
+import io.legado.app.eink.contract.PageTurnRippleMode
 import io.legado.app.help.config.AppConfigStore
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -39,6 +40,10 @@ internal object EinkLegacyPrefsStore {
 
     /** pullDownBookmark 的自有键（默认关）。 */
     const val KEY_PULL_DOWN_BOOKMARK = "einkReaderPullDownBookmark"
+
+    /** 水波纹翻页档位的自有键（"off"/"slow"/"standard"/"fast"，默认 off；
+     * 仅宿主探测到掌阅 EPDC 能力时档位行可见）。 */
+    const val KEY_PAGE_TURN_RIPPLE_MODE = "einkPageTurnRippleMode"
 
     /** 最近文件字体历史的自有键（换行分隔 path 列表，格式见模块侧）。 */
     const val KEY_RECENT_FONTS = "einkRecentFontPaths"
@@ -92,6 +97,7 @@ object EInkBridge {
             marksEngine = MarksEngineImpl,
             bookshelfGroupEngine = BookshelfGroupEngineImpl,
             backupSyncEngine = BackupSyncEngineImpl,
+            pageTurnEffectEngine = PageTurnEffectEngineImpl,
         )
         // 封面开关为快照状态缓存：每次进入 E-Ink 与宿主设置快照对齐，
         // 防止完整模式（或上一会话）修改后的陈旧值
@@ -167,6 +173,18 @@ private object GlobalSettingsImpl : GlobalSettings, KoinComponent {
         set(value) {
             einkLegacyPrefs.edit()
                 .putBoolean(EinkLegacyPrefsStore.KEY_PULL_DOWN_BOOKMARK, value).apply()
+        }
+
+    override var pageTurnRippleMode: PageTurnRippleMode
+        get() = PageTurnRippleMode.entries.firstOrNull {
+            it.name.lowercase() == einkLegacyPrefs.getString(
+                EinkLegacyPrefsStore.KEY_PAGE_TURN_RIPPLE_MODE, "off"
+            )
+        } ?: PageTurnRippleMode.OFF
+        set(value) {
+            einkLegacyPrefs.edit()
+                .putString(EinkLegacyPrefsStore.KEY_PAGE_TURN_RIPPLE_MODE, value.name.lowercase())
+                .apply()
         }
 
     override var readerTapZonesEncoding: String?
