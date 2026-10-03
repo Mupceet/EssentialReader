@@ -162,10 +162,20 @@ android {
     testOptions {
         unitTests {
             // 阅读器核心在构造期就读字符串资源（TextPageFactory 的 keepSwipeTip、
-            // TextPage 的默认 text/title、ReadView 的无障碍动作名）。不打开这个，
-            // Robolectric 下取任何 R.string 都是 Resources$NotFoundException，
-            // 整条阅读器测试线（Track D·D1c）就起不来。
+            // TextPage 的默认 text/title、ReadView 的无障碍动作名）。不打开这个，Robolectric
+            // 下取任何 R.string 都是 Resources$NotFoundException，整条阅读器测试线（Track D·D1c）
+            // 就起不来。
             isIncludeAndroidResources = true
+            // 全量 1500+ Robolectric 测试共享一个 Test JVM；默认 512m 堆在套件晚段
+            // 造成 GC 压力，把依赖真实时钟预算的交互测试（长按手势、动画走完）
+            // 挤出时限——单跑通过、全量稳定失败。给足堆消除该负载敏感性。
+            all {
+                it.maxHeapSize = "2g"
+                // 堆之外仍有按位置累积的 JVM 级退化（晚段执行的手势/动画交互测试
+                // 时序预算被挤爆，受害者随子集变化、非单点污染）：周期性换新测试
+                // JVM 限定累积范围。每 ~100 类一 fork，仅多几次 JVM 启动。
+                it.forkEvery = 100
+            }
         }
     }
 }
