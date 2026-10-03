@@ -3039,4 +3039,12 @@
     <string name="home_capsule_restore_navigation">恢復導覽列</string>
     <string name="home_capsule_expand_controls">展開播放控制</string>
     <string name="home_capsule_chapter">第 %d 章</string>
+    <!-- 上游 c3e1f7e9a 輪新增：書架副本提示與漫畫預載（values/zh-rCN 已有，補齊三份中文 locale） -->
+    <string name="bookshelf_conflict_hint">疑似重複</string>
+    <string name="bookshelf_conflict_hint_desc">疑似重複，點擊加入書架</string>
+    <string name="manga_reader_preload_chapter">預載入目前章節圖片</string>
+    <string name="shelf_duplicate_count">其他 %1$d 個副本</string>
+    <string name="shelf_delete_other_copies_hint">書架中仍保留此書的其他 %1$d 個副本（來自【%2$s】），刪除目前副本不影響其他副本。</string>
+    <string name="shelf_delete_view_copy">檢視該副本</string>
+    <string name="shelf_delete_view_copies">檢視副本 (%1$d)</string>
 </resources>
