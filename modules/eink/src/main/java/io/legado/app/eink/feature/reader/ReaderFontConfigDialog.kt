@@ -35,8 +35,10 @@ import io.legado.app.eink.designsystem.theme.EInkSpacing
  * 进二级浮层 [ReaderFontPickerOverlay]。正文字重与标题字重：预设行
  * 「细体/常规/粗体」三选 + 独立自定义行（点击原地替换为拖动条，点预设
  * 复原，窄屏四枚一行显示不完整），拖动条值域 100..900。简繁转换：三选
- * 按钮行（关闭转换/繁体转简体/简体转繁体），转发宿主阅读设置——能力门控
- * （supportsChineseConverter），点选即应用并触发重排。
+ * 按钮行（关闭/繁转简/简转繁——按钮文案 ≤3 字：等分宽度下 4 字以上
+ * 截断（真机实测），且应用内字体缩放最高 1.6 倍需留余量；语境由行标签
+ * 承担），转发宿主阅读设置——能力门控（supportsChineseConverter），
+ * 点选即应用并触发重排。
  */
 @Composable
 internal fun ReaderFontConfigDialog(
@@ -239,9 +241,9 @@ internal fun ReaderFontConfigDialog(
                         horizontalArrangement = Arrangement.spacedBy(EInkSpacing.xs),
                     ) {
                         listOf(
-                            0 to "关闭转换",
-                            1 to "繁体转简体",
-                            2 to "简体转繁体",
+                            0 to "关闭",
+                            1 to "繁转简",
+                            2 to "简转繁",
                         ).forEach { (type, text) ->
                             EInkButton(
                                 text = text,
