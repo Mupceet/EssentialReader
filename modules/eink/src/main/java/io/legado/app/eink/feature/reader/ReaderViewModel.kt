@@ -92,6 +92,8 @@ data class ReaderUiState(
     val hideStatusBar: Boolean = false,
     /** 段评气泡参与排版（转发完整模式同键阅读设置；切换触发重排）。 */
     val showReviewBubbles: Boolean = true,
+    /** 简繁转换档位（转发完整模式同键阅读设置；0 关闭/1 繁转简/2 简转繁，切换触发重排）。 */
+    val chineseConverterType: Int = 0,
     /** 阅读页点击分区（九宫格；点按分发的唯一依据，蒙层退出时更新）。 */
     val tapZones: ReaderTapZoneGrid = ReaderTapZoneGrid(),
     val style: ReaderTextStyle = ReaderTextStyle(),
@@ -185,6 +187,7 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application),
                 pageTurnRippleMode = EInkEngineRegistry.globalSettings.pageTurnRippleMode,
                 hideStatusBar = EInkEngineRegistry.globalSettings.hideStatusBar,
                 showReviewBubbles = EInkEngineRegistry.globalSettings.showReviewBubbles,
+                chineseConverterType = EInkEngineRegistry.globalSettings.chineseConverterType,
                 tapZones = ReaderTapZoneGrid.decodeOrDefault(
                     EInkEngineRegistry.globalSettings.readerTapZonesEncoding
                 ),
@@ -1017,6 +1020,19 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application),
         val newValue = !EInkEngineRegistry.globalSettings.showReviewBubbles
         EInkEngineRegistry.globalSettings.showReviewBubbles = newValue
         _uiState.update { it.copy(showReviewBubbles = newValue) }
+        scheduleRelayout()
+    }
+
+    /**
+     * 简繁转换档位（转发完整模式同键设置）：写入 + 乐观更新当前档，再
+     * 触发重排——宿主内容处理层按新档对正文与章标题逐章转换，新
+     * contentHash 使分页缓存自然未命中重排。同值以 UiState 快照为准
+     * （乐观源）直写跳过，免无谓重排。
+     */
+    fun setChineseConverterType(type: Int) {
+        if (type == _uiState.value.chineseConverterType) return
+        EInkEngineRegistry.globalSettings.chineseConverterType = type
+        _uiState.update { it.copy(chineseConverterType = type) }
         scheduleRelayout()
     }
 

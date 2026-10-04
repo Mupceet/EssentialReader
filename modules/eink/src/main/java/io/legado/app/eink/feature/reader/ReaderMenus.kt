@@ -696,6 +696,13 @@ private fun pageTurnRippleModeLabel(mode: io.legado.app.eink.contract.PageTurnRi
         io.legado.app.eink.contract.PageTurnRippleMode.FAST -> "快速"
     }
 
+/** 简繁转换档位界面文案（0/1/2 → 关闭/繁体转简体/简体转繁体；入口行与单选弹窗共用，未识别值回落关闭）。 */
+internal fun chineseConverterTypeLabel(type: Int): String = when (type) {
+    1 -> "繁体转简体"
+    2 -> "简体转繁体"
+    else -> "关闭"
+}
+
 /**
  * 循环档位行：形态同 [ToggleRow]——标签在左（纯展示），档位按钮在右
  * （[EInkButton]，文案随当前档位，如 关/慢速/标准/快速），点按按钮
