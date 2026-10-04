@@ -34,7 +34,9 @@ import io.legado.app.eink.designsystem.theme.EInkSpacing
  * 过文件夹/空文件夹）为「选择字体文件夹」直开 SAF，非空为「更多字体…（N）」
  * 进二级浮层 [ReaderFontPickerOverlay]。正文字重与标题字重：预设行
  * 「细体/常规/粗体」三选 + 独立自定义行（点击原地替换为拖动条，点预设
- * 复原，窄屏四枚一行显示不完整），拖动条值域 100..900。
+ * 复原，窄屏四枚一行显示不完整），拖动条值域 100..900。简繁转换：三选
+ * 按钮行（关闭转换/繁体转简体/简体转繁体），转发宿主阅读设置——能力门控
+ * （supportsChineseConverter），点选即应用并触发重排。
  */
 @Composable
 internal fun ReaderFontConfigDialog(
@@ -42,10 +44,12 @@ internal fun ReaderFontConfigDialog(
     style: ReaderTextStyle,
     fontOptions: List<ReaderFontOption>,
     recentFontPaths: List<String>,
+    chineseConverterType: Int,
     onSetFont: (ReaderFontSelection) -> Unit,
     onOpenFontPicker: () -> Unit,
     onSetBodyWeight: (Int) -> Unit,
     onSetTitleWeight: (Int) -> Unit,
+    onSetChineseConverterType: (Int) -> Unit,
     onPickFolder: () -> Unit,
     onClose: () -> Unit,
     onBackdropClick: () -> Unit,
@@ -206,6 +210,52 @@ internal fun ReaderFontConfigDialog(
                     valueRange = catalog.intRange(Ids.TITLE_WEIGHT),
                     onSetWeight = onSetTitleWeight,
                 )
+            }
+            // 简繁转换（转发宿主阅读设置，与完整模式同键）：能力门控——宿主
+            // 声明不支持时整行隐藏（不留死开关）；点选即应用并触发重排，
+            // 行形态同字体预设行（标签在左，三枚等分按钮选中反白）
+            if (io.legado.app.eink.contract.EInkEngineRegistry.globalSettings.supportsChineseConverter) {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(EInkSpacing.xs),
+                    verticalAlignment = Alignment.Top,
+                ) {
+                    Box(
+                        modifier = Modifier.height(44.dp),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        EInkText(
+                            text = "简繁转换",
+                            style = EInkTheme.typography.bodyMedium,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                    Row(
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxWidth()
+                            .height(44.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(EInkSpacing.xs),
+                    ) {
+                        listOf(
+                            0 to "关闭转换",
+                            1 to "繁体转简体",
+                            2 to "简体转繁体",
+                        ).forEach { (type, text) ->
+                            EInkButton(
+                                text = text,
+                                onClick = { onSetChineseConverterType(type) },
+                                modifier = Modifier.weight(1f),
+                                selected = type == chineseConverterType,
+                                height = 44.dp,
+                                style = EInkTheme.typography.bodyMedium,
+                                role = Role.Button,
+                                contentPadding = PaddingValues(horizontal = 2.dp),
+                            )
+                        }
+                    }
+                }
             }
         }
     }

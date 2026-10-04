@@ -148,9 +148,9 @@ interface GlobalSettings {
      * 写入为纯异步可见（写后读 getter 拿到旧值），排版最迟随下一次翻页
      * 的内容刷新对齐。
      *
-     * 可写（阅读界面「其它设置」面板单选弹窗）：fire-and-forget 写入。
+     * 可写（阅读排版「字体配置」弹窗三选按钮行）：fire-and-forget 写入。
      *
-     * 默认实现（旧宿主）getter 恒返回 0、写入丢弃：入口行经
+     * 默认实现（旧宿主）getter 恒返回 0、写入丢弃：设置行经
      * [supportsChineseConverter] 门控不渲染，行为不回退（正文按原文
      * 呈现），设置不可持久化。
      */
@@ -158,7 +158,7 @@ interface GlobalSettings {
         get() = 0
         set(value) {}
 
-    /** 简繁转换能力声明：false = 宿主不支持，模块隐藏「简繁转换」入口行（不留死开关）。 */
+    /** 简繁转换能力声明：false = 宿主不支持，模块隐藏「字体配置」弹窗的「简繁转换」行（不留死开关）。 */
     val supportsChineseConverter: Boolean get() = false
 
     /**

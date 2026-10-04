@@ -658,7 +658,6 @@ internal fun ReaderOtherPanel(
     onCyclePageTurnRippleMode: () -> Unit,
     onToggleHideStatusBar: () -> Unit,
     onToggleShowReviewBubbles: () -> Unit,
-    onOpenChineseConverter: () -> Unit,
     onOpenTapZones: () -> Unit,
 ) {
     // 行序按功能域分组：翻页交互 → 界面显示 → 阅读区手势（点击区域设置
@@ -681,15 +680,6 @@ internal fun ReaderOtherPanel(
     if (io.legado.app.eink.contract.EInkEngineRegistry.globalSettings.supportsReviewBubbles) {
         ToggleRow(label = "显示段评气泡", checked = state.showReviewBubbles, onToggle = onToggleShowReviewBubbles)
     }
-    // 简繁转换：宿主声明不支持时隐藏入口行（不留死开关）；点行开单选弹窗
-    // （组合于 Screen 根层，EInkDialog 组合契约），点选即应用并触发重排
-    if (io.legado.app.eink.contract.EInkEngineRegistry.globalSettings.supportsChineseConverter) {
-        OptionRow(
-            label = "简繁转换",
-            value = chineseConverterTypeLabel(state.chineseConverterType),
-            onClick = onOpenChineseConverter,
-        )
-    }
     // 能力门控（0.6.0）：宿主未声明书签能力时隐藏下拉书签开关
     if (io.legado.app.eink.contract.EInkEngineRegistry.marksEngine?.supportsBookmarks == true) {
         ToggleRow(label = "下拉添加书签", checked = state.pullDownBookmark, onToggle = onTogglePullDownBookmark)
@@ -705,13 +695,6 @@ private fun pageTurnRippleModeLabel(mode: io.legado.app.eink.contract.PageTurnRi
         io.legado.app.eink.contract.PageTurnRippleMode.STANDARD -> "标准"
         io.legado.app.eink.contract.PageTurnRippleMode.FAST -> "快速"
     }
-
-/** 简繁转换档位界面文案（0/1/2 → 关闭/繁体转简体/简体转繁体；入口行与单选弹窗共用，未识别值回落关闭）。 */
-internal fun chineseConverterTypeLabel(type: Int): String = when (type) {
-    1 -> "繁体转简体"
-    2 -> "简体转繁体"
-    else -> "关闭"
-}
 
 /**
  * 循环档位行：形态同 [ToggleRow]——标签在左（纯展示），档位按钮在右
@@ -739,47 +722,6 @@ private fun CycleValueRow(label: String, value: String, selected: Boolean, onCli
             height = 44.dp,
             selected = selected,
         )
-    }
-}
-
-/**
- * 简繁转换单选弹框：满宽选项行（[EInkButton]，当前档实心反白——字体
- * 配置弹窗选项行同款形态），点选即应用并关闭——与完整模式下拉「选中
- * 即应用」语义一致，单选无确认回路。组合契约见 [EInkDialog]：必须组合
- * 在全屏容器（Screen 根 Box）子级。× / 系统返回经 [onClose] 回到其它
- * 面板展开态；点击弹框外空白区域经 [onBackdropClick] 一次性收起到
- * 干净阅读界面。
- */
-@Composable
-internal fun ReaderChineseConverterDialog(
-    current: Int,
-    onSelect: (Int) -> Unit,
-    onClose: () -> Unit,
-    onBackdropClick: () -> Unit,
-) {
-    EInkDialog(
-        onDismiss = onClose,
-        title = "简繁转换",
-        onClose = onClose,
-        onBackdropClick = onBackdropClick,
-        showActions = false,
-    ) {
-        Column(
-            modifier = Modifier.fillMaxWidth(),
-            verticalArrangement = Arrangement.spacedBy(EInkSpacing.xs),
-        ) {
-            listOf(0, 1, 2).forEach { type ->
-                EInkButton(
-                    text = chineseConverterTypeLabel(type),
-                    onClick = {
-                        onSelect(type)
-                        onClose()
-                    },
-                    modifier = Modifier.fillMaxWidth(),
-                    selected = type == current,
-                )
-            }
-        }
     }
 }
 
@@ -945,10 +887,9 @@ internal fun ToggleRow(label: String, checked: Boolean, onToggle: () -> Unit) {
  * contentHorizontalPadding = 0 装载，行天然铺满屏幕宽度——按压块与
  * 点击区随之满宽；行内内容自管内边距：标签左缘对齐面板内容（m），
  * 箭头右缘对齐开关行按钮边框（m+s，见 [ToggleRow]）。
- * [value] 非空时在箭头左侧渲染当前值（次级色，如「简繁转换 繁体转简体 →」）。
  */
 @Composable
-private fun OptionRow(label: String, value: String? = null, onClick: () -> Unit) {
+private fun OptionRow(label: String, onClick: () -> Unit) {
     val press = rememberImmediatePressState()
     val colors = eInkActionColors(pressed = press.isPressed)
     Row(
@@ -967,14 +908,6 @@ private fun OptionRow(label: String, value: String? = null, onClick: () -> Unit)
             color = colors.contentColor,
         )
         Spacer(modifier = Modifier.weight(1f))
-        if (value != null) {
-            EInkText(
-                text = value,
-                style = EInkTheme.typography.bodyMedium,
-                color = colors.secondaryContentColor,
-                modifier = Modifier.padding(end = EInkSpacing.s),
-            )
-        }
         Image(
             painter = painterResource(R.drawable.eink_ic_keyboard_arrow_right),
             contentDescription = null,
