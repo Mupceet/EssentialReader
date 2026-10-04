@@ -118,9 +118,10 @@ internal val einkSettingsWriteScope =
  * 设置项全部经设置网关读写：threadCount/preDownloadNum 经
  * DownloadCacheSettingsGateway（与旧 AppConfig 门面同键同默认值的
  * 快照）；autoRefreshBook/defaultToRead（「我的」页可写）经
- * OtherSettingsGateway、volumeKeyPage、hideStatusBar 与
- * showReviewBubbles（后三者为阅读界面其它设置开关、转发宿主阅读设置
- * 键，与完整模式共享同一存储）经 ReadSettingsGateway、
+ * OtherSettingsGateway、volumeKeyPage、hideStatusBar、showReviewBubbles
+ * 与 chineseConverterType（后四者为阅读界面其它设置开关、转发宿主阅读
+ * 设置键，与完整模式共享同一存储；chineseConverterType 由宿主内容处理
+ * 管线逐章消费）经 ReadSettingsGateway、
  * changeSourceCheckAuthor 经 ChangeSourceSettingsGateway；
  * useDefaultCover（「我的」页可写）为本对象持有的 Compose 快照状态 +
  * CoverSettingsGateway 异步落盘——组合内读取订阅变化，切换后开关行与
@@ -253,6 +254,16 @@ private object GlobalSettingsImpl : GlobalSettings, KoinComponent {
                 readSettingsGateway.update { it.copy(showReviewBubbles = value) }
             }
         }
+
+    override var chineseConverterType: Int
+        get() = readSettingsGateway.currentSettings.chineseConverterType
+        set(value) {
+            einkSettingsWriteScope.launch {
+                readSettingsGateway.update { it.copy(chineseConverterType = value) }
+            }
+        }
+
+    override val supportsChineseConverter: Boolean get() = true
 
     override var useDefaultCover: Boolean
         get() = useDefaultCoverState.value
