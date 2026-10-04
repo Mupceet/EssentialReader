@@ -11,7 +11,7 @@
 章标题实时转换（quick-chinese-transfer，`ChineseUtils.t2s/s2t`）。E-Ink 嵌入式阅读器
 （eink-lib 子模块）目前完全没有暴露该能力。
 
-目标：在 eink 阅读器「其它设置」面板新增简繁转换设置入口，三档可选，**与完整模式共享同一
+目标：在 eink 阅读器排版「字体配置」弹窗新增简繁转换设置行，三档可选，**与完整模式共享同一
 存储值**——任一侧修改，全局一致；改动后当前章以新转换重排。
 
 ## 2. 范围与非目标
@@ -19,7 +19,7 @@
 范围：
 
 - eink-lib `contract/GlobalSettings` 新增转发键与能力声明（零新引擎端口）。
-- eink-lib 阅读器「其它设置」面板新增入口行 + 单选弹窗（面板私有组合件）。
+- eink-lib 阅读器排版「字体配置」弹窗新增三选按钮行（弹窗内组合，无新组件/弹窗层级）。
 - eink-lib `ReaderViewModel`/`ReaderUiState` 新增字段与设值函数（写 + 乐观更新 + 重排调度）。
 - 宿主 `eink/bridge/EInkBridge.kt` `GlobalSettingsImpl` 覆写转发（读写既有 DataStore 键）。
 - `EINK-PORTING.md` 移植手册差异表补一条。
@@ -67,39 +67,29 @@ eink-lib 侧（路径 `eink-lib/modules/eink/src/main/java/io/legado/app/eink/`�
 
 ## 4. 呈现设计
 
-入口行（插在「界面显示」组末尾：`显示段评气泡` 之后、`下拉添加书签` 之前）：
+> 演进记录：初版为「其它设置」面板入口行 + 单选弹窗（同日实现后），按产品决策调整移入
+> 排版体系，最终形态如下。
+
+位置：**排版设置 → 字体配置弹窗**（`ReaderStyleDialog.Fonts` → `ReaderFontConfigDialog`），
+「标题字重」行之后收尾：
 
 ```text
-│ 简繁转换              繁体转简体 → │   ← 新增：整行按压反色
+┌─ 字体配置 ──────────────────── × ┐
+│ 字体选择  [系统默认][系统衬线][系统等宽] │
+│           [最近字体][更多字体…（N）]    │
+│ 正文字重   [细体][常规][粗体]  …       │
+│ 标题字重   [细体][常规][粗体]  …       │
+│ 简繁转换   [关闭转换][繁体转简体][简体转繁体] │ ← 新增
+└──────────────────────────────────┘
 ```
 
-- 复用 `OptionRow`，扩展一个可选行尾值参数：当前档文案（次级色）+ 右箭头。不新增行组件。
-- `supportsChineseConverter == false` 时入口行整体不渲染（旧宿主不留死开关，先例：
-  `supportsReviewBubbles` 对「显示段评气泡」的显隐处理）。
-
-单选弹窗（点入口行弹出）：
-
-```text
-┌─ 简繁转换 ────────────── × ┐
-│  ◉ 关闭                    │
-│  ○ 繁体转简体              │
-│  ○ 简体转繁体              │
-└────────────────────────────┘
-```
-
-- 弹窗组合在 `ReaderScreen` 根 Box 层——`EInkDialog` 组合契约要求全屏容器子级（放进
-  面板卡片等受限容器会使满宽覆盖层被裁剪、点击拦截范围错误）。可见性为 Screen 层
-  `remember` 布尔状态，面板入口行经 `onOpenChineseConverter` 回调置位（`tapZoneEditor`
-  先例）；关闭后回到其它面板展开态（`styleDialog` 同款逐级回退口径）。
-- 弹窗本体 `ReaderChineseConverterDialog`（`ReaderMenus.kt` 组合件，不进 designsystem）：
-  `EInkDialog(onDismiss, title = "简繁转换", onClose, onBackdropClick = dismissToCleanReading,
-  showActions = false)` + content 插槽三个满宽 `EInkButton` 选项行，当前档 `selected`
-  实心反白——字体配置弹窗选项行同款形态，不引入自绘 ◉/○ 新视觉词汇。
-- **点选项即生效并关弹窗**（无确定/取消）——与宿主下拉「选中即应用」语义一致，单选无需确认
-  回路，少一次整屏闪烁。系统返回/× = `onDismiss` 回面板不改值；点弹框外空白 =
-  `onBackdropClick` 一次性收起到干净阅读界面（面板一并收起）。
-- 文案统一一套全称（入口行与弹窗共用同一映射函数）：`0 → 关闭`、`1 → 繁体转简体`、
-  `2 → 简体转繁体`（与宿主 `values-zh-rCN/arrays.xml` 的 chinese_mode 对齐）。
+- 行形态复用本弹窗既有约定（同字体预设行/字重预设行）：标签在左（按需占宽、垂直居中
+  对齐按钮行），右侧三枚等分 `EInkButton`（当前档 `selected` 实心反白），点选即应用。
+  零新组件、零弹窗层级。
+- 选项文案：`0 → 关闭转换`、`1 → 繁体转简体`、`2 → 简体转繁体`（字面量内联于弹窗行）。
+- `supportsChineseConverter == false` 时整行不渲染（旧宿主不留死开关，同本弹窗字重行
+  的目录守卫显隐口径）。
+- 点选即应用并触发重排——与宿主下拉「选中即应用」语义一致，无确认回路。
 
 ## 5. 契约与宿主接缝
 
@@ -112,13 +102,13 @@ var chineseConverterType: Int
     get() = 0
     set(value) {}
 
-/** 简繁转换能力声明：false = 宿主不支持，模块隐藏「简繁转换」入口行。 */
+/** 简繁转换能力声明：false = 宿主不支持，模块隐藏「字体配置」弹窗的「简繁转换」行。 */
 val supportsChineseConverter: Boolean get() = false
 ```
 
 KDoc 要点：值域 0/1/2；fire-and-forget 写入档；**切换需重排——调用方写后显式触发重排**；
 嵌入式宿主经设置网关 pending-overlay 内存同步可见（主线程写后重排即可读到新值）；旧宿主
-默认实现 getter 恒 0、写入丢弃，入口行不渲染、行为不回退。
+默认实现 getter 恒 0、写入丢弃，设置行不渲染、行为不回退。
 
 宿主 `app/src/main/java/io/legado/app/eink/bridge/EInkBridge.kt` `GlobalSettingsImpl` 覆写
 （模板 = `volumeKeyPage`，:233-239）：
@@ -148,7 +138,8 @@ eink-lib：
   2. 写 `EInkEngineRegistry.globalSettings.chineseConverterType`；
   3. `_uiState.update { it.copy(chineseConverterType = type) }` 乐观更新；
   4. `scheduleRelayout()`。
-- `ReaderScreen.kt` 面板装载处接线 `onSetChineseConverterType = viewModel::setChineseConverterType`。
+- `ReaderScreen.kt` 字体配置弹窗调用接线 `chineseConverterType = uiState.chineseConverterType`、
+  `onSetChineseConverterType = viewModel::setChineseConverterType`。
 
 生效链（全复用现有机制，零新引擎方法）：
 
@@ -175,22 +166,22 @@ setChineseConverterType → 写 globalSettings（宿主 pending-overlay 即时�
   - 契约兼容守护（`ReaderSyncContractCompatTest` 同款）：手写 Legacy fake 只实现既有成员面
     （编译通过 = 新成员带默认实现零破坏），断言降级语义——恒 0 档、能力 false、写入丢弃
     不抛。
-  - 纯函数：档位文案映射（0/1/2 → 关闭/繁体转简体/简体转繁体；未识别值回落关闭）。
   - VM 设值逻辑不落单测——模块无 ReaderViewModel 实例化测试先例（VM 直读注册表），
-    覆盖 = 编译 + 全量模块测试 + 真机；同值短路/重排调度随真机复核。
-  - `supportsChineseConverter = false` 的入口行显隐是单行条件渲染，不单测，真机/宿主覆写
+    覆盖 = 编译 + 全量模块测试 + 真机；同值短路/重排调度随真机复核。选项文案为弹窗内
+    字面量，无独立映射函数（初版映射函数随入口迁移删除）。
+  - `supportsChineseConverter = false` 的设置行显隐是单行条件渲染，不单测，真机/宿主覆写
     `true` 的事实由装配保证。
 - 宿主主验证集：`.\gradlew.bat testAppDebugUnitTest lintAppDebug verifyConfigArchitecture assembleAppDebug --continue --no-configuration-cache`。
 - `git diff --check`（文本改动）。
 - 真机复核（实现后）：转换生效正确性；重排后阅读位置保持；与完整模式下拉互改一致性；
-  弹窗/入口行交互与 e-ink 刷新表现。
+  字体配置弹窗行交互与 e-ink 刷新表现。
 
 ## 9. 审查门禁问答
 
 - 行为基线：宿主完整模式下拉的现有行为（同键、同管线）；eink 侧为新增入口，无回退面。
 - 依赖边界净变化：零新 Gradle 依赖、零新端口；eink-lib 经既有 `GlobalSettings` 契约扩展
   （带默认实现，旧宿主编译与运行均不破坏）。
-- 更小改法：入口行复用 `OptionRow`（仅加行尾值参数）、弹窗复用 `EInkDialog`、转发复用
+- 更小改法：设置行复用字体配置弹窗既有行形态（标签左 + 等分按钮，零新组件）、转发复用
   `volumeKeyPage` 模板——已是最小垂直切片。
 - 错误/线程/取消语义：fire-and-forget 写入 + 防抖重排与 `showReviewBubbles` 等现有内容影响型
   设置完全同构；写入经 `einkSettingsWriteScope`（SupervisorJob + Main.immediate）。
