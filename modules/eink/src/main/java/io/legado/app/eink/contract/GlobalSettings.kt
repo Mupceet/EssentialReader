@@ -138,6 +138,30 @@ interface GlobalSettings {
     val supportsReviewBubbles: Boolean get() = true
 
     /**
+     * 简繁转换档位（转发宿主阅读设置键 chineseConverterType，与完整模式
+     * 排版设置「简繁转换」下拉共享同一存储；默认 0 关闭）。
+     *
+     * 值域：0 = 关闭 / 1 = 繁体转简体 / 2 = 简体转繁体。转换在宿主内容
+     * 处理层逐章生效（正文与章标题实时转换，不改章节缓存文件），与朗读/
+     * 导书/全文搜索同管线。**切换需重排**——调用方写后显式触发重排（设值
+     * 后 scheduleRelayout，新 contentHash 使分页缓存自然未命中）；若宿主
+     * 写入为纯异步可见（写后读 getter 拿到旧值），排版最迟随下一次翻页
+     * 的内容刷新对齐。
+     *
+     * 可写（阅读界面「其它设置」面板单选弹窗）：fire-and-forget 写入。
+     *
+     * 默认实现（旧宿主）getter 恒返回 0、写入丢弃：入口行经
+     * [supportsChineseConverter] 门控不渲染，行为不回退（正文按原文
+     * 呈现），设置不可持久化。
+     */
+    var chineseConverterType: Int
+        get() = 0
+        set(value) {}
+
+    /** 简繁转换能力声明：false = 宿主不支持，模块隐藏「简繁转换」入口行（不留死开关）。 */
+    val supportsChineseConverter: Boolean get() = false
+
+    /**
      * 阅读页点击分区的存储编码（E-Ink 自有偏好，完整模式无对应设置）。
      *
      * 端口面只承载透明字符串：9 位数字编码（行主序，每格 0/1/2，中心位
