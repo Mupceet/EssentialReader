@@ -202,6 +202,10 @@ fun ReaderRoute(
     // 自持返回键（蒙层内 BackHandler 后组合优先于 Route 链）；退出即
     // 落盘生效，面板状态保留——关闭后回到其它面板展开态
     var tapZoneEditor by remember { mutableStateOf(false) }
+    // 简繁转换单选弹窗（其它面板入口）：组合于根 Box（EInkDialog 契约，
+    // 满宽覆盖不被面板卡片裁剪）；点选即应用并关闭，关闭后回到其它面板
+    // 展开态（styleDialog 同款逐级回退）
+    var chineseConverterDialog by remember { mutableStateOf(false) }
     // 退出阅读的「加入书架」提示：未加书架的书经任一出口（系统返回 /
     // 操作条返回）离开时弹出，形态对齐详情页「移出书架」确认框；
     // 确认 = 加入并退出，取消 = 直接退出
@@ -930,6 +934,7 @@ fun ReaderRoute(
                             onCyclePageTurnRippleMode = viewModel::cyclePageTurnRippleMode,
                             onToggleHideStatusBar = viewModel::toggleHideStatusBar,
                             onToggleShowReviewBubbles = viewModel::toggleShowReviewBubbles,
+                            onOpenChineseConverter = { chineseConverterDialog = true },
                             onOpenTapZones = { tapZoneEditor = true },
                         )
                     }
@@ -1029,6 +1034,16 @@ fun ReaderRoute(
                     viewModel.applyTapZones(zones)
                     tapZoneEditor = false
                 },
+            )
+        }
+
+        // 简繁转换单选弹窗（其它面板入口行置位）：点选即应用并触发重排
+        if (chineseConverterDialog) {
+            ReaderChineseConverterDialog(
+                current = uiState.chineseConverterType,
+                onSelect = viewModel::setChineseConverterType,
+                onClose = { chineseConverterDialog = false },
+                onBackdropClick = dismissToCleanReading,
             )
         }
 
