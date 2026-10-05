@@ -1,5 +1,6 @@
 package io.legado.app.eink.feature.reader
 
+import android.graphics.Typeface
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -24,6 +25,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
@@ -32,11 +34,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import io.legado.app.eink.R
+import io.legado.app.eink.contract.EInkEngineRegistry
 import io.legado.app.eink.contract.ReaderFontOption
 import io.legado.app.eink.designsystem.content.EInkText
 import io.legado.app.eink.designsystem.interaction.eInkActionColors
@@ -52,8 +56,10 @@ import io.legado.app.eink.designsystem.refresh.EInkRefreshIntent
 import io.legado.app.eink.designsystem.refresh.LocalEInkRefreshController
 import io.legado.app.eink.designsystem.theme.EInkSpacing
 import io.legado.app.eink.designsystem.theme.EInkTheme
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /**
  * 全屏字体选择浮层（字体配置弹层的二级）：单列整行显示文件夹字体，
@@ -62,8 +68,12 @@ import kotlinx.coroutines.launch
  * 骨架参考目录界面（TocScreen）：顶栏（标题 + 关闭）+ 列表 + 底部
  * 操作栏（返回 / 切换字体文件夹 / 翻页胶囊）。
  *
- * - 字体名单行省略号（去扩展名，同一级弹层口径，行内左右留 [EInkSpacing.l]
- *   边距）；选中行按 DS §42 用左侧实心竖条 + 名称加粗（大面积持久反色
+ * - 字体行两行：字体名（去扩展名，同一级弹层口径）+ 名称下方一行示例
+ *   文字（[FontSampleText]）；两行均以该字体文件渲染（path 经宿主端口
+ *   loadFontTypeface 逐项异步加载 Typeface，加载失败回落平台默认字体），
+ *   所见即选择后的正文效果；行内左右留 16dp 边距（[EInkSpacing.m]，与
+ *   目录行、顶栏标题同列）；列表按字体名升序（VM sortFontOptions 口径）；
+ *   选中行按 DS §42 用左侧实心竖条 + 名称加粗（大面积持久反色
  *   残影重），按压仍瞬时反色（§35）；
  * - 打开时定位到当前选中字体所在页（jumpToItemAligned），定位完成前以
  *   surface 色遮盖列表防闪现第一页（同目录页 positioned 先例）；打开即
@@ -173,6 +183,7 @@ internal fun ReaderFontPickerOverlay(
                     items(fontOptions, key = { it.path }) { option ->
                         FontPickerRow(
                             label = option.name.substringBeforeLast("."),
+                            path = option.path,
                             selected = option.path == selectedPath,
                             onClick = { onSelect(option) },
                         )
@@ -233,24 +244,49 @@ private fun selectedFontIndex(
 private val FontRowMarkWidth = 4.dp
 private val FontRowMarkHeight = 16.dp
 
+/** 字体行高：名称 + 示例两行（等高行是分页不变量，触控目标）。 */
+private val FontRowHeight = 72.dp
+
+/** 示例文字：字体行第二行，覆盖拉丁字母/数字/汉字展示该字体实际效果。 */
+private const val FontSampleText = "AaBbCc123 字体示例"
+
 /**
- * 字体行：定高 44dp（触控目标；等高行是分页不变量），单行省略号。
- * 选中 = 左侧实心竖条 + 名称加粗（§42 不用整行持久反色）；按压瞬时
- * 反色（§35）。写法同目录页 ChapterItem（TocScreen.kt）。
+ * 字体文件 path → FontFamily（每行一份）：经宿主端口 loadFontTypeface
+ * 在 IO 上下文异步加载（宿主侧进程级缓存，同路径不重复解码），加载失败
+ * 为 null → 不指定 fontFamily 回落平台默认字体。path 不变不重新加载。
+ */
+@Composable
+private fun rememberFontFamily(path: String): FontFamily? {
+    val typeface by produceState<Typeface?>(initialValue = null, path) {
+        value = withContext(Dispatchers.IO) {
+            runCatching { EInkEngineRegistry.readerEngine.loadFontTypeface(path) }
+                .getOrNull()
+        }
+    }
+    return remember(typeface) { typeface?.let(::FontFamily) }
+}
+
+/**
+ * 字体行：定高 72dp（名称 + 示例两行；等高行是分页不变量）。两行文字
+ * 均以该字体文件的 Typeface 渲染（[rememberFontFamily]）。选中 = 左侧
+ * 实心竖条 + 名称加粗（§42 不用整行持久反色）；按压瞬时反色（§35）。
+ * 写法同目录页 ChapterItem（TocScreen.kt）。
  */
 @Composable
 private fun FontPickerRow(
     label: String,
+    path: String,
     selected: Boolean,
     onClick: () -> Unit,
 ) {
     val scheme = EInkTheme.colorScheme
     val press = rememberImmediatePressState()
     val colors = eInkActionColors(pressed = press.isPressed)
+    val fontFamily = rememberFontFamily(path)
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .height(44.dp)
+            .height(FontRowHeight)
             .then(press.modifier)
             .background(colors.containerColor)
             .einkClickable(role = Role.Button, onClickLabel = label, onClick = onClick)
@@ -266,17 +302,30 @@ private fun FontPickerRow(
                     .background(if (press.isPressed) scheme.surface else scheme.onSurface),
             )
         }
-        EInkText(
-            text = label,
-            style = EInkTheme.typography.bodyLarge,
-            fontWeight = if (selected) FontWeight.Bold else null,
-            color = when {
-                press.isPressed -> colors.contentColor
-                selected -> scheme.onSurface
-                else -> scheme.onSurfaceVariant
-            },
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
+        Column(verticalArrangement = Arrangement.spacedBy(EInkSpacing.xs)) {
+            EInkText(
+                text = label,
+                fontFamily = fontFamily,
+                style = EInkTheme.typography.bodyLarge,
+                fontWeight = if (selected) FontWeight.Bold else null,
+                color = when {
+                    press.isPressed -> colors.contentColor
+                    selected -> scheme.onSurface
+                    else -> scheme.onSurfaceVariant
+                },
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            // 示例行用 tertiaryContent 与名称行拉开一档实灰（灰阶做减法，
+            // 不用字重/字号层级）；按压跟随整行反色
+            EInkText(
+                text = FontSampleText,
+                fontFamily = fontFamily,
+                style = EInkTheme.typography.bodySmall,
+                color = if (press.isPressed) colors.contentColor else scheme.tertiaryContent,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
     }
 }

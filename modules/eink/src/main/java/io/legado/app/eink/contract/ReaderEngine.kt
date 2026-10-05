@@ -1,5 +1,7 @@
 package io.legado.app.eink.contract
 
+import android.graphics.Typeface
+
 
 /**
  * 阅读会话书籍的展示快照。
@@ -478,6 +480,14 @@ interface ReaderEngine {
 
     /** 设置字体文件夹（SAF tree uri 字符串）并持久化。 */
     suspend fun setFontFolder(uri: String) {}
+
+    /**
+     * 字体文件路径（[availableFonts] 项的 path，content:// uri 或文件路径）
+     * → Typeface，字体选择列表逐项名称/示例预览用。加载失败或路径无效
+     * 返回 null（调用方回落平台默认字体）。宿主负责加载与进程级缓存；
+     * 阻塞式文件读取，调用方应在 IO 上下文调用。
+     */
+    suspend fun loadFontTypeface(path: String): Typeface? = null
 
     /** 从宿主排版配置读回当前参数快照。 */
     fun currentStyle(): ReaderTextStyle

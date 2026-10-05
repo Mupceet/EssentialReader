@@ -100,11 +100,12 @@
 - **`ReaderStyleCatalog.kt`** — 排版参数协商目录（`ReaderStyleParam`
   描述符 + 稳定 id 集 `ReaderStyleParamIds` + 旧宿主回落基线
   `FallbackReaderStyleCatalog`）；伴生 `ReaderFontSelection.kt` 为字体
-  取值与选项类型。`ReaderEngine` 四个关联端口成员（默认实现 =
+  取值与选项类型。`ReaderEngine` 五个关联端口成员（默认实现 =
   能力降级）：
   - `styleCatalog(): ReaderStyleCatalog?` — 排版参数协商目录（null = 旧宿主，模块回落内置基线 FallbackReaderStyleCatalog）
   - `availableFonts(): List<ReaderFontOption>` — 字体文件夹枚举（suspend，阻塞式，调用方 IO 上下文）
   - `setFontFolder(uri: String)` — 持久化字体文件夹（suspend）
+  - `loadFontTypeface(path): Typeface?` — 字体文件路径→Typeface（选择列表逐项名称/示例预览；suspend，阻塞式，调用方 IO 上下文；失败 null = 回落平台默认字体）
   - `headerFooterTypefaces(): ReaderTipTypefaces` — 页眉/页脚有效字体（设置→跟随正文→系统默认）
 - **云端进度同步（0.4.0 起）** — `ReaderEngine` 新增两个带默认实现的成员
   + 回调一个默认成员：`syncCloudProgress(trigger)`（触发矩阵见

@@ -5,6 +5,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
@@ -41,6 +42,8 @@ val MIN_FONT_SIZE: TextUnit = 14.sp
  * @param color Text color (defaults to onSurface from theme)
  * @param fontSize Explicit font size; clamped to [MIN_FONT_SIZE] if smaller
  * @param fontWeight Font weight override
+ * @param fontFamily Font family override (e.g. a font-file backed family for
+ *   per-item font previews); null keeps the base [style]'s family
  * @param textAlign Text alignment override
  * @param textDecoration Text decoration override (underline, strikethrough)
  * @param overflow How to handle text overflow
@@ -56,6 +59,7 @@ fun EInkText(
     color: Color = EInkTheme.colorScheme.onSurface,
     fontSize: TextUnit = TextUnit.Unspecified,
     fontWeight: FontWeight? = null,
+    fontFamily: FontFamily? = null,
     textAlign: TextAlign? = null,
     textDecoration: TextDecoration? = null,
     overflow: TextOverflow = TextOverflow.Clip,
@@ -80,6 +84,7 @@ fun EInkText(
         color = color,
         fontSize = enforcedFontSize,
         fontWeight = fontWeight ?: style.fontWeight,
+        fontFamily = fontFamily ?: style.fontFamily,
         textAlign = textAlign ?: style.textAlign,
         textDecoration = textDecoration ?: style.textDecoration
     )

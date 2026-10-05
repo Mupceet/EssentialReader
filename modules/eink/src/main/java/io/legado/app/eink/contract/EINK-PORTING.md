@@ -218,12 +218,14 @@ Koin / 无 AppConfigStore。
   表达防盗链；无持久缓存的宿主实现每次冷启动重新抓取，建议自带文件缓存
   与失败冷却。阅读页内嵌插图不经此链路（页快照的 loader 闭包由宿主提供）。
 - **排版协商与字体端口**：`ReaderEngine` 的 `styleCatalog` /
-  `availableFonts` / `setFontFolder` / `headerFooterTypefaces` 四成员带
-  默认实现，旧宿主零改动即降级（目录 null → 回落内置 17 参数基线，
-  字体/字重/标题/页眉页脚设置行全部隐藏）。要启用这些设置，宿主最低
-  要求：实现目录声明（参照本仓 `HostStyleCatalog`：逐参数声明可用性/
-  值域/默认值/affectsLayout，值域与宿主排版设置 UI 同源）+ 字体文件夹
-  枚举与 SAF 持久化（均 suspend、阻塞式，模块在 IO 上下文调用）。加粗
+  `availableFonts` / `setFontFolder` / `loadFontTypeface` /
+  `headerFooterTypefaces` 五成员带默认实现，旧宿主零改动即降级（目录
+  null → 回落内置 17 参数基线，字体/字重/标题/页眉页脚设置行全部隐藏）。
+  要启用这些设置，宿主最低要求：实现目录声明（参照本仓
+  `HostStyleCatalog`：逐参数声明可用性/值域/默认值/affectsLayout，值域
+  与宿主排版设置 UI 同源）+ 字体文件夹枚举与 SAF 持久化（均 suspend、
+  阻塞式，模块在 IO 上下文调用）+ 字体文件→Typeface 加载（不实现时
+  选择列表预览回落平台默认字体，选择行为不受影响）。加粗
   能力由字重参数表达（body.weight / title.weight：0 常规 / 1 粗 / 2 细
   预设 + 100..900 自定义），端口无独立加粗键。
 - **云端进度同步**：`ReaderEngine` 的 `syncCloudProgress` /

@@ -30,6 +30,8 @@ import io.legado.app.eink.contract.ReaderTextStyle
 import io.legado.app.eink.feature.reader.selection.ReaderSelectionUi
 import io.legado.app.eink.feature.reader.selection.toPageBookmarkContent
 import io.legado.app.eink.session.ReaderSessionCache
+import java.text.Collator
+import java.util.Locale
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -139,6 +141,20 @@ internal fun decodeRecentFontPaths(encoding: String): List<String> =
     encoding.split('\n').filter { it.isNotEmpty() }
 
 internal fun encodeRecentFontPaths(paths: List<String>): String = paths.joinToString("\n")
+
+/**
+ * 字体选择列表排序：按字体名（去扩展名，与列表显示口径一致）升序，
+ * 中文按简体拼音（[Collator]），显示名相同再比原文件名。宿主枚举顺序
+ * 不保证（SAF content 按显示名、纯文件路径按原始序），排序口径收口在
+ * 模块侧。
+ */
+internal fun sortFontOptions(options: List<ReaderFontOption>): List<ReaderFontOption> {
+    val collator = Collator.getInstance(Locale.SIMPLIFIED_CHINESE)
+    return options.sortedWith { a, b ->
+        collator.compare(a.name.substringBeforeLast('.'), b.name.substringBeforeLast('.'))
+            .takeIf { it != 0 } ?: a.name.compareTo(b.name)
+    }
+}
 
 /**
  * 阅读器 ViewModel。
@@ -956,18 +972,18 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application),
     /** 可选字体文件（宿主字体文件夹枚举）。 */
     val fontOptions = _fontOptions.asStateFlow()
 
-    /** 拉取字体文件列表（打开字体配置弹层时调用）。 */
+    /** 拉取字体文件列表（打开字体配置弹层时调用），按字体名升序。 */
     fun loadFontOptions() {
         viewModelScope.launch(Dispatchers.IO) {
-            _fontOptions.value = engine.availableFonts()
+            _fontOptions.value = sortFontOptions(engine.availableFonts())
         }
     }
 
-    /** 设置字体文件夹（SAF tree uri）并刷新字体列表。 */
+    /** 设置字体文件夹（SAF tree uri）并刷新字体列表（按字体名升序）。 */
     fun setFontFolder(uri: String) {
         viewModelScope.launch(Dispatchers.IO) {
             engine.setFontFolder(uri)
-            _fontOptions.value = engine.availableFonts()
+            _fontOptions.value = sortFontOptions(engine.availableFonts())
         }
     }
 
