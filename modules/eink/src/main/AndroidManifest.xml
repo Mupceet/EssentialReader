@@ -7,6 +7,11 @@
                     中列出本应用，用户显式启用后才装载）
   - xposedminversion 传统 API 最低版本（93 = LSPosed 兼容层普遍支持）
   - xposeddescription 模块作用的一句话描述（LSPosed 模块列表展示用）
+  - xposedscope     推荐作用域（官方 Module Scope 协议，分号分隔包名）：
+                    LSPosed 在用户启用本模块时默认勾选这两个宿主，免去在
+                    系统应用列表里手找通用的「设置」「桌面」名；两包仅
+                    存在于汉王系统，其它设备上匹配不到、无副作用。名单与
+                    HanvonCleanerHook.HOSTS 一一对应，改一处必须同步另一处。
 
   模块入口类声明在 src/main/assets/xposed_init；实现见
   java/io/legado/app/eink/hanvon/HanvonCleanerHook.kt（机制与作用域说明
@@ -24,5 +29,8 @@
         <meta-data
             android:name="xposeddescription"
             android:value="让墨本阅读在汉王系统中回到桌面后不被系统清理后台" />
+        <meta-data
+            android:name="xposedscope"
+            android:value="hanvon.aebr.hvsettings;hanvon.aebr.hvLauncher" />
     </application>
 </manifest>

@@ -12,7 +12,8 @@
 
 1. 设备已 root 且安装 Zygisk LSPosed；
 2. 安装本应用后，在 LSPosed 管理器中启用「墨本阅读」模块；
-3. 作用域勾选 **设置（hanvon.aebr.hvsettings）** 与 **桌面（hanvon.aebr.hvLauncher）**；
+3. 作用域已随模块声明（`xposedscope`）**默认勾选 设置（hanvon.aebr.hvsettings）
+   与 桌面（hanvon.aebr.hvLauncher）**，确认两项在列即可；
 4. 重启设备。
 
 未启用 LSPosed 的设备不受任何影响（声明性元数据 + 若干 KB 的惰性类）。

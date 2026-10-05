@@ -42,7 +42,9 @@ import de.robv.android.xposed.callbacks.XC_LoadPackage
  *
  * 本类经 `src/main/assets/xposed_init` 声明为模块入口（LSPosed 传统协议），
  * 在每个作用域进程的包加载阶段被实例化并回调 [handleLoadPackage]。
- * 作用域（需用户在 LSPosed 中勾选）：hanvon.aebr.hvsettings + hanvon.aebr.hvLauncher。
+ * 作用域：hanvon.aebr.hvsettings + hanvon.aebr.hvLauncher——已在本模块
+ * AndroidManifest.xml 经 `xposedscope` 声明为推荐作用域，LSPosed 启用模块
+ * 时默认勾选，用户无需在系统应用列表里手找（两处名单必须同步）。
  * 未启用 LSPosed 的设备上本类永远不会执行（仅多占数 KB dex）。
  */
 class HanvonCleanerHook : IXposedHookLoadPackage {
