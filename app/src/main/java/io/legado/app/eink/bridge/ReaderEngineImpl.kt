@@ -686,6 +686,9 @@ internal object ReaderEngineImpl : ReaderEngine, KoinComponent {
         readSettingsRepository.setFontFolder(uri)
     }
 
+    /** 字体选择列表逐项预览：复用正文排版同款加载与进程级缓存。 */
+    override suspend fun loadFontTypeface(path: String): Typeface? = loadTipTypeface(path)
+
     override fun formatTimeNow(): String =
         AppConst.timeFormat.format(Date()).toString()
 
