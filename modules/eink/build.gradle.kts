@@ -82,6 +82,19 @@ dependencies {
     implementation(einkLibs.coil.compose)
     implementation(einkLibs.coil.network.okhttp)
 
+    // ── Xposed API 官方构件（Hanvon 清理免疫模块用） ──
+    // de.robv.android.xposed:api:82 官方 jar 直接入库（源
+    // https://api.xposed.info/de/robv/android/xposed/api/82/api-82.jar，
+    // 25478 字节，SHA-256 f48c635f…8e25；该 API 2016-04-15 定型后冻结，
+    // 纯接口无实现无传递依赖，入库零风险）。入库而非声明仓库的原因：
+    // Gradle 仓库无法由库模块向宿主 settings 传递，vendored 后所有
+    // 源码嵌入宿主零额外配置（AAR 消费方本就无感——compileOnly 不进 POM）。
+    // 仍须 compileOnly：绝不进 dex 与 POM，运行期由 LSPosed 在宿主进程
+    // 提供真实 bridge，打进 dex 反而会与之冲突。模块本体：
+    // src/main/java/io/legado/app/eink/hanvon/（入口声明在
+    // assets/xposed_init，保活规则在 consumer-rules.pro，三者缺一不可）。
+    compileOnly(files("libs/xposed-api-82.jar"))
+
     // Tooling (debug only)
     debugImplementation(einkLibs.compose.ui.tooling)
     debugImplementation(einkLibs.compose.ui.tooling.preview)

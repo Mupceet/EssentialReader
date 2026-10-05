@@ -1,2 +1,28 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest />
+<!--
+  Hanvon 清理免疫模块的声明性元数据（LSPosed/Xposed 传统协议识别标记）。
+  经 manifest merge 进入宿主 APK；在未安装 LSPosed 的设备上无任何行为。
+
+  - xposedmodule    声明本 APK 是一个 Xposed 模块（LSPosed 据此在模块列表
+                    中列出本应用，用户显式启用后才装载）
+  - xposedminversion 传统 API 最低版本（93 = LSPosed 兼容层普遍支持）
+  - xposeddescription 模块作用的一句话描述（LSPosed 模块列表展示用）
+
+  模块入口类声明在 src/main/assets/xposed_init；实现见
+  java/io/legado/app/eink/hanvon/HanvonCleanerHook.kt（机制与作用域说明
+  读该文件 KDoc 与同包 README）。
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <application>
+        <meta-data
+            android:name="xposedmodule"
+            android:value="true" />
+        <meta-data
+            android:name="xposedminversion"
+            android:value="93" />
+        <meta-data
+            android:name="xposeddescription"
+            android:value="让墨本阅读在汉王系统中回到桌面后不被系统清理后台" />
+    </application>
+</manifest>
