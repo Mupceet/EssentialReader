@@ -70,7 +70,7 @@ import kotlinx.coroutines.launch
  * 翻页手势（EInkPageSwipe）与真实屏幕同款接线，含 PageTurn 意图上报。
  */
 /** 对话框样例的形态枚举：弹框本体须组合在页根（见 [ComponentGalleryRoute]），样例行只持触发钮。 */
-private enum class GalleryDialog { Confirm, ConfirmDisabled, PanelStyle }
+private enum class GalleryDialog { Confirm, ConfirmDisabled, ConfirmNeutral, PanelStyle }
 
 @Composable
 fun ComponentGalleryRoute(
@@ -116,7 +116,7 @@ fun ComponentGalleryRoute(
                     SearchSamples()
                 }
                 item(key = "control-dialog") {
-                    SectionHeader("Control · 对话框（标题 + 内容插槽 + 确认/取消）")
+                    SectionHeader("Control · 对话框（双按钮 / 三动作 / 面板关闭）")
                     DialogSample(onOpen = { openDialog = it })
                 }
                 item(key = "nav-topbar") {
@@ -162,7 +162,24 @@ fun ComponentGalleryRoute(
                     onConfirm = null,
                 ) {
                     EInkText(
-                        text = "确认按钮不可点（弱化描边与文字）。",
+                        text = "确认动作不可点（弱化文字，格线不变）。",
+                        style = EInkTheme.typography.bodyMedium
+                    )
+                }
+
+            GalleryDialog.ConfirmNeutral ->
+                // 三动作形态：第三动作整行居上下两条通宽横线之间，
+                // 下方取消/确认等分格以竖线分割（参考恢复进度弹框）
+                EInkDialog(
+                    onDismiss = { openDialog = null },
+                    title = "三动作弹框",
+                    confirmText = "以云端为准",
+                    neutralText = "以本设备为准",
+                    onNeutral = { openDialog = null },
+                    onConfirm = { openDialog = null },
+                ) {
+                    EInkText(
+                        text = "第三动作整行在上，取消/确认等分格在下；格线与面板边框连通。",
                         style = EInkTheme.typography.bodyMedium
                     )
                 }
@@ -557,7 +574,15 @@ private fun DialogSample(onOpen: (GalleryDialog) -> Unit) {
                 modifier = Modifier.weight(1f)
             )
         }
-        Row(modifier = Modifier.padding(top = EInkSpacing.s)) {
+        Row(
+            modifier = Modifier.padding(top = EInkSpacing.s),
+            horizontalArrangement = Arrangement.spacedBy(EInkSpacing.s)
+        ) {
+            SampleTriggerButton(
+                text = "三动作",
+                onClick = { onOpen(GalleryDialog.ConfirmNeutral) },
+                modifier = Modifier.weight(1f)
+            )
             SampleTriggerButton(
                 text = "关闭钮面板",
                 onClick = { onOpen(GalleryDialog.PanelStyle) },

@@ -3,23 +3,26 @@ package io.legado.app.eink.designsystem.control
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import io.legado.app.eink.designsystem.content.EInkHorizontalDivider
 import io.legado.app.eink.designsystem.content.EInkText
+import io.legado.app.eink.designsystem.content.EInkVerticalDivider
 import io.legado.app.eink.designsystem.interaction.eInkActionColors
 import io.legado.app.eink.designsystem.interaction.einkClickable
 import io.legado.app.eink.designsystem.interaction.rememberImmediatePressState
@@ -34,11 +37,14 @@ import io.legado.app.eink.designsystem.theme.EInkTheme
  * 随组合卸载，无窗口泄漏。
  *
  * 两种形态：
- * - 确认弹框（默认）：标题 + [belowTitle] + [content] + 取消/确认按钮
+ * - 确认弹框（默认）：标题 + [belowTitle] + [content] + 动作区
  *   （§35 按压反色；[onConfirm] 传 null 时确认按钮呈禁用态）。
- *   三动作形态：[onNeutral] 非空时主按钮行上方加一整行第三动作
- *   （文案长于两字时三等分行会省略截断，且直接应答关系应保持二元
- *   对位——如「恢复进度」弹框的「以本设备为准」）。
+ *   动作区与面板边框融合成格线：内容下方一条通宽横线，取消/确认
+ *   为无描边等分格，两格之间竖线上接横线、下接面板底边——按压时整格
+ *   反白（§35），不出现按钮小框描边。
+ *   三动作形态：[onNeutral] 非空时主按钮行上方加一整行第三动作，上下
+ *   各一条通宽横线（文案长于两字时三等分行会省略截断，且直接应答关系
+ *   应保持二元对位——如「恢复进度」弹框的「以本设备为准」）。
  * - 面板弹框：[onClose] 非空时标题行右侧显示 × 关闭钮并在标题行下加分隔线；
  *   [showActions] = false 隐藏底部按钮组（排版调参等实时预览场景，背后
  *   内容不被遮盖）。
@@ -100,6 +106,9 @@ fun EInkDialog(
                 .padding(panelPadding)
                 .background(EInkTheme.colorScheme.surface, shape = EInkShapes.medium)
                 .border(1.dp, EInkTheme.colorScheme.outline, EInkShapes.medium)
+                // 裁剪到面板形状：动作区贴边格线与整格反白按压态
+                // 不越过 4dp 圆角盖成直角
+                .clip(EInkShapes.medium)
                 // 消费面板内空白处点击，避免透传到点击层误关
                 .einkClickable(onClick = {})
             // 内边距下放到各行级：面板形态的分隔线要通到面板左右边缘
@@ -132,47 +141,50 @@ fun EInkDialog(
                 modifier = Modifier.padding(
                     start = EInkSpacing.m,
                     end = EInkSpacing.m,
-                    bottom = if (showActions) 0.dp else EInkSpacing.m
+                    // 动作区自身无纵向留白（横线即区域边界），
+                    // 内容与横线之间的呼吸感统一由这里承担
+                    bottom = EInkSpacing.m
                 )
             ) {
                 content()
             }
             if (showActions) {
-                // 外层统一持有四向边距：第三动作行与主按钮行同组纵向堆叠
-                // （spacedBy 与行内一致）；无第三动作时度量与单 Row 形态相同
-                Column(
-                    modifier = Modifier.padding(
-                        start = EInkSpacing.m,
-                        end = EInkSpacing.m,
-                        top = EInkSpacing.m,
-                        bottom = EInkSpacing.m
-                    ),
-                    verticalArrangement = Arrangement.spacedBy(EInkSpacing.s)
-                ) {
+                // 与面板边框融合的格线动作区：横线取面板描边色连通左右，
+                // 按钮为无描边等分格贴边；竖线上接横线、下接面板底边
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    EInkHorizontalDivider(color = EInkTheme.colorScheme.outline)
                     if (onNeutral != null && neutralText != null) {
                         EInkButton(
                             text = neutralText,
                             onClick = onNeutral,
                             modifier = Modifier.fillMaxWidth(),
                             height = 44.dp,
+                            bordered = false,
                         )
+                        EInkHorizontalDivider(color = EInkTheme.colorScheme.outline)
                     }
+                    // IntrinsicSize.Min：等分格定行高，竖线才只通本行——
+                    // 松约束下 fillMaxHeight 会撑满剩余空间把弹框拉满屏
                     Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(EInkSpacing.s)
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(IntrinsicSize.Min)
                     ) {
                         EInkButton(
                             text = cancelText,
                             onClick = onDismiss,
                             modifier = Modifier.weight(1f),
                             height = 44.dp,
+                            bordered = false,
                         )
+                        EInkVerticalDivider(color = EInkTheme.colorScheme.outline)
                         EInkButton(
                             text = confirmText,
                             enabled = onConfirm != null,
                             onClick = { onConfirm?.invoke() },
                             modifier = Modifier.weight(1f),
                             height = 44.dp,
+                            bordered = false,
                         )
                     }
                 }
