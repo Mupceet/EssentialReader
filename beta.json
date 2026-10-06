@@ -1,49 +1,49 @@
 {
-  "tag_name": "3.26.17-beta.25",
-  "name": "Pre-release 3.26.17-beta.25",
-  "body": "**此版本为测试版，会存在不稳定问题。**\n\n# 更新日志\n\n墨本阅读——开源阅读 legado 的墨水屏增强发行版：同一本书，两种读法。\n\n## 3.26.17-beta（预发布）\n\n本次更新为墨水屏模式新增阅读正文简繁转换，并修复恢复备份与批量导入的两处问题。\n\n### 新增\n\n* 墨水屏模式：阅读正文支持简繁转换——在「排版 → 字体配置」中选择 关闭/繁转简/简转繁，点选后正文立即切换；与完整模式里同一个设置互通，改哪边两边都生效\n\n### 修复\n\n* 恢复备份：从备份恢复时，同一本书不再因为来源不同被重复添加成多本；在一台设备上换过源的书，恢复到其他设备后仍保持换源后的结果\n* 完整模式：修复一次性导入大量书籍（几千本）时可能闪退的问题",
+  "tag_name": "3.26.17-beta.26",
+  "name": "Pre-release 3.26.17-beta.26",
+  "body": "**此版本为测试版，会存在不稳定问题。**\n\n# 更新日志\n\n墨本阅读——开源阅读 legado 的墨水屏增强发行版：同一本书，两种读法。\n\n## 3.26.17-beta（预发布）\n\n本次更新为墨水屏模式优化了换源与字体选择列表，并新增汉王设备后台免疫模块（需 LSPosed）。\n\n### 新增\n\n* 墨水屏模式：换源列表第一位常驻当前书源——打开换源即可看到当前正在使用的书源（带「当前源」标记），重新搜索也不会消失；点击它会提示已是当前书源，搜索结果中也不再重复出现当前书源\n* 墨水屏模式：字体选择列表所见即所得——列表中每个字体都用它自己的字形显示名称和一段中英文示例文字，选中项有醒目的标记；列表按名称排序，更容易比较和找到想要的字体\n* 墨水屏模式：应用内置 LSPosed 模块「墨本阅读」——汉王设备上配合 LSPosed 启用本模块（作用域勾选 设置 + 桌面，重启后生效），回到桌面应用不再被桌面强制清理后台",
   "prerelease": true,
-  "created_at": "2026-10-04T04:45:15Z",
+  "created_at": "2026-10-06T03:52:25Z",
   "assets": [
     {
-      "browser_download_url": "https://github.com/Mupceet/EssentialReader/releases/download/3.26.17-beta.25/mapping.txt",
+      "browser_download_url": "https://github.com/Mupceet/EssentialReader/releases/download/3.26.17-beta.26/mapping.txt",
       "content_type": "text/plain",
-      "created_at": "2026-10-04T09:19:33Z",
+      "created_at": "2026-10-06T04:44:35Z",
       "download_count": 0,
-      "id": 609517371,
+      "id": 614504772,
       "name": "mapping.txt",
       "state": "uploaded",
-      "url": "https://api.github.com/repos/Mupceet/EssentialReader/releases/assets/609517371"
+      "url": "https://api.github.com/repos/Mupceet/EssentialReader/releases/assets/614504772"
     },
     {
-      "browser_download_url": "https://github.com/Mupceet/EssentialReader/releases/download/3.26.17-beta.25/moben-3.26.17-beta.25-arm64-v8a.apk",
+      "browser_download_url": "https://github.com/Mupceet/EssentialReader/releases/download/3.26.17-beta.26/moben-3.26.17-beta.26-arm64-v8a.apk",
       "content_type": "application/vnd.android.package-archive",
-      "created_at": "2026-10-04T09:19:33Z",
+      "created_at": "2026-10-06T04:44:35Z",
       "download_count": 0,
-      "id": 609517370,
-      "name": "moben-3.26.17-beta.25-arm64-v8a.apk",
+      "id": 614504776,
+      "name": "moben-3.26.17-beta.26-arm64-v8a.apk",
       "state": "uploaded",
-      "url": "https://api.github.com/repos/Mupceet/EssentialReader/releases/assets/609517370"
+      "url": "https://api.github.com/repos/Mupceet/EssentialReader/releases/assets/614504776"
     },
     {
-      "browser_download_url": "https://github.com/Mupceet/EssentialReader/releases/download/3.26.17-beta.25/moben-3.26.17-beta.25-armeabi-v7a.apk",
+      "browser_download_url": "https://github.com/Mupceet/EssentialReader/releases/download/3.26.17-beta.26/moben-3.26.17-beta.26-armeabi-v7a.apk",
       "content_type": "application/vnd.android.package-archive",
-      "created_at": "2026-10-04T09:19:33Z",
+      "created_at": "2026-10-06T04:44:35Z",
       "download_count": 0,
-      "id": 609517373,
-      "name": "moben-3.26.17-beta.25-armeabi-v7a.apk",
+      "id": 614504769,
+      "name": "moben-3.26.17-beta.26-armeabi-v7a.apk",
       "state": "uploaded",
-      "url": "https://api.github.com/repos/Mupceet/EssentialReader/releases/assets/609517373"
+      "url": "https://api.github.com/repos/Mupceet/EssentialReader/releases/assets/614504769"
     },
     {
-      "browser_download_url": "https://github.com/Mupceet/EssentialReader/releases/download/3.26.17-beta.25/moben-3.26.17-beta.25.apk",
+      "browser_download_url": "https://github.com/Mupceet/EssentialReader/releases/download/3.26.17-beta.26/moben-3.26.17-beta.26.apk",
       "content_type": "application/vnd.android.package-archive",
-      "created_at": "2026-10-04T09:19:34Z",
+      "created_at": "2026-10-06T04:44:35Z",
       "download_count": 0,
-      "id": 609517375,
-      "name": "moben-3.26.17-beta.25.apk",
+      "id": 614504770,
+      "name": "moben-3.26.17-beta.26.apk",
       "state": "uploaded",
-      "url": "https://api.github.com/repos/Mupceet/EssentialReader/releases/assets/609517375"
+      "url": "https://api.github.com/repos/Mupceet/EssentialReader/releases/assets/614504770"
     }
   ]
 }
