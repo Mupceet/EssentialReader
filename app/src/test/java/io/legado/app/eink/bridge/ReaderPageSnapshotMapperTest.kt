@@ -17,6 +17,7 @@ import io.legado.app.feature.reader.core.model.ReaderPageId
 import io.legado.app.feature.reader.core.model.ReaderRect
 import io.legado.app.feature.reader.core.model.ReaderTextStyle
 import io.legado.app.feature.reader.core.model.ReaderUnderline
+import io.legado.app.feature.reader.platform.ReaderAndroidPaginationStyle
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -610,5 +611,142 @@ class ReaderPageSnapshotMapperTest {
         assertEquals(android.graphics.Typeface.MONOSPACE, spec.typeface)
         // fontVariationSettings：Robolectric 4.16 ShadowPaint 未实现 get/set
         // 往返，不做断言（属 shadow 能力限制）；阴影/斜体不在规格内（E-Ink 不渲染）。
+    }
+
+    // ==== 内容填充比（自动翻页单页时长缩放口径）====
+
+    private fun paginationStyle(
+        bodyTextHeightPx: Float = 50f,
+        lineSpacingExtra: Float = 0f,
+    ): ReaderAndroidPaginationStyle {
+        val paint = android.text.TextPaint().apply { textSize = 40f }
+        val style = ReaderTextStyle(colorArgb = 0, fontSizePx = 40f)
+        return ReaderAndroidPaginationStyle(
+            bodyPaint = paint,
+            titlePaint = paint,
+            bodyStyle = style,
+            titleStyle = style,
+            paddingLeftPx = 0,
+            paddingTopPx = 0,
+            paddingRightPx = 0,
+            paddingBottomPx = 0,
+            bodyTextHeightPx = bodyTextHeightPx,
+            titleTextHeightPx = bodyTextHeightPx,
+            bodyBaselineOffsetPx = 40f,
+            titleBaselineOffsetPx = 40f,
+            lineSpacingExtra = lineSpacingExtra,
+            titleLineSpacingExtra = 0f,
+            paragraphSpacing = 0,
+        )
+    }
+
+    @Test
+    fun `填充比半页内容按内容区高度折算`() {
+        val page = readerPage(
+            listOf(
+                textElement(0f, 0f, "首行", height = 50f),
+                textElement(0f, 650f, "末行", height = 50f),
+            ),
+        )
+        // 既有 fixture：contentTop 0、contentBottom 1400，末行 bottom 700 → 0.5
+        assertEquals(
+            0.5f,
+            ReaderPageSnapshotMapper.contentFillRatio(page, bodyLineAdvancePx = 50f),
+            0.001f,
+        )
+    }
+
+    @Test
+    fun `填充比底部剩余不足一行判满页`() {
+        // 末行 bottom 1380，底部剩余 20 < 行高 50 → 满页（分页器「放不下即换页」同源判据）
+        val page = readerPage(listOf(textElement(0f, 1330f, "近满", height = 50f)))
+        assertEquals(
+            1f,
+            ReaderPageSnapshotMapper.contentFillRatio(page, bodyLineAdvancePx = 50f),
+            0.001f,
+        )
+    }
+
+    @Test
+    fun `填充比空页与非渲染元素页均判满页`() {
+        assertEquals(
+            1f,
+            ReaderPageSnapshotMapper.contentFillRatio(
+                readerPage(emptyList()),
+                bodyLineAdvancePx = 50f,
+            ),
+        )
+        // Review/Action 等元素 eink 不渲染，不计入内容盒
+        assertEquals(
+            1f,
+            ReaderPageSnapshotMapper.contentFillRatio(
+                readerPage(
+                    listOf(
+                        ReaderElement.Review(
+                            bounds = ReaderRect(0f, 0f, 10f, 10f),
+                            count = 3,
+                            paragraphIndex = 0,
+                        ),
+                    ),
+                ),
+                bodyLineAdvancePx = 50f,
+            ),
+        )
+    }
+
+    @Test
+    fun `填充比图片元素计入内容盒且越界钳回一`() {
+        val imagePage = readerPage(listOf(imageElement(0f, 100f, 40f, 700f)))
+        assertEquals(
+            0.5f,
+            ReaderPageSnapshotMapper.contentFillRatio(imagePage, bodyLineAdvancePx = 50f),
+            0.001f,
+        )
+        // 元素 bottom 越过 contentBottom（异常布局）：钳回 1
+        val overflow = readerPage(listOf(textElement(0f, 1380f, "越界", height = 100f)))
+        assertEquals(
+            1f,
+            ReaderPageSnapshotMapper.contentFillRatio(overflow, bodyLineAdvancePx = 50f),
+            0.001f,
+        )
+    }
+
+    @Test
+    fun `快照缺省与显式填充比透传`() {
+        // 既有 mapElements 路径（未传比例）缺省 1f = 满页全时长
+        assertEquals(1f, mapElements(textElement(0f, 0f, "文")).contentFillRatio, 0.001f)
+        val half = ReaderPageSnapshotMapper.mapWithSpecs(
+            page = readerPage(listOf(textElement(0f, 0f, "文"))),
+            titleSpec = titleSpec,
+            contentSpec = contentSpec,
+            sdkInt = 30,
+            sessionBook = null,
+            readProgress = "0.0%",
+            contentFillRatio = 0.5f,
+            imageLoader = { _, _ -> { _, _ -> null } },
+        )
+        assertEquals(0.5f, half.contentFillRatio, 0.001f)
+    }
+
+    @Test
+    fun `map 入口按正文行高加行距计算填充比`() {
+        // 内容区高 1400，末行 bottom 700 = 半页；判满容差 = bodyTextHeightPx 50 + lineSpacingExtra 0
+        val half = ReaderPageSnapshotMapper.map(
+            page = readerPage(listOf(textElement(0f, 650f, "半页", height = 50f))),
+            paginationStyle = paginationStyle(bodyTextHeightPx = 50f, lineSpacingExtra = 0f),
+            sessionBook = null,
+            readProgress = "0.0%",
+        )
+        assertEquals(0.5f, half.contentFillRatio, 0.001f)
+
+        // 容差口径 = bodyTextHeightPx + lineSpacingExtra：末行 bottom 1380，
+        // 剩余 20 < 50 + 8 → 判满页
+        val full = ReaderPageSnapshotMapper.map(
+            page = readerPage(listOf(textElement(0f, 1330f, "近满", height = 50f))),
+            paginationStyle = paginationStyle(bodyTextHeightPx = 50f, lineSpacingExtra = 8f),
+            sessionBook = null,
+            readProgress = "0.0%",
+        )
+        assertEquals(1f, full.contentFillRatio, 0.001f)
     }
 }

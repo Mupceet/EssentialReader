@@ -62,6 +62,11 @@ internal object ReaderPageSnapshotMapper {
             sessionBook = sessionBook,
             readProgress = readProgress,
             bookmarkBadge = bookmarkBadge,
+            contentFillRatio = contentFillRatio(
+                page = page,
+                bodyLineAdvancePx =
+                    paginationStyle.bodyTextHeightPx + paginationStyle.lineSpacingExtra,
+            ),
             imageLoader = ::defaultImageLoader,
         )
 
@@ -74,6 +79,7 @@ internal object ReaderPageSnapshotMapper {
         sessionBook: Book?,
         readProgress: String,
         bookmarkBadge: Boolean = false,
+        contentFillRatio: Float = 1f,
         imageLoader: (Book, String) -> (Int, Int) -> Bitmap?,
     ): ReaderPageSnapshot {
         val staged = ArrayList<LineBuffer>()
@@ -189,6 +195,7 @@ internal object ReaderPageSnapshotMapper {
             lines = staged.map { it.toLine() },
             images = images,
             bookmarkBadge = bookmarkBadge,
+            contentFillRatio = contentFillRatio,
         )
     }
 
@@ -307,6 +314,30 @@ internal object ReaderPageSnapshotMapper {
             percent = "99.9%"
         }
         return percent
+    }
+
+    /**
+     * 内容填充比 (0, 1]：本页最低渲染内容盒（文本/图片元素）bottom 相对
+     * 内容区高度的占比；契约 ReaderPageSnapshot.contentFillRatio 的计算
+     * 义务，模块自动翻页单页时长缩放消费。判满容差与分页器「下一行放不下
+     * 即换页」同源：底部剩余不足一行正文行高视为满页；无渲染内容元素
+     * 或内容区退化（高度 ≤ 0）填 1.0 维持满页时长。
+     */
+    internal fun contentFillRatio(page: ReaderPage, bodyLineAdvancePx: Float): Float {
+        val contentHeight = page.contentBottomPx - page.contentTopPx
+        if (contentHeight <= 0f) return 1f
+        var maxBottom = Float.NEGATIVE_INFINITY
+        for (element in page.elements) {
+            val bottom = when (element) {
+                is ReaderElement.Text -> element.bounds.bottom
+                is ReaderElement.Image -> element.bounds.bottom
+                else -> null
+            } ?: continue
+            if (bottom > maxBottom) maxBottom = bottom
+        }
+        if (maxBottom == Float.NEGATIVE_INFINITY) return 1f
+        if (page.contentBottomPx - maxBottom < bodyLineAdvancePx.coerceAtLeast(1f)) return 1f
+        return ((maxBottom - page.contentTopPx) / contentHeight).coerceIn(0f, 1f)
     }
 
     /**
