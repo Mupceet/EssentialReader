@@ -241,9 +241,11 @@ private fun selectedFontIndex(
     ?.let { path -> fontOptions.indexOfFirst { it.path == path } }
     ?.takeIf { it >= 0 } ?: 0
 
-/** 选中标记尺寸：左侧实心竖条（§42 additive inking：加黑比去黑可靠）。 */
+/** 选中标记尺寸：左侧实心竖条（§42 additive inking：加黑比去黑可靠）。
+ *  高度与行内文字块三行同高（26+4+16+4+16=66dp，bodyLarge 名称 + xs 间距
+ *  + 两行 bodySmall 示例），窄条贯穿文字块，三行行内选中态依旧可辨。 */
 private val FontRowMarkWidth = 4.dp
-private val FontRowMarkHeight = 16.dp
+private val FontRowMarkHeight = 66.dp
 
 /** 字体行高：名称 + 中英示例两行（等高行是分页不变量，触控目标）。 */
 private val FontRowHeight = 88.dp
