@@ -31,9 +31,13 @@ import kotlin.time.Duration.Companion.milliseconds
 
 /**
  * 换源 UiState。
+ *
+ * [current] 是常驻列表首项的「当前源」行数据（进入即见，不随搜索
+ * 清空/重搜消失）；[results] 只含其它书源的搜索结果。
  */
 data class ChangeSourceUiState(
     val book: ChangeSourceBookUiModel? = null,
+    val current: ChangeSourceBookUiModel? = null,
     val results: List<ChangeSourceResultUiModel> = emptyList(),
     val isSearching: Boolean = false,
     val searchedCount: Int = 0,
@@ -85,10 +89,11 @@ class ChangeSourceViewModel(application: Application) : AndroidViewModel(applica
             }
             val (handle, book) = found
             bookHandle = handle
-            _uiState.update { it.copy(book = book) }
+            _uiState.update { it.copy(book = book, current = book) }
             // 对齐宿主 initData：先读历史搜索缓存，命中即直接展示、不重搜
             //（换源 VM 随导航条目销毁，缓存是跨进入次数的唯一记忆；
-            // 顶栏刷新仍可强制重新搜索）；未命中才发起全新搜索
+            // 顶栏刷新仍可强制重新搜索）；未命中才发起全新搜索。
+            // 当前书源自己的记录不进 results——它已由 current 常驻首项
             val cached = engine.cachedSourceBooks(
                 name = book.name,
                 author = book.author,
@@ -99,7 +104,7 @@ class ChangeSourceViewModel(application: Application) : AndroidViewModel(applica
             } else {
                 val seen = HashSet<String>()
                 val results = cached.filter {
-                    it.bookUrl != book.bookUrl && seen.add(it.deduplicationKey)
+                    it.origin != book.origin && seen.add(it.deduplicationKey)
                 }
                 _uiState.update { state -> state.copy(results = results) }
             }
@@ -108,13 +113,20 @@ class ChangeSourceViewModel(application: Application) : AndroidViewModel(applica
 
     /**
      * 跨书源搜索：结果按到达顺序追加（E-Ink 无动画，逐条刷新即可）。
+     * 重新搜索只清空其它源的结果，[ChangeSourceUiState.current] 常驻行保留。
      */
     fun startSearch() {
         val book = _uiState.value.book ?: return
         val handle = bookHandle ?: return
         searchJob?.cancel()
         _uiState.update {
-            ChangeSourceUiState(book = book, isSearching = true)
+            it.copy(
+                results = emptyList(),
+                isSearching = true,
+                searchedCount = 0,
+                totalSourceCount = 0,
+                error = null,
+            )
         }
         searchJob = viewModelScope.launch(Dispatchers.IO) {
             val sources = engine.enabledSources()
@@ -136,9 +148,7 @@ class ChangeSourceViewModel(application: Application) : AndroidViewModel(applica
                                         checkAuthor
                                     )
                                         .forEach { searchBook ->
-                                            if (searchBook.bookUrl != book.bookUrl) {
-                                                onSearchSuccess(searchBook)
-                                            }
+                                            onSearchSuccess(searchBook)
                                         }
                                 }
                             } catch (e: kotlinx.coroutines.CancellationException) {
@@ -183,6 +193,10 @@ class ChangeSourceViewModel(application: Application) : AndroidViewModel(applica
     }
 
     private fun onSearchSuccess(searchBook: ChangeSourceResultUiModel) {
+        val current = _uiState.value.current ?: return
+        // 当前书源自己的搜索结果不进列表（含同源不同 bookUrl 的别版）：
+        // 它已由 current 常驻首项，进列表会出现两行「当前源」
+        if (searchBook.origin == current.origin) return
         _uiState.update { state ->
             // 去重：同一书源同一书籍只保留一条
             if (state.results.any { it.deduplicationKey == searchBook.deduplicationKey }) {
@@ -190,6 +204,16 @@ class ChangeSourceViewModel(application: Application) : AndroidViewModel(applica
             } else {
                 state.copy(results = state.results + searchBook)
             }
+        }
+    }
+
+    /**
+     * 点击常驻首项「当前源」行：换到当前源等于换到原书，无操作，
+     * 只给一条提示反馈点击已被接收。
+     */
+    fun selectCurrentSource() {
+        viewModelScope.launch {
+            _messages.emit(UserMessage.from(R.string.eink_change_source_already_current))
         }
     }
 

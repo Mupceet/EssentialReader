@@ -12,4 +12,5 @@
     <string name="eink_reader_no_prev_page">没有上一页</string>
     <string name="eink_change_source_failed">换源失败</string>
     <string name="eink_change_source_no_result">未找到其它可用书源</string>
+    <string name="eink_change_source_already_current">已是当前书源</string>
 </resources>

@@ -29,6 +29,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import io.legado.app.eink.R
+import io.legado.app.eink.contract.ChangeSourceBookUiModel
 import io.legado.app.eink.contract.ChangeSourceResultUiModel
 import io.legado.app.eink.designsystem.content.EInkHorizontalDivider
 import io.legado.app.eink.designsystem.content.EInkInfoRow
@@ -49,9 +50,16 @@ import io.legado.app.eink.designsystem.theme.EInkSpacing
 import io.legado.app.eink.designsystem.theme.EInkTheme
 import kotlinx.coroutines.launch
 
-/** 当前源左侧实心标记尺寸（▮，规范 §42 列表行持久选中，同目录页“在读”标记）。 */
+/** 当前源左侧实心标记尺寸（▮，规范 §42 列表行持久选中）。高度与行内
+ *  文字块三行同高（26+18+18=62dp，bodyLarge 名称 + 两行 bodySmall 信息
+ *  行、行高由 18dp 图标撑起），同字体选择页 66dp 修正先例：16dp 是
+ *  单行时代尺寸，三行行内只占中间一小截，宽 4dp 不变。 */
 private val CurrentMarkWidth = 4.dp
-private val CurrentMarkHeight = 16.dp
+private val CurrentMarkHeight = 62.dp
+
+/** 常驻首项「当前源」行的 LazyColumn key（deduplicationKey 为书源维度
+ *  组合值，不会再以此字面量出现，不会撞 key）。 */
+private const val CurrentItemKey = "eink_change_source_current"
 
 /**
  * 换源 Route — ViewModel 感知层。
@@ -60,7 +68,7 @@ private val CurrentMarkHeight = 16.dp
  *  - 顶栏动作区为刷新/中止图标按钮（对齐主项目换源弹层 startOrStopSearch），
  *    搜索中图标切换为中止；进度以顶栏被动文本呈现，不再作为按钮；
  *  - 结果列表固定页分页（[rememberEInkListPagerState]），
- *    上下滑动手势与底部 ▲▼ 翻页同一动作；
+ *    上下滑动手势与底部 ▲▼ 翻页同一动作；当前源常驻首项计入分页总数；
  *  - 底部操作栏：左侧返回按钮，右侧上下翻页箭头。
  */
 @Composable
@@ -83,7 +91,8 @@ fun ChangeSourceRoute(
 
     val pager = rememberEInkListPagerState()
     val scope = rememberCoroutineScope()
-    val totalItems = uiState.results.size
+    // 当前源常驻首项与其它源结果一起计入分页总数（pager 按项下标翻页）
+    val totalItems = uiState.results.size + if (uiState.current != null) 1 else 0
 
     // 翻页动作 remember 稳定实例：下传后接收方（列表 / EInkPageSwipe）
     // 不因 lambda 逐次更换而被迫重组；翻页后上报 PageTurn 意图（规范 §26/§40）
@@ -113,7 +122,7 @@ fun ChangeSourceRoute(
         )
     }
 
-    // 顶栏刷新/中止按钮：重新发起搜索时列表会被清空，只重置分页计数，
+    // 顶栏刷新/中止按钮：重新搜索时列表会被清空，只重置分页计数，
     // 不在数据切换期滚动（scrollToItem 会与测量竞争，同搜索页 triggerSearch）
     val onRefreshToggle: () -> Unit = {
         if (!uiState.isSearching) {
@@ -154,7 +163,8 @@ fun ChangeSourceRoute(
                 onPageDown = pageDown,
                 onPick = { searchBook ->
                     viewModel.changeTo(searchBook, onBack)
-                }
+                },
+                onCurrentClick = viewModel::selectCurrentSource,
             )
             if (uiState.isChanging) {
                 // 不透明 surface 遮盖列表（同目录页初始定位遮盖），
@@ -186,6 +196,10 @@ fun ChangeSourceRoute(
 
 /**
  * 无状态换源 Screen。
+ *
+ * 当前源常驻首项（进入即见，重搜不清空）：搜索期不再有全屏“正在搜索
+ * 书源…”遮盖——顶栏已有搜索进度文本，遮盖反而藏掉首项当前源；无其它
+ * 源结果时当前源行保留，说明文案居中补位。
  */
 @Composable
 internal fun ChangeSourceScreen(
@@ -194,31 +208,53 @@ internal fun ChangeSourceScreen(
     onPageUp: () -> Unit,
     onPageDown: () -> Unit,
     onPick: (ChangeSourceResultUiModel) -> Unit,
+    onCurrentClick: () -> Unit,
 ) {
     Box(modifier = Modifier.fillMaxSize()) {
         when {
             state.error != null -> CenterMessage(state.error)
-            state.isSearching && state.results.isEmpty() -> {
-                EInkLoading(
-                    text = "正在搜索书源…",
-                    modifier = Modifier.fillMaxSize(),
-                )
-            }
-
-            state.isEmpty -> CenterMessage("未找到其它书源")
+            state.isEmpty -> EmptyWithCurrent(
+                current = state.current,
+                onCurrentClick = onCurrentClick,
+            )
             else -> SourceList(
                 state = state,
                 pagerListState = pagerListState,
                 onPageUp = onPageUp,
                 onPageDown = onPageDown,
                 onPick = onPick,
+                onCurrentClick = onCurrentClick,
             )
         }
     }
 }
 
 /**
- * 结果列表（固定页分页 + 手势整页翻页）。
+ * 无其它书源结果：常驻当前源行 + 居中说明（说明不顶掉当前源行）。
+ */
+@Composable
+private fun EmptyWithCurrent(
+    current: ChangeSourceBookUiModel?,
+    onCurrentClick: () -> Unit,
+) {
+    Column(modifier = Modifier.fillMaxSize()) {
+        if (current != null) {
+            CurrentSourceItem(current = current, onClick = onCurrentClick)
+            EInkHorizontalDivider()
+        }
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .weight(1f),
+            contentAlignment = Alignment.Center,
+        ) {
+            EInkText(text = "未找到其它书源", style = EInkTheme.typography.bodyLarge)
+        }
+    }
+}
+
+/**
+ * 结果列表（固定页分页 + 手势整页翻页）。首项为常驻当前源行。
  */
 @Composable
 private fun SourceList(
@@ -227,9 +263,8 @@ private fun SourceList(
     onPageUp: () -> Unit,
     onPageDown: () -> Unit,
     onPick: (ChangeSourceResultUiModel) -> Unit,
+    onCurrentClick: () -> Unit,
 ) {
-    val currentOrigin = state.book?.origin
-
     LazyColumn(
         state = pagerListState,
         userScrollEnabled = false,
@@ -241,10 +276,15 @@ private fun SourceList(
                 onPageDown = onPageDown
             )
     ) {
+        state.current?.let { current ->
+            item(key = CurrentItemKey) {
+                CurrentSourceItem(current = current, onClick = onCurrentClick)
+                EInkHorizontalDivider()
+            }
+        }
         items(state.results, key = { it.deduplicationKey }) { searchBook ->
             SourceItem(
                 searchBook = searchBook,
-                isCurrent = searchBook.origin == currentOrigin,
                 onClick = { onPick(searchBook) }
             )
             EInkHorizontalDivider()
@@ -253,15 +293,52 @@ private fun SourceList(
 }
 
 /**
- * 书源条目：按压瞬时反色（规范 §35）。
- *
- * 当前书源为长列表持久选中态：不整行反色（大面积持久反色退出时残影重，
- * 规范 §42），改用左侧实心标记 + 名称加粗 + “当前源”标签（additive inking）。
- * 内容为 书源名称 / 最新章节 / 作者（对齐主项目换源列表字段）。
+ * 结果条目（其它书源）：按压瞬时反色（规范 §35）。
  */
 @Composable
 private fun SourceItem(
     searchBook: ChangeSourceResultUiModel,
+    onClick: () -> Unit,
+) {
+    SourceRow(
+        title = searchBook.originName.ifBlank { searchBook.origin },
+        latestChapter = searchBook.latestChapter,
+        author = searchBook.author,
+        isCurrent = false,
+        onClick = onClick,
+    )
+}
+
+/**
+ * 常驻首项「当前源」条目：与结果行同布局，持久选中态；点击不换源
+ * （换到当前源等于换到原书），仅提示（见 VM selectCurrentSource）。
+ */
+@Composable
+private fun CurrentSourceItem(
+    current: ChangeSourceBookUiModel,
+    onClick: () -> Unit,
+) {
+    SourceRow(
+        title = current.originName.ifBlank { current.origin },
+        latestChapter = current.latestChapterTitle,
+        author = current.author,
+        isCurrent = true,
+        onClick = onClick,
+    )
+}
+
+/**
+ * 书源行：按压瞬时反色（规范 §35）。
+ *
+ * 当前源为长列表持久选中态：不整行反色（大面积持久反色退出时残影重，
+ * 规范 §42），改用左侧实心标记 + 名称加粗 + “当前源”标签（additive inking）。
+ * 内容为 书源名称 / 最新章节 / 作者（对齐主项目换源列表字段）。
+ */
+@Composable
+private fun SourceRow(
+    title: String,
+    latestChapter: String?,
+    author: String,
     isCurrent: Boolean,
     onClick: () -> Unit,
 ) {
@@ -296,7 +373,7 @@ private fun SourceItem(
                 horizontalArrangement = Arrangement.spacedBy(EInkSpacing.s),
             ) {
                 EInkText(
-                    text = searchBook.originName.ifBlank { searchBook.origin },
+                    text = title,
                     modifier = Modifier.weight(1f),
                     style = EInkTheme.typography.bodyLarge,
                     fontWeight = if (isCurrent) FontWeight.Bold else null,
@@ -314,13 +391,13 @@ private fun SourceItem(
             }
             EInkInfoRow(
                 iconRes = R.drawable.eink_ic_book_last,
-                text = searchBook.latestChapter?.takeIf { it.isNotBlank() } ?: "无最新章节",
+                text = latestChapter?.takeIf { it.isNotBlank() } ?: "无最新章节",
                 style = EInkTheme.typography.bodySmall,
                 contentColor = infoColor,
             )
             EInkInfoRow(
                 iconRes = R.drawable.eink_ic_author,
-                text = searchBook.author.ifBlank { "佚名" },
+                text = author.ifBlank { "佚名" },
                 style = EInkTheme.typography.bodySmall,
                 contentColor = infoColor,
             )

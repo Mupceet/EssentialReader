@@ -12,8 +12,10 @@ import androidx.compose.runtime.saveable.Saver
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.filter
-import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 
 /**
  * E-Ink 固定页分页控制器的公共接口（列表 [EInkListPagerState] 与网格
@@ -79,28 +81,50 @@ class EInkListPagerState(val listState: LazyListState) : EInkPageController {
 
     /**
      * 首次布局后测量一页的项数：从下标 0 起连续计数完整可见项。
+     *
+     * 等到首个「视口被填满」的布局才落定（存在底部被截断的项，即内容
+     * 已超过一页）：流式追加的列表（换源页常驻首项、搜索页首批结果）
+     * 首个非空布局可能只有个位数条目，视口未被填满时计数只是过渡值，
+     * 落定过早会把整页翻页永久退化成逐条翻。列表不足一页时永不落定
+     * （[pageItemCount] 保持 0、翻页保持禁用——单页列表本就无需翻页）。
      */
     internal suspend fun measureOnFirstLayout() {
         if (pageItemCount > 0) return
-        val layoutFlow = snapshotFlow { listState.layoutInfo }
-            .filter { it.visibleItemsInfo.isNotEmpty() }
-        var info = layoutFlow.first()
-        // 滚动位置可能被 rememberSaveable 恢复到非首项（如从阅读页返回书架）：
-        // 此时首个可见项下标不为 0，逐项计数第一步就会中断，页大小被误测
-        // 为 1，整页翻页退化成逐项翻。新分页实例逻辑上从第一页开始，
-        // 先回到首项再测量。
-        if (listState.firstVisibleItemIndex != 0 || listState.firstVisibleItemScrollOffset != 0) {
-            scrollToPageStart(0)
-            info = layoutFlow.first { it.visibleItemsInfo.first().index == 0 }
+        val measured = CompletableDeferred<Unit>()
+        coroutineScope {
+            val job = launch {
+                snapshotFlow { listState.layoutInfo }
+                    .filter { it.visibleItemsInfo.isNotEmpty() }
+                    .collect { info ->
+                        // 滚动位置可能被 rememberSaveable 恢复到非首项（如从阅读页返回书架）：
+                        // 此时首个可见项下标不为 0，逐项计数第一步就会中断，页大小被误测
+                        // 为 1，整页翻页退化成逐项翻。新分页实例逻辑上从第一页开始，
+                        // 先回到首项再测量。
+                        if (listState.firstVisibleItemIndex != 0 ||
+                            listState.firstVisibleItemScrollOffset != 0
+                        ) {
+                            scrollToPageStart(0)
+                            return@collect
+                        }
+                        val viewportEnd = info.viewportEndOffset
+                        var count = 0
+                        for (item in info.visibleItemsInfo) {
+                            if (item.index != count) break
+                            if (item.offset + item.size > viewportEnd) break
+                            count++
+                        }
+                        // 视口填满 = 首项起连续完整可见的项数少于可见项总数
+                        //（末项被截断）；恰好整页放下的列表同短列表一样继续等，
+                        // 翻页可用性两种落定值下一致（均为不可下翻）
+                        if (count > 0 && count < info.visibleItemsInfo.size) {
+                            pageItemCount = count
+                            measured.complete(Unit)
+                        }
+                    }
+            }
+            measured.await()
+            job.cancel()
         }
-        val viewportEnd = info.viewportEndOffset
-        var count = 0
-        for (item in info.visibleItemsInfo) {
-            if (item.index != count) break
-            if (item.offset + item.size > viewportEnd) break
-            count++
-        }
-        pageItemCount = count.coerceAtLeast(1)
     }
 
     override fun canPageUp(): Boolean = pageStart > 0

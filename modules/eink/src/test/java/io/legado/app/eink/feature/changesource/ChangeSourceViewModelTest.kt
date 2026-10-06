@@ -86,7 +86,7 @@ class ChangeSourceViewModelTest {
     @Test
     fun `缓存命中时进入即展示历史结果且不发起搜索`() = runBlocking {
         val cachedResult = cachedResultOf(bookUrl = "url-cached", origin = "origin-cached")
-        // 当前书源自己的历史记录应被滤除（换源列表不含当前源）
+        // 当前书源自己的历史记录不进结果列表——它由常驻首项「当前源」行承担
         val currentSourceRecord = cachedResultOf(bookUrl = "url-old", origin = "origin-old")
         val engine = FakeChangeSourceEngine(
             cached = listOf(currentSourceRecord, cachedResult),
@@ -100,6 +100,9 @@ class ChangeSourceViewModelTest {
             val state = viewModel.uiState.value
             assertFalse(state.isSearching)
             assertEquals(listOf(cachedResult), state.results)
+            // 常驻首项的当前源数据来自进入时的书籍快照，与缓存无关
+            assertEquals("origin-old", state.current?.origin)
+            assertEquals("旧书源", state.current?.originName)
             // 缓存命中路径不得发起任何网络搜索
             assertTrue(engine.searchCalls.isEmpty())
         }
@@ -116,6 +119,32 @@ class ChangeSourceViewModelTest {
             withTimeout(10_000) { engine.searchStarted.await() }
 
             assertTrue(engine.searchCalls.isNotEmpty())
+        }
+    }
+
+    @Test
+    fun `搜索结果中当前源不进列表且当前源行常驻`() = runBlocking {
+        // 当前源的搜索命中（含同源不同 bookUrl 的别版）不进结果列表，
+        // 避免出现两行「当前源」；其它源结果正常追加
+        val sameOriginOtherEdition = cachedResultOf(bookUrl = "url-old-2nd", origin = "origin-old")
+        val otherOrigin = cachedResultOf(bookUrl = "url-new", origin = "origin-new")
+        val engine = FakeChangeSourceEngine(
+            cached = emptyList(),
+            searchResults = listOf(sameOriginOtherEdition, otherOrigin),
+            suspendInSearch = false,
+        )
+        withRegistryPatched(engine) {
+            val viewModel = ChangeSourceViewModel(Application())
+
+            viewModel.load("url-old")
+            withTimeout(10_000) {
+                viewModel.uiState.first { !it.isSearching && it.results.isNotEmpty() }
+            }
+
+            val state = viewModel.uiState.value
+            assertEquals(listOf(otherOrigin), state.results)
+            assertEquals("origin-old", state.current?.origin)
+            assertFalse(state.isSearching)
         }
     }
 
@@ -181,13 +210,16 @@ class ChangeSourceViewModelTest {
     } as GlobalSettings
 
     /**
-     * 换源端口假实现：单源搜索进入后挂起（awaitCancellation）模拟
-     * 进行中的网络请求，取消时落标记；changeBookSource 记录入参并
-     * 返回新句柄（成功路径）；cachedSourceBooks 返回构造时给定的
-     * 历史缓存（默认空）。
+     * 换源端口假实现：单源搜索默认进入后挂起（awaitCancellation）模拟
+     * 进行中的网络请求，取消时落标记；[suspendInSearch] 为 false 时直接
+     * 返回 [searchResults]（跑完即止，验证搜索完成态）。changeBookSource
+     * 记录入参并返回新句柄（成功路径）；cachedSourceBooks 返回构造时
+     * 给定的历史缓存（默认空）。
      */
     private class FakeChangeSourceEngine(
         private val cached: List<ChangeSourceResultUiModel> = emptyList(),
+        private val searchResults: List<ChangeSourceResultUiModel> = emptyList(),
+        private val suspendInSearch: Boolean = true,
     ) : ChangeSourceEngine {
 
         val searchStarted = CompletableDeferred<Unit>()
@@ -206,6 +238,7 @@ class ChangeSourceViewModelTest {
                 name = "书名",
                 author = "作者",
                 origin = "origin-old",
+                originName = "旧书源",
             ),
         )
 
@@ -226,6 +259,7 @@ class ChangeSourceViewModelTest {
         ): List<ChangeSourceResultUiModel> {
             searchCalls += source
             searchStarted.complete(Unit)
+            if (!suspendInSearch) return searchResults
             try {
                 awaitCancellation()
             } catch (e: CancellationException) {

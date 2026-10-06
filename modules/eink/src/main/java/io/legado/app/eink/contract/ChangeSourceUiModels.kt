@@ -10,7 +10,8 @@ import io.legado.app.eink.arch.EInkImmutable
  * 宿主书籍实体（阅读会话书优先，否则存储读取）
  *        │ currentReadingBook 时一次映射
  *        ▼
- * ChangeSourceBookUiModel（全基元字段；origin 用于标记「当前源」）
+ * ChangeSourceBookUiModel（全基元字段；origin/originName 用于
+ * 常驻首项的「当前源」行，结果列表按 origin 过滤同源记录）
  * ```
  */
 @EInkImmutable
@@ -24,8 +25,14 @@ data class ChangeSourceBookUiModel(
     /** 作者（换源搜索的匹配词）。 */
     val author: String,
 
-    /** 当前书源 origin 标识（结果列表中标记「当前源」）。 */
+    /** 当前书源 origin 标识（结果列表按它过滤同源记录）。 */
     val origin: String,
+
+    /** 当前书源显示名快照（书籍记录内的 originName，可为空串，UI 回落 origin）。 */
+    val originName: String = "",
+
+    /** 当前书已缓存的最新章节标题（可为 null，UI 回落「无最新章节」）。 */
+    val latestChapterTitle: String? = null,
 )
 
 /**
