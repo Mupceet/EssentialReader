@@ -2,14 +2,15 @@
 
 日期：2026-10-06
 状态：待用户审阅
-范围：eink 模块（eink-lib 子模块）与宿主 Canvas 阅读器墨水屏路径的自动翻页时长
+范围：eink 模块（eink-lib 子模块）自动翻页时长；宿主只新增比例数据通路，自身阅读器行为不变
 
 ## 背景与目标
 
 自动翻页的语义是「用户设置 N 秒/页」，当前两套阅读 UI 都按固定 N 秒翻一页。
 章节末页、短章、含插图页往往只有半页甚至几行内容，仍等满 N 秒，节奏明显拖沓。
 
-目标：翻页时长 = N 秒 × 本页内容占整页比例；满页时长不变，内容越少翻得越快。
+目标（仅 eink 模块）：翻页时长 = N 秒 × 本页内容占整页比例；满页时长不变，
+内容越少翻得越快。宿主完整模式时长行为不变。
 
 ## 现状
 
@@ -54,9 +55,9 @@ duration = max(N 秒 × ratio, 1 秒)
 
 ## 范围外（明确不做）
 
+- **宿主 Canvas 阅读器自身时长**：完整模式的自动翻页（含墨水屏 DISCRETE、
+  非墨水屏 PROGRESSIVE）维持现状；宿主改动仅限为模块填充比例字段的数据通路。
 - **滚动模式自动翻页**：连续滚动本无「页」粒度，速度 = 视口/时长，已是内容比例。
-- **非墨水屏 PROGRESSIVE 分页模式**：揭示条语义是「扫满整个视口」，提前翻页会
-  显得条没走完；本工程面向墨水屏，不在本次范围。
 - **漫画阅读器自动翻页**：整图页无行数概念。
 - 配置 UI、配置项、更新日志：不变更；用户向日志素材留给下次发版汇总。
 
@@ -75,15 +76,12 @@ val contentFillRatio: Float = 1f,
 
 向后兼容：缺省值使旧宿主映射零改动；模块消费方只读该值。
 
-## 宿主侧改动
+## 宿主侧改动（仅数据通路）
 
 - `ReaderPageSnapshotMapper`：计算并填充 `contentFillRatio`。纯函数
-  （elements bounds + contentTop/BottomPx + 行高 → ratio），可单测。
-- `ReaderAutoPagePolicy`：`pageDurationMillis(speedSeconds)` 增加带比例的变体
-  （如 `pageDurationMillis(speedSeconds, ratio)`），保留原签名给 PROGRESSIVE 路径。
-- `ReaderCanvasSurface` DISCRETE 分支：`delay` 与重置点改用缩放后时长。
-  `LaunchedEffect` 已按 `current.id` 重启，每页起算新比例，与「整段重新计时」
-  语义兼容。
+  （elements bounds + contentTop/BottomPx + 正文行高 → ratio），可单测。
+- `ReaderAutoPagePolicy`、`ReaderCanvasSurface` 不动：宿主自身自动翻页时长
+  维持现状（见「范围外」）。
 
 ## 模块侧改动（eink-lib）
 
@@ -98,7 +96,7 @@ val contentFillRatio: Float = 1f,
 ## 测试与验证
 
 - 宿主单测：填充比纯函数（满页=1.0 含容差判满用例、半页≈0.5、空页填 1.0、
-  ratio 钳制）、`pageDurationMillis` 缩放变体（钳 1 秒下限、ratio 边界）。
+  ratio 钳制）。
 - 模块单测：倒计时毫秒化后到点翻页、进度条推进、短页时长缩短、1 秒下限
   （沿 `ReaderUiStateTest` 既有风格）。
 - 编译验证：宿主 `.\gradlew.bat :app:compileAppDebugKotlin`；
