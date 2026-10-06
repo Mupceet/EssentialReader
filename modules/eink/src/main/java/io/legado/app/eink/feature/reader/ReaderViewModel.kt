@@ -600,34 +600,48 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application),
         if (autoPlayJob?.isActive == true) return
         _uiState.update { it.copy(autoPlayProgress = 0f) }
         autoPlayJob = viewModelScope.launch {
-            var elapsedSec = 0
             while (isActive) {
-                delay(1000L)
-                elapsedSec += 1
-                val interval = _uiState.value.autoPlayIntervalSec
-                val progress = (elapsedSec.toFloat() / interval.coerceAtLeast(1)).coerceIn(0f, 1f)
-                _uiState.update { it.copy(autoPlayProgress = progress) }
-                if (elapsedSec >= interval) {
-                    elapsedSec = 0
-                    // 刷新/装载窗口无可渲染页：本拍不翻页、清条重新起算——
-                    // 直连引擎翻章会弃当前重载目标章（判据见 pageTurnAvailable）
-                    if (!_uiState.value.pageTurnAvailable) {
-                        _uiState.update { it.copy(autoPlayProgress = 0f) }
-                        continue
+                // 当前页倒计时：目标时长逐拍重读（配置变更立即生效，对齐旧整秒
+                // 循环每拍读 interval 的语义），并按当页内容填充比缩放——满页为
+                // 配置时长，章节末页等非满页按比例缩短（契约 contentFillRatio）
+                var elapsedMillis = 0L
+                while (isActive) {
+                    val targetMillis = autoPageDurationMillis(
+                        intervalSec = _uiState.value.autoPlayIntervalSec,
+                        contentFillRatio = _uiState.value.page?.contentFillRatio ?: 1f,
+                    )
+                    if (elapsedMillis >= targetMillis) break
+                    // 页脚进度条保持每秒至多刷新一次（墨水屏友好）；末拍取剩余
+                    // 时长，翻页时刻精确落在缩放后时长（含不足 1 秒的短页）
+                    val tickMillis = minOf(1_000L, targetMillis - elapsedMillis)
+                    delay(tickMillis)
+                    elapsedMillis += tickMillis
+                    _uiState.update {
+                        it.copy(
+                            autoPlayProgress =
+                                (elapsedMillis.toFloat() / targetMillis).coerceIn(0f, 1f),
+                        )
                     }
-                    // 直连引擎而非 nextPage()：自动翻页不触发倒计时重置
-                    //（水波纹效果仍按页触发，与手动翻页一致）
-                    preparePageTurnEffect(forward = true)
-                    if (!engine.nextPage()) {
-                        stopAutoPlay()
-                        _messages.emit(UserMessage.from(R.string.eink_reader_auto_page_end))
-                        break
-                    }
-                    // 翻页即清条：满条与清空落在同一帧窗口，渲染层最多闪现一帧
-                    // 即回零——否则 100% 满条要挂到下一个整秒 tick 才消失，
-                    // 用户看到整行黑条持续一秒
-                    _uiState.update { it.copy(autoPlayProgress = 0f) }
                 }
+                if (!isActive) break
+                // 刷新/装载窗口无可渲染页：本拍不翻页、清条重新起算——
+                // 直连引擎翻章会弃当前重载目标章（判据见 pageTurnAvailable）
+                if (!_uiState.value.pageTurnAvailable) {
+                    _uiState.update { it.copy(autoPlayProgress = 0f) }
+                    continue
+                }
+                // 直连引擎而非 nextPage()：自动翻页不触发倒计时重置
+                //（水波纹效果仍按页触发，与手动翻页一致）
+                preparePageTurnEffect(forward = true)
+                if (!engine.nextPage()) {
+                    stopAutoPlay()
+                    _messages.emit(UserMessage.from(R.string.eink_reader_auto_page_end))
+                    break
+                }
+                // 翻页即清条：满条与清空落在同一帧窗口，渲染层最多闪现一帧
+                // 即回零——否则 100% 满条要挂到下一个整秒 tick 才消失，
+                // 用户看到整行黑条持续一秒
+                _uiState.update { it.copy(autoPlayProgress = 0f) }
             }
         }
     }
@@ -1368,6 +1382,17 @@ internal const val BOUNDARY_MESSAGE_INTERVAL_MS = 1_500L
 internal const val DEFAULT_AUTO_INTERVAL_SEC = 10
 internal const val MIN_AUTO_INTERVAL_SEC = 1
 internal const val MAX_AUTO_INTERVAL_SEC = 120
+
+/**
+ * 自动翻页单页时长（毫秒）：配置时长按当页内容填充比缩放（契约
+ * contentFillRatio，满页 = 1 即配置时长），1 秒下限——短页无下限会造成
+ * 墨水屏高频整刷；下限即配置区间 [MIN_AUTO_INTERVAL_SEC]。
+ */
+internal fun autoPageDurationMillis(intervalSec: Int, contentFillRatio: Float): Long {
+    val baseMillis = intervalSec.coerceIn(MIN_AUTO_INTERVAL_SEC, MAX_AUTO_INTERVAL_SEC) * 1000L
+    val scaled = baseMillis * contentFillRatio.coerceIn(0f, 1f)
+    return scaled.toLong().coerceAtLeast(MIN_AUTO_INTERVAL_SEC * 1000L)
+}
 
 /** 字距档位滑条的实际步进（实际字距 = 步进索引 × [LETTER_SPACING_STEP]）。 */
 internal const val LETTER_SPACING_STEP = 0.05f

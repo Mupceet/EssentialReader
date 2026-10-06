@@ -82,4 +82,29 @@ class ReaderUiStateTest {
             ReaderUiState(page = page(), isLoading = false).pageTurnAvailable,
         )
     }
+
+    @Test
+    fun `单页时长满页为配置时长且非满页按比例缩短`() {
+        assertEquals(10_000L, autoPageDurationMillis(10, 1f))
+        assertEquals(5_000L, autoPageDurationMillis(10, 0.5f))
+        assertEquals(7_500L, autoPageDurationMillis(30, 0.25f))
+    }
+
+    @Test
+    fun `单页时长一秒下限防墨水屏高频刷`() {
+        // 短页比例趋零：钳到 1 秒
+        assertEquals(1_000L, autoPageDurationMillis(10, 0.02f))
+        // 配置已是 1 秒：任何比例都不低于 1 秒
+        assertEquals(1_000L, autoPageDurationMillis(1, 0.5f))
+    }
+
+    @Test
+    fun `单页时长配置与比例越界均钳制`() {
+        // 配置越界钳回 1..120
+        assertEquals(1_000L, autoPageDurationMillis(0, 1f))
+        assertEquals(60_000L, autoPageDurationMillis(200, 0.5f))
+        // 比例越界钳回 0..1
+        assertEquals(10_000L, autoPageDurationMillis(10, 1.5f))
+        assertEquals(1_000L, autoPageDurationMillis(10, 0f))
+    }
 }
