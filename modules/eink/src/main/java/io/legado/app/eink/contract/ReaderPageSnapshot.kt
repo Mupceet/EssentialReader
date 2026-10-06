@@ -51,6 +51,15 @@ class ReaderPageSnapshot(
      * 自持「当前页是否有书签」状态。
      */
     val bookmarkBadge: Boolean = false,
+
+    /**
+     * 本页内容填充比 (0, 1]：本页最低内容盒相对内容区高度的占比，1 = 满页。
+     * 宿主映射义务：由分页几何计算——底部剩余不足一行正文行高视为满页
+     * （与分页器「下一行放不下即换页」判据同源），无内容元素的空页填 1.0；
+     * 旧宿主缺省 1.0 = 满页全时长。模块不自行做几何推断，唯一消费方是
+     * 自动翻页单页时长缩放（ReaderViewModel.autoPageDurationMillis）。
+     */
+    val contentFillRatio: Float = 1f,
 )
 
 /**
