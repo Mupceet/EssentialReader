@@ -1,0 +1,113 @@
+# 自动翻页非满页按时长比例缩减——设计
+
+日期：2026-10-06
+状态：待用户审阅
+范围：eink 模块（eink-lib 子模块）与宿主 Canvas 阅读器墨水屏路径的自动翻页时长
+
+## 背景与目标
+
+自动翻页的语义是「用户设置 N 秒/页」，当前两套阅读 UI 都按固定 N 秒翻一页。
+章节末页、短章、含插图页往往只有半页甚至几行内容，仍等满 N 秒，节奏明显拖沓。
+
+目标：翻页时长 = N 秒 × 本页内容占整页比例；满页时长不变，内容越少翻得越快。
+
+## 现状
+
+自动翻页有两处独立实现，共用同一配置（`autoReadSpeed`，有效范围 1..120 秒，
+默认 10；两模式调参互相同步）：
+
+| 界面 | 实现位置 | 倒计时形态 |
+| --- | --- | --- |
+| eink 模块（Compose） | `eink-lib` `ReaderViewModel.startAutoPlayJob` | 1 秒 tick 累计秒数，到点 `engine.nextPage()`；页脚进度条 1 秒粒度 |
+| 宿主 Canvas 阅读器 | `ReaderCanvasSurface` + `ReaderAutoPagePolicy` | 墨水屏 DISCRETE：`delay(整页时长)` 后翻页；非墨水屏 PROGRESSIVE：连续滚动/揭示条 |
+
+## 口径决策：内容填充比（而非严格行数比）
+
+需求口语是「按行数比例缩减」。实现口径有两个候选：
+
+1. **内容填充比（选定）**：`(本页最低内容盒 bottom − contentTop) / (contentBottom − contentTop)`。
+   宿主 `ReaderPage.elements` 全部带 `bounds`，几何现成。行高一致时与行数比相等；
+   标题行、插图、段间距自然纳入；无需「整页行数」参照物。
+2. **严格行数比**：本页行数 / 整页行数。「整页行数」没有权威定义——同一章内
+   标题页、插图页每页容量本就不同，章节最大行数只是近似；契约还要多传一个参照数。
+
+选定 1。另需一条**满页容差**：分页器排版满页时，底部剩余空间必然不足一行行高，
+若按原始填充比计算，满页会得到约 0.93~0.97 的比例、被系统性缩短。规则：
+底部剩余不足一行正文行高视为满页（比例 = 1.0）。行高取 `paginationStyle` 的
+`bodyTextHeightPx + lineSpacingExtra`（映射器已持有该参数，与分页器
+「下一行放不下即换页」判据同源），模块不做几何估算（契约既有纪律）。
+
+## 时长公式与边界
+
+```
+ratio = contentFillRatio ∈ (0, 1]     // 见契约变更
+duration = max(N 秒 × ratio, 1 秒)
+```
+
+- **1 秒下限**：短页比例可能趋近 0，无下限会造成墨水屏高频整刷。下限即配置区间
+  已有的 `MIN_AUTO_INTERVAL_SEC = 1`。
+- **重算时机**：每页倒计时**起点**按当页比例定长，倒计时中途不重算（页面内容在
+  倒计时中不变）。手动翻页、配置变更照既有语义重置倒计时，自然带上新比例。
+- **空页/占位页**：模块侧既有 `pageTurnAvailable` 门已挡（不翻页、清条重计）；
+  ratio 缺省 1.0 时行为与现状完全一致。
+- **翻到书末自动停止**、暂停/恢复整段重新计时：语义不变。
+
+## 范围外（明确不做）
+
+- **滚动模式自动翻页**：连续滚动本无「页」粒度，速度 = 视口/时长，已是内容比例。
+- **非墨水屏 PROGRESSIVE 分页模式**：揭示条语义是「扫满整个视口」，提前翻页会
+  显得条没走完；本工程面向墨水屏，不在本次范围。
+- **漫画阅读器自动翻页**：整图页无行数概念。
+- 配置 UI、配置项、更新日志：不变更；用户向日志素材留给下次发版汇总。
+
+## 契约变更（eink-lib 子模块先行）
+
+`ReaderPageSnapshot` 新增字段：
+
+```kotlin
+/**
+ * 本页内容填充比 (0, 1]：本页最低内容盒相对内容区高度的占比，1 = 满页。
+ * 宿主映射义务：由分页几何计算（满页容差：底部剩余不足一行正文行高时填 1.0；
+ * 无内容元素的空页填 1.0，维持现行为）；旧宿主缺省 1.0，模块不自行做几何推断。
+ */
+val contentFillRatio: Float = 1f,
+```
+
+向后兼容：缺省值使旧宿主映射零改动；模块消费方只读该值。
+
+## 宿主侧改动
+
+- `ReaderPageSnapshotMapper`：计算并填充 `contentFillRatio`。纯函数
+  （elements bounds + contentTop/BottomPx + 行高 → ratio），可单测。
+- `ReaderAutoPagePolicy`：`pageDurationMillis(speedSeconds)` 增加带比例的变体
+  （如 `pageDurationMillis(speedSeconds, ratio)`），保留原签名给 PROGRESSIVE 路径。
+- `ReaderCanvasSurface` DISCRETE 分支：`delay` 与重置点改用缩放后时长。
+  `LaunchedEffect` 已按 `current.id` 重启，每页起算新比例，与「整段重新计时」
+  语义兼容。
+
+## 模块侧改动（eink-lib）
+
+`ReaderViewModel.startAutoPlayJob` 由秒级累计改为毫秒累计：
+
+- 目标时长 = `autoPlayIntervalSec × 1000 × ratio`，钳 1 秒下限。
+- tick 间隔取 `min(1 秒, 剩余时长)`：页脚进度条仍最多每秒刷新一次
+  （墨水屏友好，维持现有注释承诺），翻页时刻精确落在缩放后时长；
+  缩放后不足 1 秒时单次 delay 直达翻页点。
+- 进度条语义不变：`elapsed / 目标时长`，翻页即清零。
+
+## 测试与验证
+
+- 宿主单测：填充比纯函数（满页=1.0 含容差判满用例、半页≈0.5、空页填 1.0、
+  ratio 钳制）、`pageDurationMillis` 缩放变体（钳 1 秒下限、ratio 边界）。
+- 模块单测：倒计时毫秒化后到点翻页、进度条推进、短页时长缩短、1 秒下限
+  （沿 `ReaderUiStateTest` 既有风格）。
+- 编译验证：宿主 `.\gradlew.bat :app:compileAppDebugKotlin`；
+  eink 子模块为独立构建，跑其自身 unit test 任务后按「先子模块后宿主」推指针。
+- 所有文本改动过 `git diff --check`。
+
+## 未验证风险
+
+- 真机墨水屏观感：末页变快后的翻页节奏、进度条在短页上的显示时长，需真机复核。
+- 满页容差按正文行高（`bodyTextHeightPx + lineSpacingExtra`）一刀切：标题行、
+  插图后的残余空间略大于一行正文行高时会被判为非满页、比例略小于 1，
+  影响量级为个位数百分比，真机复核时一并观察。
