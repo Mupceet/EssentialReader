@@ -97,8 +97,10 @@ val contentFillRatio: Float = 1f,
 
 - 宿主单测：填充比纯函数（满页=1.0 含容差判满用例、半页≈0.5、空页填 1.0、
   ratio 钳制）。
-- 模块单测：倒计时毫秒化后到点翻页、进度条推进、短页时长缩短、1 秒下限
-  （沿 `ReaderUiStateTest` 既有风格）。
+- 模块单测（纯 JVM，沿 `ReaderUiStateTest` 既有风格）：短页时长缩短、
+  1 秒下限、配置/比例钳制。倒计时到点翻页与进度条推进属协程行为，
+  模块无 Robolectric 测试基建（`ReaderViewModel` 需 Application），
+  由改动内的行为保真自查与真机复核覆盖。
 - 编译验证：宿主 `.\gradlew.bat :app:compileAppDebugKotlin`；
   eink 子模块为独立构建，跑其自身 unit test 任务后按「先子模块后宿主」推指针。
 - 所有文本改动过 `git diff --check`。
