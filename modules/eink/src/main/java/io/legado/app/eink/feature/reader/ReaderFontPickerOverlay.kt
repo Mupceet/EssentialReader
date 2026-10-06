@@ -68,8 +68,9 @@ import kotlinx.coroutines.withContext
  * 骨架参考目录界面（TocScreen）：顶栏（标题 + 关闭）+ 列表 + 底部
  * 操作栏（返回 / 切换字体文件夹 / 翻页胶囊）。
  *
- * - 字体行两行：字体名（去扩展名，同一级弹层口径）+ 名称下方一行示例
- *   文字（[FontSampleText]）；两行均以该字体文件渲染（path 经宿主端口
+ * - 字体行三行文字：字体名（去扩展名，同一级弹层口径）+ 名称下方两行
+ *   示例（中文 [FontSampleTextCn] / 英文 [FontSampleTextEn]，分看中外
+ *   文字形）；各行均以该字体文件渲染（path 经宿主端口
  *   loadFontTypeface 逐项异步加载 Typeface，加载失败回落平台默认字体），
  *   所见即选择后的正文效果；行内左右留 16dp 边距（[EInkSpacing.m]，与
  *   目录行、顶栏标题同列）；列表按字体名升序（VM sortFontOptions 口径）；
@@ -244,11 +245,17 @@ private fun selectedFontIndex(
 private val FontRowMarkWidth = 4.dp
 private val FontRowMarkHeight = 16.dp
 
-/** 字体行高：名称 + 示例两行（等高行是分页不变量，触控目标）。 */
-private val FontRowHeight = 72.dp
+/** 字体行高：名称 + 中英示例两行（等高行是分页不变量，触控目标）。 */
+private val FontRowHeight = 88.dp
 
-/** 示例文字：字体行第二行，覆盖拉丁字母/数字/汉字展示该字体实际效果。 */
-private const val FontSampleText = "AaBbCc123 字体示例"
+/** 示例文字（中文行）：自然中文短句（口径同「我的」字体大小页），
+ *  覆盖汉字与常用标点字形；按最小屏宽一行放得下取 19 字，超宽由
+ *  单行省略号兜底。 */
+private const val FontSampleTextCn = "合适的字体，让目光在字里行间从容行走。"
+
+/** 示例文字（英文行）：自然英文短句，与中文行同为预览小写/大写/标点
+ *  字形；36 字符按最小屏宽一行放得下取值，超宽单行省略号兜底。 */
+private const val FontSampleTextEn = "Good type makes reading a quiet joy."
 
 /**
  * 字体文件 path → FontFamily（每行一份）：经宿主端口 loadFontTypeface
@@ -267,9 +274,9 @@ private fun rememberFontFamily(path: String): FontFamily? {
 }
 
 /**
- * 字体行：定高 72dp（名称 + 示例两行；等高行是分页不变量）。两行文字
- * 均以该字体文件的 Typeface 渲染（[rememberFontFamily]）。选中 = 左侧
- * 实心竖条 + 名称加粗（§42 不用整行持久反色）；按压瞬时反色（§35）。
+ * 字体行：定高 88dp（名称 + 中英示例两行；等高行是分页不变量）。各行
+ * 文字均以该字体文件的 Typeface 渲染（[rememberFontFamily]）。选中 =
+ * 左侧实心竖条 + 名称加粗（§42 不用整行持久反色）；按压瞬时反色（§35）。
  * 写法同目录页 ChapterItem（TocScreen.kt）。
  */
 @Composable
@@ -316,10 +323,18 @@ private fun FontPickerRow(
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
-            // 示例行用 tertiaryContent 与名称行拉开一档实灰（灰阶做减法，
-            // 不用字重/字号层级）；按压跟随整行反色
+            // 示例两行（中/英）用 tertiaryContent 与名称行拉开一档实灰
+            // （灰阶做减法，不用字重/字号层级）；按压跟随整行反色
             EInkText(
-                text = FontSampleText,
+                text = FontSampleTextCn,
+                fontFamily = fontFamily,
+                style = EInkTheme.typography.bodySmall,
+                color = if (press.isPressed) colors.contentColor else scheme.tertiaryContent,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            EInkText(
+                text = FontSampleTextEn,
                 fontFamily = fontFamily,
                 style = EInkTheme.typography.bodySmall,
                 color = if (press.isPressed) colors.contentColor else scheme.tertiaryContent,
