@@ -43,7 +43,7 @@ class WholeBookPageCoordinatorTest {
 
         coordinator.correctChapter(0, realPageCount = 7, layoutGeneration = generation)
         loaderGate.complete(Unit)
-        withTimeout(2_000) { changed.await() }
+        withTimeout(10_000) { changed.await() }
 
         val state = requireNotNull(coordinator.getState(0, 0))
         assertEquals(10, state.totalPages)
@@ -85,7 +85,7 @@ class WholeBookPageCoordinatorTest {
 
         coordinator.requestEstimate(config, BOOK_ID) { chapters(1) }
 
-        assertFalse(withTimeout(2_000) { oldReady.await() })
+        assertFalse(withTimeout(10_000) { oldReady.await() })
     }
 
     @Test
@@ -277,8 +277,10 @@ class WholeBookPageCoordinatorTest {
         assertEquals(10, coordinator.getState(0, 0)?.totalPages)
         assertFalse(coordinator.getState(0, 0)?.currentChapterExact == true)
         // WholeBookPageCoordinator 把过期记录删除放在估算协程之外另起的 IO 任务里，
-        // 状态发布不等待它落地，所以这里必须轮询到删除完成。
-        withTimeout(2_000) {
+        // 状态发布不等待它落地，所以这里必须轮询到删除完成。预算 10s：满载
+        // CI runner 的 IO 调度延迟曾超 2s 使本断言间歇挂（轮询只等落地，
+        // 结果仍由下方断言校验，放宽不掩盖缺陷）。
+        withTimeout(10_000) {
             while (exactStore.values.isNotEmpty()) delay(10)
         }
         assertTrue(exactStore.values.isEmpty())
@@ -298,7 +300,7 @@ class WholeBookPageCoordinatorTest {
         awaitState(coordinator)
 
         coordinator.correctChapter(0, realPageCount = 7, layoutGeneration = generation)
-        withTimeout(2_000) {
+        withTimeout(10_000) {
             while (exactStore.values.isEmpty()) delay(10)
         }
 
@@ -310,7 +312,7 @@ class WholeBookPageCoordinatorTest {
     }
 
     private suspend fun awaitState(coordinator: WholeBookPageCoordinator) {
-        withTimeout(2_000) {
+        withTimeout(10_000) {
             while (coordinator.getState(0, 0) == null) delay(10)
         }
     }
@@ -319,7 +321,7 @@ class WholeBookPageCoordinatorTest {
         coordinator: WholeBookPageCoordinator,
         expected: Int,
     ) {
-        withTimeout(2_000) {
+        withTimeout(10_000) {
             while (coordinator.getState(0, 0)?.totalPages != expected) delay(10)
         }
     }
