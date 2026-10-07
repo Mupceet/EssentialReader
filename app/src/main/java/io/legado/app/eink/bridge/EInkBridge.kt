@@ -2,19 +2,27 @@ package io.legado.app.eink.bridge
 
 import android.content.Context
 import android.content.SharedPreferences
+import android.net.Uri
 import androidx.compose.runtime.mutableStateOf
 import io.legado.app.constant.PreferKey
 import io.legado.app.domain.gateway.CoverSettingsGateway
 import io.legado.app.domain.gateway.DownloadCacheSettingsGateway
 import io.legado.app.domain.gateway.OtherSettingsGateway
 import io.legado.app.domain.gateway.ReadSettingsGateway
+import io.legado.app.domain.gateway.ThemeSettingsGateway
 import io.legado.app.eink.contract.EInkEngineRegistry
 import io.legado.app.eink.contract.GlobalSettings
 import io.legado.app.eink.contract.PageTurnRippleMode
 import io.legado.app.help.config.AppConfigStore
+import io.legado.app.help.config.AppFontStore
+import io.legado.app.utils.FileDoc
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
@@ -47,6 +55,12 @@ internal object EinkLegacyPrefsStore {
 
     /** 最近文件字体历史的自有键（换行分隔 path 列表，格式见模块侧）。 */
     const val KEY_RECENT_FONTS = "einkRecentFontPaths"
+
+    /** 「我的 → 字体设置」反显记录：所选字体文件夹枚举项 path（源）。 */
+    const val KEY_APP_FONT_SOURCE = "einkAppFontSourcePath"
+
+    /** 反显记录：安装后的私有副本路径（与当前 appFontPath 相等时源记录有效）。 */
+    const val KEY_APP_FONT_COPY = "einkAppFontCopyPath"
 
     fun prefs(): SharedPreferences =
         appCtx.getSharedPreferences(FILE_NAME, Context.MODE_PRIVATE)
@@ -159,6 +173,8 @@ private object GlobalSettingsImpl : GlobalSettings, KoinComponent {
     private val backupSettingsGateway:
             io.legado.app.domain.gateway.BackupSettingsGateway by inject()
 
+    private val themeSettingsGateway: ThemeSettingsGateway by inject()
+
     /** 封面开关快照状态（install 时与宿主设置对齐，防跨模式往返陈旧值）。 */
     private val useDefaultCoverState = mutableStateOf(false)
 
@@ -201,6 +217,75 @@ private object GlobalSettingsImpl : GlobalSettings, KoinComponent {
             einkLegacyPrefs.edit()
                 .putString(EinkLegacyPrefsStore.KEY_RECENT_FONTS, value).apply()
         }
+
+    /**
+     * 应用界面字体（完整模式「外观 → 字体」同流程）：复制入私有目录后写
+     * ThemeSettings.appFontPath——与 ThemeConfigViewModel.SelectAppFont
+     * 同键同语义（含 [launchAppFontJob] 的选择/清除串行纪律），完整模式与
+     * eink 界面字体（uiFontFamily 钩子）经设置流实时生效。源不可读等失败
+     * 静默丢弃（当前字体保持不变，对齐宿主 runCatching+printStackTrace
+     * 的降级）。
+     */
+    override fun setAppFont(sourcePath: String) {
+        launchAppFontJob {
+            val fileDoc = runCatching { FileDoc.fromUri(Uri.parse(sourcePath), false) }
+                .getOrNull() ?: return@launchAppFontJob
+            val target = AppFontStore.install(fileDoc)
+            // 复制期间可能已被新的选择或清除取代，此时不能写回路径
+            ensureActive()
+            themeSettingsGateway.update { it.copy(appFontPath = target.absolutePath) }
+            // 反显记录（源 path + 副本路径）：currentAppFontListPath 据此匹配
+            einkLegacyPrefs.edit()
+                .putString(EinkLegacyPrefsStore.KEY_APP_FONT_SOURCE, sourcePath)
+                .putString(EinkLegacyPrefsStore.KEY_APP_FONT_COPY, target.absolutePath)
+                .apply()
+            AppFontStore.prune(keep = target)
+        }
+    }
+
+    override fun clearAppFont() {
+        launchAppFontJob {
+            themeSettingsGateway.update { it.copy(appFontPath = null) }
+            einkLegacyPrefs.edit()
+                .remove(EinkLegacyPrefsStore.KEY_APP_FONT_SOURCE)
+                .remove(EinkLegacyPrefsStore.KEY_APP_FONT_COPY)
+                .apply()
+            AppFontStore.prune()
+        }
+    }
+
+    override val hasCustomAppFont: Boolean
+        get() = themeSettingsGateway.currentSettings.appFontPath != null
+
+    /**
+     * 反显匹配：eink 侧选择时记录的 源 path + 副本路径，仅当记录副本仍是
+     * 当前生效副本时返回源 path——完整模式侧另选字体会失配（副本按内容
+     * 摘要命名，完整模式选同一字体文件不失配，反显依旧正确）。
+     */
+    override val currentAppFontListPath: String?
+        get() {
+            val copy = einkLegacyPrefs.getString(EinkLegacyPrefsStore.KEY_APP_FONT_COPY, null)
+                ?: return null
+            return themeSettingsGateway.currentSettings.appFontPath
+                ?.takeIf { it == copy }
+                ?.let { einkLegacyPrefs.getString(EinkLegacyPrefsStore.KEY_APP_FONT_SOURCE, null) }
+        }
+
+    /**
+     * 字体的选择与清除串行执行（对齐 ThemeConfigViewModel.launchFontJob）：
+     * 新任务先取消并等待上一个结束，避免未完成的复制晚于清除写回
+     * appFontPath、或先到的 prune(keep=旧值) 误删新副本。
+     */
+    private var appFontJob: Job? = null
+
+    private fun launchAppFontJob(block: suspend CoroutineScope.() -> Unit) {
+        val previous = appFontJob
+        appFontJob = einkSettingsWriteScope.launch {
+            previous?.cancelAndJoin()
+            runCatching { block() }
+                .onFailure { if (it !is CancellationException) it.printStackTrace() }
+        }
+    }
 
     override val threadCount: Int
         get() = downloadCacheSettingsGateway.currentSettings.threadCount

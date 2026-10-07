@@ -13,13 +13,13 @@ import io.legado.app.domain.gateway.ThemeSettingsGateway
 import io.legado.app.domain.model.settings.AppShellSettings
 import io.legado.app.domain.model.settings.CoverSettings
 import io.legado.app.domain.model.settings.ThemeSettings
+import io.legado.app.help.config.AppFontStore
 import io.legado.app.ui.main.MainDestination
 import io.legado.app.utils.FileDoc
 import io.legado.app.utils.FileUtils
 import io.legado.app.utils.MD5Utils
 import io.legado.app.utils.externalFiles
 import io.legado.app.utils.inputStream
-import io.legado.app.utils.openInputStream
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -34,7 +34,6 @@ import kotlinx.coroutines.launch
 import splitties.init.appCtx
 import java.io.File
 import java.io.FileOutputStream
-import kotlin.uuid.Uuid
 import kotlin.coroutines.cancellation.CancellationException
 
 class ThemeConfigViewModel(
@@ -546,42 +545,18 @@ class ThemeConfigViewModel(
 
     private fun setAppFont(fileDoc: FileDoc) {
         launchFontJob {
-            val extension = fileDoc.name.substringAfterLast('.', "ttf")
-                .lowercase()
-                .takeIf { it.matches(Regex("[a-z0-9]{1,8}")) }
-                ?: "ttf"
-            val fontDir = appFontDir()
-            val temp = File(fontDir, "app_font_${Uuid.random()}.tmp")
-            val target = try {
-                fileDoc.openInputStream().getOrThrow().use { input ->
-                    FileOutputStream(temp).use(input::copyTo)
-                }
-                // 以内容摘要命名：同一字体无论导入多少次都指向同一路径，
-                // 既不会留下重复副本，字体缓存也能按路径命中。
-                val digest = temp.inputStream().use(MD5Utils::md5Encode)
-                File(fontDir, "app_font_$digest.$extension").also { target ->
-                    if (target.isFile) {
-                        temp.delete()
-                    } else if (!temp.renameTo(target)) {
-                        temp.copyTo(target, overwrite = true)
-                        temp.delete()
-                    }
-                }
-            } catch (e: Throwable) {
-                temp.delete()
-                throw e
-            }
+            val target = AppFontStore.install(fileDoc)
             // 复制期间可能已被新的选择或清除取代，此时不能写回路径。
             ensureActive()
             themeSettingsGateway.update { it.copy(appFontPath = target.absolutePath) }
-            pruneCopiedFonts(keep = target)
+            AppFontStore.prune(keep = target)
         }
     }
 
     private fun clearAppFont() {
         launchFontJob {
             themeSettingsGateway.update { it.copy(appFontPath = null) }
-            pruneCopiedFonts()
+            AppFontStore.prune()
         }
     }
 
@@ -595,18 +570,6 @@ class ThemeConfigViewModel(
             previous?.cancelAndJoin()
             runCatching { block() }
                 .onFailure { if (it !is CancellationException) it.printStackTrace() }
-        }
-    }
-
-    private fun appFontDir() = File(appCtx.filesDir, "fonts").apply { mkdirs() }
-
-    /**
-     * 清理私有目录里已经用不到的字体副本，只认本应用复制的 app_font 前缀，
-     * 不碰主题包导入的 theme_ 资源。
-     */
-    private fun pruneCopiedFonts(keep: File? = null) {
-        appFontDir().listFiles()?.forEach { file ->
-            if (file.name.startsWith("app_font") && file != keep) file.delete()
         }
     }
 }
