@@ -189,7 +189,7 @@ maven-publish 接线（release 单变体 + sources jar，坐标
 | ReaderEngineImpl (startCache) | `CacheBook.start` 为 suspend——改构造 `CacheDownloadRequest` 走非 suspend 重载 |
 | SearchEngineImpl | `SearchModel` 已删——走 `SearchBooksUseCase.execute(...): Flow<SearchRunEvent>`；搜索范围读 local_ui_status DataStore |
 | ChangeSourceEngineImpl | `migrateTo` 需补 `replaceEnableDefault`/`chineseConverterType` 两参；filter 三参 |
-| EInkBridge | 全部设置经网关（OtherSettings/ReadSettings/DownloadCache/Cover/ChangeSource Gateway + Koin；chineseConverterType 转发 ReadSettingsGateway 与完整模式同键，supportsChineseConverter 声明 true）；fontScaleSetting 仍走同步快照 |
+| EInkBridge | 全部设置经网关（OtherSettings/ReadSettings/DownloadCache/Cover/ChangeSource/ThemeSettings Gateway + Koin；chineseConverterType 转发 ReadSettingsGateway 与完整模式同键，supportsChineseConverter 声明 true；setAppFont/clearAppFont/setAppFontPreset(0) 走 ThemeSettingsGateway + AppFontStore 与「外观 → 字体」同流程同键（选择/清除串行纪律 launchAppFontJob）；hasCustomAppFont/currentAppFontListPath 反显走 appFontPath 快照 + eink prefs 源 path/副本路径匹配（完整模式侧改动后失配为 null））；fontScaleSetting 仍走同步快照 |
 | PageTurnEffectEngineImpl | 掌阅固件 EPDCDevice 反射（水波纹翻页，effect 编码见 PageTurnEffectCodes）：能力 = 品牌 iReader **且** 反射探测通过，任一不过档位行不渲染；档位键 `einkPageTurnRippleMode`（off/slow/standard/fast）落 EinkLegacyPrefsStore |
 
 ### 3.3 develop@01ee1e956（legado-with-MD3 旧栈，2026-09-05 全量回放实测）

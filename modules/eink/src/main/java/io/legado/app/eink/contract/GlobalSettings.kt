@@ -207,6 +207,70 @@ interface GlobalSettings {
         set(value) {}
 
     /**
+     * 应用界面字体（转发完整模式「外观 → 字体」键 appFontPath，与完整
+     * 模式共享同一存储；完整模式 UI 与 eink 界面的 uiFontFamily 钩子都
+     * 消费它）。注意：存储的是宿主私有目录内的副本路径（宿主安装时复制），
+     * 与字体文件夹枚举项的内容 URI 不同源，按 path 比对不出选中项。
+     *
+     * 可写（「我的 → 字体设置」选中文件字体时）：调用方传入字体文件夹
+     * 枚举项的 path（内容 URI 或文件路径均可），宿主负责复制入私有目录
+     * 并原子更新设置——fire-and-forget，写完即生效：UI 字体订阅设置流
+     * 实时重渲染，无需 recreate。失败（源不可读等）静默丢弃，当前字体
+     * 保持不变。
+     *
+     * 默认实现（旧宿主）：写入丢弃——界面字体保持平台默认，行为不回退。
+     */
+    fun setAppFont(sourcePath: String) {}
+
+    /**
+     * 清除应用界面字体（回落平台默认）：「我的 → 字体设置」系统默认档
+     * （[setAppFontPreset] 的 0 档）与完整模式「外观 → 字体」清除共用的
+     * 回退动作。fire-and-forget。
+     *
+     * 默认实现（旧宿主）：无操作。
+     */
+    fun clearAppFont() {}
+
+    /**
+     * 应用界面字体是否已启用自定义文件字体（appFontPath 非空）。
+     * 「我的 → 字体设置」以此判定系统默认档的选中反显：完整模式侧改动
+     * 后本值实时反映（getter 读同步快照）。自定义字体源不可反显时
+     * （[currentAppFontListPath] 为 null）本值仍为 true——列表不误亮
+     * 系统默认。
+     *
+     * 默认实现（旧宿主）：恒 false——界面字体只能是默认，反显恒正确。
+     */
+    val hasCustomAppFont: Boolean get() = false
+
+    /**
+     * 当前应用字体对应的字体文件夹枚举项 path（「我的 → 字体设置」的自
+     * 定义字体反显/定位数据源）：宿主以 eink 侧选择时记录的 源 path +
+     * 副本路径 匹配，仅当记录的副本仍是当前生效副本时返回源 path；完整
+     * 模式侧另选字体会失配（副本按内容摘要命名，选同一字体文件不失配）。
+     * null = 系统默认或不可匹配（不定位、不亮行）。
+     *
+     * 默认实现（旧宿主）：恒 null——不反显。
+     */
+    val currentAppFontListPath: String? get() = null
+
+    /**
+     * 应用界面字体支持的系统预设档（列表头部预设项，标签由模块侧维护）：
+     * 0 = 系统默认（必含，选中即清除自定义）；1 = 系统衬线；2 = 系统等宽
+     * ——宿主声明支持才渲染。当前宿主 appFontPath 仅 自定义/默认 两态，
+     * 默认实现即终态（仅 0 档）。
+     */
+    val supportedAppFontPresets: List<Int> get() = listOf(0)
+
+    /**
+     * 应用系统预设档（[supportedAppFontPresets] 声明的档位才有效）：
+     * 0 = 系统默认 = 清除自定义字体；1/2 = 衬线/等宽（支持的宿主自行
+     * 映射写径）。fire-and-forget，语义同 [clearAppFont]。
+     */
+    fun setAppFontPreset(preset: Int) {
+        if (preset == 0) clearAppFont()
+    }
+
+    /**
      * 图片绘制抗锯齿（仅阅读页图片画笔消费；文字画笔恒抗锯齿不受
      * 影响）。与灰阶控制立场存在张力，默认关闭。
      */

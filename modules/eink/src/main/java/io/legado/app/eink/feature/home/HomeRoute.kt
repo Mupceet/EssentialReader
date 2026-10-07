@@ -99,6 +99,7 @@ internal fun HomeRoute(
     onSearch: () -> Unit,
     onOpenFullMode: () -> Unit = {},
     onOpenFontScale: () -> Unit = {},
+    onOpenFontSettings: () -> Unit = {},
     onOpenThemeDebug: () -> Unit = {},
     onOpenComponentGallery: () -> Unit = {},
     viewModel: BookshelfViewModel = viewModel()
@@ -328,6 +329,7 @@ internal fun HomeRoute(
                     onPageDown = minePageDown,
                     updateViewModel = updateViewModel,
                     onOpenFontScale = onOpenFontScale,
+                    onOpenFontSettings = onOpenFontSettings,
                     onOpenFullMode = onOpenFullMode,
                     onOpenThemeDebug = onOpenThemeDebug,
                     onOpenComponentGallery = onOpenComponentGallery

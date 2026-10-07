@@ -49,4 +49,17 @@ sealed interface EInkScreen {
 
     /** 字体大小设置（示例文字预览 + 抬手生效的倍率滑条，入口在「我的」页） */
     data object FontScaleSettings : EInkScreen
+
+    /**
+     * 字体设置（字体文件夹内文件字体分页列表选择，入口在「我的」页与
+     * 阅读器字体配置弹层）。
+     *
+     * 两入口写径与生效流程不同，按 [fromReader] 路由分流（对齐完整模式
+     * 两条字体流程）：
+     * - 自阅读页进入：阅读字体（正文直选、标题/页眉跟随正文的统一写径），
+     *   点选应用后即返回阅读页（对齐原浮层点选即关的路径）；
+     * - 「我的」进入：应用界面字体（完整模式「外观 → 字体」同流程同键），
+     *   选完停留本页，界面字体经设置流实时生效，底栏可清除回落默认。
+     */
+    data class FontSettings(val fromReader: Boolean = false) : EInkScreen
 }

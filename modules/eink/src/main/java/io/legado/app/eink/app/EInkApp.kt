@@ -53,6 +53,7 @@ import io.legado.app.eink.designsystem.theme.EInkTheme
 import io.legado.app.eink.feature.bookdetail.BookDetailRoute
 import io.legado.app.eink.feature.changesource.ChangeSourceRoute
 import io.legado.app.eink.feature.home.FontScaleSettingsRoute
+import io.legado.app.eink.feature.home.FontSettingsRoute
 import io.legado.app.eink.feature.home.HomeRoute
 import io.legado.app.eink.feature.home.releaseNoteToPlainText
 import io.legado.app.eink.feature.reader.ReaderRoute
@@ -162,6 +163,9 @@ fun EInkApp(
                             EInkScreen.BookDetail(name, author, bookUrl, fromReader = true)
                         )
                     },
+                    onOpenFontSettings = {
+                        controller.navigate(EInkScreen.FontSettings(fromReader = true))
+                    },
                 )
             } else {
                 // 其余界面统一避让系统栏（Edge-to-Edge 下系统栏透明覆盖在
@@ -203,6 +207,9 @@ fun EInkApp(
                                 onOpenFullMode = onExitToFullMode,
                                 onOpenFontScale = {
                                     controller.navigate(EInkScreen.FontScaleSettings)
+                                },
+                                onOpenFontSettings = {
+                                    controller.navigate(EInkScreen.FontSettings())
                                 },
                                 onOpenThemeDebug = {
                                     controller.navigate(EInkScreen.ThemeDebug)
@@ -285,6 +292,13 @@ fun EInkApp(
 
                         is EInkScreen.FontScaleSettings -> {
                             FontScaleSettingsRoute(onBack = { controller.pop() })
+                        }
+
+                        is EInkScreen.FontSettings -> {
+                            FontSettingsRoute(
+                                fromReader = screen.fromReader,
+                                onBack = { controller.pop() },
+                            )
                         }
 
                         is EInkScreen.Reader -> Unit // 上方已处理

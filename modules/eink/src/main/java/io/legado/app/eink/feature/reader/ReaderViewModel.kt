@@ -157,6 +157,20 @@ internal fun sortFontOptions(options: List<ReaderFontOption>): List<ReaderFontOp
 }
 
 /**
+ * 统一字体写径快照：正文直选、标题/页眉归位「跟随正文」（页脚经
+ * applyHeaderStyle 跟随页眉）——选字体时由桥展开为同一路径；正文选系统
+ * 预设时跟随者回落空串（宿主语义）。阅读器字体配置弹层（setReaderFont）
+ * 与独立字体设置页（FontSettingsScreen）共用，保证两侧写径不漂移。
+ */
+internal fun ReaderTextStyle.withUnifiedFont(
+    selection: ReaderFontSelection,
+): ReaderTextStyle = copy(
+    bodyFont = selection,
+    titleFont = ReaderFontSelection.FollowBody,
+    headerFont = ReaderFontSelection.FollowBody,
+)
+
+/**
  * 阅读器 ViewModel。
  *
  * 桥接引擎全局状态机（经 [io.legado.app.eink.contract.ReaderEngine] 端口）
@@ -908,22 +922,15 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application),
     // ---- 协商扩展参数（目录可用性由 UI 入口判定，VM 只管写） ----
 
     /** 统一字体：正文/标题/页眉（页脚经 applyHeaderStyle 跟随页眉）完全
-     *  一致——选字体时正文直写、标题/页眉归位「跟随正文」，由桥展开为
-     *  同一路径；正文选系统预设时跟随者回落空串（宿主语义）。
-     *  选中文件字体时同步记录最近选择（弹框反显数据源）。 */
+     *  一致（写径见 [withUnifiedFont]）。选中文件字体时同步记录最近选择
+     *  （弹框反显数据源；独立字体设置页入口写径同款）。 */
     fun setReaderFont(selection: ReaderFontSelection) {
         if (selection is ReaderFontSelection.File) {
             _recentFontPaths.value = listOf(selection.path)
             EInkEngineRegistry.globalSettings.recentFontPathsEncoding =
                 encodeRecentFontPaths(_recentFontPaths.value)
         }
-        applyStyleChange {
-            it.copy(
-                bodyFont = selection,
-                titleFont = ReaderFontSelection.FollowBody,
-                headerFont = ReaderFontSelection.FollowBody,
-            )
-        }
+        applyStyleChange { it.withUnifiedFont(selection) }
     }
 
     fun setBodyWeight(value: Int) = applyStyleChange {
@@ -986,10 +993,16 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application),
     /** 可选字体文件（宿主字体文件夹枚举）。 */
     val fontOptions = _fontOptions.asStateFlow()
 
-    /** 拉取字体文件列表（打开字体配置弹层时调用），按字体名升序。 */
+    /** 拉取字体文件列表（打开字体配置弹层时调用），按字体名升序。独立
+     *  字体设置页（自阅读页进入）经外部写径直接改 最近字体记录 + 引擎
+     *  样式（不经本 VM），返回重开弹层时在此一并重同步——「当前字体」
+     *  反显与选中高亮不残留旧值。 */
     fun loadFontOptions() {
         viewModelScope.launch(Dispatchers.IO) {
             _fontOptions.value = sortFontOptions(engine.availableFonts())
+            _recentFontPaths.value =
+                decodeRecentFontPaths(EInkEngineRegistry.globalSettings.recentFontPathsEncoding)
+            _uiState.update { it.copy(style = engine.currentStyle()) }
         }
     }
 

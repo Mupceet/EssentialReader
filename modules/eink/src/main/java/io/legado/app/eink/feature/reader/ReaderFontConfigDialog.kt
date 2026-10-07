@@ -32,7 +32,7 @@ import io.legado.app.eink.designsystem.theme.EInkSpacing
  * 条件行反显最近选中的文件字体（历史 ∩ 当前枚举，幽灵剔除——切回系统
  * 预设后一键可回；无历史不默认展示，入口独占整行）；入口：枚举空（未选
  * 过文件夹/空文件夹）为「选择字体文件夹」直开 SAF，非空为「更多字体…（N）」
- * 进二级浮层 [ReaderFontPickerOverlay]。正文字重与标题字重：预设行
+ * 导航进入独立字体设置页（EInkScreen.FontSettings）。正文字重与标题字重：预设行
  * 「细体/常规/粗体」三选 + 独立自定义行（点击原地替换为拖动条，点预设
  * 复原，窄屏四枚一行显示不完整），拖动条值域 100..900。简繁转换：三选
  * 按钮行（关闭/繁转简/简转繁——按钮文案 ≤3 字：等分宽度下 4 字以上
@@ -48,7 +48,7 @@ internal fun ReaderFontConfigDialog(
     recentFontPaths: List<String>,
     chineseConverterType: Int,
     onSetFont: (ReaderFontSelection) -> Unit,
-    onOpenFontPicker: () -> Unit,
+    onOpenFontSettings: () -> Unit,
     onSetBodyWeight: (Int) -> Unit,
     onSetTitleWeight: (Int) -> Unit,
     onSetChineseConverterType: (Int) -> Unit,
@@ -128,13 +128,13 @@ internal fun ReaderFontConfigDialog(
                     }
                     // 条件行：最近选中的文件字体反显（若有）与入口同排等分；
                     // 无反显时入口独占整行。入口：枚举空 = 首选动作选文件夹
-                    // 直开 SAF；非空「更多字体…（N）」进二级
+                    // 直开 SAF；非空「更多字体…（N）」进字体设置页
                     val entryLabel = if (fontOptions.isEmpty()) {
                         "选择字体文件夹"
                     } else {
                         "更多字体…（${fontOptions.size}）"
                     }
-                    val entryAction = if (fontOptions.isEmpty()) onPickFolder else onOpenFontPicker
+                    val entryAction = if (fontOptions.isEmpty()) onPickFolder else onOpenFontSettings
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(EInkSpacing.xs),

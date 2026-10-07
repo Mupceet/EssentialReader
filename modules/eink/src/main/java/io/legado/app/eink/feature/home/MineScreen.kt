@@ -76,6 +76,7 @@ internal fun MineScreen(
     onPageDown: () -> Unit = {},
     updateViewModel: EInkAppUpdateViewModel,
     onOpenFontScale: () -> Unit = {},
+    onOpenFontSettings: () -> Unit = {},
     onOpenFullMode: () -> Unit = {},
     onOpenThemeDebug: () -> Unit = {},
     onOpenComponentGallery: () -> Unit = {},
@@ -107,6 +108,14 @@ internal fun MineScreen(
                 label = "字体大小",
                 sublabel = "当前倍率 ${(fontScale ?: FONT_SCALE_NEUTRAL) / 10f}x",
                 onClick = onOpenFontScale
+            )
+        }
+        item { EInkHorizontalDivider() }
+        item {
+            MineEntry(
+                label = "字体设置",
+                sublabel = "设置界面显示字体",
+                onClick = onOpenFontSettings
             )
         }
         item { EInkHorizontalDivider() }

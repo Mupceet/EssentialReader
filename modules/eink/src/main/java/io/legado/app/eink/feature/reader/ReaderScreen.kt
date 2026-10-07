@@ -78,7 +78,6 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import io.legado.app.eink.contract.EInkEngineRegistry
-import io.legado.app.eink.contract.ReaderFontSelection
 import io.legado.app.eink.contract.ReaderPageSnapshot
 import io.legado.app.eink.designsystem.content.EInkText
 import io.legado.app.eink.designsystem.control.EInkDialog
@@ -184,6 +183,7 @@ fun ReaderRoute(
     onOpenToc: (String) -> Unit,
     onChangeSource: (String) -> Unit,
     onOpenDetail: (name: String, author: String, bookUrl: String) -> Unit,
+    onOpenFontSettings: () -> Unit,
     viewModel: ReaderViewModel = viewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -193,11 +193,10 @@ fun ReaderRoute(
     val keyEventHub = EInkEngineRegistry.keyEventHub
     var panel by remember { mutableStateOf<ReaderPanel?>(null) }
     // 排版设置弹层（字体配置/信息配置/边距调整）：居中透明卡片，
-    // 打开期间面板与操作条隐藏；返回键逐级回退到排版展开态
+    // 打开期间面板与操作条隐藏；返回键逐级回退到排版展开态。
+    // 字体文件列表选择（原二级浮层）已提取为独立字体设置页（EInkScreen.
+    // FontSettings），经 onOpenFontSettings 导航进入，自阅读页进入选完即返回
     var styleDialog by remember { mutableStateOf<ReaderStyleDialog?>(null) }
-    // 字体二级浮层（字体配置弹层内「当前字体/更多字体」进入）：全屏分页
-    // 列表，点选应用后回一级；×/返回键只关本级（styleDialog 不动）
-    var fontPicker by remember { mutableStateOf(false) }
     // 点击区域蒙层（九宫格简化版，其它面板入口）：全屏覆盖含操作条，
     // 自持返回键（蒙层内 BackHandler 后组合优先于 Route 链）；退出即
     // 落盘生效，面板状态保留——关闭后回到其它面板展开态
@@ -557,9 +556,6 @@ fun ReaderRoute(
     LaunchedEffect(styleDialog) {
         if (styleDialog == ReaderStyleDialog.Fonts) {
             viewModel.loadFontOptions()
-        } else {
-            // 一级字体弹层关闭即复位二级浮层（组合条件已挡，此处防重开残影）
-            fontPicker = false
         }
     }
 
@@ -983,7 +979,7 @@ fun ReaderRoute(
                 onSetBodyWeight = viewModel::setBodyWeight,
                 onSetTitleWeight = viewModel::setTitleWeight,
                 onSetChineseConverterType = viewModel::setChineseConverterType,
-                onOpenFontPicker = { fontPicker = true },
+                onOpenFontSettings = onOpenFontSettings,
                 onPickFolder = { fontFolderLauncher.launch(null) },
                 onClose = { styleDialog = null },
                 onBackdropClick = dismissToCleanReading,
@@ -1002,23 +998,6 @@ fun ReaderRoute(
                 onBackdropClick = dismissToCleanReading,
             )
             null -> Unit
-        }
-
-        // 字体二级浮层：组合晚于一级字体弹层（BackHandler 优先接管返回键）；
-        // 全屏本体无背板，点选应用/× 即关（styleDialog 不动，一级保留）
-        if (styleDialog == ReaderStyleDialog.Fonts && fontPicker) {
-            ReaderFontPickerOverlay(
-                fontOptions = fontOptions,
-                selectedPath = (uiState.style.bodyFont as? ReaderFontSelection.File)?.path,
-                // 菜单层活值避让：开关开启期状态栏不在场为 0，关闭期为真实栏高
-                topInset = statusBarTop,
-                onSelect = { option ->
-                    viewModel.setReaderFont(ReaderFontSelection.File(option.path))
-                    fontPicker = false
-                },
-                onPickFolder = { fontFolderLauncher.launch(null) },
-                onClose = { fontPicker = false },
-            )
         }
 
         // 点击区域蒙层（九宫格简化版）：全屏覆盖（面板/操作条/阅读手势
