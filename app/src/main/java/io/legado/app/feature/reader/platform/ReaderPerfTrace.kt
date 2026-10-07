@@ -9,6 +9,7 @@ import java.util.concurrent.atomic.AtomicInteger
  * path to the first readable page, not to trace every Canvas draw or Compose recomposition.
  */
 internal object ReaderPerfTrace {
+    private const val MAX_NAME = 100
     private val nextAsyncCookie = AtomicInteger()
 
     // 纯 JVM 单测里 android.os.Trace 未 mock，首次调用直接抛 RuntimeException。
@@ -80,15 +81,21 @@ internal object ReaderPerfTrace {
      * 归因打点。`marker` 会被放在 composable 体内，每次重组都执行；未开 tracing 时必须尽早
      * 返回，否则每条 marker 都是两次 `Trace` 静态调用乘以重组次数。
      * 注意：API < 29 没有 `Trace.isEnabled()`，这里随之整体跳过（与 suspendSection 一致）。
+     * 段名必须截断：`Trace.beginSection` 对超过 127 字符的名字直接抛 IllegalArgumentException，
+     * 而 marker 常在组合期调用，抛出即整个应用崩溃。
      */
     fun marker(name: String) {
         // isEnabled 前置（上游：marker 在 composable 体内每次重组执行，未开 tracing 时
         // 尽早返回省两次 Trace 静态调用；纯 JVM 单测 SDK_INT=0 在此短路）。begin/end
         // 内部保留失效软化，Trace 异常环境降级为 no-op 而不拖垮调用方。
         if (!isEnabled()) return
-        begin("reader.$name")
+        begin(markerSectionName(name))
         end()
     }
+
+    /** 段名截断（上游 3c57 轮并入）：begin 走失效软化，截断让超长名仍可追踪而非整体降级。 */
+    private fun markerSectionName(name: String): String =
+        if (name.length <= MAX_NAME) "reader.$name" else "reader." + name.substring(0, MAX_NAME)
 
     fun isEnabled(): Boolean = Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && Trace.isEnabled()
 
