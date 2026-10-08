@@ -24,7 +24,6 @@ import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -48,6 +47,7 @@ import io.legado.app.eink.designsystem.navigation.EInkOperationBar
 import io.legado.app.eink.designsystem.navigation.EInkOperationBarIcon
 import io.legado.app.eink.designsystem.navigation.EInkPageArrows
 import io.legado.app.eink.designsystem.pager.EInkPageSwipe
+import io.legado.app.eink.designsystem.pager.awaitPositionReady
 import io.legado.app.eink.designsystem.pager.rememberEInkListPagerState
 import io.legado.app.eink.designsystem.refresh.EInkRefreshIntent
 import io.legado.app.eink.designsystem.refresh.LocalEInkRefreshController
@@ -57,7 +57,6 @@ import io.legado.app.eink.feature.reader.encodeRecentFontPaths
 import io.legado.app.eink.feature.reader.sortFontOptions
 import io.legado.app.eink.feature.reader.withUnifiedFont
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -232,9 +231,11 @@ private fun FontSettingsScreen(
     val refresh = LocalEInkRefreshController.current
     val totalRows = presets.size + fontOptions.size
 
-    // 初始定位：等字体枚举完成 + 首布局测出页容量后跳到选中项所在页。
-    // 未选中/幽灵选中归 0。定位只执行一次；数据原地变化（文件夹重扫）
-    // 后拉回页首（防御）。选择不进本效应键，点选只更新行内选中态
+    // 初始定位：等字体枚举完成 + 首布局后，跳到选中项所在页——等测量落定
+    // 或单页可容纳（单页无需跳转，jumpToItemAligned no-op；只等测量落定
+    // 会把恰好一页的列表卡在遮盖常驻）。未选中/幽灵选中归 0。定位只执行
+    // 一次；数据原地变化（文件夹重扫）后拉回页首（防御）。选择不进本
+    // 效应键，点选只更新行内选中态
     var positioned by remember { mutableStateOf(false) }
     LaunchedEffect(fontsLoaded, fontOptions) {
         if (!fontsLoaded) return@LaunchedEffect
@@ -243,7 +244,7 @@ private fun FontSettingsScreen(
             return@LaunchedEffect
         }
         if (!positioned) {
-            snapshotFlow { pager.pageItemCount }.first { it > 0 }
+            pager.awaitPositionReady()
             pager.jumpToItemAligned(positionTargetIndex(presets, fontOptions, selectedFontPath))
             positioned = true
         } else {

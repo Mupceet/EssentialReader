@@ -31,7 +31,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
@@ -70,6 +69,7 @@ import io.legado.app.eink.designsystem.navigation.EInkOperationBarIcon
 import io.legado.app.eink.designsystem.navigation.EInkPageArrows
 import io.legado.app.eink.designsystem.navigation.EInkTopBar
 import io.legado.app.eink.designsystem.pager.EInkPageSwipe
+import io.legado.app.eink.designsystem.pager.awaitPositionReady
 import io.legado.app.eink.designsystem.pager.rememberEInkFlowPagerState
 import io.legado.app.eink.designsystem.pager.rememberEInkListPagerState
 import io.legado.app.eink.designsystem.refresh.EInkRefreshIntent
@@ -77,7 +77,6 @@ import io.legado.app.eink.designsystem.refresh.LocalEInkRefreshController
 import io.legado.app.eink.designsystem.theme.EInkShapes
 import io.legado.app.eink.designsystem.theme.EInkSpacing
 import io.legado.app.eink.designsystem.theme.EInkTheme
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 
@@ -183,8 +182,10 @@ fun TocRoute(
     LaunchedEffect(uiState.chapters, uiState.isReversed, uiState.searchKey) {
         if (uiState.chapters.isEmpty()) return@LaunchedEffect
         if (uiState.searchKey.isBlank()) {
+            // 等测量落定或单页可容纳（单页无需也无页可跳，jumpToItemAligned
+            // no-op）——只等测量落定会把恰好一页的目录卡在遮盖常驻
             if (!positioned) {
-                snapshotFlow { pager.pageItemCount }.first { it > 0 }
+                pager.awaitPositionReady()
             }
             pager.jumpToItemAligned(displayIndexOfCurrent())
             positioned = true

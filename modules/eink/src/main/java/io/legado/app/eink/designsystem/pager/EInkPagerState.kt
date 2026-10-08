@@ -1,5 +1,6 @@
 package io.legado.app.eink.designsystem.pager
 
+import androidx.compose.foundation.lazy.LazyListLayoutInfo
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.runtime.Composable
@@ -15,6 +16,7 @@ import androidx.compose.runtime.snapshotFlow
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 /**
@@ -229,6 +231,39 @@ class EInkListPagerState(val listState: LazyListState) : EInkPageController {
             }
         }
     }
+}
+
+/**
+ * 定位遮盖的前置等待：分页测量落定（内容超一页，[pageItemCount] > 0），
+ * 或当前内容单页即可完整展示。
+ *
+ * [measureOnFirstLayout] 只在「末项被截断」（视口被填满）时落定——内容
+ * 恰好装进一页的列表（短列表，或行高变化后原本微溢出的列表缩回一页）
+ * 按设计永不落定；此时无需翻页也无页可跳（[jumpToItemAligned] 对
+ * pageItemCount ≤ 0 直接 no-op），必须放行，否则以测量落定为揭盖条件的
+ * 界面（目录页、字体设置页）遮盖常驻——不透明遮盖无指针处理，表现为
+ * 「列表不可见但行可点击」。
+ *
+ * 调用方须保证等待期间 totalItems 已是终态（数据整批到位，非流式追加），
+ * 避免过渡批次被误判为单页。
+ */
+internal suspend fun EInkListPagerState.awaitPositionReady() {
+    snapshotFlow { listState.layoutInfo to pageItemCount }.first { (info, pages) ->
+        pages > 0 || (info.visibleItemsInfo.isNotEmpty() && singlePageContent(info))
+    }
+}
+
+/** 当前布局是否单页可容纳：首项起、末项即列表末尾且完整可见（含首项
+ *  自身即超出视口的退化布局——异常字体度量撑爆行高等）。 */
+private fun singlePageContent(info: LazyListLayoutInfo): Boolean {
+    val visible = info.visibleItemsInfo
+    val first = visible.firstOrNull() ?: return false
+    if (first.index != 0) return false
+    val last = visible.last()
+    if (last.index == info.totalItemsCount - 1 && last.offset + last.size <= info.viewportEndOffset) {
+        return true
+    }
+    return visible.size == 1 && first.offset + first.size > info.viewportEndOffset
 }
 
 /**
