@@ -214,8 +214,12 @@ internal fun CoverSettings.toPrefMap(): Map<String, Any?> = mapOf(
 )
 
 internal fun Preferences.toLabSettings(): LabSettings = LabSettings(
-    enabled = compatDsBoolean(PreferKey.labEnabled) ?: false,
-    eInkDisplay = compatDsBoolean(PreferKey.labEInkDisplay) ?: false,
+    // 「启用实验室」「墨水屏显示」默认开：全新安装即可在「我的」页直接看到
+    // 「墨水屏模式」开关（条目显隐 = enabled && eInkDisplay）。App.kt 的
+    // eInkMode←labEInkDisplay 一次性迁移读的是原始存储值（缺省 null 不触发），
+    // 此处读取时默认不落盘，不会让新装机自动进入墨水屏模式
+    enabled = compatDsBoolean(PreferKey.labEnabled) ?: true,
+    eInkDisplay = compatDsBoolean(PreferKey.labEInkDisplay) ?: true,
     eyeProtection = compatDsBoolean(PreferKey.labEyeProtection) ?: false,
     eInkMode = compatDsBoolean(PreferKey.eInkMode) ?: false,
 )

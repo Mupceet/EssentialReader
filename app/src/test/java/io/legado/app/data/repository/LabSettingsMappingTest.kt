@@ -1,6 +1,7 @@
 package io.legado.app.data.repository
 
 import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.preferencesOf
 import io.legado.app.constant.PreferKey
 import io.legado.app.domain.model.settings.LabSettings
 import io.legado.app.help.config.PendingOverlayCore
@@ -24,6 +25,14 @@ class LabSettingsMappingTest {
         samples.forEach { expected ->
             assertEquals(expected, expected.toPrefMap().toTestPreferences().toLabSettings())
         }
+    }
+
+    @Test
+    fun `键缺省时实验室与墨水屏显示默认开`() {
+        // 新装机未写任何实验室键：条目显隐门控 enabled && eInkDisplay 直接成立，
+        // 「我的」页即可见「墨水屏模式」开关；eInkMode 仍默认关，不会自动进入模式
+        val defaults = preferencesOf().toLabSettings()
+        assertEquals(LabSettings(enabled = true, eInkDisplay = true), defaults)
     }
 
     @Test
