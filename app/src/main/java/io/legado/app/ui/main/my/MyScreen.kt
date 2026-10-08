@@ -2,6 +2,7 @@ package io.legado.app.ui.main.my
 
 import android.Manifest
 import android.annotation.SuppressLint
+import android.content.Intent
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -25,6 +26,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ExitToApp
 import androidx.compose.material.icons.automirrored.filled.LibraryBooks
+import androidx.compose.material.icons.automirrored.filled.MenuBook
 import androidx.compose.material.icons.automirrored.filled.Rule
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Bookmark
@@ -52,11 +54,13 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.legado.app.R
+import io.legado.app.eink.EInkMainActivity
 import io.legado.app.ui.book.bookmark.AllBookmarkActivity
 import io.legado.app.ui.book.toc.rule.TxtTocRuleActivity
 import io.legado.app.ui.dict.rule.DictRuleActivity
 import io.legado.app.ui.file.FileManageActivity
 import io.legado.app.ui.theme.adaptiveContentPadding
+import io.legado.app.utils.startActivity
 import io.legado.app.ui.widget.components.AppScaffold
 import io.legado.app.ui.widget.components.SplicedColumnGroup
 import io.legado.app.ui.widget.components.button.series.SmallPlainButton
@@ -95,6 +99,12 @@ fun MyRouteScreen(
     LaunchedEffect(viewModel) {
         viewModel.effects.collectLatest { effect ->
             when (effect) {
+                // 打开开关即整体切换进 E-Ink（CLEAR_TASK），与退出方向的
+                // EInkMainActivity.onExitToFullMode 对称
+                MyEffect.EnterEInkMode -> context.startActivity<EInkMainActivity> {
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    addFlags(Intent.FLAG_ACTIVITY_CLEAR_TASK)
+                }
                 MyEffect.RequestLocalNetworkPermission -> localNetworkPermissionLauncher.launch(
                     Manifest.permission.ACCESS_LOCAL_NETWORK
                 )
@@ -146,6 +156,14 @@ fun MyScreen(
             SplicedColumnGroup(
                 title = ""
             ) {
+                if (state.showEInkModeEntry) {
+                    SwitchSettingItem(
+                        title = stringResource(R.string.my_eink_mode),
+                        imageVector = Icons.AutoMirrored.Filled.MenuBook,
+                        checked = state.isEInkModeOn,
+                        onCheckedChange = { onIntent(MyIntent.SetEInkMode(it)) },
+                    )
+                }
                 WebServiceSettingBlock(
                     uiState = state,
                     onToggleWebService = {

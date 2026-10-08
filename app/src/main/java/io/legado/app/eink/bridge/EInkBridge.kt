@@ -1,0 +1,386 @@
+package io.legado.app.eink.bridge
+
+import android.content.Context
+import android.content.SharedPreferences
+import android.net.Uri
+import androidx.compose.runtime.mutableStateOf
+import io.legado.app.constant.PreferKey
+import io.legado.app.domain.gateway.CoverSettingsGateway
+import io.legado.app.domain.gateway.DownloadCacheSettingsGateway
+import io.legado.app.domain.gateway.OtherSettingsGateway
+import io.legado.app.domain.gateway.ReadSettingsGateway
+import io.legado.app.domain.gateway.ThemeSettingsGateway
+import io.legado.app.eink.contract.EInkEngineRegistry
+import io.legado.app.eink.contract.GlobalSettings
+import io.legado.app.eink.contract.PageTurnRippleMode
+import io.legado.app.help.config.AppConfigStore
+import io.legado.app.help.config.AppFontStore
+import io.legado.app.utils.FileDoc
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.launch
+import org.koin.core.component.KoinComponent
+import org.koin.core.component.inject
+import splitties.init.appCtx
+
+/**
+ * E-InK 自有偏好（readerTapZonesEncoding/pullDownBookmark）的存储位。
+ *
+ * 历史存储位是宿主默认 prefs 文件（`<packageName>_preferences`），而该
+ * 文件正是 DataStore「settings」的 MIGRATE_ALL_KEYS 迁移源
+ * （SettingsRepository）：androidx 在每次进程启动时对非空源文件执行
+ * 迁移并在 cleanUp 中 clear() 整文件——自有键写进去后进程一重启即被
+ * 清空回默认（点击区域/常亮开关反复重置的根因）。故迁至专属文件
+ * [FILE_NAME]，键名逐字保留；旧默认文件中的残留由该迁移机制自行清空。
+ */
+internal object EinkLegacyPrefsStore {
+
+    /** E-InK 自有偏好的专属 prefs 文件（独立于 DataStore 迁移源）。 */
+    const val FILE_NAME = "eink_preferences"
+
+    /** readerTapZonesEncoding 的自有键（9 位编码整键，格式见模块侧）。 */
+    const val KEY_TAP_ZONES = "einkReaderTapZones"
+
+    /** pullDownBookmark 的自有键（默认关）。 */
+    const val KEY_PULL_DOWN_BOOKMARK = "einkReaderPullDownBookmark"
+
+    /** 水波纹翻页档位的自有键（"off"/"slow"/"standard"/"fast"，默认 off；
+     * 仅宿主探测到掌阅 EPDC 能力时档位行可见）。 */
+    const val KEY_PAGE_TURN_RIPPLE_MODE = "einkPageTurnRippleMode"
+
+    /** 最近文件字体历史的自有键（换行分隔 path 列表，格式见模块侧）。 */
+    const val KEY_RECENT_FONTS = "einkRecentFontPaths"
+
+    /** 「我的 → 字体设置」反显记录：所选字体文件夹枚举项 path（源）。 */
+    const val KEY_APP_FONT_SOURCE = "einkAppFontSourcePath"
+
+    /** 反显记录：安装后的私有副本路径（与当前 appFontPath 相等时源记录有效）。 */
+    const val KEY_APP_FONT_COPY = "einkAppFontCopyPath"
+
+    fun prefs(): SharedPreferences =
+        appCtx.getSharedPreferences(FILE_NAME, Context.MODE_PRIVATE)
+}
+
+/**
+ * E-Ink 引擎桥接层装配入口。
+ *
+ * 宿主侧唯一职责：把 app 引擎能力以 [io.legado.app.eink.contract] 端口
+ * 实现的形式提供给 :modules:eink。由入口子类 EInkMainActivity 的
+ * onInstallEngines 钩子调用（模块模板基类 EInkHostActivity 在
+ * attachBaseContext 首行触发，早于任何 E-Ink Composable 组合与端口读取）。
+ *
+ * 移植到新上游时：本目录（eink/bridge/）是唯一需要重写的部分，模块侧
+ * 零改动（差异记录见 contract/EINK-PORTING.md §3）。
+ */
+object EInkBridge {
+
+    /**
+     * 当前在前的 E-Ink 宿主 Activity（EinkMainActivity onStart/onStop 挂载）。
+     * 端口实现弹出宿主 UI 层（段评半屏 WebView 等 DialogFragment）的事务
+     * 宿主与生命周期作用域来源；无前台活动时（退后台/已销毁）相关分派
+     * 静默放弃。
+     */
+    private var hostActivity: androidx.appcompat.app.AppCompatActivity? = null
+
+    fun attachHostActivity(activity: androidx.appcompat.app.AppCompatActivity) {
+        hostActivity = activity
+    }
+
+    fun detachHostActivity(activity: androidx.appcompat.app.AppCompatActivity) {
+        if (hostActivity === activity) hostActivity = null
+    }
+
+    fun hostActivity(): androidx.appcompat.app.AppCompatActivity? = hostActivity
+
+    fun install() {
+        EInkEngineRegistry.install(
+            globalSettings = GlobalSettingsImpl,
+            bookshelfEngine = BookshelfEngineImpl,
+            searchEngine = SearchEngineImpl,
+            tocEngine = TocEngineImpl,
+            bookDetailEngine = BookDetailEngineImpl,
+            changeSourceEngine = ChangeSourceEngineImpl,
+            coverEngine = CoverEngineImpl,
+            readerEngine = ReaderEngineImpl,
+            appUpdateEngine = AppUpdateEngineImpl,
+            marksEngine = MarksEngineImpl,
+            bookshelfGroupEngine = BookshelfGroupEngineImpl,
+            backupSyncEngine = BackupSyncEngineImpl,
+            pageTurnEffectEngine = PageTurnEffectEngineImpl,
+        )
+        // 封面开关为快照状态缓存：每次进入 E-Ink 与宿主设置快照对齐，
+        // 防止完整模式（或上一会话）修改后的陈旧值
+        GlobalSettingsImpl.syncUseDefaultCover()
+    }
+}
+
+// E-Ink 设置项的异步落盘作用域：端口契约保持同步 setter，写入经
+// Gateway update（DataStore 原子提交）在本作用域承接；写后立即读
+// getter 不保证可见新值，UI 侧应以本地状态做乐观更新（useDefaultCover
+// 的快照状态除外——见 GlobalSettingsImpl）。
+internal val einkSettingsWriteScope =
+    CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+
+/**
+ * 全局设置视图。
+ *
+ * 设置项全部经设置网关读写：threadCount/preDownloadNum 经
+ * DownloadCacheSettingsGateway（与旧 AppConfig 门面同键同默认值的
+ * 快照）；autoRefreshBook/defaultToRead（「我的」页可写）经
+ * OtherSettingsGateway、volumeKeyPage、hideStatusBar、showReviewBubbles
+ * 与 chineseConverterType（后四者为阅读界面其它设置开关、转发宿主阅读
+ * 设置键，与完整模式共享同一存储；chineseConverterType 由宿主内容处理
+ * 管线逐章消费）经 ReadSettingsGateway、
+ * changeSourceCheckAuthor 经 ChangeSourceSettingsGateway；
+ * useDefaultCover（「我的」页可写）为本对象持有的 Compose 快照状态 +
+ * CoverSettingsGateway 异步落盘——组合内读取订阅变化，切换后开关行与
+ * 书架/详情可见封面立即重组；readerTapZonesEncoding、pullDownBookmark
+ * （均为阅读菜单设置、E-InK 自有偏好、完整模式无对应设置；
+ * readerTapZonesEncoding 不转发完整模式 clickAction* 键：值域只有三动作，
+ * 转发会让两侧配置互相覆盖）同走
+ * EinkLegacyPrefsStore 专属 prefs 文件不经设置网关（默认 prefs 文件是
+ * DataStore 迁移源、启动即被整文件清空，不可作存储位）：readerTapZonesEncoding
+ * （9 位编码整键原样存取，编码语义在模块侧）、recentFontPathsEncoding
+ * （换行分隔 path 列表原样存取，编码语义在模块侧）与 pullDownBookmark
+ * （下拉添加书签，默认关）为自有键；syncReadingProgress（「我的」页
+ * 可写）经 BackupSettingsGateway 转发宿主「同步阅读进度」主键，写时
+ * 带宿主设置页同款父子联动。
+ *
+ * fontScaleSetting 例外地仍走 AppConfigStore 同步快照（护栏允许——
+ * 禁的是 AppConfig/ui.config.*Config）：端口契约的 null = 未设置/跟随
+ * 系统缩放语义在域模型中不存在（AppShellSettings.fontScale 非空，仓库
+ * 把未设置映射为 10），且写入需支持 remove 键；域化须先把该字段
+ * nullable 化并处理完整模式读方与主题导出，另行专项。
+ */
+private object GlobalSettingsImpl : GlobalSettings, KoinComponent {
+
+    private val changeSourceSettingsGateway:
+            io.legado.app.domain.gateway.ChangeSourceSettingsGateway by inject()
+
+    private val otherSettingsGateway: OtherSettingsGateway by inject()
+
+    private val readSettingsGateway: ReadSettingsGateway by inject()
+
+    private val downloadCacheSettingsGateway: DownloadCacheSettingsGateway by inject()
+
+    private val coverSettingsGateway: CoverSettingsGateway by inject()
+
+    private val backupSettingsGateway:
+            io.legado.app.domain.gateway.BackupSettingsGateway by inject()
+
+    private val themeSettingsGateway: ThemeSettingsGateway by inject()
+
+    /** 封面开关快照状态（install 时与宿主设置对齐，防跨模式往返陈旧值）。 */
+    private val useDefaultCoverState = mutableStateOf(false)
+
+    fun syncUseDefaultCover() {
+        useDefaultCoverState.value = coverSettingsGateway.currentSettings.useDefaultCover
+    }
+
+    /** E-InK 自有偏好的存储位（[EinkLegacyPrefsStore] 专属文件，历史键名不变）。 */
+    private val einkLegacyPrefs by lazy { EinkLegacyPrefsStore.prefs() }
+
+    override var pullDownBookmark: Boolean
+        get() = einkLegacyPrefs.getBoolean(EinkLegacyPrefsStore.KEY_PULL_DOWN_BOOKMARK, false)
+        set(value) {
+            einkLegacyPrefs.edit()
+                .putBoolean(EinkLegacyPrefsStore.KEY_PULL_DOWN_BOOKMARK, value).apply()
+        }
+
+    override var pageTurnRippleMode: PageTurnRippleMode
+        get() = PageTurnRippleMode.entries.firstOrNull {
+            it.name.lowercase() == einkLegacyPrefs.getString(
+                EinkLegacyPrefsStore.KEY_PAGE_TURN_RIPPLE_MODE, "off"
+            )
+        } ?: PageTurnRippleMode.OFF
+        set(value) {
+            einkLegacyPrefs.edit()
+                .putString(EinkLegacyPrefsStore.KEY_PAGE_TURN_RIPPLE_MODE, value.name.lowercase())
+                .apply()
+        }
+
+    override var readerTapZonesEncoding: String?
+        get() = einkLegacyPrefs.getString(EinkLegacyPrefsStore.KEY_TAP_ZONES, null)
+        set(value) {
+            einkLegacyPrefs.edit()
+                .putString(EinkLegacyPrefsStore.KEY_TAP_ZONES, value).apply()
+        }
+
+    override var recentFontPathsEncoding: String
+        get() = einkLegacyPrefs.getString(EinkLegacyPrefsStore.KEY_RECENT_FONTS, "") ?: ""
+        set(value) {
+            einkLegacyPrefs.edit()
+                .putString(EinkLegacyPrefsStore.KEY_RECENT_FONTS, value).apply()
+        }
+
+    /**
+     * 应用界面字体（完整模式「外观 → 字体」同流程）：复制入私有目录后写
+     * ThemeSettings.appFontPath——与 ThemeConfigViewModel.SelectAppFont
+     * 同键同语义（含 [launchAppFontJob] 的选择/清除串行纪律），完整模式与
+     * eink 界面字体（uiFontFamily 钩子）经设置流实时生效。源不可读等失败
+     * 静默丢弃（当前字体保持不变，对齐宿主 runCatching+printStackTrace
+     * 的降级）。
+     */
+    override fun setAppFont(sourcePath: String) {
+        launchAppFontJob {
+            val fileDoc = runCatching { FileDoc.fromUri(Uri.parse(sourcePath), false) }
+                .getOrNull() ?: return@launchAppFontJob
+            val target = AppFontStore.install(fileDoc)
+            // 复制期间可能已被新的选择或清除取代，此时不能写回路径
+            ensureActive()
+            themeSettingsGateway.update { it.copy(appFontPath = target.absolutePath) }
+            // 反显记录（源 path + 副本路径）：currentAppFontListPath 据此匹配
+            einkLegacyPrefs.edit()
+                .putString(EinkLegacyPrefsStore.KEY_APP_FONT_SOURCE, sourcePath)
+                .putString(EinkLegacyPrefsStore.KEY_APP_FONT_COPY, target.absolutePath)
+                .apply()
+            AppFontStore.prune(keep = target)
+        }
+    }
+
+    override fun clearAppFont() {
+        launchAppFontJob {
+            themeSettingsGateway.update { it.copy(appFontPath = null) }
+            einkLegacyPrefs.edit()
+                .remove(EinkLegacyPrefsStore.KEY_APP_FONT_SOURCE)
+                .remove(EinkLegacyPrefsStore.KEY_APP_FONT_COPY)
+                .apply()
+            AppFontStore.prune()
+        }
+    }
+
+    override val hasCustomAppFont: Boolean
+        get() = themeSettingsGateway.currentSettings.appFontPath != null
+
+    /**
+     * 反显匹配：eink 侧选择时记录的 源 path + 副本路径，仅当记录副本仍是
+     * 当前生效副本时返回源 path——完整模式侧另选字体会失配（副本按内容
+     * 摘要命名，完整模式选同一字体文件不失配，反显依旧正确）。
+     */
+    override val currentAppFontListPath: String?
+        get() {
+            val copy = einkLegacyPrefs.getString(EinkLegacyPrefsStore.KEY_APP_FONT_COPY, null)
+                ?: return null
+            return themeSettingsGateway.currentSettings.appFontPath
+                ?.takeIf { it == copy }
+                ?.let { einkLegacyPrefs.getString(EinkLegacyPrefsStore.KEY_APP_FONT_SOURCE, null) }
+        }
+
+    /**
+     * 字体的选择与清除串行执行（对齐 ThemeConfigViewModel.launchFontJob）：
+     * 新任务先取消并等待上一个结束，避免未完成的复制晚于清除写回
+     * appFontPath、或先到的 prune(keep=旧值) 误删新副本。
+     */
+    private var appFontJob: Job? = null
+
+    private fun launchAppFontJob(block: suspend CoroutineScope.() -> Unit) {
+        val previous = appFontJob
+        appFontJob = einkSettingsWriteScope.launch {
+            previous?.cancelAndJoin()
+            runCatching { block() }
+                .onFailure { if (it !is CancellationException) it.printStackTrace() }
+        }
+    }
+
+    override val threadCount: Int
+        get() = downloadCacheSettingsGateway.currentSettings.threadCount
+
+    override var fontScaleSetting: Int?
+        get() = AppConfigStore.getInt(PreferKey.fontScale)
+        set(value) {
+            if (value == null) {
+                AppConfigStore.remove(PreferKey.fontScale)
+            } else {
+                AppConfigStore.putInt(PreferKey.fontScale, value)
+            }
+        }
+
+    override var autoRefreshBook: Boolean
+        get() = otherSettingsGateway.currentSettings.autoRefresh
+        set(value) {
+            einkSettingsWriteScope.launch {
+                otherSettingsGateway.update { it.copy(autoRefresh = value) }
+            }
+        }
+
+    override var defaultToRead: Boolean
+        get() = otherSettingsGateway.currentSettings.defaultToRead
+        set(value) {
+            einkSettingsWriteScope.launch {
+                otherSettingsGateway.update { it.copy(defaultToRead = value) }
+            }
+        }
+
+    override var volumeKeyPage: Boolean
+        get() = readSettingsGateway.currentSettings.volumeKeyPage
+        set(value) {
+            einkSettingsWriteScope.launch {
+                readSettingsGateway.update { it.copy(volumeKeyPage = value) }
+            }
+        }
+
+    override var hideStatusBar: Boolean
+        get() = readSettingsGateway.currentSettings.hideStatusBar
+        set(value) {
+            einkSettingsWriteScope.launch {
+                readSettingsGateway.update { it.copy(hideStatusBar = value) }
+            }
+        }
+
+    override var showReviewBubbles: Boolean
+        get() = readSettingsGateway.currentSettings.showReviewBubbles
+        set(value) {
+            einkSettingsWriteScope.launch {
+                readSettingsGateway.update { it.copy(showReviewBubbles = value) }
+            }
+        }
+
+    override var chineseConverterType: Int
+        get() = readSettingsGateway.currentSettings.chineseConverterType
+        set(value) {
+            einkSettingsWriteScope.launch {
+                readSettingsGateway.update { it.copy(chineseConverterType = value) }
+            }
+        }
+
+    override val supportsChineseConverter: Boolean get() = true
+
+    override var useDefaultCover: Boolean
+        get() = useDefaultCoverState.value
+        set(value) {
+            // 同步更新快照状态（组合即时可见），落盘异步承接
+            useDefaultCoverState.value = value
+            einkSettingsWriteScope.launch {
+                coverSettingsGateway.update { it.copy(useDefaultCover = value) }
+            }
+        }
+
+    override val preDownloadChapterCount: Int
+        get() = downloadCacheSettingsGateway.currentSettings.preDownloadNum
+
+    override val changeSourceCheckAuthor: Boolean
+        get() = changeSourceSettingsGateway.currentSettings.checkAuthor
+
+    override val useAntiAlias: Boolean
+        get() = otherSettingsGateway.currentSettings.antiAlias
+
+    override var syncReadingProgress: Boolean
+        get() = backupSettingsGateway.currentSettings.syncBookProgress
+        set(value) {
+            einkSettingsWriteScope.launch {
+                backupSettingsGateway.update {
+                    it.copy(
+                        syncBookProgress = value,
+                        // 宿主设置页同款父子联动（BackupConfigViewModel）：
+                        // 主开关关闭时「同步增强」子键一并关闭
+                        syncBookProgressPlus = it.syncBookProgressPlus && value,
+                    )
+                }
+            }
+        }
+}

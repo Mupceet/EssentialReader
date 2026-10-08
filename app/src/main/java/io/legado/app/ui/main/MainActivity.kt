@@ -62,6 +62,9 @@ import io.legado.app.domain.model.PlaybackCapsuleSource
 import io.legado.app.domain.model.PlaybackCapsuleState
 import io.legado.app.help.book.BookHelp
 import io.legado.app.help.config.LocalConfig
+import io.legado.app.constant.PreferKey
+import io.legado.app.eink.EInkMainActivity
+import io.legado.app.help.config.AppConfigStore
 import io.legado.app.help.coroutine.Coroutine
 import io.legado.app.help.storage.Backup
 import io.legado.app.help.update.AppUpdateGitHub
@@ -132,8 +135,6 @@ open class MainActivity : BaseComposeActivity(), AudioPlay.CallBack {
         private const val KEY_RESTORE_READ_ALOUD = "restoreReadAloud"
         private const val KEY_RESTORE_READ_IN_BOOKSHELF = "restoreReadInBookshelf"
         private const val KEY_RESTORE_READ_CHAPTER_CHANGED = "restoreReadChapterChanged"
-        private val startupUpdateCheckGate = ProcessStartupUpdateCheckGate()
-
         @Volatile
         var hasActiveReadBookRoute: Boolean = false
 
@@ -345,7 +346,14 @@ open class MainActivity : BaseComposeActivity(), AudioPlay.CallBack {
         super.onCreate(savedInstanceState)
 
         if (checkStartupRoute()) return
-        val shouldAutoCheckUpdate = startupUpdateCheckGate.consume(
+        // 墨水屏模式（eInkMode，「我的」页开关）打开时接管界面；条目显隐门控
+        // 是实验室「墨水屏显示」(labEInkDisplay)，两者独立
+        if (AppConfigStore.getBoolean(PreferKey.eInkMode) == true) {
+            startActivity<EInkMainActivity>()
+            finish()
+            return
+        }
+        val shouldAutoCheckUpdate = ProcessStartupUpdateCheckGate.consume(
             otherSettingsGateway.currentSettings.autoCheckUpdateOnStart
         )
 

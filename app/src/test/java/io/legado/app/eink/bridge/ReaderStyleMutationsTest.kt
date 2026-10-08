@@ -1,0 +1,154 @@
+package io.legado.app.eink.bridge
+
+import io.legado.app.domain.gateway.ReadStyleIntKey
+import io.legado.app.domain.gateway.ReadStyleMutation
+import io.legado.app.domain.gateway.ReadStyleStringKey
+import io.legado.app.eink.contract.ReaderFontSelection as FontSel
+import io.legado.app.eink.contract.ReaderTextStyle
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
+import org.junit.Test
+
+class ReaderStyleMutationsTest {
+
+    private fun ints(mutations: List<ReadStyleMutation>) =
+        mutations.filterIsInstance<ReadStyleMutation.IntValue>()
+
+    private fun strings(mutations: List<ReadStyleMutation>) =
+        mutations.filterIsInstance<ReadStyleMutation.StringValue>()
+
+    @Test
+    fun `扩展字段全null时只写17个基础键且不写TitleSize`() {
+        val mutations = buildStyleMutations(ReaderTextStyle(), currentBodyFontPath = "/f.ttf")
+        assertEquals(17, mutations.size)
+        assertTrue(strings(mutations).none { it.key == ReadStyleStringKey.TitleFont })
+        assertTrue(ints(mutations).none { it.key == ReadStyleIntKey.TitleSize })
+        assertTrue(ints(mutations).none { it.key == ReadStyleIntKey.TextBold })
+    }
+
+    @Test
+    fun `titleSize设置后写TitleSize不再钉平`() {
+        val mutations = buildStyleMutations(
+            ReaderTextStyle(textSize = 24, titleSize = 30),
+            currentBodyFontPath = "",
+        )
+        assertEquals(24, ints(mutations).first { it.key == ReadStyleIntKey.TextSize }.value)
+        assertEquals(30, ints(mutations).first { it.key == ReadStyleIntKey.TitleSize }.value)
+    }
+
+    @Test
+    fun `FollowBody展开为正文文件路径三键同写`() {
+        val mutations = buildStyleMutations(
+            ReaderTextStyle(
+                bodyFont = FontSel.File("/fonts/x.ttf"),
+                titleFont = FontSel.FollowBody,
+                headerFont = FontSel.FollowBody,
+            ),
+            currentBodyFontPath = "/old.ttf",
+        )
+        assertEquals("/fonts/x.ttf", strings(mutations).first { it.key == ReadStyleStringKey.TextFont }.value)
+        assertEquals("/fonts/x.ttf", strings(mutations).first { it.key == ReadStyleStringKey.TitleFont }.value)
+        assertEquals("/fonts/x.ttf", strings(mutations).first { it.key == ReadStyleStringKey.HeaderFont }.value)
+    }
+
+    @Test
+    fun `正文为系统预设时跟随者写空串`() {
+        val mutations = buildStyleMutations(
+            ReaderTextStyle(
+                bodyFont = FontSel.Serif,
+                titleFont = FontSel.FollowBody,
+                headerFont = FontSel.FollowBody,
+            ),
+            currentBodyFontPath = "/old.ttf",
+        )
+        assertEquals("", strings(mutations).first { it.key == ReadStyleStringKey.TextFont }.value)
+        assertEquals("", strings(mutations).first { it.key == ReadStyleStringKey.TitleFont }.value)
+        assertEquals("", strings(mutations).first { it.key == ReadStyleStringKey.HeaderFont }.value)
+    }
+
+    @Test
+    fun `bodyFont为null时FollowBody按宿主当前正文路径展开`() {
+        val mutations = buildStyleMutations(
+            ReaderTextStyle(titleFont = FontSel.FollowBody),
+            currentBodyFontPath = "/host.ttf",
+        )
+        assertEquals("/host.ttf", strings(mutations).first { it.key == ReadStyleStringKey.TitleFont }.value)
+    }
+
+    @Test
+    fun `页眉模式三态与页脚开关映射宿主模式值`() {
+        val mutations = buildStyleMutations(
+            ReaderTextStyle(headerMode = 2, footerVisible = false),
+            currentBodyFontPath = "",
+        )
+        assertEquals(2, ints(mutations).first { it.key == ReadStyleIntKey.HeaderMode }.value)
+        assertEquals(1, ints(mutations).first { it.key == ReadStyleIntKey.FooterMode }.value)
+
+        val show = buildStyleMutations(
+            ReaderTextStyle(headerMode = 1, footerVisible = true),
+            currentBodyFontPath = "",
+        )
+        assertEquals(1, ints(show).first { it.key == ReadStyleIntKey.HeaderMode }.value)
+        assertEquals(0, ints(show).first { it.key == ReadStyleIntKey.FooterMode }.value)
+
+        val follow = buildStyleMutations(
+            ReaderTextStyle(headerMode = 0),
+            currentBodyFontPath = "",
+        )
+        assertEquals(0, ints(follow).first { it.key == ReadStyleIntKey.HeaderMode }.value)
+    }
+
+    @Test
+    fun `页脚字号独立写入`() {
+        val mutations = buildStyleMutations(
+            ReaderTextStyle(footerSize = 14),
+            currentBodyFontPath = "",
+        )
+        assertEquals(14, ints(mutations).first { it.key == ReadStyleIntKey.FooterFontSize }.value)
+    }
+
+    @Test
+    fun `页眉模式null时不跨桥写HeaderMode`() {
+        val mutations = buildStyleMutations(
+            ReaderTextStyle(footerVisible = true),
+            currentBodyFontPath = "",
+        )
+        assertTrue(ints(mutations).none { it.key == ReadStyleIntKey.HeaderMode })
+        assertEquals(0, ints(mutations).first { it.key == ReadStyleIntKey.FooterMode }.value)
+    }
+
+    @Test
+    fun `titleMode越界钳制到0到2`() {
+        val mutations = buildStyleMutations(
+            ReaderTextStyle(titleMode = 5),
+            currentBodyFontPath = "",
+        )
+        assertEquals(2, ints(mutations).first { it.key == ReadStyleIntKey.TitleMode }.value)
+    }
+
+    @Test
+    fun `字重预设档直传其余钳到自定义区间`() {
+        val mutations = buildStyleMutations(
+            ReaderTextStyle(bodyWeight = 0, titleWeight = 2),
+            currentBodyFontPath = "",
+        )
+        assertEquals(0, ints(mutations).first { it.key == ReadStyleIntKey.TextBold }.value)
+        assertEquals(2, ints(mutations).first { it.key == ReadStyleIntKey.TitleBold }.value)
+
+        val clamped = buildStyleMutations(
+            ReaderTextStyle(bodyWeight = 50, titleWeight = 950),
+            currentBodyFontPath = "",
+        )
+        assertEquals(100, ints(clamped).first { it.key == ReadStyleIntKey.TextBold }.value)
+        assertEquals(900, ints(clamped).first { it.key == ReadStyleIntKey.TitleBold }.value)
+    }
+
+    @Test
+    fun `缩进展开为全角空格`() {
+        val mutations = buildStyleMutations(
+            ReaderTextStyle(indentChars = 3),
+            currentBodyFontPath = "",
+        )
+        assertEquals("　　　", strings(mutations).first { it.key == ReadStyleStringKey.ParagraphIndent }.value)
+    }
+}

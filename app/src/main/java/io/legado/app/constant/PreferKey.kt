@@ -197,6 +197,7 @@ object PreferKey {
     const val importKeepEnable = "importKeepEnable"
     const val previewImageByClick = "previewImageByClick"
     const val clickImgWay = "clickImgWay"
+    const val showReviewBubbles = "showReviewBubbles"
     const val keyPageOnLongPress = "keyPageOnLongPress"
     const val swipeToAddBookmark = "swipeToAddBookmark"
     const val bookmarkBadgeImage = "bookmarkBadgeImage"
@@ -474,6 +475,9 @@ object PreferKey {
     const val labEnabled = "labEnabled"
     const val labEInkDisplay = "labEInkDisplay"
     const val labEyeProtection = "labEyeProtection"
+
+    // E-Ink 模式当前状态（「我的」页开关；显隐门控是上面的 labEInkDisplay）
+    const val eInkMode = "eInkMode"
 
     // Eye Protection
     const val eyeProtectionEnabled = "eyeProtectionEnabled"

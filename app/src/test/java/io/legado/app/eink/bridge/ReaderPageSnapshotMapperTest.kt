@@ -1,0 +1,752 @@
+package io.legado.app.eink.bridge
+
+import android.app.Application
+import android.graphics.Bitmap
+import io.legado.app.data.entities.Book
+import io.legado.app.eink.contract.ReaderDecorationRun
+import io.legado.app.eink.contract.ReaderPaintSpec
+import io.legado.app.eink.contract.ReaderUnderlineGeometry
+import io.legado.app.feature.reader.core.layout.ReaderMeasuredBlock
+import io.legado.app.feature.reader.core.layout.ReaderMeasuredInlineItem
+import io.legado.app.feature.reader.core.layout.ReaderPaginator
+import io.legado.app.feature.reader.core.layout.ReaderPaginationConfig
+import io.legado.app.feature.reader.core.layout.ReaderTextAlignment
+import io.legado.app.feature.reader.core.model.ReaderElement
+import io.legado.app.feature.reader.core.model.ReaderPage
+import io.legado.app.feature.reader.core.model.ReaderPageId
+import io.legado.app.feature.reader.core.model.ReaderRect
+import io.legado.app.feature.reader.core.model.ReaderTextStyle
+import io.legado.app.feature.reader.core.model.ReaderUnderline
+import io.legado.app.feature.reader.platform.ReaderAndroidPaginationStyle
+import org.junit.Assert.assertArrayEquals
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
+import org.junit.Before
+import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.RuntimeEnvironment
+import org.robolectric.annotation.Config
+import splitties.init.injectAsAppCtx
+
+// application = Application::class 与其余 Robolectric 测试一致：不指定的话 Robolectric
+// 会从 manifest 取真的 io.legado.app.App，App.onCreate() 要拉 Koin/DB/Cronet，单测里必炸。
+@RunWith(RobolectricTestRunner::class)
+@Config(application = Application::class, sdk = [34])
+class ReaderPageSnapshotMapperTest {
+
+    @Before
+    fun setUp() {
+        // ReaderTextStyle 等模型不读上下文，但映射链路统一按仓库惯例注入
+        // 应用上下文，避免个别路径触碰 splitties appCtx。
+        RuntimeEnvironment.getApplication().injectAsAppCtx()
+    }
+
+    private val contentSpec = ReaderPaintSpec(
+        textSizePx = 40f,
+        letterSpacing = 0f,
+        typeface = null,
+        fontVariationSettings = null,
+    )
+    // ReaderPaintSpec 非 data class（无 copy），标题规格显式构造
+    private val titleSpec = ReaderPaintSpec(
+        textSizePx = 40f,
+        letterSpacing = 0.1f,
+        typeface = null,
+        fontVariationSettings = null,
+    )
+
+    private val bodyStyle = ReaderTextStyle(colorArgb = 0, fontSizePx = 40f)
+
+    private fun readerPage(elements: List<ReaderElement>, title: String = "章节标题") =
+        ReaderPage(
+            id = ReaderPageId(chapterIndex = 0, pageIndex = 0),
+            chapterTitle = title,
+            text = "正文",
+            widthPx = 1000,
+            heightPx = 1400,
+            contentTopPx = 0f,
+            contentBottomPx = 1400f,
+            elements = elements,
+            revision = 1L,
+        )
+
+    private fun textElement(
+        x: Float,
+        top: Float,
+        value: String,
+        emphasized: Boolean = false,
+        baselinePx: Float = top + 40f,
+        chapterPosition: Int = 0,
+        height: Float = 50f,
+        underlineMode: Int = 0,
+        highlight: Boolean = false,
+        markingId: String? = null,
+        underlineWidthPx: Float = 1f,
+        underlineOffsetPx: Float = 2f,
+    ) = ReaderElement.Text(
+        bounds = ReaderRect(x, top, x + 20f, top + height),
+        baselinePx = baselinePx,
+        value = value,
+        style = if (underlineMode != 0 || highlight) {
+            bodyStyle.copy(
+                // 与真实划线/高亮元素同构：backgroundArgb 非空 ⇔ 高亮；
+                // underline.mode 透传（颜色/几何按合理默认，不跨桥）
+                backgroundArgb = if (highlight) 0x80FFFFFF.toInt() else null,
+                underline = if (underlineMode != 0) {
+                    ReaderUnderline(
+                        mode = underlineMode,
+                        colorArgb = 0xFF000000.toInt(),
+                        widthPx = underlineWidthPx,
+                        offsetPx = underlineOffsetPx,
+                    )
+                } else {
+                    null
+                },
+            )
+        } else {
+            bodyStyle
+        },
+        selected = false,
+        emphasized = emphasized,
+        markingId = markingId,
+        chapterPosition = chapterPosition,
+    )
+
+    private fun imageElement(
+        left: Float,
+        top: Float,
+        right: Float,
+        bottom: Float,
+        src: String = "img.png",
+        action: String? = null,
+    ) = ReaderElement.Image(
+        bounds = ReaderRect(left, top, right, bottom),
+        source = src,
+        action = action,
+    )
+
+    private fun mapElements(
+        vararg elements: ReaderElement,
+        sdkInt: Int = 30,
+        sessionBook: Book? = null,
+    ) = ReaderPageSnapshotMapper.mapWithSpecs(
+        page = readerPage(elements.toList()),
+        titleSpec = titleSpec,
+        contentSpec = contentSpec,
+        sdkInt = sdkInt,
+        sessionBook = sessionBook,
+        readProgress = "12.3%",
+        imageLoader = { _, _ -> { _, _ -> null } },
+    )
+
+    /** ReaderDecorationRun 非 data class（引用相等），按字段断言。 */
+    private fun assertDecorationRun(
+        run: ReaderDecorationRun,
+        start: Int,
+        end: Int,
+        underlineMode: Int,
+        highlight: Boolean,
+        markingId: String,
+    ) {
+        assertEquals(start, run.start)
+        assertEquals(end, run.end)
+        assertEquals(underlineMode, run.underlineMode)
+        assertEquals(highlight, run.highlight)
+        assertEquals(markingId, run.markingId)
+    }
+
+    @Test
+    fun `下划线几何按宿主样式逐段透传且不同几何不并入同一run`() {
+        val snapshot = mapElements(
+            textElement(
+                0f, 0f, "选中", underlineMode = 1, markingId = "mark-a",
+                underlineWidthPx = 1f, underlineOffsetPx = 2f,
+            ),
+            textElement(
+                20f, 0f, "另一段", underlineMode = 1, markingId = "mark-b",
+                underlineWidthPx = 0.5f, underlineOffsetPx = 4f,
+            ),
+        )
+        val runs = snapshot.lines[0].decorations
+        // 几何不同 → 不并入同一 run（模块逐段按宿主几何绘制）
+        assertEquals(2, runs.size)
+        assertDecorationRun(
+            runs[0], start = 0, end = 2, underlineMode = 1, highlight = false,
+            markingId = "mark-a",
+        )
+        assertDecorationRun(
+            runs[1], start = 2, end = 5, underlineMode = 1, highlight = false,
+            markingId = "mark-b",
+        )
+        // 宿主线宽/偏移原样透传：模块按 y = 行盒下沿 + offsetPx 绘制，与完整模式一致
+        val first = runs[0].underline
+        val second = runs[1].underline
+        assertEquals(1f, first!!.widthPx, 0.001f)
+        assertEquals(2f, first.offsetPx, 0.001f)
+        assertEquals(0.5f, second!!.widthPx, 0.001f)
+        assertEquals(4f, second.offsetPx, 0.001f)
+        assertTrue(first != second)
+    }
+
+    @Test
+    fun `文本元素按行折叠为 chunk 与起点 x`() {
+        val snapshot = mapElements(
+            textElement(10f, 0f, "你"),
+            textElement(30f, 0f, "好"),
+        )
+
+        assertEquals(1, snapshot.lines.size)
+        val line = snapshot.lines[0]
+        assertEquals(40f, line.baseY, 0.001f)
+        assertFalse(line.isTitle)
+        assertEquals(listOf("你", "好"), line.chunks)
+        assertEquals(2, line.x.size)
+        assertEquals(10f, line.x[0], 0.001f)
+        assertEquals(30f, line.x[1], 0.001f)
+    }
+
+    @Test
+    fun `不同行顶的元素拆为多行`() {
+        val snapshot = mapElements(
+            textElement(0f, 0f, "上"),
+            textElement(0f, 50f, "下"),
+        )
+
+        assertEquals(2, snapshot.lines.size)
+        assertEquals(40f, snapshot.lines[0].baseY, 0.001f)
+        assertEquals(90f, snapshot.lines[1].baseY, 0.001f)
+    }
+
+    @Test
+    fun `API35 以上加字距半格补偿`() {
+        // contentSpec.letterSpacing=0、textSizePx=40 → 补偿 0
+        val s1 = mapElements(textElement(10f, 0f, "a"), sdkInt = 35)
+        assertEquals(10f, s1.lines[0].x[0], 0.001f)
+
+        // 标题元素：titleSpec.letterSpacing=0.1、textSizePx=40 → 补偿 2.0
+        val s2 = mapElements(textElement(10f, 0f, "a", emphasized = true), sdkInt = 35)
+        assertEquals(12f, s2.lines[0].x[0], 0.001f)
+
+        // API35 以下无补偿
+        val s3 = mapElements(textElement(10f, 0f, "a", emphasized = true), sdkInt = 34)
+        assertEquals(10f, s3.lines[0].x[0], 0.001f)
+    }
+
+    @Test
+    fun `标题元素携带 isTitle 标记`() {
+        val snapshot = mapElements(
+            textElement(0f, 0f, "题", emphasized = true),
+            textElement(0f, 50f, "文"),
+        )
+
+        assertTrue(snapshot.lines[0].isTitle)
+        assertFalse(snapshot.lines[1].isTitle)
+    }
+
+    @Test
+    fun `行携带元素章内位置与行盒`() {
+        val snapshot = mapElements(
+            textElement(0f, 10f, "第一段第一行", chapterPosition = 0, height = 20f, baselinePx = 28f),
+            textElement(0f, 34f, "第一段第二行", chapterPosition = 7, height = 20f, baselinePx = 52f),
+            sdkInt = 34,
+        )
+
+        val line0 = snapshot.lines[0]
+        assertArrayEquals(intArrayOf(0), line0.chapterPositions)
+        assertEquals(10f, line0.top, 0.001f)
+        assertEquals(30f, line0.bottom, 0.001f)
+        val line1 = snapshot.lines[1]
+        assertArrayEquals(intArrayOf(7), line1.chapterPositions)
+        assertEquals(34f, line1.top, 0.001f)
+        assertEquals(54f, line1.bottom, 0.001f)
+        // 无样式元素不产生装饰 run
+        assertTrue(line0.decorations.isEmpty())
+    }
+
+    @Test
+    fun `同行相邻同款划线合并为单个装饰 run`() {
+        val snapshot = mapElements(
+            textElement(0f, 10f, "划线甲", chapterPosition = 0, height = 20f, baselinePx = 28f,
+                underlineMode = 1),
+            textElement(60f, 10f, "划线乙", chapterPosition = 3, height = 20f, baselinePx = 28f,
+                underlineMode = 1),
+            textElement(120f, 10f, "无样式", chapterPosition = 6, height = 20f, baselinePx = 28f),
+            textElement(180f, 10f, "高亮丙", chapterPosition = 9, height = 20f, baselinePx = 28f,
+                highlight = true),
+            sdkInt = 34,
+        )
+
+        val runs = snapshot.lines.single().decorations
+        assertEquals(2, runs.size)
+        // 无 markingId（宿主高亮规则等非用户标记来源）归一为空串
+        assertDecorationRun(runs[0], start = 0, end = 6, underlineMode = 1, highlight = false,
+            markingId = "")
+        assertDecorationRun(runs[1], start = 9, end = 12, underlineMode = 0, highlight = true,
+            markingId = "")
+    }
+
+    @Test
+    fun `不同markingId相邻同款划线不合并为同一run`() {
+        val snapshot = mapElements(
+            textElement(0f, 10f, "标记甲", chapterPosition = 0, height = 20f, baselinePx = 28f,
+                underlineMode = 1, markingId = "mark-a"),
+            textElement(60f, 10f, "标记乙", chapterPosition = 3, height = 20f, baselinePx = 28f,
+                underlineMode = 1, markingId = "mark-b"),
+            sdkInt = 34,
+        )
+
+        // 样式签名相同但标记身份不同：必须拆为两条 run（点按命中按 markingId 定位）
+        val runs = snapshot.lines.single().decorations
+        assertEquals(2, runs.size)
+        assertDecorationRun(runs[0], start = 0, end = 3, underlineMode = 1, highlight = false,
+            markingId = "mark-a")
+        assertDecorationRun(runs[1], start = 3, end = 6, underlineMode = 1, highlight = false,
+            markingId = "mark-b")
+    }
+
+    @Test
+    fun `相同markingId相邻同款划线合并为单run并携带该id`() {
+        val snapshot = mapElements(
+            textElement(0f, 10f, "同标", chapterPosition = 0, height = 20f, baselinePx = 28f,
+                underlineMode = 2, markingId = "test-marking"),
+            textElement(60f, 10f, "同款", chapterPosition = 2, height = 20f, baselinePx = 28f,
+                underlineMode = 2, markingId = "test-marking"),
+            sdkInt = 34,
+        )
+
+        val runs = snapshot.lines.single().decorations
+        assertEquals(1, runs.size)
+        assertDecorationRun(runs[0], start = 0, end = 4, underlineMode = 2, highlight = false,
+            markingId = "test-marking")
+    }
+
+    @Test
+    fun `不同markingId相邻高亮不合并`() {
+        val snapshot = mapElements(
+            textElement(0f, 10f, "亮甲", chapterPosition = 0, height = 20f, baselinePx = 28f,
+                highlight = true, markingId = "mark-a"),
+            textElement(60f, 10f, "亮乙", chapterPosition = 2, height = 20f, baselinePx = 28f,
+                highlight = true, markingId = "mark-b"),
+            sdkInt = 34,
+        )
+
+        val runs = snapshot.lines.single().decorations
+        assertEquals(2, runs.size)
+        assertDecorationRun(runs[0], start = 0, end = 2, underlineMode = 0, highlight = true,
+            markingId = "mark-a")
+        assertDecorationRun(runs[1], start = 2, end = 4, underlineMode = 0, highlight = true,
+            markingId = "mark-b")
+    }
+
+    @Test
+    fun `字体色标记不产生装饰 run`() {
+        val snapshot = mapElements(
+            textElement(0f, 10f, "仅变色", chapterPosition = 0, height = 20f, baselinePx = 28f),
+            sdkInt = 34,
+        )
+
+        assertTrue(snapshot.lines.single().decorations.isEmpty())
+    }
+
+    @Test
+    fun `同行元素行盒底取元素最大值`() {
+        val snapshot = mapElements(
+            textElement(0f, 10f, "上", height = 20f, baselinePx = 28f),
+            textElement(30f, 10f, "下", height = 30f, baselinePx = 28f),
+        )
+
+        assertEquals(1, snapshot.lines.size)
+        assertEquals(10f, snapshot.lines[0].top, 0.001f)
+        assertEquals(40f, snapshot.lines[0].bottom, 0.001f)
+    }
+
+    @Test
+    fun `图片元素成为槽位并原样透传最终布局矩形`() {
+        val loaderCalls = mutableListOf<Pair<Int, Int>>()
+        val loader: (Book, String) -> (Int, Int) -> Bitmap? = { _, _ ->
+            { w, h ->
+                loaderCalls.add(w to h)
+                null
+            }
+        }
+        val book = Book()
+        val snapshot = ReaderPageSnapshotMapper.mapWithSpecs(
+            page = readerPage(listOf(imageElement(5f, 100f, 25f, 150f))),
+            titleSpec = titleSpec,
+            contentSpec = contentSpec,
+            sdkInt = 30,
+            sessionBook = book,
+            readProgress = "0.0%",
+            imageLoader = loader,
+        )
+
+        assertEquals(0, snapshot.lines.size)
+        assertEquals(1, snapshot.images.size)
+        val slot = snapshot.images[0]
+        // 新引擎图片元素自带最终布局矩形（缩放/居中已定），槽位整框透传
+        assertEquals(5f, slot.x0, 0.001f)
+        assertEquals(25f, slot.x1, 0.001f)
+        assertEquals(100f, slot.lineTop, 0.001f)
+        assertEquals(150f, slot.lineBottom, 0.001f)
+        assertEquals(50f, slot.lineHeight, 0.001f)
+        assertTrue(slot.fullLine)
+        // loader 透传调用方传入的 w/h
+        assertNull(slot.loader(20, 50))
+        assertEquals(listOf(20 to 50), loaderCalls)
+    }
+
+    @Test
+    fun `无会话书时图片槽位 loader 恒空`() {
+        val snapshot = mapElements(imageElement(0f, 0f, 40f, 40f))
+
+        assertNull(snapshot.images[0].loader(20, 20))
+    }
+
+    @Test
+    fun `图片来源与动作脚本原样透传到槽位`() {
+        // 段评气泡用法：地址尾部携带 ,{...} 选项（click 键为动作脚本），
+        // 映射器不解析不裁剪，source/action 原样透传供点击分派
+        val src = "https://img.example/bubble.png,{\"style\":\"text\",\"click\":\"java.showBrowser('u')\"}"
+        val snapshot = mapElements(
+            imageElement(0f, 0f, 20f, 20f, src = src, action = "java.showBrowser('u')"),
+        )
+
+        val slot = snapshot.images[0]
+        assertEquals(src, slot.source)
+        assertEquals("java.showBrowser('u')", slot.action)
+        // 无动作脚本的普通插图 action 保持 null（不参与点按命中）
+        assertNull(mapElements(imageElement(40f, 0f, 60f, 20f)).images[0].action)
+    }
+
+    @Test
+    fun `文本与行内嵌图共存时各自保留`() {
+        val snapshot = mapElements(
+            textElement(0f, 0f, "文"),
+            imageElement(20f, 0f, 40f, 40f),
+            textElement(40f, 0f, "字"),
+        )
+
+        // 图片打断文本行：文本拆为同基线的两段（绝对 x 坐标绘制，视觉不变）
+        assertEquals(2, snapshot.lines.size)
+        assertEquals(listOf("文"), snapshot.lines[0].chunks)
+        assertEquals(listOf("字"), snapshot.lines[1].chunks)
+        assertEquals(1, snapshot.images.size)
+        assertTrue(snapshot.images[0].fullLine)
+    }
+
+    @Test
+    fun `评论等非文本元素不进入快照`() {
+        val snapshot = mapElements(
+            ReaderElement.Review(
+                bounds = ReaderRect(0f, 0f, 10f, 10f),
+                count = 3,
+                paragraphIndex = 0,
+            ),
+        )
+
+        assertEquals(0, snapshot.lines.size)
+        assertEquals(0, snapshot.images.size)
+    }
+
+    @Test
+    fun `快照携带标题与进度文本`() {
+        val snapshot = ReaderPageSnapshotMapper.mapWithSpecs(
+            page = readerPage(emptyList(), title = "第一章"),
+            titleSpec = titleSpec,
+            contentSpec = contentSpec,
+            sdkInt = 30,
+            sessionBook = null,
+            readProgress = "12.3%",
+            imageLoader = { _, _ -> { _, _ -> null } },
+        )
+
+        assertEquals("第一章", snapshot.title)
+        assertEquals("12.3%", snapshot.readProgress)
+    }
+
+    // ==== 书签角标布尔透传 ====
+
+    @Test
+    fun `快照书签角标默认false且显式传入时透传`() {
+        val base = mapElements(textElement(0f, 0f, "文"))
+        // 缺省构造：模块页角不画角标
+        assertFalse(base.bookmarkBadge)
+
+        val marked = ReaderPageSnapshotMapper.mapWithSpecs(
+            page = readerPage(listOf(textElement(0f, 0f, "文"))),
+            titleSpec = titleSpec,
+            contentSpec = contentSpec,
+            sdkInt = 30,
+            sessionBook = null,
+            readProgress = "0.0%",
+            imageLoader = { _, _ -> { _, _ -> null } },
+            bookmarkBadge = true,
+        )
+        // 宿主 page.decoration.bookmarkBadge 原样拷贝
+        assertTrue(marked.bookmarkBadge)
+    }
+
+    // ==== 进度文本公式（沿用旧 TextPage.readProgress）====
+
+    @Test
+    fun `进度公式覆盖零状态与章节折算分支`() {
+        // 章节数为 0：恒 0.0%
+        assertEquals(
+            "0.0%",
+            ReaderPageSnapshotMapper.readProgress(
+                chapterIndex = 0, localPageIndex = 0, chapterPageCount = 0, chapterSize = 0,
+            ),
+        )
+        // 章节未分页且为首章：命中旧公式守卫，恒 0.0%
+        assertEquals(
+            "0.0%",
+            ReaderPageSnapshotMapper.readProgress(
+                chapterIndex = 0, localPageIndex = 0, chapterPageCount = 0, chapterSize = 2,
+            ),
+        )
+        // 章节未分页（非首章）：按章节序号折算（该分支与旧实现一致，不做末页钳制）
+        assertEquals(
+            "100.0%",
+            ReaderPageSnapshotMapper.readProgress(
+                chapterIndex = 1, localPageIndex = 0, chapterPageCount = 0, chapterSize = 2,
+            ),
+        )
+        // 正常页：章节进度 + 页内折算
+        assertEquals(
+            "37.5%",
+            ReaderPageSnapshotMapper.readProgress(
+                chapterIndex = 1, localPageIndex = 1, chapterPageCount = 4, chapterSize = 4,
+            ),
+        )
+        // 末章末页：保持 100.0%
+        assertEquals(
+            "100.0%",
+            ReaderPageSnapshotMapper.readProgress(
+                chapterIndex = 1, localPageIndex = 0, chapterPageCount = 1, chapterSize = 2,
+            ),
+        )
+    }
+
+    // ==== 段落边界同构门禁（契约 v2 书签载荷拼装口径）====
+
+    @Test
+    fun `快照行重构与宿主 page text 段落边界同构`() {
+        // ReaderPaginatorTest 同款 fixture：内容区宽 40f、每字 10f → 4 字/行
+        val style = ReaderTextStyle(colorArgb = 0xff111111.toInt(), fontSizePx = 10f)
+        fun paragraph(value: String, emphasized: Boolean = false) =
+            ReaderMeasuredBlock.InlineParagraph(
+                items = value.mapIndexed { index, ch ->
+                    ReaderMeasuredInlineItem.Text(ch.toString(), 10f, style, index)
+                },
+                indentCharacters = 0,
+                alignment = ReaderTextAlignment.START,
+                lineHeightPx = 20f,
+                baselineOffsetPx = 15f,
+                baseTextSizePx = 10f,
+                emphasized = emphasized,
+            )
+        val page = ReaderPaginator.paginateBlocks(
+            listOf(
+                paragraph("卷题", emphasized = true),        // 标题行
+                paragraph("甲乙丙丁戊己"),                    // 同段折行（折成 4+2 两行，行间无 \n）
+                paragraph("庚辛"),                            // 相邻段落（无空行，边界 1）
+                ReaderMeasuredBlock.BlankLine(9, 20f, 1.5f),  // 空行分隔（边界 2）
+                paragraph("子丑"),
+            ),
+            ReaderPaginationConfig(
+                chapterIndex = 0,
+                chapterTitle = "章",
+                viewportWidthPx = 40,
+                viewportHeightPx = 300,
+                paddingLeftPx = 0f,
+                paddingTopPx = 0f,
+                paddingRightPx = 0f,
+                paddingBottomPx = 5f,
+                lineHeightPx = 20f,
+                baselineOffsetPx = 15f,
+            ),
+        ).single()
+        // 宿主真值先行锚定：分页器按「段末/空行各补一个 \n、同段折行不补」拼 page.text
+        assertEquals("卷题\n甲乙丙丁戊己\n庚辛\n\n子丑", page.text)
+
+        val snapshot = ReaderPageSnapshotMapper.mapWithSpecs(
+            page = page,
+            titleSpec = titleSpec,
+            contentSpec = contentSpec,
+            sdkInt = 34,
+            sessionBook = null,
+            readProgress = "0.0%",
+            imageLoader = { _, _ -> { _, _ -> null } },
+        )
+        // 模块 internal 扩展 toPageBookmarkContent 对宿主测试不可见，按同口径在测试内
+        // 复刻拼装：行内 chunks 连接，行间按上一行 paragraphBreaksAfter 插 "\n".repeat(n)，
+        // 末行不计
+        val assembled = buildString {
+            snapshot.lines.forEachIndexed { index, line ->
+                append(line.chunks.joinToString(""))
+                if (index < snapshot.lines.lastIndex) append("\n".repeat(line.paragraphBreaksAfter))
+            }
+        }
+        // 先 trim 再逐字比对：宿主 page.text 在页底完成段带尾随 \n、空行落页首带前导 \n，
+        // 与「末行不计」差这层（bookmarkDisplayText 落库前的 trim 即该存储语义）
+        assertEquals(page.text.trim(), assembled.trim())
+    }
+
+    // ==== 画笔规格拷贝（Robolectric：需要 android.graphics 原生行为）====
+
+    @Test
+    fun `画笔规格拷贝测量耦合属性`() {
+        val paint = android.text.TextPaint().apply {
+            textSize = 42f
+            letterSpacing = 0.08f
+            typeface = android.graphics.Typeface.MONOSPACE
+        }
+        val spec = paint.copyPaintSpec()
+
+        assertEquals(42f, spec.textSizePx, 0.001f)
+        assertEquals(0.08f, spec.letterSpacing, 0.0001f)
+        assertEquals(android.graphics.Typeface.MONOSPACE, spec.typeface)
+        // fontVariationSettings：Robolectric 4.16 ShadowPaint 未实现 get/set
+        // 往返，不做断言（属 shadow 能力限制）；阴影/斜体不在规格内（E-Ink 不渲染）。
+    }
+
+    // ==== 内容填充比（自动翻页单页时长缩放口径）====
+
+    private fun paginationStyle(
+        bodyTextHeightPx: Float = 50f,
+        lineSpacingExtra: Float = 0f,
+    ): ReaderAndroidPaginationStyle {
+        val paint = android.text.TextPaint().apply { textSize = 40f }
+        val style = ReaderTextStyle(colorArgb = 0, fontSizePx = 40f)
+        return ReaderAndroidPaginationStyle(
+            bodyPaint = paint,
+            titlePaint = paint,
+            bodyStyle = style,
+            titleStyle = style,
+            paddingLeftPx = 0,
+            paddingTopPx = 0,
+            paddingRightPx = 0,
+            paddingBottomPx = 0,
+            bodyTextHeightPx = bodyTextHeightPx,
+            titleTextHeightPx = bodyTextHeightPx,
+            bodyBaselineOffsetPx = 40f,
+            titleBaselineOffsetPx = 40f,
+            lineSpacingExtra = lineSpacingExtra,
+            titleLineSpacingExtra = 0f,
+            paragraphSpacing = 0,
+        )
+    }
+
+    @Test
+    fun `填充比半页内容按内容区高度折算`() {
+        val page = readerPage(
+            listOf(
+                textElement(0f, 0f, "首行", height = 50f),
+                textElement(0f, 650f, "末行", height = 50f),
+            ),
+        )
+        // 既有 fixture：contentTop 0、contentBottom 1400，末行 bottom 700 → 0.5
+        assertEquals(
+            0.5f,
+            ReaderPageSnapshotMapper.contentFillRatio(page, bodyLineAdvancePx = 50f),
+            0.001f,
+        )
+    }
+
+    @Test
+    fun `填充比底部剩余不足一行判满页`() {
+        // 末行 bottom 1380，底部剩余 20 < 行高 50 → 满页（分页器「放不下即换页」同源判据）
+        val page = readerPage(listOf(textElement(0f, 1330f, "近满", height = 50f)))
+        assertEquals(
+            1f,
+            ReaderPageSnapshotMapper.contentFillRatio(page, bodyLineAdvancePx = 50f),
+            0.001f,
+        )
+    }
+
+    @Test
+    fun `填充比空页与非渲染元素页均判满页`() {
+        assertEquals(
+            1f,
+            ReaderPageSnapshotMapper.contentFillRatio(
+                readerPage(emptyList()),
+                bodyLineAdvancePx = 50f,
+            ),
+        )
+        // Review/Action 等元素 eink 不渲染，不计入内容盒
+        assertEquals(
+            1f,
+            ReaderPageSnapshotMapper.contentFillRatio(
+                readerPage(
+                    listOf(
+                        ReaderElement.Review(
+                            bounds = ReaderRect(0f, 0f, 10f, 10f),
+                            count = 3,
+                            paragraphIndex = 0,
+                        ),
+                    ),
+                ),
+                bodyLineAdvancePx = 50f,
+            ),
+        )
+    }
+
+    @Test
+    fun `填充比图片元素计入内容盒且越界钳回一`() {
+        val imagePage = readerPage(listOf(imageElement(0f, 100f, 40f, 700f)))
+        assertEquals(
+            0.5f,
+            ReaderPageSnapshotMapper.contentFillRatio(imagePage, bodyLineAdvancePx = 50f),
+            0.001f,
+        )
+        // 元素 bottom 越过 contentBottom（异常布局）：钳回 1
+        val overflow = readerPage(listOf(textElement(0f, 1380f, "越界", height = 100f)))
+        assertEquals(
+            1f,
+            ReaderPageSnapshotMapper.contentFillRatio(overflow, bodyLineAdvancePx = 50f),
+            0.001f,
+        )
+    }
+
+    @Test
+    fun `快照缺省与显式填充比透传`() {
+        // 既有 mapElements 路径（未传比例）缺省 1f = 满页全时长
+        assertEquals(1f, mapElements(textElement(0f, 0f, "文")).contentFillRatio, 0.001f)
+        val half = ReaderPageSnapshotMapper.mapWithSpecs(
+            page = readerPage(listOf(textElement(0f, 0f, "文"))),
+            titleSpec = titleSpec,
+            contentSpec = contentSpec,
+            sdkInt = 30,
+            sessionBook = null,
+            readProgress = "0.0%",
+            contentFillRatio = 0.5f,
+            imageLoader = { _, _ -> { _, _ -> null } },
+        )
+        assertEquals(0.5f, half.contentFillRatio, 0.001f)
+    }
+
+    @Test
+    fun `map 入口按正文行高加行距计算填充比`() {
+        // 内容区高 1400，末行 bottom 700 = 半页；判满容差 = bodyTextHeightPx 50 + lineSpacingExtra 0
+        val half = ReaderPageSnapshotMapper.map(
+            page = readerPage(listOf(textElement(0f, 650f, "半页", height = 50f))),
+            paginationStyle = paginationStyle(bodyTextHeightPx = 50f, lineSpacingExtra = 0f),
+            sessionBook = null,
+            readProgress = "0.0%",
+        )
+        assertEquals(0.5f, half.contentFillRatio, 0.001f)
+
+        // 容差口径 = bodyTextHeightPx + lineSpacingExtra：末行 bottom 1380，
+        // 剩余 20 < 50 + 8 → 判满页
+        val full = ReaderPageSnapshotMapper.map(
+            page = readerPage(listOf(textElement(0f, 1330f, "近满", height = 50f))),
+            paginationStyle = paginationStyle(bodyTextHeightPx = 50f, lineSpacingExtra = 8f),
+            sessionBook = null,
+            readProgress = "0.0%",
+        )
+        assertEquals(1f, full.contentFillRatio, 0.001f)
+    }
+}

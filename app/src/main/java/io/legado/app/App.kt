@@ -103,6 +103,16 @@ class App : Application(), SingletonImageLoader.Factory {
         // 首行初始化设置快照层：同步预加载 DataStore（触发 SP 迁移），
         // 之后所有 getPref* 门面读取均为纯内存查找，须先于一切主题/配置读取
         AppConfigStore.init(this)
+        // 一次性迁移：eInkMode（墨水屏模式状态）键缺省时继承旧版 labEInkDisplay
+        // 的值——旧版该键同时承担「进入墨水屏模式」语义，直接归零会让存量用户
+        // 失去冷启动自动进入。键缺省即自带一次性守卫：迁移落盘后不再缺省，
+        // 之后的 labEInkDisplay 开关不再影响 eInkMode；须早于 MainActivity
+        // 冷启动分流读取
+        if (AppConfigStore.getBoolean(PreferKey.eInkMode) == null) {
+            AppConfigStore.getBoolean(PreferKey.labEInkDisplay)?.let { inherited ->
+                AppConfigStore.putBoolean(PreferKey.eInkMode, inherited)
+            }
+        }
         // 一次性迁移：把旧版语言偏好写入 AppCompat per-app locales，之后交由
         // autoStoreLocales 持久化。不能每次启动都执行——API 33+ 上会覆盖用户在
         // 系统设置里选择的应用语言，API <33 上此时 AppCompat 存储尚未加载、
