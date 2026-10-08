@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="ic_launcher_background">#2E2D3D</color>
-    <color name="ic_launcher_background_w">#F2F1F6</color>
+    <color name="ic_launcher_background">#FFFFFF</color>
+    <color name="ic_launcher_background_w">#FFFFFF</color>
     <color name="ic_st_aloud_background">#D7D7D7</color>
 
     <!--    GR Theme-->

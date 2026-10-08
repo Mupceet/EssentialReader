@@ -373,7 +373,7 @@ Book sources, RSS sources, and HTTP TTS use JavaScript rules. `initRhino()` in `
   routes through `cn.hutool.core.codec.Base64.decode` for lenient input compatibility (Kotlin
   `kotlin.io.encoding.Base64` is strict about `=` padding). App crypto otherwise uses JCA (
   `javax.crypto`/`java.security`); new internal tools live in `help/crypto/CryptoUtils.kt`
-- Package name discrepancy: code namespace is `io.legado.app` but `applicationId` is `io.legato.kazusa`
+- Package name discrepancy: code namespace is `io.legado.app` but `applicationId` is `io.legato.kazusa.eink`
 - Min SDK 26, target SDK 37, compile SDK 37
 - Release builds enable R8 minification + resource shrinking; `noR8` variant disables both for crash debugging
 - APK is split by ABI (`armeabi-v7a`, `arm64-v8a`, plus universal)

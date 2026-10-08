@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <!--App-->
-    <string name="app_name">Legado</string>
-    <string name="app_name_a">Legado·A</string>
+    <string name="app_name">墨本阅读</string>
+    <string name="app_name_a">墨本阅读·A</string>
     <string name="receiving_shared_label">Legado·search</string>
     <string name="tip_perm_request_storage">Legado needs storage access to find and read books. Please go "App Settings" to allow "Storage Permission".</string>
 
@@ -773,6 +773,7 @@
     <string name="change_icon_summary">Switch the software icon displayed on the desktop</string>
     <string name="help">Help</string>
     <string name="my">Me</string>
+    <string name="my_eink_mode">E-Ink Mode</string>
     <string name="reading">Read</string>
     <string name="battery_show">%d%%</string>
     <string name="timer_m">%d min</string>

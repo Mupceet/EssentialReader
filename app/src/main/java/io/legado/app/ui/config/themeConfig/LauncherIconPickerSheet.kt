@@ -137,16 +137,18 @@ data class LauncherIconItem(
 object LauncherIcons {
 
     val list = listOf(
+        // 主备对调后 application icon=@mipmap/launcherw（朱文）、LauncherW 别名=@mipmap/ic_launcher
+        // （白文），各选项生效后桌面显示的是对方资源，预览按“生效后的桌面图标”取：
         LauncherIconItem(
             value = "ic_launcher",
             label = "iconMain",
-            resId = R.mipmap.ic_launcher,
+            resId = R.mipmap.launcherw,
             component = ComponentName(appCtx, LauncherW::class.java)
         ),
         LauncherIconItem(
             value = "launcherw",
             label = "iconWhite",
-            resId = R.mipmap.launcherw,
+            resId = R.mipmap.ic_launcher,
             component = ComponentName(appCtx, LauncherW::class.java)
         ),
         LauncherIconItem(

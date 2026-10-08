@@ -612,4 +612,7 @@
 
     <!--statusBarBackground-->
     <color name="navigation_bar_bag">#222222</color>
+    <!-- 深色模式下桌面图标底色转黑：前景字画由 drawable-night 反转为白色 -->
+    <color name="ic_launcher_background">#000000</color>
+    <color name="ic_launcher_background_w">#000000</color>
 </resources>
