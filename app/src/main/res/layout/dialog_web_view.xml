@@ -13,4 +13,56 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent" />
 
+    <!-- 墨水屏翻页控制条（BottomWebViewDialog.Config.pageControls 启用；
+         eink 分派路径强制开启）：WebView 触摸滚动在墨水屏上不可靠，
+         改按钮步进滚动 + 显式关闭入口 -->
+    <LinearLayout
+        android:id="@+id/page_controls_bar"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom|center_horizontal"
+        android:layout_marginBottom="16dp"
+        android:background="@drawable/bg_eink_page_controls"
+        android:clickable="true"
+        android:focusable="true"
+        android:orientation="horizontal"
+        android:visibility="gone">
+
+        <TextView
+            android:id="@+id/page_up"
+            android:layout_width="wrap_content"
+            android:layout_height="48dp"
+            android:gravity="center"
+            android:minWidth="76dp"
+            android:paddingHorizontal="16dp"
+            android:text="@string/prev_page"
+            android:textColor="?android:attr/colorForeground"
+            android:textSize="14sp" />
+
+        <TextView
+            android:id="@+id/page_close"
+            android:layout_width="wrap_content"
+            android:layout_height="48dp"
+            android:layout_marginStart="8dp"
+            android:gravity="center"
+            android:minWidth="76dp"
+            android:paddingHorizontal="16dp"
+            android:text="@string/close"
+            android:textColor="?android:attr/colorForeground"
+            android:textSize="14sp" />
+
+        <TextView
+            android:id="@+id/page_down"
+            android:layout_width="wrap_content"
+            android:layout_height="48dp"
+            android:layout_marginStart="8dp"
+            android:gravity="center"
+            android:minWidth="76dp"
+            android:paddingHorizontal="16dp"
+            android:text="@string/next_page"
+            android:textColor="?android:attr/colorForeground"
+            android:textSize="14sp" />
+
+    </LinearLayout>
+
 </FrameLayout>

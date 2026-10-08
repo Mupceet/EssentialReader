@@ -17,6 +17,9 @@ import io.legado.app.constant.AppConst
 import io.legado.app.constant.AppLog
 import io.legado.app.constant.IntentAction
 import io.legado.app.constant.NotificationId
+import io.legado.app.model.DownloadProgressStore
+import io.legado.app.model.DownloadProgressStore.DownloadProgress
+import io.legado.app.model.downloadStateOf
 import io.legado.app.utils.IntentType
 import io.legado.app.utils.openFileUri
 import io.legado.app.utils.servicePendingIntent
@@ -94,9 +97,20 @@ class DownloadService : BaseService() {
             }
             return
         }
-        if (downloads.values.any { it.url == url }) {
-            toastOnUi("已在下载列表")
-            return
+        // 失败任务残留的 id 永远停在 FAILED，不清掉会让同地址重下
+        // 永远撞「已在下载列表」；先移除旧任务再重新入队
+        downloads.entries.find { it.value.url == url }?.let { (id, info) ->
+            if (completeDownloads.contains(id)) {
+                // 已完成的同地址任务直接重开文件（更新流：用户取消
+                // 安装器后再点「立即更新」须重调安装器）
+                openDownload(id, info.fileName)
+                return
+            }
+            if (!info.failed) {
+                toastOnUi("已在下载列表")
+                return
+            }
+            removeDownload(id)
         }
         kotlin.runCatching {
             // 指定下载地址
@@ -129,12 +143,16 @@ class DownloadService : BaseService() {
      */
     @Synchronized
     private fun removeDownload(downloadId: Long) {
+        val info = downloads[downloadId]
         if (!completeDownloads.contains(downloadId)) {
             downloadManager.remove(downloadId)
         }
         downloads.remove(downloadId)
         completeDownloads.remove(downloadId)
         notificationManager.cancel(downloadId.toInt())
+        // 同步下线进度条目：清掉最后一项后 queryState 直接 stopSelf
+        // 不再发布，残留行会永久停在中间态
+        info?.let { DownloadProgressStore.remove(it.url) }
     }
 
     /**
@@ -171,6 +189,7 @@ class DownloadService : BaseService() {
         val ids = downloads.keys
         val query = DownloadManager.Query()
         query.setFilterById(*ids.toLongArray())
+        val progressRows = arrayListOf<DownloadProgress>()
         downloadManager.query(query).use { cursor ->
             if (cursor.moveToFirst()) {
                 val idIndex = cursor.getColumnIndex(DownloadManager.COLUMN_ID)
@@ -182,19 +201,31 @@ class DownloadService : BaseService() {
                     val id = cursor.getLong(idIndex)
                     val progress = cursor.getInt(progressIndex)
                     val max = cursor.getInt(fileSizeIndex)
-                    val status = when (cursor.getInt(statusIndex)) {
-                        DownloadManager.STATUS_PAUSED -> getString(R.string.pause)
-                        DownloadManager.STATUS_PENDING -> getString(R.string.wait_download)
-                        DownloadManager.STATUS_RUNNING -> getString(R.string.downloading)
-                        DownloadManager.STATUS_SUCCESSFUL -> {
+                    val state = downloadStateOf(cursor.getInt(statusIndex))
+                    if (state == DownloadProgressStore.DownloadState.FAILED) {
+                        downloads[id]?.failed = true
+                    }
+                    val status = when (state) {
+                        DownloadProgressStore.DownloadState.PAUSED -> getString(R.string.pause)
+                        DownloadProgressStore.DownloadState.PENDING -> getString(R.string.wait_download)
+                        DownloadProgressStore.DownloadState.RUNNING -> getString(R.string.downloading)
+                        DownloadProgressStore.DownloadState.SUCCEEDED -> {
                             successDownload(id)
                             getString(R.string.download_success)
                         }
 
-                        DownloadManager.STATUS_FAILED -> getString(R.string.download_error)
-                        else -> getString(R.string.unknown_state)
+                        DownloadProgressStore.DownloadState.FAILED -> getString(R.string.download_error)
                     }
                     downloads[id]?.let { downloadInfo ->
+                        progressRows.add(
+                            DownloadProgress(
+                                url = downloadInfo.url,
+                                fileName = downloadInfo.fileName,
+                                state = state,
+                                bytesSoFar = progress.toLong(),
+                                totalBytes = max.toLong(),
+                            )
+                        )
                         upDownloadNotification(
                             id,
                             downloadInfo.notificationId,
@@ -207,6 +238,8 @@ class DownloadService : BaseService() {
                 } while (cursor.moveToNext())
             }
         }
+        // 整体重建发布：条目被移除后即从快照表下线
+        DownloadProgressStore.publish(progressRows)
     }
 
     /**
@@ -273,7 +306,9 @@ class DownloadService : BaseService() {
         val url: String,
         val fileName: String,
         val notificationId: Int,
-        val startTime: Long = System.currentTimeMillis()
+        val startTime: Long = System.currentTimeMillis(),
+        // 终态标记：失败后同地址重下须清旧任务重新入队
+        var failed: Boolean = false,
     )
 
 }

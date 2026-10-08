@@ -11,23 +11,69 @@ import java.util.concurrent.atomic.AtomicInteger
 internal object ReaderPerfTrace {
     private const val MAX_NAME = 100
     private val nextAsyncCookie = AtomicInteger()
+
+    // 纯 JVM 单测里 android.os.Trace 未 mock，首次调用直接抛 RuntimeException。
+    // 追踪只做观测，任何环境都不允许它拖垮被测/调用路径，失败一次后整体降级为 no-op。
+    @Volatile
+    private var tracingUsable = true
+
+    @PublishedApi
+    internal fun begin(name: String) {
+        if (!tracingUsable) return
+        try {
+            Trace.beginSection(name)
+        } catch (e: RuntimeException) {
+            tracingUsable = false
+        }
+    }
+
+    @PublishedApi
+    internal fun end() {
+        if (!tracingUsable) return
+        try {
+            Trace.endSection()
+        } catch (e: RuntimeException) {
+            tracingUsable = false
+        }
+    }
+
+    @PublishedApi
+    internal fun beginAsync(name: String, cookie: Int) {
+        if (!tracingUsable || Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return
+        try {
+            Trace.beginAsyncSection(name, cookie)
+        } catch (e: RuntimeException) {
+            tracingUsable = false
+        }
+    }
+
+    @PublishedApi
+    internal fun endAsync(name: String, cookie: Int) {
+        if (!tracingUsable || Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return
+        try {
+            Trace.endAsyncSection(name, cookie)
+        } catch (e: RuntimeException) {
+            tracingUsable = false
+        }
+    }
+
     inline fun <T> section(name: String, block: () -> T): T {
-        Trace.beginSection("reader.$name")
+        begin("reader.$name")
         return try {
             block()
         } finally {
-            Trace.endSection()
+            end()
         }
     }
 
     suspend fun <T> suspendSection(name: String, block: suspend () -> T): T {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return block()
         val cookie = nextAsyncCookie.incrementAndGet()
-        Trace.beginAsyncSection("reader.$name", cookie)
+        beginAsync("reader.$name", cookie)
         return try {
             block()
         } finally {
-            Trace.endAsyncSection("reader.$name", cookie)
+            endAsync("reader.$name", cookie)
         }
     }
 
@@ -39,11 +85,17 @@ internal object ReaderPerfTrace {
      * 而 marker 常在组合期调用，抛出即整个应用崩溃。
      */
     fun marker(name: String) {
+        // isEnabled 前置（上游：marker 在 composable 体内每次重组执行，未开 tracing 时
+        // 尽早返回省两次 Trace 静态调用；纯 JVM 单测 SDK_INT=0 在此短路）。begin/end
+        // 内部保留失效软化，Trace 异常环境降级为 no-op 而不拖垮调用方。
         if (!isEnabled()) return
-        val section = if (name.length <= MAX_NAME) "reader.$name" else "reader." + name.substring(0, MAX_NAME)
-        Trace.beginSection(section)
-        Trace.endSection()
+        begin(markerSectionName(name))
+        end()
     }
+
+    /** 段名截断（上游 3c57 轮并入）：begin 走失效软化，截断让超长名仍可追踪而非整体降级。 */
+    private fun markerSectionName(name: String): String =
+        if (name.length <= MAX_NAME) "reader.$name" else "reader." + name.substring(0, MAX_NAME)
 
     fun isEnabled(): Boolean = Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && Trace.isEnabled()
 

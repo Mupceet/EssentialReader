@@ -12,8 +12,8 @@ import io.legado.app.feature.reader.core.layout.ReaderTextShaper
 import io.legado.app.feature.reader.core.layout.clusterGlyphs
 import io.legado.app.feature.reader.core.model.ReaderTextStyle
 import io.legado.app.utils.validFontLeading
-import splitties.init.appCtx
 import java.io.File
+import splitties.init.appCtx
 
 object ReaderAndroidPaintFactory {
     /** 进程级字体缓存：同一 path/weight/italic/family 只做一次磁盘读取与解析。 */
