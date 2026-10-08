@@ -84,11 +84,12 @@ class EInkListPagerState(val listState: LazyListState) : EInkPageController {
     /**
      * 首次布局后测量一页的项数：从下标 0 起连续计数完整可见项。
      *
-     * 等到首个「视口被填满」的布局才落定（存在底部被截断的项，即内容
-     * 已超过一页）：流式追加的列表（换源页常驻首项、搜索页首批结果）
-     * 首个非空布局可能只有个位数条目，视口未被填满时计数只是过渡值，
-     * 落定过早会把整页翻页永久退化成逐条翻。列表不足一页时永不落定
-     * （[pageItemCount] 保持 0、翻页保持禁用——单页列表本就无需翻页）。
+     * 等到首个「视口被填满」的布局才落定（末项被截断，或整除填满——见
+     * [settledPageCount] 的两种形态）：流式追加的列表（换源页常驻首项、
+     * 搜索页首批结果）首个非空布局可能只有个位数条目，视口未被填满时
+     * 计数只是过渡值，落定过早会把整页翻页永久退化成逐条翻。列表不足
+     * 一页时永不落定（[pageItemCount] 保持 0、翻页保持禁用——单页列表
+     * 本就无需翻页）。
      */
     internal suspend fun measureOnFirstLayout() {
         if (pageItemCount > 0) return
@@ -108,17 +109,8 @@ class EInkListPagerState(val listState: LazyListState) : EInkPageController {
                             scrollToPageStart(0)
                             return@collect
                         }
-                        val viewportEnd = info.viewportEndOffset
-                        var count = 0
-                        for (item in info.visibleItemsInfo) {
-                            if (item.index != count) break
-                            if (item.offset + item.size > viewportEnd) break
-                            count++
-                        }
-                        // 视口填满 = 首项起连续完整可见的项数少于可见项总数
-                        //（末项被截断）；恰好整页放下的列表同短列表一样继续等，
-                        // 翻页可用性两种落定值下一致（均为不可下翻）
-                        if (count > 0 && count < info.visibleItemsInfo.size) {
+                        val count = settledPageCount(info)
+                        if (count > 0) {
                             pageItemCount = count
                             measured.complete(Unit)
                         }
@@ -234,15 +226,49 @@ class EInkListPagerState(val listState: LazyListState) : EInkPageController {
 }
 
 /**
+ * 单次布局可落定的一页项数；0 = 视口未填满（过渡布局或单页列表），继续等。
+ *
+ * 视口被填满有两种形态，都落定：
+ *  1. **末项被截断**——首项起连续完整可见的项数少于可见项总数；
+ *  2. **整除填满**——可见项从首项起全部完整、其后仍有已到位未展示项
+ *     （可见末项下标 < 列表总数-1）。行高像素 = 排版行高或字体度量 ×
+ *     fontScale × density 四舍五入，特定界面字体 × 字体缩放组合可确定性
+ *     命中整除（真机 2026-10：界面字体 A + 1.1 缩放，目录页整页空白）。
+ *     LazyList 视口被整数行填满时，下一项从视口底边起、不与视口相交、
+ *     不进可见集——形态 1 永不出现；若形态 2 也不落定，多页列表会被
+ *     永久卡在 pageItemCount = 0（无法整页翻页），且以测量落定为揭盖
+ *     条件的界面（[awaitPositionReady]）遮盖常驻。
+ *
+ * 流式追加列表（搜索/换源）的过渡批次不会误入形态 2：已到末项即当前
+ * 列表末项（totalItemsCount 只含已到项），不落定、仍按原设计等首个
+ * 截断布局，避免把过渡批次误测成一页。单页列表（末项即列表末尾且
+ * 完整可见，无论恰好装满还是留白）两种形态都不满足，保持不落定。
+ */
+internal fun settledPageCount(info: LazyListLayoutInfo): Int {
+    val visible = info.visibleItemsInfo
+    var count = 0
+    for (item in visible) {
+        if (item.index != count) break
+        if (item.offset + item.size > info.viewportEndOffset) break
+        count++
+    }
+    if (count <= 0) return 0
+    return when {
+        count < visible.size -> count
+        visible.last().index < info.totalItemsCount - 1 -> count
+        else -> 0
+    }
+}
+
+/**
  * 定位遮盖的前置等待：分页测量落定（内容超一页，[pageItemCount] > 0），
  * 或当前内容单页即可完整展示。
  *
- * [measureOnFirstLayout] 只在「末项被截断」（视口被填满）时落定——内容
- * 恰好装进一页的列表（短列表，或行高变化后原本微溢出的列表缩回一页）
- * 按设计永不落定；此时无需翻页也无页可跳（[jumpToItemAligned] 对
- * pageItemCount ≤ 0 直接 no-op），必须放行，否则以测量落定为揭盖条件的
- * 界面（目录页、字体设置页）遮盖常驻——不透明遮盖无指针处理，表现为
- * 「列表不可见但行可点击」。
+ * [measureOnFirstLayout] 只在「视口被填满」（末项被截断或整除填满，见
+ * [settledPageCount]）时落定——内容恰好装进一页的列表（短列表，或行高
+ * 变化后原本微溢出的列表缩回一页）按设计永不落定；此时无需翻页也无页
+ * 可跳（[jumpToItemAligned] 对 pageItemCount ≤ 0 直接 no-op），必须放行，
+ * 否则遮盖常驻——不透明遮盖无指针处理，表现为「列表不可见但行可点击」。
  *
  * 调用方须保证等待期间 totalItems 已是终态（数据整批到位，非流式追加），
  * 避免过渡批次被误判为单页。
