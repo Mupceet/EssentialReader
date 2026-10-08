@@ -1,49 +1,49 @@
 {
-  "tag_name": "3.26.17-beta.27",
-  "name": "Pre-release 3.26.17-beta.27",
+  "tag_name": "3.26.17-beta.28",
+  "name": "Pre-release 3.26.17-beta.28",
   "body": "**此版本为测试版，会存在不稳定问题。**\n\n# 更新日志\n\n墨本阅读——开源阅读 legado 的墨水屏增强发行版：同一本书，两种读法。\n\n## 3.26.17-beta（预发布）\n\n本次更新墨水屏模式落地自动翻页节奏、弹窗样式与独立字体设置三项改进，完整模式合入上游朗读多角色配音套件，Web 阅读端支持手柄翻页，并修复多项问题。\n\n### 新增\n\n* 墨水屏模式：自动翻页按页面内容量调节等待——本页内容不满一屏时，等待时间按实际内容占比缩短，不再每页都等满时长（最短保留 1 秒，防墨水屏高频刷新）\n* 墨水屏模式：确认弹窗按钮改为格线样式——按钮之间以细线分隔、按压时整格反白，双按钮一横一竖、三个动作两横一竖，墨水屏下更清晰\n* 墨水屏模式：新增独立字体设置页——「我的」中设置应用界面字体（含系统预设与自定义字体，选择后自动定位反显）；阅读器内打开则进入阅读字体选择，两处入口各自生效\n* 完整模式：朗读多角色配音——正则角色按规则匹配角色并绑定音色，也可让 AI 自动分配；支持音色池、变声器、背景音乐与音效、角色悬浮胶囊与头像等一整套设置\n* Web 阅读端：支持手柄翻页——LT/RT 扳机键翻页，摇杆死区与扳机判定优化；十字键加冷却防抖，抖动不再一次连跳多章\n\n### 修复\n\n* 完整模式：书源人机验证完成后自动继续之前的搜索，不再中断\n* 完整模式：分组关闭「允许下拉刷新」后不再能下拉刷新\n* 完整模式：修复开书瞬间可能闪现上一本书正文、朗读通知点回阅读页叠出两层阅读页、高亮规则预览示例句位置偏移等问题\n\n### 优化\n\n* 完整模式：开书与详情页转场更流畅，设置类页面静止时不再空转耗电",
   "prerelease": true,
-  "created_at": "2026-10-07T20:09:49Z",
+  "created_at": "2026-10-08T04:12:15Z",
   "assets": [
     {
-      "browser_download_url": "https://github.com/Mupceet/EssentialReader/releases/download/3.26.17-beta.27/mapping.txt",
+      "browser_download_url": "https://github.com/Mupceet/EssentialReader/releases/download/3.26.17-beta.28/mapping.txt",
       "content_type": "text/plain",
-      "created_at": "2026-10-07T20:23:57Z",
+      "created_at": "2026-10-08T05:16:09Z",
       "download_count": 0,
-      "id": 619721768,
+      "id": 620808292,
       "name": "mapping.txt",
       "state": "uploaded",
-      "url": "https://api.github.com/repos/Mupceet/EssentialReader/releases/assets/619721768"
+      "url": "https://api.github.com/repos/Mupceet/EssentialReader/releases/assets/620808292"
     },
     {
-      "browser_download_url": "https://github.com/Mupceet/EssentialReader/releases/download/3.26.17-beta.27/moben-3.26.17-beta.27-arm64-v8a.apk",
+      "browser_download_url": "https://github.com/Mupceet/EssentialReader/releases/download/3.26.17-beta.28/moben-3.26.17-beta.28-arm64-v8a.apk",
       "content_type": "application/vnd.android.package-archive",
-      "created_at": "2026-10-07T20:23:57Z",
+      "created_at": "2026-10-08T05:16:09Z",
       "download_count": 0,
-      "id": 619721770,
-      "name": "moben-3.26.17-beta.27-arm64-v8a.apk",
+      "id": 620808295,
+      "name": "moben-3.26.17-beta.28-arm64-v8a.apk",
       "state": "uploaded",
-      "url": "https://api.github.com/repos/Mupceet/EssentialReader/releases/assets/619721770"
+      "url": "https://api.github.com/repos/Mupceet/EssentialReader/releases/assets/620808295"
     },
     {
-      "browser_download_url": "https://github.com/Mupceet/EssentialReader/releases/download/3.26.17-beta.27/moben-3.26.17-beta.27-armeabi-v7a.apk",
+      "browser_download_url": "https://github.com/Mupceet/EssentialReader/releases/download/3.26.17-beta.28/moben-3.26.17-beta.28-armeabi-v7a.apk",
       "content_type": "application/vnd.android.package-archive",
-      "created_at": "2026-10-07T20:23:57Z",
+      "created_at": "2026-10-08T05:16:09Z",
       "download_count": 0,
-      "id": 619721775,
-      "name": "moben-3.26.17-beta.27-armeabi-v7a.apk",
+      "id": 620808293,
+      "name": "moben-3.26.17-beta.28-armeabi-v7a.apk",
       "state": "uploaded",
-      "url": "https://api.github.com/repos/Mupceet/EssentialReader/releases/assets/619721775"
+      "url": "https://api.github.com/repos/Mupceet/EssentialReader/releases/assets/620808293"
     },
     {
-      "browser_download_url": "https://github.com/Mupceet/EssentialReader/releases/download/3.26.17-beta.27/moben-3.26.17-beta.27.apk",
+      "browser_download_url": "https://github.com/Mupceet/EssentialReader/releases/download/3.26.17-beta.28/moben-3.26.17-beta.28.apk",
       "content_type": "application/vnd.android.package-archive",
-      "created_at": "2026-10-07T20:23:57Z",
+      "created_at": "2026-10-08T05:16:09Z",
       "download_count": 0,
-      "id": 619721773,
-      "name": "moben-3.26.17-beta.27.apk",
+      "id": 620808294,
+      "name": "moben-3.26.17-beta.28.apk",
       "state": "uploaded",
-      "url": "https://api.github.com/repos/Mupceet/EssentialReader/releases/assets/619721773"
+      "url": "https://api.github.com/repos/Mupceet/EssentialReader/releases/assets/620808294"
     }
   ]
 }
