@@ -59,7 +59,9 @@ internal fun Preferences.toChangeSourceSettings() = ChangeSourceSettings(
     migrateRemark = compatDsBoolean(KEY_MIGRATE_REMARK) ?: true,
     migrateAuthor = compatDsBoolean(KEY_MIGRATE_AUTHOR) ?: true,
     migrateReadConfig = compatDsBoolean(KEY_MIGRATE_READ_CONFIG) ?: true,
-    deleteDownloadedChapters = compatDsBoolean(KEY_DELETE_DOWNLOADED_CHAPTERS) ?: false,
+    // 默认 true：正文缓存按「序号-标题」命中（与源无关），换源搬移会沿用旧源
+    // 正文（含坏章）；与 ChangeSourceSettings 数据类默认保持一致
+    deleteDownloadedChapters = compatDsBoolean(KEY_DELETE_DOWNLOADED_CHAPTERS) ?: true,
 )
 
 internal fun ChangeSourceSettings.toPrefMap(): Map<String, Any?> = mapOf(

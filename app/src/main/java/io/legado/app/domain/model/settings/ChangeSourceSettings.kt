@@ -16,7 +16,9 @@ data class ChangeSourceSettings(
     val migrateRemark: Boolean = true,
     val migrateAuthor: Boolean = true,
     val migrateReadConfig: Boolean = true,
-    val deleteDownloadedChapters: Boolean = false,
+    // 默认删：正文缓存文件名是「序号-标题MD5」（与源无关），换源搬移会沿用
+    // 旧源正文（含坏章），换源动机多为旧源内容有问题
+    val deleteDownloadedChapters: Boolean = true,
 ) {
     fun migrationOptions() = ChangeSourceMigrationOptions(
         migrateChapters = migrateChapters,

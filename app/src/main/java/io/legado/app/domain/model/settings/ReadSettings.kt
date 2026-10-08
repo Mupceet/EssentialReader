@@ -44,6 +44,8 @@ data class ReadSettings(
     val selectText: Boolean = true,
     val noAnimScrollPage: Boolean = false,
     val clickImgWay: String = "2",
+    /** 段评气泡（带 click 动作脚本的行内图片）参与排版；false = 不参与排版、不绘制、不可点、不取图。 */
+    val showReviewBubbles: Boolean = true,
     val optimizeRender: Boolean = false,
     val disableReturnKey: Boolean = false,
     val expandTextMenu: Boolean = false,

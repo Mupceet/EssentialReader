@@ -18,6 +18,7 @@ class LabSettingsMappingTest {
             LabSettings(enabled = true),
             LabSettings(eInkDisplay = true),
             LabSettings(eyeProtection = true),
+            LabSettings(eInkMode = true),
         )
 
         samples.forEach { expected ->

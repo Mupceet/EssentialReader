@@ -217,12 +217,14 @@ internal fun Preferences.toLabSettings(): LabSettings = LabSettings(
     enabled = compatDsBoolean(PreferKey.labEnabled) ?: false,
     eInkDisplay = compatDsBoolean(PreferKey.labEInkDisplay) ?: false,
     eyeProtection = compatDsBoolean(PreferKey.labEyeProtection) ?: false,
+    eInkMode = compatDsBoolean(PreferKey.eInkMode) ?: false,
 )
 
 internal fun LabSettings.toPrefMap(): Map<String, Any?> = mapOf(
     PreferKey.labEnabled to enabled,
     PreferKey.labEInkDisplay to eInkDisplay,
     PreferKey.labEyeProtection to eyeProtection,
+    PreferKey.eInkMode to eInkMode,
 )
 
 internal fun Preferences.toTranslationSettings(): TranslationSettings {
