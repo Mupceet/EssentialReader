@@ -33,7 +33,8 @@ import kotlin.time.Duration.Companion.milliseconds
  * 换源 UiState。
  *
  * [current] 是常驻列表首项的「当前源」行数据（进入即见，不随搜索
- * 清空/重搜消失）；[results] 只含其它书源的搜索结果。
+ * 清空/重搜消失）；[results] 不含当前书自身的精确记录（同源别版——
+ * 聚合源的子结果——照常展示，不得按 origin 过滤）。
  */
 data class ChangeSourceUiState(
     val book: ChangeSourceBookUiModel? = null,
@@ -93,7 +94,8 @@ class ChangeSourceViewModel(application: Application) : AndroidViewModel(applica
             // 对齐宿主 initData：先读历史搜索缓存，命中即直接展示、不重搜
             //（换源 VM 随导航条目销毁，缓存是跨进入次数的唯一记忆；
             // 顶栏刷新仍可强制重新搜索）；未命中才发起全新搜索。
-            // 当前书源自己的记录不进 results——它已由 current 常驻首项
+            // 当前书自己的精确记录不进 results——它已由 current 常驻首项；
+            // 同源别版保留（聚合源子结果同 origin，按 origin 过滤会整锅滤掉）
             val cached = engine.cachedSourceBooks(
                 name = book.name,
                 author = book.author,
@@ -104,7 +106,7 @@ class ChangeSourceViewModel(application: Application) : AndroidViewModel(applica
             } else {
                 val seen = HashSet<String>()
                 val results = cached.filter {
-                    it.origin != book.origin && seen.add(it.deduplicationKey)
+                    it.bookUrl != book.bookUrl && seen.add(it.deduplicationKey)
                 }
                 _uiState.update { state -> state.copy(results = results) }
             }
@@ -194,9 +196,10 @@ class ChangeSourceViewModel(application: Application) : AndroidViewModel(applica
 
     private fun onSearchSuccess(searchBook: ChangeSourceResultUiModel) {
         val current = _uiState.value.current ?: return
-        // 当前书源自己的搜索结果不进列表（含同源不同 bookUrl 的别版）：
-        // 它已由 current 常驻首项，进列表会出现两行「当前源」
-        if (searchBook.origin == current.origin) return
+        // 当前书自己的精确记录不进列表（它已由 current 常驻首项承担）；
+        // 同源不同 bookUrl 的别版保留——聚合源的全部子结果同 origin，
+        // 按 origin 过滤会整锅滤掉、聚合源内无法换源
+        if (searchBook.bookUrl == current.bookUrl) return
         _uiState.update { state ->
             // 去重：同一书源同一书籍只保留一条
             if (state.results.any { it.deduplicationKey == searchBook.deduplicationKey }) {

@@ -11,7 +11,7 @@ import io.legado.app.eink.arch.EInkImmutable
  *        │ currentReadingBook 时一次映射
  *        ▼
  * ChangeSourceBookUiModel（全基元字段；origin/originName 用于
- * 常驻首项的「当前源」行，结果列表按 origin 过滤同源记录）
+ * 常驻首项的「当前源」行，结果列表仅按 bookUrl 滤当前书自身记录）
  * ```
  */
 @EInkImmutable
@@ -25,7 +25,7 @@ data class ChangeSourceBookUiModel(
     /** 作者（换源搜索的匹配词）。 */
     val author: String,
 
-    /** 当前书源 origin 标识（结果列表按它过滤同源记录）。 */
+    /** 当前书源 origin 标识（聚合源子结果同 origin，不可作结果过滤键）。 */
     val origin: String,
 
     /** 当前书源显示名快照（书籍记录内的 originName，可为空串，UI 回落 origin）。 */

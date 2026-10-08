@@ -86,10 +86,13 @@ class ChangeSourceViewModelTest {
     @Test
     fun `缓存命中时进入即展示历史结果且不发起搜索`() = runBlocking {
         val cachedResult = cachedResultOf(bookUrl = "url-cached", origin = "origin-cached")
-        // 当前书源自己的历史记录不进结果列表——它由常驻首项「当前源」行承担
+        // 聚合源同源别版的历史缓存照常进列表——聚合源全部子结果同 origin，
+        // 按 origin 过滤会把它们整锅滤掉、聚合源内无法换源
+        val sameOriginOtherEdition = cachedResultOf(bookUrl = "url-old-2nd", origin = "origin-old")
+        // 当前书自己的精确记录不进结果列表——它由常驻首项「当前源」行承担
         val currentSourceRecord = cachedResultOf(bookUrl = "url-old", origin = "origin-old")
         val engine = FakeChangeSourceEngine(
-            cached = listOf(currentSourceRecord, cachedResult),
+            cached = listOf(currentSourceRecord, sameOriginOtherEdition, cachedResult),
         )
         withRegistryPatched(engine) {
             val viewModel = ChangeSourceViewModel(Application())
@@ -99,7 +102,7 @@ class ChangeSourceViewModelTest {
 
             val state = viewModel.uiState.value
             assertFalse(state.isSearching)
-            assertEquals(listOf(cachedResult), state.results)
+            assertEquals(listOf(sameOriginOtherEdition, cachedResult), state.results)
             // 常驻首项的当前源数据来自进入时的书籍快照，与缓存无关
             assertEquals("origin-old", state.current?.origin)
             assertEquals("旧书源", state.current?.originName)
@@ -123,14 +126,16 @@ class ChangeSourceViewModelTest {
     }
 
     @Test
-    fun `搜索结果中当前源不进列表且当前源行常驻`() = runBlocking {
-        // 当前源的搜索命中（含同源不同 bookUrl 的别版）不进结果列表，
-        // 避免出现两行「当前源」；其它源结果正常追加
+    fun `搜索结果仅滤当前书自身记录同源别版保留且当前源行常驻`() = runBlocking {
+        // 只滤当前书自己的精确 bookUrl 记录：同源不同 bookUrl 的别版
+        // （聚合源的子结果）与其它源结果都正常进列表，否则聚合源内
+        // 无法换源（a5bbcebed 按 origin 过滤的回归）
+        val selfRecord = cachedResultOf(bookUrl = "url-old", origin = "origin-old")
         val sameOriginOtherEdition = cachedResultOf(bookUrl = "url-old-2nd", origin = "origin-old")
         val otherOrigin = cachedResultOf(bookUrl = "url-new", origin = "origin-new")
         val engine = FakeChangeSourceEngine(
             cached = emptyList(),
-            searchResults = listOf(sameOriginOtherEdition, otherOrigin),
+            searchResults = listOf(selfRecord, sameOriginOtherEdition, otherOrigin),
             suspendInSearch = false,
         )
         withRegistryPatched(engine) {
@@ -142,7 +147,7 @@ class ChangeSourceViewModelTest {
             }
 
             val state = viewModel.uiState.value
-            assertEquals(listOf(otherOrigin), state.results)
+            assertEquals(listOf(sameOriginOtherEdition, otherOrigin), state.results)
             assertEquals("origin-old", state.current?.origin)
             assertFalse(state.isSearching)
         }
