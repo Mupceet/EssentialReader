@@ -54,7 +54,7 @@ android {
         applicationId = "io.legato.kazusa.eink"
         minSdk = 26
         targetSdk = 37
-        versionCode = System.getenv("COMMIT_NUMBER")?.toInt()?.let { 10000 + it } ?: 32640
+        versionCode = versionProps["VERSION_CODE"]?.toString()?.toInt() ?: 33000
         versionName = System.getenv("APP_VERSION_NAME") ?: projectVersionName
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
@@ -162,10 +162,15 @@ android {
     testOptions {
         unitTests {
             // 阅读器核心在构造期就读字符串资源（TextPageFactory 的 keepSwipeTip、
-            // TextPage 的默认 text/title、ReadView 的无障碍动作名）。不打开这个，
-            // Robolectric 下取任何 R.string 都是 Resources$NotFoundException，
-            // 整条阅读器测试线（Track D·D1c）就起不来。
+            // TextPage 的默认 text/title、ReadView 的无障碍动作名）。不打开这个，Robolectric
+            // 下取任何 R.string 都是 Resources$NotFoundException，整条阅读器测试线（Track D·D1c）
+            // 就起不来。
             isIncludeAndroidResources = true
+            // fork 口径与上游对齐（forkEvery=1 + maxParallelForks=1，见文件尾）：套件长到
+            // 323 类后 forkEvery=100 的分界漂移，同 fork 内前序类残留的主线程调度状态让
+            // idleFor 泵帧类测量断言（RoundDropdownMenuLazyTest）在满套件下间歇挂、单跑
+            // 恒过；上游同口径在其 2 核 runner 上整轮 Verify 23 分钟，本仓库 45 分钟 job
+            // 超时装得下。
         }
     }
 }

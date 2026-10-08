@@ -6,7 +6,7 @@ on:
       branch:
         description: '要构建的分支'
         required: true
-        default: 'trae/solo-agent-vhkVM3'
+        default: 'eink/port/md3/modules'
 
 permissions:
   contents: write
@@ -20,6 +20,8 @@ jobs:
         with:
           ref: ${{ github.event.inputs.branch }}
           fetch-depth: 0
+          # eink 模块经 git 子模块集成（eink/lib 分支）
+          submodules: recursive
 
       - name: Set up JDK 21
         uses: actions/setup-java@v5
@@ -44,7 +46,6 @@ jobs:
           chmod +x gradlew
           ./gradlew assembleAppDebug -PenableAbiSplits=false --no-daemon --no-configuration-cache
         env:
-          COMMIT_NUMBER: ${{ github.run_number }}
           APP_VERSION_NAME: debug-${{ github.run_number }}
 
       - name: Check Build Output
