@@ -52,7 +52,6 @@ import io.legado.app.eink.designsystem.theme.EInkSpacing
 import io.legado.app.eink.designsystem.theme.EInkTheme
 import io.legado.app.eink.feature.bookdetail.BookDetailRoute
 import io.legado.app.eink.feature.changesource.ChangeSourceRoute
-import io.legado.app.eink.feature.home.FontScaleSettingsRoute
 import io.legado.app.eink.feature.home.FontSettingsRoute
 import io.legado.app.eink.feature.home.HomeRoute
 import io.legado.app.eink.feature.home.releaseNoteToPlainText
@@ -205,9 +204,6 @@ fun EInkApp(
                                 // 完整模式（View UI）退出由宿主实现：恢复原主题并跳转
                                 // 完整模式首页（导入导出等管理功能在完整模式中完成）
                                 onOpenFullMode = onExitToFullMode,
-                                onOpenFontScale = {
-                                    controller.navigate(EInkScreen.FontScaleSettings)
-                                },
                                 onOpenFontSettings = {
                                     controller.navigate(EInkScreen.FontSettings())
                                 },
@@ -288,10 +284,6 @@ fun EInkApp(
 
                         is EInkScreen.ComponentGallery -> {
                             ComponentGalleryRoute(onBack = { controller.pop() })
-                        }
-
-                        is EInkScreen.FontScaleSettings -> {
-                            FontScaleSettingsRoute(onBack = { controller.pop() })
                         }
 
                         is EInkScreen.FontSettings -> {

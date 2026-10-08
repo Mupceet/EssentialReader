@@ -75,7 +75,6 @@ internal fun MineScreen(
     onPageUp: () -> Unit = {},
     onPageDown: () -> Unit = {},
     updateViewModel: EInkAppUpdateViewModel,
-    onOpenFontScale: () -> Unit = {},
     onOpenFontSettings: () -> Unit = {},
     onOpenFullMode: () -> Unit = {},
     onOpenThemeDebug: () -> Unit = {},
@@ -84,7 +83,6 @@ internal fun MineScreen(
     val globalSettings = EInkEngineRegistry.globalSettings
     val appUpdateEngine = EInkEngineRegistry.appUpdateEngine
     val context = LocalContext.current
-    val fontScale = globalSettings.fontScaleSetting
     var autoRefresh by remember { mutableStateOf(globalSettings.autoRefreshBook) }
     var defaultToRead by remember { mutableStateOf(globalSettings.defaultToRead) }
     // 写路径 fire-and-forget（getter 不保证立即可见新值），本地乐观状态
@@ -105,16 +103,8 @@ internal fun MineScreen(
     ) {
         item {
             MineEntry(
-                label = "字体大小",
-                sublabel = "当前倍率 ${(fontScale ?: FONT_SCALE_NEUTRAL) / 10f}x",
-                onClick = onOpenFontScale
-            )
-        }
-        item { EInkHorizontalDivider() }
-        item {
-            MineEntry(
                 label = "字体设置",
-                sublabel = "设置界面显示字体",
+                sublabel = "设置界面显示字体与大小",
                 onClick = onOpenFontSettings
             )
         }

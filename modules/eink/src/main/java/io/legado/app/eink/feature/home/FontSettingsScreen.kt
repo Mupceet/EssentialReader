@@ -1,5 +1,6 @@
 package io.legado.app.eink.feature.home
 
+import android.app.Activity
 import android.content.Intent
 import android.graphics.Typeface
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -12,6 +13,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
@@ -40,6 +42,7 @@ import io.legado.app.eink.contract.ReaderFontOption
 import io.legado.app.eink.contract.ReaderFontSelection
 import io.legado.app.eink.designsystem.content.EInkHorizontalDivider
 import io.legado.app.eink.designsystem.content.EInkText
+import io.legado.app.eink.designsystem.control.EInkSteppedSlider
 import io.legado.app.eink.designsystem.interaction.eInkActionColors
 import io.legado.app.eink.designsystem.interaction.einkClickable
 import io.legado.app.eink.designsystem.interaction.rememberImmediatePressState
@@ -60,17 +63,31 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
+/** 字体缩放原始设置的最小/最大值（÷10 为倍率：0.8x ~ 1.6x，宿主解析同区间）。 */
+internal const val FONT_SCALE_MIN = 8
+
+internal const val FONT_SCALE_MAX = 16
+
+/** 未设置时的锚定档位（1.0x）；宿主对 null 的回落语义见 GlobalSettings 契约。 */
+internal const val FONT_SCALE_NEUTRAL = 10
+
 /**
  * 字体设置页（入口：「我的 → 字体设置」与阅读器字体配置弹层「更多字体…」）。
  *
- * 自阅读器字体二级浮层提取的独立界面：单列整行显示字体文件夹中的字体
- * 文件，复用全仓全屏列表分页定式（[rememberEInkListPagerState]：LazyColumn
- * 禁滚 + 首布局实测页容量 + 整页跳转；上下滑动手势识别为翻页，同 ▲▼）。
- * 骨架参考字体大小设置页（FontScaleSettingsScreen）：居中标题栏（返回在
- * 底部操作条）+ 内容区 + 底部操作栏（返回 / 切换字体文件夹 / 翻页胶囊）。
+ * 原「字体大小」设置页已并入本页：顶部为示例文字 + 字号拖动条，示例文字
+ * 同时承担**字号预览**（随拖动等比缩放，抬手/步进写入全局设置并 recreate
+ * 入口 Activity 应用——fontScale 是 attach 期档，导航栈与各条目
+ * ViewModelStore 跨 recreate 存活，仍停留在本页）与**字体预览**（跟随
+ * 当前选中字体，点选下方列表即时切换）；底部为字体列表（复用全仓全屏
+ * 列表分页定式 [rememberEInkListPagerState]：LazyColumn 禁滚 + 首布局
+ * 实测页容量 + 整页跳转；上下滑动手势识别为翻页，同 ▲▼）——**翻页只
+ * 作用于列表区**，顶部预览区不参与。顶部预览区（示例文字 + 字号拖动条）
+ * 仅「我的」入口显示：自阅读页进入时整体隐藏（字号缩放与阅读无关，
+ * 阅读正文字号在排版面板；字体预览由列表行承担），界面回到标题 +
+ * 列表的纯选字体形态。
  *
- * 两个入口的写径与生效流程不同，按 [fromReader] 路由分流（对齐完整模式
- * 的两条字体流程）：
+ * 两个入口的字体写径与生效流程不同，按 [fromReader] 路由分流（对齐完整
+ * 模式的两条字体流程）：
  * - 自阅读页进入（fromReader = true）：**阅读字体**流程——统一字体写径
  *   （正文直选、标题/页眉归位跟随正文，[withUnifiedFont]，与阅读器弹层
  *   setReaderFont 同写径），选中文件字体同时记录最近选择（弹框反显数据
@@ -79,7 +96,7 @@ import kotlinx.coroutines.withContext
  * - 「我的」进入（fromReader = false）：**应用界面字体**流程（完整模式
  *   「外观 → 字体」同流程同键）——选中经端口复制入宿主私有目录写
  *   appFontPath，fire-and-forget；生效：eink 界面字体与完整模式 UI 经
- *   设置流订阅实时重渲染（本页文字随之换字体，即点即所见），停留本页。
+ *   设置流订阅实时重渲染（示例文字随之换字体，即点即所见），停留本页。
  *   列表头部插入系统预设项（[GlobalSettings.supportedAppFontPresets]，
  *   宿主声明才渲染：当前宿主仅「系统默认」——选中即清除自定义回落默认，
  *   承接原清除按钮职责）；自定义字体反显/定位经
@@ -138,6 +155,36 @@ fun FontSettingsRoute(
         globalSettings.supportedAppFontPresets.filter { it in APP_FONT_PRESET_RANGE }
     }
 
+    // ---- 字号缩放（并入自原「字体大小」设置页）----
+
+    val activity = context as? Activity
+    // 拖动只动预览值；写入经 [onScaleChangeFinished]/[onScaleStep]（写后
+    // recreate 应用）。remember 键含当前生效值：recreate 后回填新档位
+    var pendingScale by remember(globalSettings.fontScaleSetting) {
+        mutableStateOf(globalSettings.fontScaleSetting ?: FONT_SCALE_NEUTRAL)
+    }
+    val onScaleChange: (Int) -> Unit = { pendingScale = it }
+    val onScaleChangeFinished: () -> Unit = {
+        if (pendingScale != globalSettings.fontScaleSetting) {
+            globalSettings.fontScaleSetting = pendingScale
+            activity?.recreate()
+        }
+    }
+    val onScaleStep: (Int) -> Unit = { target ->
+        if (applyScaleStep(globalSettings, globalSettings.fontScaleSetting, target) {
+                pendingScale = it
+            }
+        ) {
+            activity?.recreate()
+        }
+    }
+
+    // 顶部示例文字的预览字体 = 当前选中字体（阅读模式=引擎样式、我的
+    // 模式=反显源 path），点选/预设切换即时跟随；null = 平台默认
+    val previewFontFamily = rememberFontFamily(
+        if (fromReader) selectedReaderPath else selectedListPath
+    )
+
     LaunchedEffect(Unit) {
         fontOptions = withContext(Dispatchers.IO) {
             sortFontOptions(engine.availableFonts())
@@ -195,8 +242,14 @@ fun FontSettingsRoute(
         fontOptions = fontOptions,
         fontsLoaded = fontsLoaded,
         presets = presets,
+        showPreviewSection = !fromReader,
         selectedFontPath = if (fromReader) selectedReaderPath else selectedListPath,
         selectedPreset = if (fromReader) null else selectedPreset,
+        pendingScale = pendingScale,
+        previewFontFamily = previewFontFamily,
+        onScaleChange = onScaleChange,
+        onScaleChangeFinished = onScaleChangeFinished,
+        onScaleStep = onScaleStep,
         onSelect = onSelect,
         onSelectPreset = onSelectPreset,
         onPickFolder = { fontFolderLauncher.launch(null) },
@@ -205,11 +258,12 @@ fun FontSettingsRoute(
 }
 
 /**
- * 无状态字体设置页外壳 — 居中标题栏 + 列表（系统预设表头 + 字体文件，
- * 分页）+ 底部操作栏。
+ * 无状态字体设置页外壳 — 居中标题栏 + 示例文字与字号拖动条 + 字体列表
+ * （系统预设表头 + 字体文件，分页）+ 底部操作栏。
  *
- * 分页与初始定位为界面本地状态（数据由 Route 注入）：等字体枚举完成
- * （[fontsLoaded]）与首布局测出页容量后，跳到选中项所在页——预设项
+ * **翻页只作用于列表区**：上下滑动手势挂在列表上，顶部预览区/拖动条
+ * 不参与（顶部预览区仅「我的」入口显示，见 [showPreviewSection]）。分页与初始定位为界面本地状态（数据由 Route 注入）：等字体
+ * 枚举完成（[fontsLoaded]）与首布局就绪后，跳到选中项所在页——预设项
  * 在表头（下标 < [presets].size），字体文件紧随其后；未选中/幽灵选中
  * 归 0（「我的」模式即系统默认项、阅读模式即首行）。枚举中列表以
  * background 色遮盖（防闪现第一页再跳）。
@@ -219,8 +273,14 @@ private fun FontSettingsScreen(
     fontOptions: List<ReaderFontOption>,
     fontsLoaded: Boolean,
     presets: List<Int>,
+    showPreviewSection: Boolean,
     selectedFontPath: String?,
     selectedPreset: Int?,
+    pendingScale: Int,
+    previewFontFamily: FontFamily?,
+    onScaleChange: (Int) -> Unit,
+    onScaleChangeFinished: () -> Unit,
+    onScaleStep: (Int) -> Unit,
     onSelect: (ReaderFontOption) -> Unit,
     onSelectPreset: (Int) -> Unit,
     onPickFolder: () -> Unit,
@@ -271,25 +331,80 @@ private fun FontSettingsScreen(
             .fillMaxSize()
             .background(EInkTheme.colorScheme.background),
     ) {
-        // 顶部：居中标题（返回在底部操作条，与字体大小设置页一致）
+        // 顶部：居中标题（返回在底部操作条）
         Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(56.dp),
             contentAlignment = Alignment.Center,
         ) {
-            EInkText(
-                text = if (fontOptions.isEmpty()) {
-                    "选择字体"
-                } else {
-                    "选择字体（${fontOptions.size}）"
-                },
-                style = EInkTheme.typography.titleLarge,
-            )
+            EInkText(text = "字体设置", style = EInkTheme.typography.titleLarge)
         }
         EInkHorizontalDivider()
 
-        // 列表区 / 空态
+        // 顶部预览区（仅「我的」入口显示，showPreviewSection）：示例文字
+        // 双预览——字号随拖动档位等比缩放（fontSize 与 lineHeight 同乘，
+        // min 14sp 下限与全局一致，recreate 后即所见），字体跟随当前选中
+        // （点选列表即时切换）。自阅读页进入时整体隐藏（字号缩放与阅读
+        // 无关、阅读正文字号在排版面板，字体预览由列表行承担），列表占满
+        // 剩余空间
+        if (showPreviewSection) {
+            val previewScale = pendingScale / 10f
+            val heading = EInkTheme.typography.titleMedium
+            val body = EInkTheme.typography.bodyLarge
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = EInkSpacing.m, vertical = EInkSpacing.m),
+            ) {
+                EInkText(
+                    text = "排版是一本书的呼吸",
+                    fontFamily = previewFontFamily,
+                    style = heading.copy(
+                        fontSize = heading.fontSize * previewScale,
+                        lineHeight = heading.lineHeight * previewScale,
+                    ),
+                )
+                EInkText(
+                    text = "合适的字号与字体，让目光在字里行间从容行走，不必停留，" +
+                            "也不必追赶。在下方进行调整直到这一段文字读起来最舒服为止。",
+                    fontFamily = previewFontFamily,
+                    style = body.copy(
+                        fontSize = body.fontSize * previewScale,
+                        lineHeight = body.lineHeight * previewScale,
+                    ),
+                    modifier = Modifier.padding(top = EInkSpacing.s),
+                )
+            }
+
+            // 字号操作滑条行：−/＋ 单档步进（点击即应用）+ 滑条抬手生效
+            // （拖动仅预览档位）；1.0 档位上方「默认」静态标识（不可点）。
+            // 行高用 heightIn：滑条带标识时自身需要 48dp + 标识行高度
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = EInkSpacing.m, vertical = EInkSpacing.s)
+                    .heightIn(min = 48.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(EInkSpacing.xs),
+            ) {
+                StepGlyphButton("−", onClickLabel = "减小") { onScaleStep(pendingScale - 1) }
+                EInkSteppedSlider(
+                    value = pendingScale,
+                    onValueChange = onScaleChange,
+                    onValueChangeFinished = onScaleChangeFinished,
+                    valueRange = FONT_SCALE_MIN..FONT_SCALE_MAX,
+                    modifier = Modifier.weight(1f),
+                    thumbLabel = { "${it / 10f}x" },
+                    markerStep = FONT_SCALE_NEUTRAL,
+                    markerLabel = "默认",
+                )
+                StepGlyphButton("＋", onClickLabel = "增大") { onScaleStep(pendingScale + 1) }
+            }
+            EInkHorizontalDivider()
+        }
+
+        // 列表区 / 空态（翻页只作用于本区）
         Box(
             modifier = Modifier
                 .weight(1f)
@@ -381,6 +496,47 @@ private fun FontSettingsScreen(
     }
 }
 
+/** ± 单档步进：越界钳制；与当前生效值相同则不写不刷，返回是否写入（写入方 recreate）。 */
+private fun applyScaleStep(
+    globalSettings: GlobalSettings,
+    setting: Int?,
+    target: Int,
+    onPreview: (Int) -> Unit,
+): Boolean {
+    val next = target.coerceIn(FONT_SCALE_MIN, FONT_SCALE_MAX)
+    onPreview(next)
+    if (next == setting) {
+        return false
+    }
+    globalSettings.fontScaleSetting = next
+    return true
+}
+
+/** 步进按钮（−/＋）：按压反色（共享配色解析 + 120ms 最短保持，规范 §35）。 */
+@Composable
+private fun StepGlyphButton(
+    glyph: String,
+    onClickLabel: String,
+    onClick: () -> Unit
+) {
+    val press = rememberImmediatePressState()
+    val colors = eInkActionColors(pressed = press.isPressed)
+    Box(
+        modifier = Modifier
+            .size(48.dp)
+            .then(press.modifier)
+            .background(colors.containerColor)
+            .einkClickable(role = Role.Button, onClickLabel = onClickLabel, onClick = onClick),
+        contentAlignment = Alignment.Center
+    ) {
+        EInkText(
+            text = glyph,
+            style = EInkTheme.typography.titleLarge,
+            color = colors.contentColor
+        )
+    }
+}
+
 /** 系统预设档位号与标签的有效范围（0 默认 / 1 衬线 / 2 等宽，与阅读字体
  *  预设编号同口径；标签收口在模块侧）。 */
 private val APP_FONT_PRESET_RANGE = 0..2
@@ -424,12 +580,14 @@ private const val FontSampleTextCn = "合适的字体，让目光在字里行间
 private const val FontSampleTextEn = "Good type makes reading a quiet joy."
 
 /**
- * 字体文件 path → FontFamily（每行一份）：经宿主端口 loadFontTypeface
+ * 字体文件 path → FontFamily（每行/预览一份）：经宿主端口 loadFontTypeface
  * 在 IO 上下文异步加载（宿主侧进程级缓存，同路径不重复解码），加载失败
- * 为 null → 不指定 fontFamily 回落平台默认字体。path 不变不重新加载。
+ * 为 null → 不指定 fontFamily 回落平台默认字体。path 不变不重新加载；
+ * null（无自定义/系统默认）直接为 null。
  */
 @Composable
-private fun rememberFontFamily(path: String): FontFamily? {
+private fun rememberFontFamily(path: String?): FontFamily? {
+    if (path == null) return null
     val typeface by produceState<Typeface?>(initialValue = null, path) {
         value = withContext(Dispatchers.IO) {
             runCatching { EInkEngineRegistry.readerEngine.loadFontTypeface(path) }

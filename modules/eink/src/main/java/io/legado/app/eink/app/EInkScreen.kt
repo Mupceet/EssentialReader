@@ -47,12 +47,10 @@ sealed interface EInkScreen {
     /** 组件预览（Design System Gallery，规范 §72：不依赖产品界面的组件验证面） */
     data object ComponentGallery : EInkScreen
 
-    /** 字体大小设置（示例文字预览 + 抬手生效的倍率滑条，入口在「我的」页） */
-    data object FontScaleSettings : EInkScreen
-
     /**
-     * 字体设置（字体文件夹内文件字体分页列表选择，入口在「我的」页与
-     * 阅读器字体配置弹层）。
+     * 字体设置（并入原「字体大小」设置：顶部示例文字双预览字号与字体 +
+     * 字号拖动条，底部字体文件分页列表；入口在「我的」页与阅读器字体
+     * 配置弹层）。
      *
      * 两入口写径与生效流程不同，按 [fromReader] 路由分流（对齐完整模式
      * 两条字体流程）：
