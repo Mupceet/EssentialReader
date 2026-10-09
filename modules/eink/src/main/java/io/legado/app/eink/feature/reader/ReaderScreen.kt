@@ -69,6 +69,7 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -584,19 +585,20 @@ fun ReaderRoute(
     // 是顶部操作条在场时强制显示——墨水屏固件的状态栏未必随
     // insetsController.hide() 真正退场（常驻绘制或保留顶部触控拦截），
     // 操作条顶格排版时图标落进状态栏区域内不可操作；强制显示后操作条经
-    // 插图消费链自动下移让位（见顶部操作条 safeDrawing 顶避让）。二级
-    // 菜单（面板/排版弹层，操作条不在场）不受例外影响，保持跟随开关——
-    // 排版弹层的页眉调参实时预览语义不变。对齐完整模式沉浸条件「开关
-    // 开启 && 操作条收起」（ReadBookController 的 toolBarHide &&
-    // hideStatusBar，菜单展开期恢复显示）；与完整模式的差异只剩正文侧：
-    // 顶部避让仍只跟随开关本身置零，正文排版区域尺寸不随菜单开合变化
-    // （规范 §15），页眉（时间/电量）仍恒定承载顶部信息、无让位透明与
-    // 菜单层高度快照避让配合。状态栏临时查看走边缘下滑（TRANSIENT
-    // 浮层，不占用插图）。旧平台（API < 30）legacy 布局标记
-    // LAYOUT_STABLE 下系统栏插图冻结在「栏可见」尺寸、不随 hide() 归零，
-    // 不能依赖 safeDrawing 自动收缩。离开阅读页（含去目录/换源）时恢复
-    // 显示，其余界面不受影响。
-    val topBarShown = uiState.controlsVisible && panel == null
+    // 插图消费链自动下移让位（见顶部操作条 safeDrawing 顶避让）。顶栏
+    // 在场条件与 [topBarVisible] 同源（缓存面板期顶栏保持可见，状态栏
+    // 随之保持显示，与无面板的菜单态一致）；进度与翻页/排版/其它面板与
+    // 排版弹层（操作条不在场）不受例外影响，保持跟随开关——排版弹层的
+    // 页眉调参实时预览语义不变。对齐完整模式沉浸条件「开关开启 &&
+    // 操作条收起」（ReadBookController 的 toolBarHide && hideStatusBar，
+    // 菜单展开期恢复显示）；与完整模式的差异只剩正文侧：顶部避让仍只
+    // 跟随开关本身置零，正文排版区域尺寸不随菜单开合变化（规范 §15），
+    // 页眉（时间/电量）仍恒定承载顶部信息、无让位透明与菜单层高度快照
+    // 避让配合。状态栏临时查看走边缘下滑（TRANSIENT 浮层，不占用插图）。
+    // 旧平台（API < 30）legacy 布局标记 LAYOUT_STABLE 下系统栏插图冻结在
+    // 「栏可见」尺寸、不随 hide() 归零，不能依赖 safeDrawing 自动收缩。
+    // 离开阅读页（含去目录/换源）时恢复显示，其余界面不受影响。
+    val topBarShown = uiState.controlsVisible && (panel?.keepsTopBar ?: true)
     val statusBarHidden = uiState.hideStatusBar && !topBarShown
     DisposableEffect(statusBarHidden) {
         val controller = (view.context as? Activity)?.window
@@ -716,16 +718,21 @@ fun ReaderRoute(
     Box(modifier = Modifier.fillMaxSize()) {
         ReaderScreen(
             state = uiState,
-            // 顶栏在设置面板打开期间隐藏（保持页眉等顶部调参预览不被遮挡）；
-            // 底部操作条常驻可见，承载面板期间的返回与选中态；
-            // 排版弹层例外：操作条隐藏，保证排版调参实时可见
-            topBarVisible = uiState.controlsVisible && panel == null,
+            // 顶栏仅缓存面板期保持可见（经顶栏进入、无顶部反馈需求）；
+            // 其余面板期隐藏——排版/其它为页眉等顶部调参预览，进度与翻页
+            // 为跳章后新章标题行的章节反馈（顶栏会盖住正文顶部）——与
+            // 状态栏强制显示例外共用 topBarShown（见上，面板集合见
+            // ReaderPanel.keepsTopBar）；底部操作条常驻可见，承载面板期间
+            // 的返回与选中态；排版弹层例外：操作条隐藏，保证排版调参实时可见
+            topBarVisible = topBarShown,
             bottomBarVisible = uiState.controlsVisible && styleDialog == null,
             onPrevPage = viewModel::prevPage,
             onNextPage = viewModel::nextPage,
             onCenterTap = {
                 // 打开阅读菜单时，若自动翻页正在运行则停止；并自动打开
-                // 进度与翻页面板（未开启自动翻页时不自动打开）。
+                // 进度与翻页面板（未开启自动翻页时不自动打开——该面板
+                // 隐藏顶栏，跳章后的章节标题反馈需要顶部可见，不宜作为
+                // 菜单默认展开态）。
                 val openingControls = !uiState.controlsVisible
                 viewModel.toggleControls()
                 if (openingControls && uiState.autoPlay) {
@@ -868,13 +875,21 @@ fun ReaderRoute(
             val onClose = { panel = null }
             // 面板与阅读内容对齐（Edge-to-Edge 下避免被系统栏遮挡，
             // 顶部避让与正文同规则——readerSystemBarInsets 随开关消费
-            // safeDrawing 顶部），
-            // 底部避开常驻操作条，保持其可见可点
+            // safeDrawing 顶部），底部避开常驻操作条，保持其可见可点。
+            // 顶栏保持可见的面板（缓存，见 topBarShown）：覆盖层顶部再
+            // 避让顶栏占位——含「隐藏状态栏」开启期的强制状态栏背衬高度，
+            // 透明背板/面板卡片不遮挡顶栏按钮的点击
+            val panelTopInset = if (current.keepsTopBar) {
+                ReaderTopBarInset +
+                    if (uiState.hideStatusBar) forcedStatusBarTop() else 0.dp
+            } else {
+                0.dp
+            }
             Box(
                 modifier = Modifier
                     .fillMaxSize()
                     .readerSystemBarInsets(uiState.hideStatusBar)
-                    .padding(bottom = ReaderBottomBarInset)
+                    .padding(top = panelTopInset, bottom = ReaderBottomBarInset)
             ) {
                 when (current) {
                     ReaderPanel.LAYOUT -> ReaderPanelContainer(
@@ -1152,7 +1167,9 @@ fun ReaderRoute(
  * 操作条覆盖在正文之上，不改变排版区域尺寸（布局稳定，规范 §15）。
  *
  * 操作条可见性：设置面板打开期间底部操作条保持可见（承载分层返回
- * [onBarBack] 与面板选中态 [selectedPanel]），顶栏隐藏以保持顶部调参预览。
+ * [onBarBack] 与面板选中态 [selectedPanel]）；顶栏仅缓存面板期保持
+ * 可见（经顶栏进入、无顶部反馈需求），其余面板期隐藏以保持页眉调参
+ * 预览与跳章后的章节标题反馈。
  *
  * 系统栏避让由本界面自管（readerSystemBarInsets）：窗口 Edge-to-Edge、
  * 状态栏默认可见，页眉紧贴状态栏下方；「隐藏状态栏」开启时状态栏
@@ -1758,18 +1775,7 @@ internal fun ReaderScreen(
             // 可见跳动）。getInsetsIgnoringVisibility 与状态栏显隐无关，顶栏
             // 一次定位；刘海顶取恒定的 displayCutout 与之取 max。仅开关开启
             // （外层 readerSystemBarInsets 置零）时自避让——开关关闭期外层已
-            // 消费 safeDrawing 顶，此处不重复垫
-            val topBarView = LocalView.current
-            val forcedStatusBarTopPx = remember(topBarView) {
-                ViewCompat.getRootWindowInsets(topBarView)
-                    ?.getInsetsIgnoringVisibility(WindowInsetsCompat.Type.statusBars())
-                    ?.top ?: 0
-            }
-            val forcedStatusBarTop = maxOf(
-                WindowInsets.displayCutout.only(WindowInsetsSides.Top)
-                    .asPaddingValues().calculateTopPadding(),
-                with(density) { forcedStatusBarTopPx.toDp() },
-            )
+            // 消费 safeDrawing 顶，此处不重复垫（取值见 [forcedStatusBarTop]）
             Box(
                 modifier = Modifier
                     .align(Alignment.TopCenter)
@@ -1780,7 +1786,7 @@ internal fun ReaderScreen(
                     // 内容落在状态栏下方（图标不再落进状态栏区域不可操作）
                     .background(EInkTheme.colorScheme.surface)
                     .then(
-                        if (state.hideStatusBar) Modifier.padding(top = forcedStatusBarTop)
+                        if (state.hideStatusBar) Modifier.padding(top = forcedStatusBarTop())
                         else Modifier
                     )
             ) {
@@ -1872,6 +1878,29 @@ private fun Modifier.readerSystemBarInsets(hideStatusBar: Boolean): Modifier {
             .union(WindowInsets.systemBars)
             .only(WindowInsetsSides.Horizontal + WindowInsetsSides.Bottom)
     ).windowInsetsPadding(top)
+}
+
+/**
+ * 「隐藏状态栏」开启期的固定顶避让高度：菜单展开期状态栏被强制显示，
+ * 可见性感知的 safeDrawing 在栏显示前读 0（定位跳动），故取与显隐无关
+ * 的 getInsetsIgnoringVisibility；刘海顶取恒定的 displayCutout 与之取
+ * max。顶栏装载与进度面板覆盖层避让共用本值；开关关闭期避让由
+ * [readerSystemBarInsets] 统一承担，不重复垫。
+ */
+@Composable
+private fun forcedStatusBarTop(): Dp {
+    val topBarView = LocalView.current
+    val density = LocalDensity.current
+    val forcedStatusBarTopPx = remember(topBarView) {
+        ViewCompat.getRootWindowInsets(topBarView)
+            ?.getInsetsIgnoringVisibility(WindowInsetsCompat.Type.statusBars())
+            ?.top ?: 0
+    }
+    return maxOf(
+        WindowInsets.displayCutout.only(WindowInsetsSides.Top)
+            .asPaddingValues().calculateTopPadding(),
+        with(density) { forcedStatusBarTopPx.toDp() },
+    )
 }
 
 /**

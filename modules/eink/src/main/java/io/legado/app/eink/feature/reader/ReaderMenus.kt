@@ -60,11 +60,25 @@ import kotlin.math.roundToInt
 /** 设置面板类型（UI 局部状态，见 Route 中的 remember）。 */
 internal enum class ReaderPanel { LAYOUT, PROGRESS, OTHER, CACHE }
 
+/**
+ * 打开期间顶栏保持可见的面板：缓存——经顶栏按钮进入（收起顶栏反而切断
+ * 入口）且无顶部反馈需求。进度与翻页面板期顶栏必须隐藏：跳章后新章
+ * 首页的章节标题行渲染在正文顶部，顶栏（不透明 surface）会盖住这条
+ * 「跳到了哪一章」的反馈；排版/其它面板同理隐藏，保持页眉等顶部调参
+ * 预览不被遮挡。顶栏可见性与状态栏强制显示例外（Route 的 topBarShown）
+ * 均以本属性为准。
+ */
+internal val ReaderPanel.keepsTopBar: Boolean
+    get() = this == ReaderPanel.CACHE
+
 /** 操作条高度（与全局顶/底栏一致）。 */
 private val BarHeight = 56.dp
 
 /** 底部操作条总占位（操作条 + 顶部分隔线），面板/弹框覆盖层据此避让，保持操作条可见可点。 */
 internal val ReaderBottomBarInset = BarHeight + 1.dp
+
+/** 顶部操作条总占位（操作条 + 底部分隔线）：顶栏保持可见的面板期（见 [ReaderPanel.keepsTopBar]），覆盖层据此避让。 */
+internal val ReaderTopBarInset = BarHeight + 1.dp
 
 // ====================================================================
 // 顶部操作条：书签 / 换源 / 刷新 / 缓存。加/移书架不设入口：未加书架的
