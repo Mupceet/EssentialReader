@@ -6,7 +6,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -16,7 +15,6 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
@@ -332,7 +330,8 @@ private fun PageProgressRow(
  * （参数变化触发的重排会保留旧页面直到新页面就绪，不闪白）。
  * 逐级回退（× / 系统返回 / 操作条返回）经 [onClose] 只关本面板；
  * 点击面板外空白区域经 [onBackdropClick] 一次性收起到干净阅读界面。
- * 零动画直接出现/消失。
+ * 零动画直接出现/消失。内容不限高完整展开（不出半截滚动），
+ * verticalScroll 仅作小屏兜底。
  */
 @Composable
 internal fun ReaderPanelContainer(
@@ -342,9 +341,7 @@ internal fun ReaderPanelContainer(
     contentHorizontalPadding: Dp = EInkSpacing.m,
     content: @Composable () -> Unit,
 ) {
-    BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
-        // 面板内容高度封顶为屏幕 45%，保证正文预览区占多数
-        val maxContentHeight = maxHeight * 0.45f
+    Box(modifier = Modifier.fillMaxSize()) {
         // 透明点击区：一次性收起到干净阅读界面
         Box(
             modifier = Modifier
@@ -383,7 +380,6 @@ internal fun ReaderPanelContainer(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .heightIn(max = maxContentHeight)
                     .verticalScroll(rememberScrollState())
                     .padding(
                         horizontal = contentHorizontalPadding,
