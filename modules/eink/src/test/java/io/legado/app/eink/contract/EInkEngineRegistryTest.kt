@@ -1,5 +1,6 @@
 package io.legado.app.eink.contract
 
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertSame
@@ -113,7 +114,20 @@ class EInkEngineRegistryTest {
     fun `d_按键枢纽恒可用且默认无人处理`() {
         val hub = EInkEngineRegistry.keyEventHub
         assertNotNull(hub)
-        assertNull("默认无注册处理器（按键放行系统）", hub.handler)
+        assertEquals("默认无注册处理器（按键放行系统）", 0, hub.handlerCount)
+    }
+
+    @Test
+    fun `d2_按键枢纽注册入栈注销弹栈`() {
+        val hub = EInkEngineRegistry.keyEventHub
+        val unregister = hub.register { true }
+        assertEquals(1, hub.handlerCount)
+        val unregister2 = hub.register { false }
+        assertEquals(2, hub.handlerCount)
+        unregister2()
+        assertEquals(1, hub.handlerCount)
+        unregister()
+        assertEquals("注销后栈空（按键放行系统）", 0, hub.handlerCount)
     }
 
     /** 书签/笔记端口桩（代理生成，只做存取断言，方法不实际调用）。 */

@@ -5,7 +5,6 @@ import android.content.ClipData
 import android.content.Intent
 import android.graphics.Paint
 import android.os.SystemClock
-import android.view.KeyEvent
 import android.view.WindowManager
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
@@ -78,6 +77,7 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import io.legado.app.eink.app.hubVolumePagingEvent
 import io.legado.app.eink.contract.EInkEngineRegistry
 import io.legado.app.eink.contract.ReaderPageSnapshot
 import io.legado.app.eink.designsystem.content.EInkText
@@ -614,39 +614,19 @@ fun ReaderRoute(
     }
 
     // 音量键翻页（对齐 View 版 ReadBookController.volumeKeyPage）：
-    // 音量+ 上一页、音量- 下一页，仅在首按（repeatCount == 0）翻页，
-    // 长按重复不翻（View 版 keyPageDebounce 同样忽略长按）；
-    // 开关关闭或离开阅读页时处理器注销/放行，音量键回归系统调节。
+    // 语义与分页列表共用 hubVolumePagingEvent（首按翻页、长按重复不翻、
+    // 抬起吞掉）；页内模态弹框（边距调整/想法等）在场时放行系统音量
+    // 调节。开关关闭或离开阅读页时处理器注销/放行，音量键回归系统调节。
     // 设置实时读取（GlobalSettings.volumeKeyPage 经桥接层走宿主快照）
     DisposableEffect(keyEventHub) {
-        keyEventHub.handler = { event ->
-            if (!EInkEngineRegistry.globalSettings.volumeKeyPage) {
-                false
-            } else {
-                when (event.action) {
-                    KeyEvent.ACTION_DOWN -> when (event.keyCode) {
-                        KeyEvent.KEYCODE_VOLUME_UP -> {
-                            if (event.repeatCount == 0) viewModel.prevPage()
-                            true
-                        }
-
-                        KeyEvent.KEYCODE_VOLUME_DOWN -> {
-                            if (event.repeatCount == 0) viewModel.nextPage()
-                            true
-                        }
-
-                        else -> false
-                    }
-                    // 消费抬起，保证按键对整体被吞掉
-                    KeyEvent.ACTION_UP ->
-                        event.keyCode == KeyEvent.KEYCODE_VOLUME_UP ||
-                                event.keyCode == KeyEvent.KEYCODE_VOLUME_DOWN
-
-                    else -> false
-                }
-            }
+        val unregister = keyEventHub.register { event ->
+            hubVolumePagingEvent(
+                event,
+                onPageUp = viewModel::prevPage,
+                onPageDown = viewModel::nextPage,
+            )
         }
-        onDispose { keyEventHub.handler = null }
+        onDispose { unregister() }
     }
 
     // 自动翻页随界面可见性暂停/恢复：退后台（ON_STOP）暂停倒计时，

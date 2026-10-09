@@ -15,6 +15,10 @@ import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -86,6 +90,12 @@ fun EInkDialog(
     // 系统返回 = 逐级回退的 onDismiss：组合期注册、收起随组合注销；
     // 晚于页面自身 BackHandler 组合，弹框打开期间优先接管返回键
     BackHandler(onBack = onDismiss)
+    // 模态在场登记：外围按键类输入（音量键翻页等）经 EInkModalPresence
+    // 观察到弹框在场即放行，不在弹框背后继续翻页
+    DisposableEffect(Unit) {
+        EInkModalPresence.acquire()
+        onDispose { EInkModalPresence.release() }
+    }
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -190,6 +200,30 @@ fun EInkDialog(
                 }
             }
         }
+    }
+}
+
+/**
+ * 页内模态在场观察点：页内组装的 [EInkDialog]（无独立弹框窗口，按键
+ * 仍到达入口 Activity）在组合期登记在场计数，供上层输入接入（音量键
+ * 翻页等）在事件时读取——模态打开期间外围输入放行系统，不在弹框
+ * 背后触发动作。计数为 Compose 状态：多弹框嵌套正确叠加，
+ * 事件回调（组合外）读取取的是当下值。
+ */
+object EInkModalPresence {
+    /** 在场弹框数（嵌套叠加）。 */
+    var count by mutableStateOf(0)
+        private set
+
+    /** 是否有页内模态弹框在场。 */
+    val isPresent: Boolean get() = count > 0
+
+    internal fun acquire() {
+        count += 1
+    }
+
+    internal fun release() {
+        count -= 1
     }
 }
 
