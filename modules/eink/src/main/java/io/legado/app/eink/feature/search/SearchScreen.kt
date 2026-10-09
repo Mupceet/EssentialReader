@@ -41,6 +41,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import io.legado.app.eink.R
+import io.legado.app.eink.app.EInkPagerInput
 import io.legado.app.eink.contract.SearchBookUiModel
 import io.legado.app.eink.contract.SearchHistoryUiModel
 import io.legado.app.eink.designsystem.content.EInkHorizontalDivider
@@ -51,7 +52,6 @@ import io.legado.app.eink.designsystem.control.EInkSearchInputBar
 import io.legado.app.eink.designsystem.navigation.EInkOperationBar
 import io.legado.app.eink.designsystem.navigation.EInkOperationBarIcon
 import io.legado.app.eink.designsystem.navigation.EInkPageArrows
-import io.legado.app.eink.designsystem.pager.EInkPageSwipe
 import io.legado.app.eink.designsystem.pager.rememberEInkListPagerState
 import io.legado.app.eink.designsystem.refresh.EInkRefreshIntent
 import io.legado.app.eink.designsystem.refresh.LocalEInkRefreshController
@@ -155,7 +155,7 @@ fun SearchRoute(
         val totalItems = if (isResultListVisible) uiState.results.size else historyRows.size
         val canPage = isResultListVisible || uiState.history.isNotEmpty()
 
-        // 翻页动作 remember 稳定实例：下传后接收方（列表 / EInkPageSwipe）
+        // 翻页动作 remember 稳定实例：下传后接收方（列表 / 分页输入）
         // 不因 lambda 逐次更换而被迫重组；翻页后上报 PageTurn 意图（规范 §26/§40）
         val refresh = LocalEInkRefreshController.current
         val pageUp: () -> Unit = remember(pager, refresh, scope) {
@@ -318,7 +318,7 @@ private fun ResultList(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .EInkPageSwipe(
+            .EInkPagerInput(
                 onPageUp = onPageUp,
                 onPageDown = onPageDown
             )
@@ -460,7 +460,7 @@ private fun HistoryList(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .EInkPageSwipe(
+            .EInkPagerInput(
                 onPageUp = onPageUp,
                 onPageDown = onPageDown
             )

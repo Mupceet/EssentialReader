@@ -160,7 +160,7 @@ internal fun HomeRoute(
     val totalBooks = uiState.books.size
 
     // 翻页动作：底部操作栏 ▲▼ 与列表/网格滑动手势共用（固定页项数，零动画整页跳转）。
-    // remember 稳定实例：下传后接收方（BookshelfScreen / EInkPageSwipe）不因
+    // remember 稳定实例：下传后接收方（BookshelfScreen / 分页输入）不因
     // lambda 逐次更换而被迫重组；翻页后上报 PageTurn 意图（规范 §26/§40，
     // NoOp 控制器下零行为，设备 Adapter 接入后由 Policy 决定档位）
     val refresh = LocalEInkRefreshController.current
@@ -319,6 +319,9 @@ internal fun HomeRoute(
                     onPageDown = pageDown,
                     emptyMessage = if (uiState.selectedGroupId == BookshelfGroupIds.ALL) "书架为空"
                     else "此分组暂无书籍",
+                    // 双 Tab 常驻组合：仅当前 Tab 的分页区注册音量键，
+                    // 隐藏分页区不得占住按键枢纽栈顶
+                    inputEnabled = selectedTab == HomeTabs.BOOKSHELF,
                 )
             },
             mine = {
@@ -330,7 +333,8 @@ internal fun HomeRoute(
                     onOpenFontSettings = onOpenFontSettings,
                     onOpenFullMode = onOpenFullMode,
                     onOpenThemeDebug = onOpenThemeDebug,
-                    onOpenComponentGallery = onOpenComponentGallery
+                    onOpenComponentGallery = onOpenComponentGallery,
+                    inputEnabled = selectedTab != HomeTabs.BOOKSHELF
                 )
             }
         )

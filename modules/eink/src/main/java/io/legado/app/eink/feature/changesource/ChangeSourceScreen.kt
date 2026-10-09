@@ -29,6 +29,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import io.legado.app.eink.R
+import io.legado.app.eink.app.EInkPagerInput
 import io.legado.app.eink.contract.ChangeSourceBookUiModel
 import io.legado.app.eink.contract.ChangeSourceResultUiModel
 import io.legado.app.eink.designsystem.content.EInkHorizontalDivider
@@ -42,7 +43,6 @@ import io.legado.app.eink.designsystem.navigation.EInkOperationBar
 import io.legado.app.eink.designsystem.navigation.EInkOperationBarIcon
 import io.legado.app.eink.designsystem.navigation.EInkPageArrows
 import io.legado.app.eink.designsystem.navigation.EInkTopBar
-import io.legado.app.eink.designsystem.pager.EInkPageSwipe
 import io.legado.app.eink.designsystem.pager.rememberEInkListPagerState
 import io.legado.app.eink.designsystem.refresh.EInkRefreshIntent
 import io.legado.app.eink.designsystem.refresh.LocalEInkRefreshController
@@ -94,7 +94,7 @@ fun ChangeSourceRoute(
     // 当前源常驻首项与其它源结果一起计入分页总数（pager 按项下标翻页）
     val totalItems = uiState.results.size + if (uiState.current != null) 1 else 0
 
-    // 翻页动作 remember 稳定实例：下传后接收方（列表 / EInkPageSwipe）
+    // 翻页动作 remember 稳定实例：下传后接收方（列表 / 分页输入）
     // 不因 lambda 逐次更换而被迫重组；翻页后上报 PageTurn 意图（规范 §26/§40）
     val refresh = LocalEInkRefreshController.current
     val pageUp: () -> Unit = remember(pager, refresh, scope) {
@@ -271,7 +271,7 @@ private fun SourceList(
         overscrollEffect = null,
         modifier = Modifier
             .fillMaxSize()
-            .EInkPageSwipe(
+            .EInkPagerInput(
                 onPageUp = onPageUp,
                 onPageDown = onPageDown
             )

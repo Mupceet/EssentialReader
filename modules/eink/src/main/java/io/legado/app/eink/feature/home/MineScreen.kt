@@ -29,6 +29,7 @@ import androidx.compose.ui.unit.dp
 import io.legado.app.eink.BuildConfig
 import io.legado.app.eink.R
 import io.legado.app.eink.app.EInkAppUpdateViewModel
+import io.legado.app.eink.app.EInkPagerInput
 import io.legado.app.eink.app.UpdateCheckState
 import io.legado.app.eink.contract.EInkEngineRegistry
 import io.legado.app.eink.designsystem.content.EInkHorizontalDivider
@@ -38,7 +39,6 @@ import io.legado.app.eink.designsystem.interaction.eInkActionColors
 import io.legado.app.eink.designsystem.interaction.einkClickable
 import io.legado.app.eink.designsystem.interaction.rememberImmediatePressState
 import io.legado.app.eink.designsystem.pager.EInkListPagerState
-import io.legado.app.eink.designsystem.pager.EInkPageSwipe
 import io.legado.app.eink.designsystem.theme.EInkSpacing
 import io.legado.app.eink.designsystem.theme.EInkTheme
 import kotlinx.coroutines.CancellationException
@@ -51,8 +51,9 @@ import kotlinx.coroutines.launch
  * 值（如「字体大小 / 当前倍率 1.0x」），整行点击进入对应设置页；
  * 行为开关与宿主完整模式共享同一存储键：自动刷新 / 自动跳转最近阅读
  * 为启动期语义（写入后下次进入生效），总是使用默认封面为快照语义
- * （组合内读取订阅变化，切换后开关行立即重组）。音量键翻页开关在
- * 阅读界面「其它设置」面板。
+ * （组合内读取订阅变化，切换后开关行立即重组）。音量键翻页为全局
+ * 语义（阅读页与书架/目录/搜索等分页列表共用按键处理器实时读取），
+ * 本页与阅读界面「其它设置」面板同键双入口。
  * 「检查更新」行只在宿主注册了应用更新端口时渲染（companion 宿主可能
  * 没有 app 级更新机制，入口随之消失）；检查状态机由 Activity 级
  * [EInkAppUpdateViewModel] 持有（与启动自动检查共用）：本页点击发起
@@ -63,7 +64,7 @@ import kotlinx.coroutines.launch
  * 中完成）。
  *
  * 条目列表为 E-Ink 分页模式（对齐书架）：LazyColumn 禁用户滚动 +
- * [EInkPageSwipe] 手势整页翻页 + 底部操作栏箭头（经 [pager] 由
+ * [EInkPagerInput] 手势/音量键整页翻页 + 底部操作栏箭头（经 [pager] 由
  * HomeRoute 分派），首屏实测一页项数后整页跳转，不做连续滚动。
  * 开关行的乐观状态 remember 在本函数体（LazyColumn 外）——条目翻页
  * 移出视口销毁 item 组合也不丢开关显示（写路径本身 fire-and-forget，
@@ -79,6 +80,9 @@ internal fun MineScreen(
     onOpenFullMode: () -> Unit = {},
     onOpenThemeDebug: () -> Unit = {},
     onOpenComponentGallery: () -> Unit = {},
+    // 分页输入（滑动+音量键）激活态：首页双 Tab 常驻组合，以当前 Tab
+    // 互斥注册按键（见 BookshelfScreen 同名参数）
+    inputEnabled: Boolean = true,
 ) {
     val globalSettings = EInkEngineRegistry.globalSettings
     val appUpdateEngine = EInkEngineRegistry.appUpdateEngine
@@ -87,13 +91,15 @@ internal fun MineScreen(
     var defaultToRead by remember { mutableStateOf(globalSettings.defaultToRead) }
     // 写路径 fire-and-forget（getter 不保证立即可见新值），本地乐观状态
     var syncProgress by remember { mutableStateOf(globalSettings.syncReadingProgress) }
+    var volumeKeyPage by remember { mutableStateOf(globalSettings.volumeKeyPage) }
     val currentVersionName = remember(context) { context.readAppVersionName() }
     val scope = rememberCoroutineScope()
 
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
-            .EInkPageSwipe(
+            .EInkPagerInput(
+                enabled = inputEnabled,
                 onPageUp = onPageUp,
                 onPageDown = onPageDown
             ),
@@ -157,6 +163,21 @@ internal fun MineScreen(
                     val next = !syncProgress
                     globalSettings.syncReadingProgress = next
                     syncProgress = next
+                }
+            )
+        }
+        item { EInkHorizontalDivider() }
+        item {
+            MineToggleRow(
+                label = "音量键翻页",
+                description = "音量键用于阅读和列表翻页",
+                // 全局语义：阅读页与各分页列表的按键处理器事件时实时读取，
+                // 本地乐观状态仅保显示（同自动刷新）
+                checked = volumeKeyPage,
+                onToggle = {
+                    val next = !volumeKeyPage
+                    globalSettings.volumeKeyPage = next
+                    volumeKeyPage = next
                 }
             )
         }

@@ -43,7 +43,7 @@ import io.legado.app.eink.designsystem.content.EInkInfoRow
 import io.legado.app.eink.designsystem.content.EInkInfoRowIconSize
 import io.legado.app.eink.designsystem.content.EInkLoading
 import io.legado.app.eink.designsystem.content.EInkText
-import io.legado.app.eink.designsystem.pager.EInkPageSwipe
+import io.legado.app.eink.app.EInkPagerInput
 import io.legado.app.eink.designsystem.theme.EInkShapes
 import io.legado.app.eink.designsystem.theme.EInkSpacing
 import io.legado.app.eink.designsystem.theme.EInkTheme
@@ -146,7 +146,7 @@ internal fun bookshelfListRowHeight(
  * 列表不支持自由滚动（E-Ink 分页模式，参考微信读书墨水屏版）：
  *  - `userScrollEnabled = false` 禁用拖动/惯性滚动；
  *  - `overscrollEffect = null` 去除边缘回弹（拉伸/发光）效果；
- *  - 上下滑动手势经 [EInkPageSwipe] 识别为整页翻页，
+ *  - 上下滑动手势与音量键/翻页器经 [EInkPagerInput] 识别为整页翻页，
  *    与底部操作栏 ▲▼ 按钮触发同一动作。
  *
  * 列表项遵循规范 §41: title + secondary text + metadata + divider：
@@ -177,6 +177,9 @@ fun BookshelfScreen(
     onPageUp: () -> Unit = {},
     onPageDown: () -> Unit = {},
     emptyMessage: String = "书架为空",
+    // 分页输入（滑动+音量键）激活态：首页双 Tab 常驻组合（隐藏页不销毁
+    // 只翻放置态），以当前 Tab 互斥注册按键，避免隐藏分页区占住栈顶
+    inputEnabled: Boolean = true,
 ) {
     Box(modifier = Modifier.fillMaxSize()) {
         when {
@@ -192,7 +195,8 @@ fun BookshelfScreen(
                 onBookLongClick = onBookLongClick,
                 gridState = gridState,
                 onPageUp = onPageUp,
-                onPageDown = onPageDown
+                onPageDown = onPageDown,
+                inputEnabled = inputEnabled
             )
 
             else -> BookList(
@@ -205,7 +209,8 @@ fun BookshelfScreen(
                 onBookLongClick = onBookLongClick,
                 listState = listState,
                 onPageUp = onPageUp,
-                onPageDown = onPageDown
+                onPageDown = onPageDown,
+                inputEnabled = inputEnabled
             )
         }
     }
@@ -222,12 +227,14 @@ private fun BookList(
     onBookLongClick: (BookshelfItemUiModel) -> Unit,
     listState: LazyListState,
     onPageUp: () -> Unit,
-    onPageDown: () -> Unit
+    onPageDown: () -> Unit,
+    inputEnabled: Boolean
 ) {
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
-            .EInkPageSwipe(
+            .EInkPagerInput(
+                enabled = inputEnabled,
                 onPageUp = onPageUp,
                 onPageDown = onPageDown
             ),
@@ -275,13 +282,15 @@ private fun BookGrid(
     onBookLongClick: (BookshelfItemUiModel) -> Unit,
     gridState: LazyGridState,
     onPageUp: () -> Unit,
-    onPageDown: () -> Unit
+    onPageDown: () -> Unit,
+    inputEnabled: Boolean
 ) {
     LazyVerticalGrid(
         columns = GridCells.Fixed(gridColumns.coerceAtLeast(1)),
         modifier = Modifier
             .fillMaxSize()
-            .EInkPageSwipe(
+            .EInkPagerInput(
+                enabled = inputEnabled,
                 onPageUp = onPageUp,
                 onPageDown = onPageDown
             ),

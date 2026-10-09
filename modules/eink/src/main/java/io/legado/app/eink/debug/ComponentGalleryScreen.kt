@@ -30,6 +30,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import io.legado.app.eink.R
+import io.legado.app.eink.app.EInkPagerInput
 import io.legado.app.eink.designsystem.content.EInkHorizontalDivider
 import io.legado.app.eink.designsystem.content.EInkInfoRow
 import io.legado.app.eink.designsystem.content.EInkLoading
@@ -48,7 +49,6 @@ import io.legado.app.eink.designsystem.navigation.EInkOperationTab
 import io.legado.app.eink.designsystem.navigation.EInkPageArrows
 import io.legado.app.eink.designsystem.navigation.EInkPageIndicator
 import io.legado.app.eink.designsystem.navigation.EInkTopBar
-import io.legado.app.eink.designsystem.pager.EInkPageSwipe
 import io.legado.app.eink.designsystem.pager.rememberEInkListPagerState
 import io.legado.app.eink.designsystem.refresh.EInkRefreshIntent
 import io.legado.app.eink.designsystem.refresh.LocalEInkRefreshController
@@ -67,7 +67,7 @@ import kotlinx.coroutines.launch
  * 固定页分页联动、封面占位。
  *
  * 仅 debug 变体入口可见（MineScreen 内 BuildConfig.DEBUG 门控）。
- * 翻页手势（EInkPageSwipe）与真实屏幕同款接线，含 PageTurn 意图上报。
+ * 翻页手势（EInkPagerInput：滑动+音量键）与真实屏幕同款接线，含 PageTurn 意图上报。
  */
 /** 对话框样例的形态枚举：弹框本体须组合在页根（见 [ComponentGalleryRoute]），样例行只持触发钮。 */
 private enum class GalleryDialog { Confirm, ConfirmDisabled, ConfirmNeutral, PanelStyle }
@@ -750,7 +750,7 @@ private fun PagerSample() {
             userScrollEnabled = false,
             modifier = Modifier
                 .weight(1f)
-                .EInkPageSwipe(onPageUp = pageUp, onPageDown = pageDown)
+                .EInkPagerInput(onPageUp = pageUp, onPageDown = pageDown)
         ) {
             itemsIndexed(items, key = { _, item -> item }) { _, item ->
                 EInkText(

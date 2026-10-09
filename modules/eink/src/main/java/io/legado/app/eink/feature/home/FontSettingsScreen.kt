@@ -36,6 +36,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import io.legado.app.eink.R
+import io.legado.app.eink.app.EInkPagerInput
 import io.legado.app.eink.contract.EInkEngineRegistry
 import io.legado.app.eink.contract.GlobalSettings
 import io.legado.app.eink.contract.ReaderFontOption
@@ -49,7 +50,6 @@ import io.legado.app.eink.designsystem.interaction.rememberImmediatePressState
 import io.legado.app.eink.designsystem.navigation.EInkOperationBar
 import io.legado.app.eink.designsystem.navigation.EInkOperationBarIcon
 import io.legado.app.eink.designsystem.navigation.EInkPageArrows
-import io.legado.app.eink.designsystem.pager.EInkPageSwipe
 import io.legado.app.eink.designsystem.pager.awaitPositionReady
 import io.legado.app.eink.designsystem.pager.rememberEInkListPagerState
 import io.legado.app.eink.designsystem.refresh.EInkRefreshIntent
@@ -426,7 +426,7 @@ private fun FontSettingsScreen(
                     overscrollEffect = null,
                     modifier = Modifier
                         .fillMaxSize()
-                        .EInkPageSwipe(
+                        .EInkPagerInput(
                             onPageUp = pageUp,
                             onPageDown = pageDown,
                         ),

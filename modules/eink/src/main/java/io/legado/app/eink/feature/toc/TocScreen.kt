@@ -53,6 +53,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import io.legado.app.eink.R
+import io.legado.app.eink.app.EInkPagerInput
 import io.legado.app.eink.contract.BookmarkUiModel
 import io.legado.app.eink.contract.ChapterUiModel
 import io.legado.app.eink.contract.EInkEngineRegistry
@@ -68,7 +69,6 @@ import io.legado.app.eink.designsystem.navigation.EInkOperationBar
 import io.legado.app.eink.designsystem.navigation.EInkOperationBarIcon
 import io.legado.app.eink.designsystem.navigation.EInkPageArrows
 import io.legado.app.eink.designsystem.navigation.EInkTopBar
-import io.legado.app.eink.designsystem.pager.EInkPageSwipe
 import io.legado.app.eink.designsystem.pager.awaitPositionReady
 import io.legado.app.eink.designsystem.pager.rememberEInkFlowPagerState
 import io.legado.app.eink.designsystem.pager.rememberEInkListPagerState
@@ -235,7 +235,7 @@ fun TocRoute(
         scope.launch { pager.jumpToItemAligned(index) }
     }
 
-    // 翻页动作 remember 稳定实例：下传后接收方（章节列表 / EInkPageSwipe）
+    // 翻页动作 remember 稳定实例：下传后接收方（章节列表 / 分页输入）
     // 不因 lambda 逐次更换而被迫重组；翻页后上报 PageTurn 意图（规范 §26/§40）
     val refresh = LocalEInkRefreshController.current
     val pageUp: () -> Unit = remember(pager, refresh, scope) {
@@ -610,7 +610,7 @@ private fun ChapterList(
         overscrollEffect = null,
         modifier = modifier
             .fillMaxSize()
-            .EInkPageSwipe(
+            .EInkPagerInput(
                 onPageUp = onPageUp,
                 onPageDown = onPageDown
             )
@@ -847,7 +847,7 @@ private fun MarksPane(
         state = listState,
         userScrollEnabled = false,
         overscrollEffect = null,
-        modifier = Modifier.fillMaxSize().EInkPageSwipe(onPageUp = onPageUp, onPageDown = onPageDown),
+        modifier = Modifier.fillMaxSize().EInkPagerInput(onPageUp = onPageUp, onPageDown = onPageDown),
     ) {
         items(rows, key = { it.rowKey() }) { row ->
             when (row) {

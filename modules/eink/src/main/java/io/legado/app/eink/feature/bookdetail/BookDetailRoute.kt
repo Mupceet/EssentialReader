@@ -46,6 +46,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import io.legado.app.eink.R
+import io.legado.app.eink.app.EInkPagerInput
 import io.legado.app.eink.contract.BookDetailUiModel
 import io.legado.app.eink.designsystem.content.EInkInfoRow
 import io.legado.app.eink.designsystem.content.EInkLoading
@@ -58,7 +59,6 @@ import io.legado.app.eink.designsystem.navigation.EInkOperationBar
 import io.legado.app.eink.designsystem.navigation.EInkOperationBarIcon
 import io.legado.app.eink.designsystem.navigation.EInkPageArrowsWidth
 import io.legado.app.eink.designsystem.navigation.OperationBarIconButtonMaxWidth
-import io.legado.app.eink.designsystem.pager.EInkPageSwipe
 import io.legado.app.eink.designsystem.refresh.EInkRefreshIntent
 import io.legado.app.eink.designsystem.refresh.LocalEInkRefreshController
 import io.legado.app.eink.designsystem.theme.EInkShapes
@@ -290,7 +290,7 @@ internal fun BookDetailScreen(
                     .weight(1f)
                     .fillMaxWidth()
                     .onSizeChanged { detailViewportHeightPx = it.height }
-                    .EInkPageSwipe(onPageUp = pageUp, onPageDown = pageDown)
+                    .EInkPagerInput(onPageUp = pageUp, onPageDown = pageDown)
             ) {
                 when {
                     state.isLoading -> {
