@@ -65,8 +65,9 @@ private const val CurrentItemKey = "eink_change_source_current"
  * 换源 Route — ViewModel 感知层。
  *
  * 骨架对齐搜索页（固定页分页 + 底部操作条）：
- *  - 顶栏动作区为刷新/中止图标按钮（对齐主项目换源弹层 startOrStopSearch），
- *    搜索中图标切换为中止；进度以顶栏被动文本呈现，不再作为按钮；
+ *  - 顶栏动作区仅刷新/中止图标按钮（对齐主项目换源弹层 startOrStopSearch），
+ *    搜索中图标切换为中止；搜索进度与结果数在列表头摘要行呈现
+ *    （与搜索页 ResultList 同款式），不再占用顶栏；
  *  - 结果列表固定页分页（[rememberEInkListPagerState]），
  *    上下滑动手势与底部 ▲▼ 翻页同一动作；当前源常驻首项计入分页总数；
  *  - 底部操作栏：左侧返回按钮，右侧上下翻页箭头。
@@ -136,15 +137,6 @@ fun ChangeSourceRoute(
             title = "换源 - ${uiState.book?.name ?: ""}",
             actionsFillMax = true,
             actions = {
-                // 搜索进度为被动文本（非按钮），中止态时让位给图标按钮
-                if (uiState.isSearching) {
-                    EInkText(
-                        text = "搜索中 ${uiState.searchedCount}/${uiState.totalSourceCount}",
-                        style = EInkTheme.typography.labelMedium,
-                        color = EInkTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(end = EInkSpacing.s),
-                    )
-                }
                 EInkOperationBarIcon(
                     icon = painterResource(
                         if (uiState.isSearching) R.drawable.eink_ic_stop_circle
@@ -198,8 +190,8 @@ fun ChangeSourceRoute(
  * 无状态换源 Screen。
  *
  * 当前源常驻首项（进入即见，重搜不清空）：搜索期不再有全屏“正在搜索
- * 书源…”遮盖——顶栏已有搜索进度文本，遮盖反而藏掉首项当前源；无其它
- * 源结果时当前源行保留，说明文案居中补位。
+ * 书源…”遮盖——列表头进度摘要行已有搜索进度，遮盖反而藏掉首项当前源；
+ * 无其它源结果时当前源行保留，说明文案居中补位。
  */
 @Composable
 internal fun ChangeSourceScreen(
@@ -255,6 +247,11 @@ private fun EmptyWithCurrent(
 
 /**
  * 结果列表（固定页分页 + 手势整页翻页）。首项为常驻当前源行。
+ *
+ * 列表上方常驻进度摘要行（对齐搜索页 ResultList 同款式）：固定头部
+ * 位置不随翻页滚走，横向居中显示结果数与书源进度，搜索中实时更新、
+ * 停止/完成后保持最终数值；整页翻页手势挂在含摘要行的整个区域。
+ * 缓存命中直接展示时未发起搜索（计数为 0），进度段省略、只显示结果数。
  */
 @Composable
 private fun SourceList(
@@ -265,10 +262,7 @@ private fun SourceList(
     onPick: (ChangeSourceResultUiModel) -> Unit,
     onCurrentClick: () -> Unit,
 ) {
-    LazyColumn(
-        state = pagerListState,
-        userScrollEnabled = false,
-        overscrollEffect = null,
+    Column(
         modifier = Modifier
             .fillMaxSize()
             .EInkPagerInput(
@@ -276,18 +270,50 @@ private fun SourceList(
                 onPageDown = onPageDown
             )
     ) {
-        state.current?.let { current ->
-            item(key = CurrentItemKey) {
-                CurrentSourceItem(current = current, onClick = onCurrentClick)
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(
+                    start = EInkSpacing.m,
+                    end = EInkSpacing.m,
+                    top = EInkSpacing.s,
+                    bottom = EInkSpacing.s
+                ),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.Center,
+        ) {
+            EInkText(
+                text = "结果 ${state.results.size}" +
+                        if (state.isSearching || state.totalSourceCount > 0) {
+                            " · 进度 ${state.searchedCount}/${state.totalSourceCount}"
+                        } else {
+                            ""
+                        },
+                style = EInkTheme.typography.labelMedium,
+                color = EInkTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        LazyColumn(
+            state = pagerListState,
+            userScrollEnabled = false,
+            overscrollEffect = null,
+            modifier = Modifier
+                .fillMaxWidth()
+                .weight(1f)
+        ) {
+            state.current?.let { current ->
+                item(key = CurrentItemKey) {
+                    CurrentSourceItem(current = current, onClick = onCurrentClick)
+                    EInkHorizontalDivider()
+                }
+            }
+            items(state.results, key = { it.deduplicationKey }) { searchBook ->
+                SourceItem(
+                    searchBook = searchBook,
+                    onClick = { onPick(searchBook) }
+                )
                 EInkHorizontalDivider()
             }
-        }
-        items(state.results, key = { it.deduplicationKey }) { searchBook ->
-            SourceItem(
-                searchBook = searchBook,
-                onClick = { onPick(searchBook) }
-            )
-            EInkHorizontalDivider()
         }
     }
 }
