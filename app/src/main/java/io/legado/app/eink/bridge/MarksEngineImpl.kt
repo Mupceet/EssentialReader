@@ -417,17 +417,40 @@ object MarksEngineImpl : MarksEngine, KoinComponent {
         false
     }
 
-    /** 按 id 删 book_marks 后触发当前章重排（新快照经 onContentUpdated 推送）。 */
+    /**
+     * 按 id 删 book_marks：目录页直进（无会话）也允许——列表经 observeMarkings
+     * Room 流自动回删；**有阅读会话时**再触发当前章重排（装饰随新快照推送，
+     * 阅读页划线/想法消失）。
+     */
     override suspend fun deleteMarking(markingId: String): Boolean {
-        ReadBook.book ?: return false
         return try {
             bookMarkingGateway.delete(markingId)
-            ReaderEngineImpl.relayout()
+            if (ReadBook.book != null) ReaderEngineImpl.relayout()
             true
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
             AppLog.put("eink deleteMarking failed: ${e.message}", e)
+            false
+        }
+    }
+
+    /**
+     * 按 id 删 bookmarks（目录页书签 Tab 快速删除；阅读内移除走
+     * togglePageBookmark 的「删最近一条」语义）。列表经 observeBookmarks
+     * Room 流自动回删；**有阅读会话时**再触发当前章重排（页角标随新快照
+     * 推送）。false = 书签不存在或删除失败。
+     */
+    override suspend fun deleteBookmark(bookmarkId: Long): Boolean {
+        return try {
+            val bookmark = appDb.bookmarkDao.getById(bookmarkId) ?: return false
+            bookmarkRepository.delete(bookmark)
+            if (ReadBook.book != null) ReaderEngineImpl.relayout()
+            true
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            AppLog.put("eink deleteBookmark failed: ${e.message}", e)
             false
         }
     }
