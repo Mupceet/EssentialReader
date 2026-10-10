@@ -38,7 +38,9 @@ import io.legado.app.data.entities.readRecord.ReadRecordIdentity
 import io.legado.app.data.entities.readRecord.ReadRecordSession
 import io.legado.app.data.repository.ReadRecordRepository
 import io.legado.app.domain.gateway.AppLocaleGateway
+import io.legado.app.domain.gateway.BackupSettingsGateway
 import io.legado.app.domain.gateway.ReadStyleGateway
+import io.legado.app.eink.bridge.EinkLegacyPrefsStore
 import io.legado.app.help.DirectLinkUpload
 import io.legado.app.help.LauncherIconHelp
 import io.legado.app.help.book.isLocal
@@ -58,6 +60,7 @@ import io.legado.app.utils.GSON
 import io.legado.app.utils.LogUtils
 import io.legado.app.utils.compress.ZipUtils
 import io.legado.app.utils.fromJsonArray
+import io.legado.app.utils.fromJsonObject
 import io.legado.app.utils.getPrefString
 import io.legado.app.utils.isContentScheme
 import io.legado.app.utils.isJsonArray
@@ -397,15 +400,28 @@ object Restore : KoinComponent {
         }
         // 恢复配置文件 (手动解析 XML，替代反射逻辑)
         val configFile = File(path, "config.xml")
-        if (configFile.exists()) {
+        val configMap = configFile.takeIf { it.exists() }?.let { file ->
+            runCatching { readXmlToMap(file) }.onFailure { e ->
+                AppLog.put("恢复配置 XML 出错\n${e.localizedMessage}", e)
+            }.getOrNull()
+        }
+        // 来源设备名 ≠ 本机（含标记缺失/为空的旧备份）按跨设备处理：设备相关键保留本机值
+        val restoreFromSameDevice = configMap?.let { isBackupFromSameDevice(it) } ?: false
+        if (!configMap.isNullOrEmpty()) {
             try {
-                val map = readXmlToMap(configFile)
-                if (map.isNotEmpty()) {
-                    applyConfigMap(map, aes)
-                }
+                applyConfigMap(configMap, aes, restoreFromSameDevice)
             } catch (e: Exception) {
                 AppLog.put("恢复配置 XML 出错\n${e.localizedMessage}", e)
             }
+        }
+        // E-InK 自有偏好：品味键（点击分区/下拉书签/水波纹档位）跨设备也恢复；
+        // 路径类键（最近字体/字体反显记录）仅同机恢复，见 EinkLegacyPrefsStore.importAll
+        File(path, Backup.EINK_PREFERENCES_FILE_NAME).takeIf { it.exists() }?.runCatching {
+            GSON.fromJsonObject<Map<String, Any?>>(readText()).getOrNull()
+                ?.takeIf { it.isNotEmpty() }
+                ?.let { EinkLegacyPrefsStore.importAll(it, restoreFromSameDevice) }
+        }?.onFailure {
+            AppLog.put("恢复 E-InK 偏好出错\n${it.localizedMessage}", it)
         }
 
         appCtx.toastOnUi(R.string.restore_success)
@@ -537,10 +553,28 @@ object Restore : KoinComponent {
         }
     }
 
-    private suspend fun applyConfigMap(map: Map<String, Any?>, aes: BackupAES) {
+    /**
+     * 同机判定：config.xml 内嵌的来源设备名（[backupOriginDeviceKey]）与本机
+     * [PreferKey.webDavDeviceName] 一致。任一为空（未命名设备/旧版备份无标记）保守
+     * 判为跨设备——宁可少恢复设备相关键，不可把别机的模式/几何/性能值灌进本机。
+     */
+    private fun isBackupFromSameDevice(configMap: Map<String, Any?>): Boolean {
+        val origin = configMap[backupOriginDeviceKey] as? String ?: return false
+        val local = get<BackupSettingsGateway>().currentSettings.webDavDeviceName
+        return origin.isNotBlank() && origin == local
+    }
+
+    private suspend fun applyConfigMap(
+        map: Map<String, Any?>,
+        aes: BackupAES,
+        restoreFromSameDevice: Boolean,
+    ) {
         val finalMap = normalizeConfigMap(
-            map = map,
-            keyIsNotIgnore = { BackupConfig.keyIsNotIgnore(it) },
+            // 来源设备标记只用于同机判定，剥离后永不作为设置写入
+            map = map - backupOriginDeviceKey,
+            keyIsNotIgnore = {
+                BackupConfig.keyIsNotIgnore(it, restoreFromSameDevice = restoreFromSameDevice)
+            },
             decryptWebDavPassword = { runCatching { aes.decryptStr(it) }.getOrNull() },
             hasLocalWebDavPassword = !appCtx.getPrefString(PreferKey.webDavPassword)
                 .isNullOrBlank(),

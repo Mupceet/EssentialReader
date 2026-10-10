@@ -15,10 +15,6 @@ internal val alwaysIgnoredPreferenceKeys = setOf(
     PreferKey.defaultBookTreeUri,
     PreferKey.webDavDeviceName,
     PreferKey.launcherIcon,
-    PreferKey.bitmapCacheSize,
-    PreferKey.webServiceWakeLock,
-    PreferKey.readAloudWakeLock,
-    PreferKey.audioPlayWakeLock,
     LocalPreferencesKeys.PASSWORD.name,
     LocalPreferencesKeys.MIGRATED_TO_SETTINGS.name,
     // 私密内容解锁的派生凭据。salt + verifier 是"可离线爆破的产物"：密码往往很短，
@@ -31,6 +27,71 @@ internal val alwaysIgnoredPreferenceKeys = setOf(
     LocalPreferencesKeys.PRIVATE_BIOMETRIC_ENVELOPE.name,
     LocalPreferencesKeys.PRIVATE_BIOMETRIC_IV.name,
 )
+
+/**
+ * 设备相关键：值的正确性取决于设备（屏幕几何/硬件能力/性能档位/本机路径）而非用户品味。
+ *
+ * 与 [alwaysIgnoredPreferenceKeys] 的双向忽略不同，本集合**照常随备份导出**——
+ * 备份是唯一的数据捕获点，丢弃了就再也无法恢复；只在**恢复**时按来源设备过滤：
+ * 备份来源设备名（[backupOriginDeviceKey]）与本机 [PreferKey.webDavDeviceName] 一致
+ * （重装/本机恢复）才应用，跨设备恢复跳过、保留本机值。标记缺失或双方任一为空时
+ * 保守按跨设备处理——宁可少恢复，不可把手机备份的 eInkMode=false 灌进墨水屏设备。
+ */
+internal val deviceLocalPreferenceKeys = setOf(
+    // 模式与入口：跨设备同步会互相翻转 UI 模式，eink 设备丢失重入口
+    PreferKey.eInkMode,
+    PreferKey.labEInkDisplay,
+    // 书架几何：eink 书架样式契约直接消费，屏宽/密度差异下合理值天然不同
+    PreferKey.bookshelfGridCoverWidth,
+    PreferKey.bookshelfLayoutModePortrait,
+    PreferKey.bookshelfListCoverWidth,
+    // 显示与交互硬件：字体缩放（attach 期生效）、音量键翻页（实体键 vs 调音量）、
+    // 前光/背光绝对值（设备档位不可比）
+    PreferKey.fontScale,
+    PreferKey.volumeKeyPage,
+    PreferKey.brightness,
+    PreferKey.nightBrightness,
+    // 性能与资源：慢速 eink SoC 与旗舰手机的合理档位不同（自 always 迁入——
+    // 迁入前重装同机恢复也拿不回来，属过度丢弃）
+    PreferKey.threadCount,
+    PreferKey.cacheBookThreadCount,
+    PreferKey.bitmapCacheSize,
+    PreferKey.webServiceWakeLock,
+    PreferKey.readAloudWakeLock,
+    PreferKey.audioPlayWakeLock,
+    // 本机路径/URI/设备盘点：字体私有副本路径（字体文件不随备份走，必悬空）、
+    // SAF 文件夹 URI、导入路径历史、系统字体盘点、物理翻页键码
+    PreferKey.appFontPath,
+    PreferKey.fontFolder,
+    PreferKey.importBookPath,
+    PreferKey.systemTypefaces,
+    PreferKey.prevKeys,
+    PreferKey.nextKeys,
+)
+
+/**
+ * config.xml 内嵌的备份来源设备名（备份时为 [PreferKey.webDavDeviceName] 的快照）。
+ * 仅用于恢复侧的同机判定，恢复时读出比对后剥离，**永不作为设置应用**；
+ * 不进任何忽略集合（备份侧需要导出它）。旧版本 app 恢复新备份时会把本键当
+ * 未知设置写入，无人消费、无害。
+ */
+internal const val backupOriginDeviceKey = "backupOriginDeviceName"
+
+/**
+ * 硬过滤（纯函数，便于 JVM 单测）：备份/恢复都要过的第一道闸。
+ * - [alwaysIgnoredPreferenceKeys]：双向忽略，备份不导出、恢复不应用；
+ * - [deviceLocalPreferenceKeys]：备份照常导出；仅跨设备恢复（[restoreFromSameDevice]
+ *   = false）时跳过。
+ */
+internal fun isKeyAllowedByHardPolicy(
+    key: String,
+    isBackup: Boolean,
+    restoreFromSameDevice: Boolean = true,
+): Boolean {
+    if (key in alwaysIgnoredPreferenceKeys) return false
+    if (!isBackup && !restoreFromSameDevice && key in deviceLocalPreferenceKeys) return false
+    return true
+}
 
 /**
  * 备份配置
@@ -406,8 +467,16 @@ object BackupConfig {
         PreferKey.coverInfoOrientation
     )
 
-    fun keyIsNotIgnore(key: String, isBackup: Boolean = false): Boolean {
-        if (key in alwaysIgnoredPreferenceKeys) return false
+    /**
+     * @param restoreFromSameDevice 备份来源设备名与本机一致（仅恢复侧有意义；默认 true
+     *        保持既有调用语义——设备相关键照常应用，见 [deviceLocalPreferenceKeys]）
+     */
+    fun keyIsNotIgnore(
+        key: String,
+        isBackup: Boolean = false,
+        restoreFromSameDevice: Boolean = true,
+    ): Boolean {
+        if (!isKeyAllowedByHardPolicy(key, isBackup, restoreFromSameDevice)) return false
         if (isBackup) {
             return when {
                 backupIgnoreReadConfig && readPrefKeys.contains(key) -> false

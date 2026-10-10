@@ -16,6 +16,7 @@ import io.legado.app.eink.contract.PageTurnRippleMode
 import io.legado.app.help.config.AppConfigStore
 import io.legado.app.help.config.AppFontStore
 import io.legado.app.utils.FileDoc
+import io.legado.app.utils.LogUtils
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -64,6 +65,45 @@ internal object EinkLegacyPrefsStore {
 
     fun prefs(): SharedPreferences =
         appCtx.getSharedPreferences(FILE_NAME, Context.MODE_PRIVATE)
+
+    /** 备份恢复时跨设备跳过的路径类自有键（内容 URI/私有副本路径，异机必悬空）。 */
+    private val crossDeviceLocalKeys =
+        setOf(KEY_RECENT_FONTS, KEY_APP_FONT_SOURCE, KEY_APP_FONT_COPY)
+
+    /** 备份导出：当前全部自有键值。键值类型只有 String/Boolean（约束见 [importAll]）。 */
+    fun exportAll(): Map<String, Any?> = prefs().all
+
+    /**
+     * 备份恢复：合并写入（不 clear——备份缺少的本地键保留，空备份即无操作）。
+     * 当前自有键值类型只有 String/Boolean，其余类型跳过并记日志（GSON 无类型反序列化
+     * 会把数字变 Double，而 SharedPreferences 不支持 Double，扩键时须同步此处）。
+     * [restoreFromSameDevice] = false 时跳过 [crossDeviceLocalKeys]（与宿主设置
+     * deviceLocalPreferenceKeys 的跨设备语义一致：同机恢复应用、跨设备保留本机）。
+     */
+    fun importAll(entries: Map<String, Any?>, restoreFromSameDevice: Boolean) {
+        val editor = prefs().edit()
+        var hasWrite = false
+        entries.forEach { (key, value) ->
+            if (!restoreFromSameDevice && key in crossDeviceLocalKeys) return@forEach
+            when (value) {
+                is String -> {
+                    editor.putString(key, value)
+                    hasWrite = true
+                }
+
+                is Boolean -> {
+                    editor.putBoolean(key, value)
+                    hasWrite = true
+                }
+
+                else -> LogUtils.e(
+                    "EinkLegacyPrefsStore",
+                    "备份恢复跳过非 String/Boolean 键: $key=${value?.let { it::class.simpleName }}"
+                )
+            }
+        }
+        if (hasWrite) editor.apply()
+    }
 }
 
 /**

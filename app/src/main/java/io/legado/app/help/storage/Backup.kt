@@ -10,6 +10,7 @@ import io.legado.app.data.appDb
 import io.legado.app.domain.gateway.BackupSettingsGateway
 import io.legado.app.domain.gateway.ReadStyleGateway
 import io.legado.app.exception.NoStackTraceException
+import io.legado.app.eink.bridge.EinkLegacyPrefsStore
 import io.legado.app.help.AppWebDav
 import io.legado.app.help.DirectLinkUpload
 import io.legado.app.help.book.isLocal
@@ -49,6 +50,9 @@ import java.util.concurrent.TimeUnit
  * 备份
  */
 object Backup {
+
+    /** E-InK 自有偏好的备份文件名（内容为 eink_preferences 的键值 JSON，见 EinkLegacyPrefsStore）。 */
+    const val EINK_PREFERENCES_FILE_NAME = "einkPreferences.json"
 
     private val readStyleGateway: ReadStyleGateway
         get() = GlobalContext.get().get()
@@ -93,6 +97,7 @@ object Backup {
             ReadBookConfig.shareConfigFileName,
             ThemeConfigStore.configFileName,
             BookCover.configFileName,
+            EINK_PREFERENCES_FILE_NAME,
             "config.xml"
         )
     }
@@ -249,10 +254,20 @@ object Backup {
                     .writeText(GSON.toJson(it))
             }
         }
+        // E-InK 自有偏好（eink_preferences 专属文件）：多为品味键（点击分区/下拉书签/
+        // 水波纹档位），重装恢复诉求成立，随包导出；空文件不导出（完整模式设备互备
+        // 不清空对方 E-InK 偏好）
+        EinkLegacyPrefsStore.exportAll().takeIf { it.isNotEmpty() }?.let { einkPrefs ->
+            FileUtils.createFileIfNotExist(backupPath + File.separator + EINK_PREFERENCES_FILE_NAME)
+                .writeText(GSON.toJson(einkPrefs))
+        }
         currentCoroutineContext().ensureActive()
         val configMap = AppConfigStore.preferences.asMap()
             .mapKeys { it.key.name }
             .toMutableMap()
+        // 来源设备标记：webDavDeviceName 的快照。仅用于恢复侧同机判定（该设置本身
+        // 在 alwaysIgnored 双向忽略、不上云），恢复端读出比对后剥离，永不作为设置应用
+        configMap[backupOriginDeviceKey] = backupSettingsGateway.currentSettings.webDavDeviceName
         if (PreferKey.bookshelfSelectedGroupId !in configMap) {
             (configMap[PreferKey.saveTabPosition] as? Long)?.let {
                 configMap[PreferKey.bookshelfSelectedGroupId] = it
