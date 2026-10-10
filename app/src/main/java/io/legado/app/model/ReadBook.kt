@@ -219,6 +219,12 @@ object ReadBook : CoroutineScope by MainScope(), KoinComponent {
 
     private const val MIN_READ_DURATION = 10 * 1000L
 
+    /**
+     * 阅读会话休眠间隙判阈：相邻两次翻页间隔超过该值视为设备休眠/挂起
+     * （放置常亮、锁屏冻结）而非连续阅读，间隙不计入阅读时长。
+     */
+    private const val READ_SESSION_RESUME_GAP_MILLIS = 5 * 60 * 1000L
+
     // region 会话所有权：外部只能通过下列语义化命令改写会话字段（book/durChapterIndex/durChapterPos
     // 已 private set）。判定用意图化谓词替代裸实体比较，避免调用方直接持有可变 Book。
 
@@ -921,10 +927,29 @@ object ReadBook : CoroutineScope by MainScope(), KoinComponent {
                 return
             }
 
-            currentActiveSession = currentActiveSession!!.copy(
-                endTime = endTime,
-                words = durChapterIndex.toLong()
-            )
+            val previous = currentActiveSession!!
+            if (endTime - previous.endTime > READ_SESSION_RESUME_GAP_MILLIS) {
+                // 冻结/挂起恢复后的首次翻页：设备放置休眠（eink 屏常亮挂起、
+                // 锁屏进程冻结）期间 endTime 无人推进，墙钟间隙是休眠时长
+                // 而非阅读时长。上一段以真实终点落库，从本次交互重新起会话，
+                // 避免整段间隙被下一次提交补记成阅读时间（单日几十小时的
+                // 阅读总览虚高即来源于此）。
+                ioScope.launch { saveSessionToDb(previous) }
+                currentActiveSession = ReadRecordSession(
+                    deviceId = "",
+                    bookName = currentBookName,
+                    bookAuthor = currentBookAuthor,
+                    bookUrl = currentBookUrl,
+                    startTime = endTime,
+                    endTime = endTime,
+                    words = durChapterIndex.toLong()
+                )
+            } else {
+                currentActiveSession = previous.copy(
+                    endTime = endTime,
+                    words = durChapterIndex.toLong()
+                )
+            }
 
             readStartTime = endTime
             lastReadLength = currentLength

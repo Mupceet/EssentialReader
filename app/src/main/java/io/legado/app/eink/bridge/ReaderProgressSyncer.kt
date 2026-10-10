@@ -16,6 +16,7 @@ import io.legado.app.eink.contract.ReaderSyncTrigger
 import io.legado.app.help.book.simulatedTotalChapterNum
 import io.legado.app.help.storage.Backup
 import io.legado.app.model.ReadBook
+import io.legado.app.service.BaseReadAloudService
 import io.legado.app.utils.NetworkUtils
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -43,6 +44,10 @@ private const val LOG_TAG = "EInkProgressSync"
  * - 云端超前的应用路径先过章节有效性 gate；
  * - 上传成功回写 book.syncTime 并落库（宿主 LoadDelegate.uploadBookProgress
  *   同构）。
+ * - ReaderPaused/ReaderResumed 同时承载宿主 handleOnPause/handleOnResume 的
+ *   阅读会话同位：暂停即以最后一次翻页为终点提交时段（不再「换书才落库」，
+ *   杜绝放置/锁屏跨天的尾巴被补记成阅读时间），恢复则重启计时与自动落库
+ *   循环；2026-10-10 前该位缺失，是阅读总览单日虚高的成因之一。
  *
  * **一键全开（用户定案 2026-09-12）**：E-Ink 不区分宿主的「同步增强」
  * 子键——主开关开即恒走完整双向行为（进书云端超前弹确认框、暂停先
@@ -90,7 +95,10 @@ internal class ReaderProgressSyncer(
         when (trigger) {
             ReaderSyncTrigger.BookEntered -> syncOnEntered()
             ReaderSyncTrigger.ReaderPaused -> syncOnPaused()
-            ReaderSyncTrigger.ReaderResumed -> applyPendingWebProgress()
+            ReaderSyncTrigger.ReaderResumed -> {
+                resumeReadSession()
+                applyPendingWebProgress()
+            }
             ReaderSyncTrigger.NetworkAvailable -> syncOnNetworkAvailable()
             ReaderSyncTrigger.BackupTimer -> backupTimerFired()
         }
@@ -173,6 +181,14 @@ internal class ReaderProgressSyncer(
     private fun syncOnPaused() {
         // saveRead 无条件先行（宿主顺序：落库 → 同步）；同步+备份整段 DEBUG 跳过
         ReadBook.saveRead()
+        // 会话同位（宿主 handleOnPause）：暂停即以最后一次翻页为终点提交
+        // 阅读时段，放置/锁屏期间不再挂账；朗读播放中不提交，由朗读服务
+        // 自己的暂停路径处理。会话提交纯本地，不受下方 DEBUG 同步 gate 影响。
+        ReadBook.isUiActive = false
+        if (!BaseReadAloudService.isPlay()) {
+            ReadBook.stopAutoSaveSession()
+            ReadBook.commitReadSession()
+        }
         if (BuildConfig.DEBUG) {
             log("暂停同步：DEBUG 构建跳过（宿主同位 gate），本地已落库")
             return
@@ -208,6 +224,18 @@ internal class ReaderProgressSyncer(
             ReadBook.webBookProgress = null
             ReadBook.setProgress(pending)
         }
+    }
+
+    /**
+     * Activity 级恢复：宿主 handleOnResume 的会话同位——刷新计时起点并
+     * 开启自动落库循环（被冻结停摆的循环在这里一并重启）。eink 阅读此前
+     * 缺这一位：会话只在换书时落库，放置/锁屏跨天的尾巴会被下一次翻页
+     * 补记成整段阅读时间；进书与回前台都经 [ReaderSyncTrigger.ReaderResumed]
+     * 到达（ReaderScreen 组合晚于 ON_RESUME 时补发）。
+     */
+    private fun resumeReadSession() {
+        ReadBook.isUiActive = true
+        ReadBook.startReadSession()
     }
 
     /** 网络恢复：宿主 ReadBookViewModel.onNetworkChanged 位（一键全开：主开关开即同步）。 */
