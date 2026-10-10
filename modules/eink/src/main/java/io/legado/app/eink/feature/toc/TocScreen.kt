@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -64,11 +65,13 @@ import io.legado.app.eink.designsystem.content.EInkText
 import io.legado.app.eink.designsystem.control.EInkDialog
 import io.legado.app.eink.designsystem.interaction.eInkActionColors
 import io.legado.app.eink.designsystem.interaction.einkClickable
+import io.legado.app.eink.designsystem.interaction.ImmediatePressState
 import io.legado.app.eink.designsystem.interaction.rememberImmediatePressState
 import io.legado.app.eink.designsystem.navigation.EInkOperationBar
 import io.legado.app.eink.designsystem.navigation.EInkOperationBarIcon
 import io.legado.app.eink.designsystem.navigation.EInkPageArrows
 import io.legado.app.eink.designsystem.navigation.EInkTopBar
+import io.legado.app.eink.designsystem.pager.EInkPageSwipe
 import io.legado.app.eink.designsystem.pager.awaitPositionReady
 import io.legado.app.eink.designsystem.pager.rememberEInkFlowPagerState
 import io.legado.app.eink.designsystem.pager.rememberEInkListPagerState
@@ -125,7 +128,9 @@ private val CardBodyGap = EInkSpacing.s
  * 分页状态——目录为定高章节列表（计数分页 + 右侧快速滑动手柄），
  * 书签/笔记为**按章节聚合的卡片列表**，卡片高度随内容变化，用变高分页
  * （[rememberEInkFlowPagerState]）：每页从「上一条完整展示完」处接着走，
- * 不裁半截、不漏条目，章节头与其卡片同页。跳转目标（书签 / 划线 / 想法）
+ * 不裁半截、不漏条目，章节头与其卡片同页。Tab 除点按外可**左右滑动**
+ * 相邻切换（能力过滤后的滑动序列）；书签/笔记卡时间行右端「删除」钮
+ * 快速删除（契约 deleteBookmark/deleteMarking）。跳转目标（书签 / 划线 / 想法）
  * 由本层执行引擎动作（有会话即时跳章 / 无会话落进度）后交
  * [onJumpToLocation] 做纯导航；笔记导出经 SAF 取 uri 交 ViewModel。
  */
@@ -291,6 +296,30 @@ fun TocRoute(
         pagerNotes.realignToPageStart(markingRows.size)
     }
 
+    // 左右滑动切 Tab：滑动序列 = 按能力过滤出的相邻段（能力缺失的 Tab 不在
+    // 序列内）；切到头不动作。lambda 读 uiState 委托（调用时取最新选中段，
+    // 与 Screen 侧降级兜底同口径），并 remember 稳定实例（同翻页动作先例）
+    val availableTabs = remember(uiState.bookmarksAvailable, uiState.markingsAvailable) {
+        buildList {
+            add(TocTab.Chapters)
+            if (uiState.bookmarksAvailable) add(TocTab.Bookmarks)
+            if (uiState.markingsAvailable) add(TocTab.Notes)
+        }
+    }
+    val swipeToAdjacentTab: (Int) -> Unit = remember(availableTabs) {
+        { delta ->
+            val current = when (val selected = uiState.selectedTab) {
+                TocTab.Bookmarks -> if (uiState.bookmarksAvailable) selected else TocTab.Chapters
+                TocTab.Notes -> if (uiState.markingsAvailable) selected else TocTab.Chapters
+                TocTab.Chapters -> selected
+            }
+            val index = availableTabs.indexOf(current).let { if (it < 0) 0 else it }
+            availableTabs.getOrNull(index + delta)?.let(viewModel::selectTab)
+        }
+    }
+    val onSwipeLeft: () -> Unit = remember(swipeToAdjacentTab) { { swipeToAdjacentTab(1) } }
+    val onSwipeRight: () -> Unit = remember(swipeToAdjacentTab) { { swipeToAdjacentTab(-1) } }
+
     // 翻页箭头槽：canPageUp/canPageDown 读取分页状态（pageStart 为
     // mutableStateOf），在 Route 作用域读取会让整个目录页随每次翻页/滑块
     // 定位重组；收敛到槽内读取，翻页只重组箭头两个图标。按当前 Tab
@@ -383,6 +412,10 @@ fun TocRoute(
         onTabSelect = viewModel::selectTab,
         onBookmarkClick = viewModel::onBookmarkClick,
         onMarkingClick = viewModel::onMarkingClick,
+        onDeleteBookmark = viewModel::onDeleteBookmark,
+        onDeleteMarking = viewModel::onDeleteMarking,
+        onSwipeLeft = onSwipeLeft,
+        onSwipeRight = onSwipeRight,
         onExport = {
             pendingExport = true
             exportLauncher.launch("${uiState.book?.name.orEmpty()}-笔记.md")
@@ -397,7 +430,7 @@ fun TocRoute(
  *
  * 结构：顶栏（书名 + Tab 相关动作按钮：目录 Tab 为正/倒序、笔记 Tab 为
  * 导出）→ **标题下三段切换（目录 / 书签 / 笔记）** → 内容区
- *（目录 Tab：章节列表定高计数分页 + 右侧快速滑动手柄；
+ * （目录 Tab：章节列表定高计数分页 + 右侧快速滑动手柄；
  *  书签 / 笔记 Tab：按章节聚合的卡片列表，**变高分页**
  *  [io.legado.app.eink.designsystem.pager.EInkFlowPagerState]）→
  * 底部操作栏（返回 / 回到当前 / 去底部 居左连续 + 翻页胶囊；Tab 已上移到
@@ -405,6 +438,13 @@ fun TocRoute(
  *
  * [pageArrows] 为翻页箭头槽：由承载层在其中读取分页状态并组合
  * [EInkPageArrows]，使翻页可用状态的读取收敛到箭头叶作用域。
+ *
+ * 左右滑动切 Tab（与点按等价）：列表分支经各 pane 的 [EInkPagerInput]
+ * 走统一轴向仲裁（横向主导松手定夺）；**无分页列表的分支**（加载/错误/
+ * 空态——含空书签、无笔记）由内容 Box 上的 [EInkPageSwipe] 兜底承载，
+ * 避免滑进空 Tab 后滑不回去。列表在场时 Box 兜底恒被 pane 检测器抢先
+ * 认领（子节点先于父节点收事件、任意轴向 slop 不晚于横向 slop），不会
+ * 双发。
  *
  * 根为 Box：跳转确认弹层（[EInkDialog]）必须组合在全屏容器子级
  * （其组合契约），作为内容 Column 的兄弟覆盖整屏。
@@ -435,6 +475,10 @@ internal fun TocScreen(
     onTabSelect: (TocTab) -> Unit,
     onBookmarkClick: (Long) -> Unit,
     onMarkingClick: (String) -> Unit,
+    onDeleteBookmark: (Long) -> Unit,
+    onDeleteMarking: (String) -> Unit,
+    onSwipeLeft: () -> Unit,
+    onSwipeRight: () -> Unit,
     onExport: () -> Unit,
     onConfirmJump: () -> Unit,
     onDismissJump: () -> Unit,
@@ -492,7 +536,11 @@ internal fun TocScreen(
                     onSelect = onTabSelect,
                 )
             }
-            Box(modifier = Modifier.weight(1f)) {
+            // 内容 Box 挂横滑兜底（无分页列表分支的切 Tab 入口；列表分支
+            // 恒被 pane 检测器抢先认领，见 TocScreen KDoc）
+            Box(modifier = Modifier
+                .weight(1f)
+                .EInkPageSwipe(onSwipeLeft = onSwipeLeft, onSwipeRight = onSwipeRight)) {
                 when {
                     state.isLoading -> EInkLoading(modifier = Modifier.fillMaxSize())
                     state.error != null -> CenterMessage(state.error)
@@ -505,6 +553,10 @@ internal fun TocScreen(
                         onPageDown = onBookmarkPageDown,
                         onBookmarkClick = onBookmarkClick,
                         onMarkingClick = onMarkingClick,
+                        onDeleteBookmark = onDeleteBookmark,
+                        onDeleteMarking = onDeleteMarking,
+                        onSwipeLeft = onSwipeLeft,
+                        onSwipeRight = onSwipeRight,
                     )
                     tab == TocTab.Notes -> MarksPane(
                         rows = markingRows,
@@ -515,6 +567,10 @@ internal fun TocScreen(
                         onPageDown = onNotePageDown,
                         onBookmarkClick = onBookmarkClick,
                         onMarkingClick = onMarkingClick,
+                        onDeleteBookmark = onDeleteBookmark,
+                        onDeleteMarking = onDeleteMarking,
+                        onSwipeLeft = onSwipeLeft,
+                        onSwipeRight = onSwipeRight,
                     )
                     state.isEmpty -> CenterMessage("无章节")
                     else -> Box(modifier = Modifier.fillMaxSize()) {
@@ -526,6 +582,8 @@ internal fun TocScreen(
                                 onPageUp = onPageUp,
                                 onPageDown = onPageDown,
                                 onChapterClick = onChapterClick,
+                                onSwipeLeft = onSwipeLeft,
+                                onSwipeRight = onSwipeRight,
                             )
                             FastScrollHandle(
                                 listState = listState,
@@ -596,6 +654,8 @@ private fun ChapterList(
     onPageUp: () -> Unit,
     onPageDown: () -> Unit,
     onChapterClick: (Int) -> Unit,
+    onSwipeLeft: () -> Unit,
+    onSwipeRight: () -> Unit,
 ) {
     // 展示项自带真实章节号（ChapterUiModel.index）：搜索过滤后的列表下标
     // 与真实章节号错位（mapIndexed 给的是过滤列表内位置），倒序只影响
@@ -603,7 +663,8 @@ private fun ChapterList(
     val display: List<ChapterUiModel> = state.displayChapters
         .let { if (state.isReversed) it.asReversed() else it }
 
-    // 不支持自由滚动：上下滑动手势识别为整页翻页，与底部 ▲▼ 按钮同一动作
+    // 不支持自由滚动：上下滑动手势识别为整页翻页，与底部 ▲▼ 按钮同一动作；
+    // 左右滑动切 Tab（统一轴向仲裁，横向主导松手定夺）
     LazyColumn(
         state = listState,
         userScrollEnabled = false,
@@ -612,7 +673,9 @@ private fun ChapterList(
             .fillMaxSize()
             .EInkPagerInput(
                 onPageUp = onPageUp,
-                onPageDown = onPageDown
+                onPageDown = onPageDown,
+                onSwipeLeft = onSwipeLeft,
+                onSwipeRight = onSwipeRight
             )
     ) {
         items(display, key = { it.url }) { chapter ->
@@ -826,7 +889,8 @@ private fun TocTabItem(
 /**
  * 书签/笔记列表 pane：章节聚合头 + 卡片，**变高分页**（卡片高度随内容行数
  * 变化，由承载层的 [io.legado.app.eink.designsystem.pager.EInkFlowPagerState]
- * 按布局实测翻页）。两个 Tab 各自的列表状态与分页状态独立。
+ * 按布局实测翻页）。两个 Tab 各自的列表状态与分页状态独立；左右滑动切
+ * Tab、卡片时间行「删除」钮为两 Tab 共用入口。
  */
 @Composable
 private fun MarksPane(
@@ -838,6 +902,10 @@ private fun MarksPane(
     onPageDown: () -> Unit,
     onBookmarkClick: (Long) -> Unit,
     onMarkingClick: (String) -> Unit,
+    onDeleteBookmark: (Long) -> Unit,
+    onDeleteMarking: (String) -> Unit,
+    onSwipeLeft: () -> Unit,
+    onSwipeRight: () -> Unit,
 ) {
     if (rows.isEmpty()) {
         CenterMessage(emptyText)
@@ -847,7 +915,12 @@ private fun MarksPane(
         state = listState,
         userScrollEnabled = false,
         overscrollEffect = null,
-        modifier = Modifier.fillMaxSize().EInkPagerInput(onPageUp = onPageUp, onPageDown = onPageDown),
+        modifier = Modifier.fillMaxSize().EInkPagerInput(
+            onPageUp = onPageUp,
+            onPageDown = onPageDown,
+            onSwipeLeft = onSwipeLeft,
+            onSwipeRight = onSwipeRight,
+        ),
     ) {
         items(rows, key = { it.rowKey() }) { row ->
             when (row) {
@@ -859,11 +932,13 @@ private fun MarksPane(
                 is TocMarkRow.Bookmark -> BookmarkCard(
                     bookmark = row.bookmark,
                     onClick = { onBookmarkClick(row.bookmark.id) },
+                    onDelete = { onDeleteBookmark(row.bookmark.id) },
                 )
 
                 is TocMarkRow.Marking -> MarkingCard(
                     marking = row.marking,
                     onClick = { onMarkingClick(row.marking.id) },
+                    onDelete = { onDeleteMarking(row.marking.id) },
                 )
             }
         }
@@ -928,19 +1003,27 @@ private fun MarkChapterHeader(
  * 卡片外壳：整卡可点（按压瞬时反色，规范 §35），内容经 [content] 拿到
  * 当前配色——第一行图标 + 基础信息（**不再带章节名**，章名已在聚合头），
  * 下面才是具体内容（高度随内容行数变化，翻页由变高分页保证完整展示）。
+ *
+ * [deletePress] 为时间行「删除」钮的按压态（本层创建、经 [content] 下传），
+ * 卡与钮的按压反馈按落点分层：按在**钮**上时整卡不反色、只有钮自身反色
+ * （钮不触发跳转由子节点消费抬起事件保证，这里收敛视觉）；按在**卡面
+ * 其余位置**时整卡反色，钮文字（[content] 收到的 primary）随之翻转。
  */
 @Composable
 private fun MarkCard(
     onClick: () -> Unit,
-    content: @Composable (primary: Color, secondary: Color, meta: Color) -> Unit,
+    content: @Composable (primary: Color, secondary: Color, meta: Color, deletePress: ImmediatePressState) -> Unit,
 ) {
     val scheme = EInkTheme.colorScheme
     val press = rememberImmediatePressState()
-    val colors = eInkActionColors(pressed = press.isPressed)
-    val primary = if (press.isPressed) colors.contentColor else scheme.onSurface
-    val secondary = if (press.isPressed) colors.contentColor else scheme.onSurfaceVariant
+    val deletePress = rememberImmediatePressState()
+    // 删除钮按压期间整卡不参与反色（钮自己的黑底白字反馈独立呈现）
+    val cardPressed = press.isPressed && !deletePress.isPressed
+    val colors = eInkActionColors(pressed = cardPressed)
+    val primary = if (cardPressed) colors.contentColor else scheme.onSurface
+    val secondary = if (cardPressed) colors.contentColor else scheme.onSurfaceVariant
     // 元信息（首行时间）最弱一级：按压时随整卡反色
-    val meta = if (press.isPressed) colors.contentColor else scheme.tertiaryContent
+    val meta = if (cardPressed) colors.contentColor else scheme.tertiaryContent
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -951,18 +1034,23 @@ private fun MarkCard(
             .padding(start = CardStartPadding, end = EInkSpacing.m, top = EInkSpacing.s, bottom = EInkSpacing.s),
         verticalArrangement = Arrangement.spacedBy(CardBlockGap),
     ) {
-        content(primary, secondary, meta)
+        content(primary, secondary, meta, deletePress)
     }
 }
 
-/** 卡片第一行：小图标 + 基础信息（时间，最弱一级元信息色）；时间不可信时只留图标。 */
+/** 卡片第一行：小图标 + 基础信息（时间，最弱一级元信息色）+ 右端「删除」纯文本钮；时间不可信时只留图标。 */
 @Composable
 private fun MarkCardHead(
     iconRes: Int,
     timeMillis: Long,
     meta: Color,
+    deleteTextColor: Color,
+    deletePress: ImmediatePressState,
+    onDelete: () -> Unit,
 ) {
+    val scheme = EInkTheme.colorScheme
     Row(
+        modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(6.dp),
     ) {
@@ -979,23 +1067,50 @@ private fun MarkCardHead(
                 color = meta,
             )
         }
+        Spacer(modifier = Modifier.weight(1f))
+        // 快速删除（无确认弹层）：纯文本钮——常态零视觉占位（透明底 +
+        // 正文黑文字，与元信息灰区分），按压自身反色（黑底白字），整卡
+        // 不连带反色（抑制见 MarkCard）；文字色随整卡按压翻转（点卡面时
+        // [deleteTextColor] 已是反色白）。手写而非 EInkButton：其 API 不
+        // 接收外部联动色，此处按它无描边形态的同款结构组装（共享
+        // ImmediatePressState，120ms 最短保持不自制）。失败经 messages
+        // toast，成功后行随流消失；嵌套在整卡可点区域内，子节点先消费
+        // 抬起事件，不会连带触发跳转
+        Box(
+            modifier = Modifier
+                .then(deletePress.modifier)
+                .background(if (deletePress.isPressed) scheme.onSurface else Color.Transparent)
+                .einkClickable(role = Role.Button, onClickLabel = "删除", onClick = onDelete)
+                // 只扩大触控与按压反色块，不影响静止观感
+                .padding(horizontal = 8.dp, vertical = 6.dp),
+        ) {
+            EInkText(
+                text = "删除",
+                style = EInkTheme.typography.labelMedium,
+                color = if (deletePress.isPressed) scheme.surface else deleteTextColor,
+            )
+        }
     }
 }
 
 /**
- * 书签卡：第一行 = 书签图标 + 时间；内容 = 页面摘录（正文级）+
+ * 书签卡：第一行 = 书签图标 + 时间 + 「删除」；内容 = 页面摘录（正文级）+
  * （完整模式编辑过的）书签笔记文本（次级色）。
  */
 @Composable
 private fun BookmarkCard(
     bookmark: BookmarkUiModel,
     onClick: () -> Unit,
+    onDelete: () -> Unit,
 ) {
-    MarkCard(onClick = onClick) { primary, secondary, meta ->
+    MarkCard(onClick = onClick) { primary, secondary, meta, deletePress ->
         MarkCardHead(
             iconRes = R.drawable.eink_ic_bookmark_s,
             timeMillis = bookmark.id,
             meta = meta,
+            deleteTextColor = primary,
+            deletePress = deletePress,
+            onDelete = onDelete,
         )
         if (bookmark.bookText.isNotBlank()) {
             EInkText(
@@ -1021,15 +1136,16 @@ private fun BookmarkCard(
 }
 
 /**
- * 笔记卡：第一行 = 图标（划线 / 想法两种）+ 时间；内容 = 划线原文
+ * 笔记卡：第一行 = 图标（划线 / 想法两种）+ 时间 + 「删除」；内容 = 划线原文
  * **引用态弱化**（左侧细线 + 次级色），想法再叠一行想法内容（正文级强调）。
  */
 @Composable
 private fun MarkingCard(
     marking: MarkingUiModel,
     onClick: () -> Unit,
+    onDelete: () -> Unit,
 ) {
-    MarkCard(onClick = onClick) { primary, secondary, meta ->
+    MarkCard(onClick = onClick) { primary, secondary, meta, deletePress ->
         MarkCardHead(
             iconRes = if (marking.thought) {
                 R.drawable.eink_ic_selection_thought
@@ -1038,6 +1154,9 @@ private fun MarkingCard(
             },
             timeMillis = marking.createdAt,
             meta = meta,
+            deleteTextColor = primary,
+            deletePress = deletePress,
+            onDelete = onDelete,
         )
         if (marking.selectedText.isNotBlank()) {
             QuotedText(text = marking.selectedText, color = secondary)

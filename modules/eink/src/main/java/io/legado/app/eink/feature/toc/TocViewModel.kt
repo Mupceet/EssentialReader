@@ -332,6 +332,29 @@ class TocViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    /**
+     * 书签快速删除（卡片时间行「删除」钮）：成功静默——行经书签流自动
+     * 回删即是反馈，分页收敛由 Route 的 realignToPageStart 跟进；
+     * 失败才提示。
+     */
+    fun onDeleteBookmark(id: Long) {
+        val marks = marksEngine ?: return
+        viewModelScope.launch {
+            if (!marks.deleteBookmark(id)) _messages.tryEmit("删除失败")
+        }
+    }
+
+    /**
+     * 划线/想法快速删除（同书签路径；有会话时宿主触发当前章重排，
+     * 阅读页装饰随新快照消失）。
+     */
+    fun onDeleteMarking(id: String) {
+        val marks = marksEngine ?: return
+        viewModelScope.launch {
+            if (!marks.deleteMarking(id)) _messages.tryEmit("删除失败")
+        }
+    }
+
     /** 笔记 Tab 导出 Markdown 到 SAF uri（结果经 messages 反馈）。 */
     fun exportMarkdown(bookUrl: String, uri: String) {
         val marks = marksEngine ?: return

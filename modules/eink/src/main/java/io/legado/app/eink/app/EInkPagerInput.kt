@@ -17,6 +17,10 @@ import io.legado.app.eink.designsystem.pager.EInkPageSwipe
  * 语义）：开关关闭或页内模态弹框在场放行系统音量调节；首按翻页、
  * 长按重复不翻；翻页到头由各分页器 canPage 守卫（不动作、仍消费）。
  *
+ * [onSwipeLeft]/[onSwipeRight]（可选）：横向主导滑动切走（如目录页
+ * 切 Tab），与竖直翻页共用 [EInkPageSwipe] 的统一轴向仲裁；null 时
+ * 手势行为与历史版本一致（仅竖直翻页）。
+ *
  * [enabled] = false 时不注册按键（手势同 EInkPageSwipe 一并停用）：
  * 同屏常驻多个分页区（首页双 Tab）以激活态互斥，避免隐藏区占住
  * 枢纽栈顶吃掉按键；组合互斥的分页区（搜索结果/历史、目录 Tab、
@@ -27,6 +31,8 @@ fun Modifier.EInkPagerInput(
     enabled: Boolean = true,
     onPageUp: () -> Unit,
     onPageDown: () -> Unit,
+    onSwipeLeft: (() -> Unit)? = null,
+    onSwipeRight: (() -> Unit)? = null,
 ): Modifier {
     val currentUp by rememberUpdatedState(onPageUp)
     val currentDown by rememberUpdatedState(onPageDown)
@@ -38,5 +44,11 @@ fun Modifier.EInkPagerInput(
         }
         onDispose { unregister() }
     }
-    return EInkPageSwipe(enabled = enabled, onPageUp = onPageUp, onPageDown = onPageDown)
+    return EInkPageSwipe(
+        enabled = enabled,
+        onPageUp = onPageUp,
+        onPageDown = onPageDown,
+        onSwipeLeft = onSwipeLeft,
+        onSwipeRight = onSwipeRight,
+    )
 }

@@ -6,7 +6,7 @@ import kotlinx.coroutines.flow.Flow
 
 /**
  * 书签/笔记统一端口：阅读内选区批注（笔记状态机 + 页面书签 toggle）与
- * 目录页书签/笔记 Tab 的列表、跳转解析、导出。宿主负责锚点构造（上下文
+ * 目录页书签/笔记 Tab 的列表、跳转解析、快速删除、导出。宿主负责锚点构造（上下文
  * 与哈希）并写 book_marks/bookmarks，模块不复制这些规则。
  *
  * 契约 v2（0.7.1 起，状态机进签名）：笔记（划线/想法）是**同一条记录的
@@ -60,8 +60,9 @@ interface MarksEngine {
     suspend fun updateMarkingNote(markingId: String, note: String): Boolean?
 
     /**
-     * 删除标记。false = 删除失败（模块提示并保留现场）。
-     * 宿主删除后触发当前章重排（同 createMarking 推送路径）。
+     * 删除标记。false = 删除失败（模块提示并保留现场）。**有阅读会话时**
+     * 宿主删除后触发当前章重排（同 createMarking 推送路径）；无会话
+     * （详情页直进目录删除）仅删库，列表经 [observeMarkings] 流回删。
      */
     suspend fun deleteMarking(markingId: String): Boolean
 
@@ -100,6 +101,14 @@ interface MarksEngine {
      * [TextProcessAnchor.chapterPosition]。
      */
     fun observeMarkings(bookUrl: String): Flow<List<MarkingUiModel>>
+
+    /**
+     * 按 id 删除页面书签（目录页书签 Tab 快速删除入口；阅读内移除走
+     * [togglePageBookmark]）。false = 书签不存在或删除失败。**有阅读
+     * 会话时**宿主删除后触发当前章重排（页角标随新快照推送）；无会话
+     * 仅删库，列表经 [observeBookmarks] 流回删。
+     */
+    suspend fun deleteBookmark(bookmarkId: Long): Boolean
 
     /**
      * 解析书签跳转目标：复用宿主校验（源指纹 + 章节标题比对）。
