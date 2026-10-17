@@ -100,7 +100,6 @@ internal fun ReaderInfoConfigDialog(
                                 onClick = { onSetTitleSizeFollowBody(true) },
                                 modifier = Modifier.weight(1f),
                                 selected = titleSizeFollowBody,
-                                height = 40.dp,
                                 style = EInkTheme.typography.bodyMedium,
                                 role = Role.Tab,
                             )
@@ -109,7 +108,6 @@ internal fun ReaderInfoConfigDialog(
                                 onClick = { onSetTitleSizeFollowBody(false) },
                                 modifier = Modifier.weight(1f),
                                 selected = !titleSizeFollowBody,
-                                height = 40.dp,
                                 style = EInkTheme.typography.bodyMedium,
                                 role = Role.Tab,
                             )
@@ -153,7 +151,6 @@ internal fun ReaderInfoConfigDialog(
                             onClick = { onSetFooterVisible(true) },
                             modifier = Modifier.weight(1f),
                             selected = style.footerVisible ?: true,
-                            height = 40.dp,
                             style = EInkTheme.typography.bodyMedium,
                             role = Role.Tab,
                         )
@@ -162,7 +159,6 @@ internal fun ReaderInfoConfigDialog(
                             onClick = { onSetFooterVisible(false) },
                             modifier = Modifier.weight(1f),
                             selected = !(style.footerVisible ?: true),
-                            height = 40.dp,
                             style = EInkTheme.typography.bodyMedium,
                             role = Role.Tab,
                         )
@@ -242,7 +238,6 @@ private fun ChoiceButtons(
                 onClick = { onSelect(values[index]) },
                 modifier = Modifier.weight(1f),
                 selected = values[index] == selected,
-                height = 40.dp,
                 style = EInkTheme.typography.bodyMedium,
                 role = Role.Tab,
             )

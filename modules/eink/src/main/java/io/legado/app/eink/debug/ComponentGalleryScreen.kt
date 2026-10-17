@@ -517,7 +517,6 @@ private fun ButtonSamples() {
                 text = if (selected) "开" else "关",
                 onClick = { selected = !selected },
                 modifier = Modifier.width(64.dp),
-                height = 44.dp,
                 selected = selected,
                 role = Role.Switch
             )

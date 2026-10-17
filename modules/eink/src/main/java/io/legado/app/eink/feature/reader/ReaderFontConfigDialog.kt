@@ -103,7 +103,6 @@ internal fun ReaderFontConfigDialog(
                             onClick = { onSetFont(ReaderFontSelection.Sans) },
                             modifier = Modifier.weight(1f),
                             selected = style.bodyFont == ReaderFontSelection.Sans,
-                            height = 44.dp,
                             style = EInkTheme.typography.bodyMedium,
                             role = Role.Button,
                         )
@@ -112,7 +111,6 @@ internal fun ReaderFontConfigDialog(
                             onClick = { onSetFont(ReaderFontSelection.Serif) },
                             modifier = Modifier.weight(1f),
                             selected = style.bodyFont == ReaderFontSelection.Serif,
-                            height = 44.dp,
                             style = EInkTheme.typography.bodyMedium,
                             role = Role.Button,
                         )
@@ -121,7 +119,6 @@ internal fun ReaderFontConfigDialog(
                             onClick = { onSetFont(ReaderFontSelection.Mono) },
                             modifier = Modifier.weight(1f),
                             selected = style.bodyFont == ReaderFontSelection.Mono,
-                            height = 44.dp,
                             style = EInkTheme.typography.bodyMedium,
                             role = Role.Button,
                         )
@@ -150,7 +147,6 @@ internal fun ReaderFontConfigDialog(
                                 modifier = Modifier.weight(1f),
                                 selected = (style.bodyFont as? ReaderFontSelection.File)
                                     ?.path == recentOption.path,
-                                height = 44.dp,
                                 style = EInkTheme.typography.bodyMedium,
                                 role = Role.Button,
                                 contentPadding = PaddingValues(horizontal = 8.dp),
@@ -164,7 +160,6 @@ internal fun ReaderFontConfigDialog(
                             } else {
                                 Modifier.weight(1f)
                             },
-                            height = 44.dp,
                             style = EInkTheme.typography.bodyMedium,
                             role = Role.Button,
                             contentPadding = PaddingValues(horizontal = 8.dp),
@@ -250,7 +245,6 @@ internal fun ReaderFontConfigDialog(
                                 onClick = { onSetChineseConverterType(type) },
                                 modifier = Modifier.weight(1f),
                                 selected = type == chineseConverterType,
-                                height = 44.dp,
                                 style = EInkTheme.typography.bodyMedium,
                                 role = Role.Button,
                                 contentPadding = PaddingValues(horizontal = 2.dp),
@@ -291,7 +285,7 @@ private fun WeightSettingRow(
         verticalAlignment = Alignment.Top,
     ) {
         Box(
-            modifier = Modifier.height(48.dp),
+            modifier = Modifier.height(44.dp),
             contentAlignment = Alignment.Center,
         ) {
             EInkText(
@@ -307,11 +301,11 @@ private fun WeightSettingRow(
             modifier = Modifier.weight(1f),
             verticalArrangement = Arrangement.spacedBy(EInkSpacing.xs),
         ) {
-            // 预设行：三枚等分（自定义移出本行，保窄屏完整显示）
+            // 预设行：三枚等分（自定义移出本行，保窄屏完整显示）；
+            // 自然高度（36dp 按钮，同字体选择行形态）
             Row(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .height(48.dp),
+                    .fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(EInkSpacing.xs),
             ) {
@@ -321,7 +315,6 @@ private fun WeightSettingRow(
                         onClick = { onSetWeight(preset) },
                         modifier = Modifier.weight(1f),
                         selected = !isCustom && value == preset,
-                        height = 40.dp,
                         style = buttonStyle,
                         contentPadding = PaddingValues(horizontal = 2.dp),
                         role = Role.Tab,
@@ -330,12 +323,11 @@ private fun WeightSettingRow(
             }
             if (allowCustom) {
                 // 第二行原地二态：自定义态显示拖动条；点预设按钮态复原。
-                // 容器定高 48dp（= EInkSliderRow 行高）：按钮态 40dp 垂直
-                // 居中，二态切换不产生纵向跳动
+                // 自然高度（按钮 36dp，参考字体选择第二行的间距；拖动条
+                // 48dp，二态切换的纵差由整行重排吸收——真机反馈优先收间距）
                 Row(
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .height(48.dp),
+                        .fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     if (isCustom) {
@@ -345,6 +337,8 @@ private fun WeightSettingRow(
                             valueRange = valueRange,
                             thumbLabel = { it.toString() },
                             onSetValue = onSetWeight,
+                            // 与按钮态（36dp）同高，二态切换零跳动
+                            height = 36.dp,
                         )
                     } else {
                         EInkButton(
@@ -352,7 +346,6 @@ private fun WeightSettingRow(
                             // 按钮仅在非自定义态在场，点击即进自定义（映射等效值）
                             onClick = { onSetWeight(presetToCustom(value)) },
                             modifier = Modifier.fillMaxWidth(),
-                            height = 40.dp,
                             style = buttonStyle,
                             contentPadding = PaddingValues(horizontal = 2.dp),
                             role = Role.Tab,

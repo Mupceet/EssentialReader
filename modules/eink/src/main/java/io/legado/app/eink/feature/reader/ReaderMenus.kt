@@ -424,7 +424,6 @@ private fun StyleEntryRow(entries: List<Pair<String, () -> Unit>>) {
                 text = label,
                 onClick = onClick,
                 modifier = Modifier.weight(1f),
-                height = 44.dp,
                 style = EInkTheme.typography.bodyMedium,
                 role = Role.Button,
             )
@@ -648,7 +647,6 @@ internal fun PanelTabRow(labels: List<String>, selected: Int, onSelect: (Int) ->
                 onClick = { onSelect(index) },
                 modifier = Modifier.weight(1f),
                 selected = index == selected,
-                height = 40.dp,
                 style = EInkTheme.typography.bodyMedium,
                 role = Role.Tab,
             )
@@ -729,7 +727,6 @@ private fun CycleValueRow(label: String, value: String, selected: Boolean, onCli
             text = value,
             onClick = onClick,
             modifier = Modifier.width(64.dp),
-            height = 44.dp,
             selected = selected,
         )
     }
@@ -828,7 +825,6 @@ internal fun ReaderTapZoneOverlay(
             text = "完成",
             onClick = exit,
             modifier = Modifier.fillMaxWidth(),
-            height = 48.dp,
         )
     }
 }
@@ -885,7 +881,6 @@ internal fun ToggleRow(label: String, checked: Boolean, onToggle: () -> Unit) {
             text = if (checked) "开" else "关",
             onClick = onToggle,
             modifier = Modifier.width(64.dp),
-            height = 44.dp,
             selected = checked,
             role = Role.Switch,
         )

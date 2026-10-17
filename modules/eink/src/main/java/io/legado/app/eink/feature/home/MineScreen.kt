@@ -329,7 +329,6 @@ private fun MineToggleRow(
             text = if (checked) "开" else "关",
             onClick = onToggle,
             modifier = Modifier.width(64.dp),
-            height = 44.dp,
             selected = checked,
             role = Role.Switch
         )
