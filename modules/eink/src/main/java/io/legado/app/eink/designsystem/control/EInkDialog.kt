@@ -124,12 +124,9 @@ fun EInkDialog(
             // 内边距下放到各行级：面板形态的分隔线要通到面板左右边缘
         ) {
             Row(
-                modifier = Modifier.padding(
-                    start = EInkSpacing.m,
-                    end = EInkSpacing.m,
-                    top = EInkSpacing.m,
-                    bottom = if (onClose != null) EInkSpacing.s else EInkSpacing.m
-                ),
+                // 标题行与常态面板（ReaderPanelContainer/底部调整面板）统一：
+                // 横 m、纵 s 对称（52dp，36dp 关闭钮撑高）
+                modifier = Modifier.padding(horizontal = EInkSpacing.m, vertical = EInkSpacing.s),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 EInkText(
@@ -228,8 +225,8 @@ object EInkModalPresence {
 }
 
 /**
- * 标题行关闭钮（×）：44dp 触控目标、按压反色（§35）。对话框与底部面板
- * 的标题行共用，module 内部组件。
+ * 标题行关闭钮（×）：36dp 触控目标（与按钮体系同高）、按压反色（§35）。
+ * 对话框与底部面板的标题行共用，module 内部组件。
  */
 @Composable
 internal fun EInkCloseButton(onClose: () -> Unit) {
@@ -237,7 +234,7 @@ internal fun EInkCloseButton(onClose: () -> Unit) {
     val colors = eInkActionColors(pressed = press.isPressed)
     Box(
         modifier = Modifier
-            .size(44.dp)
+            .size(36.dp)
             .then(press.modifier)
             .background(colors.containerColor)
             .einkClickable(role = Role.Button, onClick = onClose),

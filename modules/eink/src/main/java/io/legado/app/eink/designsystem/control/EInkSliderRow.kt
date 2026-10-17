@@ -41,11 +41,13 @@ fun EInkSliderRow(
     thumbLabel: (Int) -> String,
     onSetValue: (Int) -> Unit,
     labelWidth: Dp = SliderLabelWidth,
+    // 行高默认 48（面板行高统一档）；字重自定义行传 36 与按钮态同高
+    height: Dp = 48.dp,
 ) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .height(48.dp),
+            .height(height),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(EInkSpacing.xs),
     ) {
