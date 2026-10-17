@@ -38,6 +38,7 @@ import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import io.legado.app.eink.R
 import io.legado.app.eink.contract.BookshelfItemUiModel
+import io.legado.app.eink.contract.BookshelfShelfEntryUiModel
 import io.legado.app.eink.contract.BookshelfStyle
 import io.legado.app.eink.designsystem.content.EInkInfoRow
 import io.legado.app.eink.designsystem.content.EInkInfoRowIconSize
@@ -172,6 +173,8 @@ fun BookshelfScreen(
     listCoverHeight: Dp,
     onBookClick: (String) -> Unit,
     onBookLongClick: (BookshelfItemUiModel) -> Unit,
+    onGroupClick: (BookshelfShelfEntryUiModel.Group) -> Unit = {},
+    onGroupLongClick: (BookshelfShelfEntryUiModel.Group) -> Unit = {},
     listState: LazyListState = rememberLazyListState(),
     gridState: LazyGridState = rememberLazyGridState(),
     onPageUp: () -> Unit = {},
@@ -186,13 +189,15 @@ fun BookshelfScreen(
             state.isLoading -> EInkLoading(modifier = Modifier.fillMaxSize())
             state.isEmpty -> EmptyBookshelf(modifier = Modifier.fillMaxSize(), message = emptyMessage)
             state.isGridLayout -> BookGrid(
-                books = state.books,
+                entries = state.entries,
                 updatingBookUrls = state.updatingBookUrls,
                 style = state.style,
                 gridCellWidth = gridCellWidth,
                 gridColumns = gridColumns,
                 onBookClick = onBookClick,
                 onBookLongClick = onBookLongClick,
+                onGroupClick = onGroupClick,
+                onGroupLongClick = onGroupLongClick,
                 gridState = gridState,
                 onPageUp = onPageUp,
                 onPageDown = onPageDown,
@@ -200,13 +205,15 @@ fun BookshelfScreen(
             )
 
             else -> BookList(
-                books = state.books,
+                entries = state.entries,
                 updatingBookUrls = state.updatingBookUrls,
                 style = state.style,
                 listCoverWidth = listCoverWidth,
                 listCoverHeight = listCoverHeight,
                 onBookClick = onBookClick,
                 onBookLongClick = onBookLongClick,
+                onGroupClick = onGroupClick,
+                onGroupLongClick = onGroupLongClick,
                 listState = listState,
                 onPageUp = onPageUp,
                 onPageDown = onPageDown,
@@ -218,13 +225,15 @@ fun BookshelfScreen(
 
 @Composable
 private fun BookList(
-    books: List<BookshelfItemUiModel>,
+    entries: List<BookshelfShelfEntryUiModel>,
     updatingBookUrls: Set<String>,
     style: BookshelfStyle,
     listCoverWidth: Dp,
     listCoverHeight: Dp,
     onBookClick: (String) -> Unit,
     onBookLongClick: (BookshelfItemUiModel) -> Unit,
+    onGroupClick: (BookshelfShelfEntryUiModel.Group) -> Unit,
+    onGroupLongClick: (BookshelfShelfEntryUiModel.Group) -> Unit,
     listState: LazyListState,
     onPageUp: () -> Unit,
     onPageDown: () -> Unit,
@@ -250,16 +259,25 @@ private fun BookList(
         // 条目跳过：不在 items 块里逐项新建 click lambda（那会让条目参数
         // 永不相等），回调直接透传、由条目内部用 model 字段构造；数据未变
         // 的条目参数全稳定相等，整条跳过重组
-        items(books) { book ->
-            BookListItem(
-                book = book,
-                style = style,
-                listCoverWidth = listCoverWidth,
-                listCoverHeight = listCoverHeight,
-                isUpdating = updatingBookUrls.contains(book.bookUrl),
-                onBookClick = onBookClick,
-                onBookLongClick = onBookLongClick
-            )
+        items(entries) { entry ->
+            when (entry) {
+                is BookshelfShelfEntryUiModel.Book -> BookListItem(
+                    book = entry.book,
+                    style = style,
+                    listCoverWidth = listCoverWidth,
+                    listCoverHeight = listCoverHeight,
+                    isUpdating = updatingBookUrls.contains(entry.book.bookUrl),
+                    onBookClick = onBookClick,
+                    onBookLongClick = onBookLongClick
+                )
+                is BookshelfShelfEntryUiModel.Group -> GroupListItem(
+                    group = entry,
+                    listCoverWidth = listCoverWidth,
+                    listCoverHeight = listCoverHeight,
+                    onGroupClick = onGroupClick,
+                    onGroupLongClick = onGroupLongClick,
+                )
+            }
         }
     }
 }
@@ -273,13 +291,15 @@ private fun BookList(
  */
 @Composable
 private fun BookGrid(
-    books: List<BookshelfItemUiModel>,
+    entries: List<BookshelfShelfEntryUiModel>,
     updatingBookUrls: Set<String>,
     style: BookshelfStyle,
     gridCellWidth: Dp,
     gridColumns: Int,
     onBookClick: (String) -> Unit,
     onBookLongClick: (BookshelfItemUiModel) -> Unit,
+    onGroupClick: (BookshelfShelfEntryUiModel.Group) -> Unit,
+    onGroupLongClick: (BookshelfShelfEntryUiModel.Group) -> Unit,
     gridState: LazyGridState,
     onPageUp: () -> Unit,
     onPageDown: () -> Unit,
@@ -304,15 +324,24 @@ private fun BookGrid(
         userScrollEnabled = false,
         overscrollEffect = null
     ) {
-        items(books) { book ->
-            BookGridItem(
-                book = book,
-                style = style,
-                gridCellWidth = gridCellWidth,
-                isUpdating = updatingBookUrls.contains(book.bookUrl),
-                onBookClick = onBookClick,
-                onBookLongClick = onBookLongClick
-            )
+        items(entries) { entry ->
+            when (entry) {
+                is BookshelfShelfEntryUiModel.Book -> BookGridItem(
+                    book = entry.book,
+                    style = style,
+                    gridCellWidth = gridCellWidth,
+                    isUpdating = updatingBookUrls.contains(entry.book.bookUrl),
+                    onBookClick = onBookClick,
+                    onBookLongClick = onBookLongClick
+                )
+                is BookshelfShelfEntryUiModel.Group -> GroupGridItem(
+                    group = entry,
+                    style = style,
+                    gridCellWidth = gridCellWidth,
+                    onGroupClick = onGroupClick,
+                    onGroupLongClick = onGroupLongClick,
+                )
+            }
         }
     }
 }
@@ -588,6 +617,112 @@ private fun ShelfBadge(
             style = EInkTheme.typography.labelSmall,
             color = if (highlight) colors.background else colors.onSurface
         )
+    }
+}
+
+
+/** 用户组网格条目：嵌套封面拼贴磁贴 + 组名（spec D9 2026-10-16 修订，计数在磁贴缺角角标）。 */
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun GroupGridItem(
+    group: BookshelfShelfEntryUiModel.Group,
+    style: BookshelfStyle,
+    gridCellWidth: Dp,
+    onGroupClick: (BookshelfShelfEntryUiModel.Group) -> Unit,
+    onGroupLongClick: (BookshelfShelfEntryUiModel.Group) -> Unit,
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .combinedClickable(
+                onClick = { onGroupClick(group) },
+                onLongClick = { onGroupLongClick(group) },
+            )
+    ) {
+        GroupCollageTile(
+            covers = group.covers,
+            bookCount = group.bookCount,
+            tileWidth = gridCellWidth,
+            tileHeight = gridCellWidth * (EInkCoverHeight / EInkCoverWidth),
+        )
+        // 组名行数限制与书籍条目一致：宿主标题最大行数（1..5），
+        // 最小高同 bookshelfGridTitleHeight 保证同行各列等高
+        val titleStyle = EInkTheme.typography.titleSmall
+        val titleMaxLines = style.titleMaxLines.coerceIn(1, 5)
+        val titleHeight = bookshelfGridTitleHeight(
+            density = LocalDensity.current,
+            lineHeight = titleStyle.lineHeight,
+            maxLines = titleMaxLines,
+        )
+        EInkText(
+            text = group.name,
+            style = titleStyle,
+            textAlign = TextAlign.Center,
+            maxLines = titleMaxLines,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = EInkSpacing.xs)
+                .heightIn(min = titleHeight),
+        )
+    }
+}
+
+/** 用户组列表条目：拼贴磁贴（与封面等高等宽）+ 组名行，整行等高不破坏分页。 */
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun GroupListItem(
+    group: BookshelfShelfEntryUiModel.Group,
+    listCoverWidth: Dp,
+    listCoverHeight: Dp,
+    onGroupClick: (BookshelfShelfEntryUiModel.Group) -> Unit,
+    onGroupLongClick: (BookshelfShelfEntryUiModel.Group) -> Unit,
+) {
+    val colors = EInkTheme.colorScheme
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .combinedClickable(
+                onClick = { onGroupClick(group) },
+                onLongClick = { onGroupLongClick(group) },
+            )
+            .padding(horizontal = EInkSpacing.m, vertical = EInkSpacing.s)
+    ) {
+        GroupCollageTile(
+            covers = group.covers,
+            bookCount = group.bookCount,
+            tileWidth = listCoverWidth,
+            tileHeight = listCoverHeight,
+        )
+        Spacer(modifier = Modifier.width(EInkSpacing.m))
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .height(listCoverHeight)
+                .padding(vertical = EInkSpacing.xxs),
+            verticalArrangement = Arrangement.spacedBy(EInkSpacing.xs, Alignment.CenterVertically),
+        ) {
+            EInkText(
+                text = group.name,
+                style = EInkTheme.typography.titleMedium,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            EInkText(
+                text = "分组",
+                style = EInkTheme.typography.bodyMedium,
+                color = colors.outline,
+            )
+            // 第三、四行：有书「包含：书名…」、无书「未添加书籍」
+            EInkText(
+                text = if (group.covers.isEmpty()) "未添加书籍"
+                else "包含：" + group.covers.joinToString(" · ") { it.name },
+                style = EInkTheme.typography.bodyMedium,
+                color = EInkTheme.colorScheme.onSurfaceVariant,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
     }
 }
 

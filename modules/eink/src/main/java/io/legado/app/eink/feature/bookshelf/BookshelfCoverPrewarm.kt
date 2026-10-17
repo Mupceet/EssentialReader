@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import io.legado.app.eink.contract.BookshelfGroupIds
+import io.legado.app.eink.contract.BookshelfShelfEntryUiModel
 import io.legado.app.eink.contract.BookshelfStyle
 import io.legado.app.eink.contract.EInkEngineRegistry
 import io.legado.app.eink.designsystem.theme.EInkSpacing
@@ -42,38 +43,55 @@ internal suspend fun prewarmFirstScreenCovers(context: Context) {
     // 「使用默认封面」模式下不显示网络封面，预热纯浪费（同 prefetchCovers 门控）
     if (EInkEngineRegistry.globalSettings.useDefaultCover) return
 
-    val engine = EInkEngineRegistry.bookshelfEngine
-    val groupEngine = EInkEngineRegistry.bookshelfGroupEngine
-    val style = engine.style.first()
+    // 尽力而为语义双保险：策展调整后存量筛选值不在精选集内时，桥层
+    // error("非精选筛选器") 不再外溢成 EInkHostActivity 无 try/catch
+    // 协程里的冷启动崩溃——异常 = 回到现状不预热
+    runCatching {
+        val engine = EInkEngineRegistry.bookshelfEngine
+        val groupEngine = EInkEngineRegistry.bookshelfGroupEngine
+        val style = engine.style.first()
 
-    val density = Density(
-        density = context.resources.displayMetrics.density,
-        fontScale = context.resources.configuration.fontScale,
-    )
-    val screenWidthDp = context.resources.configuration.screenWidthDp
-    if (screenWidthDp <= 0) return
+        val density = Density(
+            density = context.resources.displayMetrics.density,
+            fontScale = context.resources.configuration.fontScale,
+        )
+        val screenWidthDp = context.resources.configuration.screenWidthDp
+        if (screenWidthDp <= 0) return@runCatching
 
-    val (widthPx, heightPx) = prewarmCoverTargetSize(style, density, screenWidthDp) ?: return
-    val limit = if (style.isGridLayout) PREWARM_GRID_BOOKS else PREWARM_LIST_BOOKS
+        val (widthPx, heightPx) = prewarmCoverTargetSize(style, density, screenWidthDp)
+            ?: return@runCatching
+        val limit = if (style.isGridLayout) PREWARM_GRID_BOOKS else PREWARM_LIST_BOOKS
 
-    // 书集与 BookshelfViewModel.booksFlow 同口径：选中「全部」走 observeShelf，
-    // 其余走分组端口（未注册分组端口的旧宿主诚实退化为全部书架）
-    val groupId = groupEngine?.selectedGroup?.first() ?: BookshelfGroupIds.ALL
-    val books = if (groupId == BookshelfGroupIds.ALL) {
-        engine.observeShelf().first()
-    } else {
-        groupEngine?.observeGroupBooks(groupId)?.first() ?: engine.observeShelf().first()
+        // 书集与 BookshelfViewModel.entriesFlow 同口径（取 Book 形态，双模式）：
+        // 组视图走分组端口（全组），筛选（含全部）走平铺视图，无筛选走文件夹
+        // 视图（仅未归组书），未注册分组端口的旧宿主诚实退化为全部书架
+        val scopeId = groupEngine?.selectedGroup?.first() ?: BookshelfGroupIds.ALL
+        val filterId = groupEngine?.selectedFilter?.first() ?: BookshelfGroupIds.NONE
+        val books = when {
+            scopeId != BookshelfGroupIds.ALL ->
+                groupEngine?.observeGroupBooks(scopeId)?.first()
+                    ?: engine.observeShelf().first()
+            filterId != BookshelfGroupIds.NONE && groupEngine != null ->
+                groupEngine.observeFilteredShelf(filterId).first()
+                    .filterIsInstance<BookshelfShelfEntryUiModel.Book>()
+                    .map { it.book }
+            groupEngine != null ->
+                groupEngine.observeShelfWithGroups().first()
+                    .filterIsInstance<BookshelfShelfEntryUiModel.Book>()
+                    .map { it.book }
+            else -> engine.observeShelf().first()
+        }
+        if (books.isEmpty()) return@runCatching
+
+        prefetchCovers(
+            context = context,
+            items = books.take(limit),
+            widthPx = widthPx,
+            heightPx = heightPx,
+            coverUrl = { it.coverUrl },
+            sourceOrigin = { it.origin },
+        )
     }
-    if (books.isEmpty()) return
-
-    prefetchCovers(
-        context = context,
-        items = books.take(limit),
-        widthPx = widthPx,
-        heightPx = heightPx,
-        coverUrl = { it.coverUrl },
-        sourceOrigin = { it.origin },
-    )
 }
 
 /**

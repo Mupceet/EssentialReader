@@ -75,4 +75,29 @@ class BookshelfGroupStateTest {
         runCurrent()
         assertEquals(1L, values.last())
     }
+
+    @Test
+    fun `筛选维度复用同一状态机`() = runTest {
+        val saved = MutableStateFlow(BookshelfGroupIds.ALL)
+        val filters = MutableStateFlow(
+            listOf(
+                BookshelfGroupUiModel(BookshelfGroupIds.ALL, "全部", 9),
+                BookshelfGroupUiModel(-20L, "在读", 2),
+            )
+        )
+        val state = BookshelfGroupState(saved, filters, backgroundScope)
+        val values = mutableListOf<Long>()
+        backgroundScope.launch { state.selected.toList(values) }
+
+        state.submit(-20L)
+        runCurrent()
+        saved.value = -20L
+        runCurrent()
+        assertEquals(-20L, values.last())
+
+        // 筛选器被移出精选集（策展调整）→ 回退全部
+        filters.value = listOf(BookshelfGroupUiModel(BookshelfGroupIds.ALL, "全部", 9))
+        runCurrent()
+        assertEquals(BookshelfGroupIds.ALL, values.last())
+    }
 }

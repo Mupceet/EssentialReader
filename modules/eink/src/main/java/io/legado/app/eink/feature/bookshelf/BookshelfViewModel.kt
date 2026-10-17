@@ -5,10 +5,12 @@ import android.os.SystemClock
 import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import io.legado.app.eink.R
 import io.legado.app.eink.arch.UserMessage
 import io.legado.app.eink.contract.BookshelfGroupIds
 import io.legado.app.eink.contract.BookshelfGroupUiModel
 import io.legado.app.eink.contract.BookshelfItemUiModel
+import io.legado.app.eink.contract.BookshelfShelfEntryUiModel
 import io.legado.app.eink.contract.BookshelfStyle
 import io.legado.app.eink.contract.BookshelfTocRefreshResult
 import io.legado.app.eink.contract.EInkEngineRegistry
@@ -30,20 +32,23 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.util.concurrent.atomic.AtomicInteger
+import kotlin.coroutines.cancellation.CancellationException
 import kotlin.math.min
 
 /**
  * 书架屏幕 UiState（扁平布尔标志位，参考 JBusDriver UDF 模式）。
  *
- * [books] 为预抽取的稳定 UiModel（[BookshelfItemUiModel]），条目参数
- * 全稳定类型且数据未变时可跳过重组。
+ * [entries] 为预抽取的稳定条目（[BookshelfShelfEntryUiModel]，书籍与
+ * 用户组聚合两形态），条目参数全稳定类型且数据未变时可跳过重组。
  */
 data class BookshelfUiState(
-    val books: List<BookshelfItemUiModel> = emptyList(),
+    /** 顶层混合条目（组条目置顶 + 书籍）；组视图为纯书籍条目。 */
+    val entries: List<BookshelfShelfEntryUiModel> = emptyList(),
     val isLoading: Boolean = true,
     /** 目录刷新进行中（首页头部刷新按钮禁用并置灰） */
     val isRefreshing: Boolean = false,
@@ -55,17 +60,43 @@ data class BookshelfUiState(
     /** 书架显示样式快照（宿主设置投影，实时档）。 */
     val style: BookshelfStyle = BookshelfStyle(),
 
-    /** 分组选择模型（未注册分组端口时恒空，选择器不渲染）。 */
-    val groups: List<BookshelfGroupUiModel> = emptyList(),
+    /** 精选筛选器列表（筛选面板数据源）。 */
+    val filters: List<BookshelfGroupUiModel> = emptyList(),
 
-    /** 当前选中分组（[BookshelfGroupIds.ALL] = 全部平铺）。 */
-    val selectedGroupId: Long = BookshelfGroupIds.ALL,
+    /** 当前筛选（ALL = 无筛选）。 */
+    val selectedFilterId: Long = BookshelfGroupIds.ALL,
 
-    /** 分组端口已注册（选择器可渲染）；false 时书架维持现状平铺。 */
-    val groupSelectorAvailable: Boolean = false,
+    /** 当前范围（ALL = 顶层；用户组 id = 组视图）。 */
+    val selectedScopeId: Long = BookshelfGroupIds.ALL,
+
+    /** 组视图时顶栏标题显示的组名；顶层为 null。 */
+    val scopeGroupName: String? = null,
+
+    /** 用户组全量（长按菜单边界/范围回退参考；不做空组门控）。 */
+    val userGroups: List<BookshelfGroupUiModel> = emptyList(),
+
+    /** 筛选端口已注册（筛选入口可渲染）；false 时书架维持现状平铺。 */
+    val filterSelectorAvailable: Boolean = false,
+
+    /** 管理筛选器面板数据（全量系统筛选器，含隐藏；P4）。 */
+    val manageableFilters: List<BookshelfGroupUiModel> = emptyList(),
+
+    /** 归组面板目标书（null = 面板关闭）；P1。 */
+    val assignBook: BookshelfItemUiModel? = null,
+    /** 归组面板当前勾选集（用户组 id；乐观覆盖 + 回流对账）。 */
+    val assignMembership: Set<Long> = emptySet(),
 ) {
-    val isEmpty: Boolean get() = books.isEmpty() && !isLoading
+    val isEmpty: Boolean get() = entries.isEmpty() && !isLoading
 }
+
+/** 范围 × 筛选双轴选择快照（uiState combine 第三支的五元合并载体）。 */
+private data class ShelfSelection(
+    val userGroups: List<BookshelfGroupUiModel>,
+    val scope: Long,
+    val filters: List<BookshelfGroupUiModel>,
+    val filter: Long,
+    val manageableFilters: List<BookshelfGroupUiModel>,
+)
 
 /**
  * 书架 ViewModel。
@@ -102,28 +133,95 @@ class BookshelfViewModel(application: Application) : AndroidViewModel(applicatio
     // 书架维持现状平铺（诚实退化，不伪造空分组）
     private val groupEngine get() = EInkEngineRegistry.bookshelfGroupEngine
 
-    /** 分组状态宿主（列表 + 选中乐观覆盖，见 [BookshelfGroupState]）。 */
+    /** 筛选状态宿主（精选筛选器列表 + 选中乐观覆盖，复用 [BookshelfGroupState]）。 */
+    internal val filterState = BookshelfGroupState(
+        savedSelected = groupEngine?.selectedFilter
+            ?: flowOf(BookshelfGroupIds.NONE),
+        groupsFlow = groupEngine?.observeFilters()
+            ?: flowOf(emptyList()),
+        scope = viewModelScope,
+        fallbackId = BookshelfGroupIds.NONE,
+    )
+
+    /** 范围状态宿主（用户组列表 + 选中乐观覆盖 + 失联回退全部）。 */
     internal val groupState = BookshelfGroupState(
         savedSelected = groupEngine?.selectedGroup
             ?: flowOf(BookshelfGroupIds.ALL),
-        groupsFlow = groupEngine?.observeGroups()
+        groupsFlow = groupEngine?.observeUserGroups()
             ?: flowOf(emptyList()),
         scope = viewModelScope,
     )
 
-    // 组内书流：选中「全部」走现状 observeShelf 路径（零行为变化）；
-    // 其余值（含未分组 -100、用户组）走分组端口。distinctUntilChanged
-    // 防止选中流重发同值导致 Room 重订阅
+    /** 归组面板状态：目标书 + 成员集（宿主流 + 乐观覆盖，目标书切换即重订）。
+     *  组列表不另起流，直接复用 [BookshelfGroupState.groups]（userGroups）。 */
+    private val assignState = MutableStateFlow<BookshelfItemUiModel?>(null)
+    private val assignOverride = MutableStateFlow<Set<Long>?>(null)
+
+    /**
+     * 宿主成员集真值快照：toggle/建组的覆盖种子回退源。不取
+     * [uiState] 值——它经多重 combine + stateIn 传播，openAssign 切换
+     * 目标书后到 Room 首次回流之间存在陈旧窗口（空/上一书真值），
+     * 此时点首个勾选会把错误集合写成永久覆盖（回流真值永不追平）。
+     * 本快照由 init 收集器距 Room 一跳同步维护；openAssign 切换目标书
+     * 时同步清空，避免上一书真值成为下一书种子。
+     */
+    private val assignSavedLatest = MutableStateFlow<Set<Long>>(emptySet())
+
     @OptIn(ExperimentalCoroutinesApi::class)
-    private val booksFlow = groupState.selected
-        .distinctUntilChanged()
-        .flatMapLatest { groupId ->
-            if (groupId == BookshelfGroupIds.ALL) {
-                engine.observeShelf()
-            } else {
-                groupEngine?.observeGroupBooks(groupId) ?: engine.observeShelf()
+    private val assignSavedFlow = assignState
+        .flatMapLatest { book ->
+            book?.let { groupEngine?.observeBookGroupMembership(it.bookUrl) } ?: flowOf(emptySet())
+        }
+
+    private val assignMembershipFlow =
+        assignSavedFlow.combine(assignOverride) { saved, override -> override ?: saved }
+
+    init {
+        // 乐观覆盖追平清除：宿主回流追平覆盖值时清空覆盖，此后直通宿主流
+        //（镜像 [BookshelfGroupState] 的追平清除）
+        viewModelScope.launch {
+            assignSavedFlow.collect { saved ->
+                assignSavedLatest.value = saved
+                if (assignOverride.value == saved) assignOverride.value = null
             }
         }
+    }
+
+    // 内容条目流：范围 × 筛选双轴驱动——组视图（scope != ALL）走
+    // observeGroupBooks（筛选继承作用于组内容）；顶层有分组端口走
+    // observeShelfWithGroups（组条目置顶 + 书籍的混合条目）；未注册
+    // 分组端口的旧宿主诚实退化为 observeShelf 纯书籍。distinctUntilChanged
+    // 防止选中流重发同值导致 Room 重订阅
+    @OptIn(ExperimentalCoroutinesApi::class)
+    private val entriesFlow = combine(
+        groupState.selected,
+        filterState.selected,
+        // 分组展示支持（默认关）：关 = 组视图/文件夹视图不可达
+        styleState.style.map { it.groupsEnabled }.distinctUntilChanged(),
+    ) { scope, filter, groupsEnabled ->
+        Triple(scope, filter, groupsEnabled)
+    }.distinctUntilChanged().flatMapLatest { (scope, filter, groupsEnabled) ->
+        // getter 端口快照（注册状态在流生命周期内不变；局部 val 同时
+        // 解锁 when 分支内的智能转换）
+        val groupEngine = groupEngine
+        when {
+            groupsEnabled && scope != BookshelfGroupIds.ALL ->
+                (groupEngine?.observeGroupBooks(scope) ?: engine.observeShelf())
+                    .map { list -> list.map { BookshelfShelfEntryUiModel.Book(it) } }
+            // 双模式（spec 2026-10-16）：无筛选 = 文件夹视图（分组条目 +
+            // 未归组书）；任何筛选（含全部）= 平铺视图（全量匹配书单）
+            filter != BookshelfGroupIds.NONE && groupEngine != null ->
+                groupEngine.observeFilteredShelf(filter)
+                    .map { list -> list as List<BookshelfShelfEntryUiModel> }
+            // 分组关闭（或防御性 NONE+关）：恒平铺——落「全部」
+            !groupsEnabled && groupEngine != null ->
+                groupEngine.observeFilteredShelf(BookshelfGroupIds.ALL)
+                    .map { list -> list as List<BookshelfShelfEntryUiModel> }
+            groupEngine != null -> groupEngine.observeShelfWithGroups()
+            else -> engine.observeShelf()
+                .map { list -> list.map { BookshelfShelfEntryUiModel.Book(it) } }
+        }
+    }
 
     // notShelf 行已在宿主查询内过滤，并由宿主物理删除；此处
     // 直接使用查询结果，与 View 版保持一致。
@@ -133,26 +231,40 @@ class BookshelfViewModel(application: Application) : AndroidViewModel(applicatio
     // 此处直接并入 UiState。
     val uiState: StateFlow<BookshelfUiState> =
         combine(
-            combine(booksFlow, _isRefreshing, _updatingUrls) { books, refreshing, updating ->
-                Triple(books, refreshing, updating)
+            combine(entriesFlow, _isRefreshing, _updatingUrls) { entries, refreshing, updating ->
+                Triple(entries, refreshing, updating)
             },
             styleState.style,
-            combine(groupState.groups, groupState.selected) { groups, selected ->
-                groups to selected
+            combine(
+                groupState.groups, groupState.selected,
+                filterState.groups, filterState.selected,
+                groupEngine?.observeManageableFilters()
+                    ?: flowOf(emptyList()),
+            ) { userGroups, scope, filters, filter, manageable ->
+                ShelfSelection(userGroups, scope, filters, filter, manageable)
             },
-        ) { frame, style, selection ->
-            val (books, refreshing, updatingUrls) = frame
-            val (groups, selectedGroupId) = selection
+            assignState,
+            assignMembershipFlow,
+        ) { frame, style, selection, assignBook, membership ->
+            val (frameEntries, refreshing, updatingUrls) = frame
             BookshelfUiState(
-                books = books,
+                entries = frameEntries,
                 isLoading = false,
                 isRefreshing = refreshing,
                 updatingBookUrls = updatingUrls,
                 isGridLayout = style.isGridLayout,
                 style = style,
-                groups = groups,
-                selectedGroupId = selectedGroupId,
-                groupSelectorAvailable = groupEngine != null,
+                filters = if (style.groupsEnabled) selection.filters
+                else selection.filters.filterNot { it.groupId == BookshelfGroupIds.NONE },
+                selectedFilterId = selection.filter,
+                selectedScopeId = selection.scope,
+                scopeGroupName = selection.userGroups
+                    .firstOrNull { it.groupId == selection.scope }?.name,
+                userGroups = selection.userGroups,
+                filterSelectorAvailable = groupEngine != null,
+                manageableFilters = selection.manageableFilters,
+                assignBook = assignBook,
+                assignMembership = membership,
             )
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), BookshelfUiState())
 
@@ -165,10 +277,160 @@ class BookshelfViewModel(application: Application) : AndroidViewModel(applicatio
         viewModelScope.launch { engine.setStyle(style) }
     }
 
-    /** 切换分组：乐观置选中，宿主 saveTabPosition 异步落库。 */
-    fun selectGroup(groupId: Long) {
+    /** 切换筛选（仅顶层入口可达；乐观置覆盖，筛选与范围=ALL 一并落库——
+     *  选筛选即当前视图为平铺，冷启动按此恢复）。 */
+    fun selectFilter(filterId: Long) {
+        filterState.submit(filterId)
+        viewModelScope.launch {
+            groupEngine?.setSelectedFilter(filterId)
+            groupEngine?.setSelectedGroup(BookshelfGroupIds.ALL)
+        }
+    }
+
+    /** 打开归组面板（长按书菜单「加入分组」）。 */
+    fun openAssign(book: BookshelfItemUiModel) {
+        assignState.value = book
+        assignOverride.value = null
+        assignSavedLatest.value = emptySet()
+    }
+
+    fun closeAssign() {
+        assignState.value = null
+        assignOverride.value = null
+    }
+
+    /** 当前生效成员集（覆盖优先，回退宿主真值快照）——toggle/建组的覆盖种子统一取全集。 */
+    private fun currentAssignMembership(): Set<Long> =
+        assignOverride.value ?: assignSavedLatest.value
+
+    /** 勾/取消勾一个组：乐观置覆盖，宿主位掩码异步落库。 */
+    fun toggleAssignMembership(groupId: Long, member: Boolean) {
+        val book = assignState.value ?: return
+        assignOverride.value = currentAssignMembership()
+            .let { if (member) it + groupId else it - groupId }
+        viewModelScope.launch {
+            try {
+                groupEngine?.setBookGroupMembership(book.bookUrl, groupId, member)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                _messages.emit(UserMessage.from(R.string.eink_group_operation_failed))
+            }
+        }
+    }
+
+    /** 新建分组并立即勾选当前书（归组面板顶部行）。 */
+    fun createGroupAndAssign(name: String) {
+        val book = assignState.value ?: return
+        viewModelScope.launch {
+            try {
+                val newId = groupEngine?.createGroup(name) ?: return@launch
+                groupEngine?.setBookGroupMembership(book.bookUrl, newId, true)
+                assignOverride.value = currentAssignMembership() + newId
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: IllegalArgumentException) {
+                _messages.emit(UserMessage.from(R.string.eink_group_name_exists))
+            } catch (e: IllegalStateException) {
+                _messages.emit(UserMessage.from(R.string.eink_group_limit_reached))
+            } catch (e: Exception) {
+                _messages.emit(UserMessage.from(R.string.eink_group_operation_failed))
+            }
+        }
+    }
+
+    /** 进入组视图（聚合条目点击）。 */
+    fun enterGroup(groupId: Long) {
         groupState.submit(groupId)
         viewModelScope.launch { groupEngine?.setSelectedGroup(groupId) }
+    }
+
+    /** 退出组视图（点击顶栏分组名）：乐观置覆盖并落库 saveTabPosition=ALL——
+     *  当前视图即记录，冷启动按退出后的状态恢复。 */
+    fun exitGroup() {
+        groupState.submit(BookshelfGroupIds.ALL)
+        viewModelScope.launch { groupEngine?.setSelectedGroup(BookshelfGroupIds.ALL) }
+    }
+
+    /** 长按条目管理：重命名（IAE=重名/空名，toast 反馈；Room 回流驱动 UI 更新）。 */
+    fun renameGroup(groupId: Long, name: String) {
+        viewModelScope.launch {
+            try {
+                groupEngine?.renameGroup(groupId, name)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: IllegalArgumentException) {
+                _messages.emit(UserMessage.from(R.string.eink_group_name_exists))
+            } catch (e: Exception) {
+                _messages.emit(UserMessage.from(R.string.eink_group_operation_failed))
+            }
+        }
+    }
+
+    /** 排序面板退出：一次性提交用户组新序（面板本地已连续换位，此处整表落库）。 */
+    fun applyGroupAdjustments(orderedGroupIds: List<Long>, shownGroupIds: Set<Long>) {
+        viewModelScope.launch {
+            try {
+                groupEngine?.applyGroupAdjustments(orderedGroupIds, shownGroupIds)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                _messages.emit(UserMessage.from(R.string.eink_group_operation_failed))
+            }
+        }
+    }
+
+    /**
+     * 分组展示支持开关（样式面板首项）。过渡语义：开→默认选中「无筛选」
+     * （文件夹视图）；关→若当前为无筛选则默认选中第一项筛选（平铺）。
+     */
+    fun setGroupsEnabled(enabled: Boolean) {
+        val currentStyle = uiState.value.style
+        styleState.submit(currentStyle.copy(groupsEnabled = enabled))
+        viewModelScope.launch {
+            engine.setStyle(currentStyle.copy(groupsEnabled = enabled))
+            if (enabled) {
+                selectFilter(BookshelfGroupIds.NONE)
+            } else if (uiState.value.selectedFilterId == BookshelfGroupIds.NONE) {
+                val first = uiState.value.filters
+                    .firstOrNull { it.groupId != BookshelfGroupIds.NONE }?.groupId
+                    ?: BookshelfGroupIds.ALL
+                selectFilter(first)
+            }
+        }
+    }
+
+    /** 调整面板守卫提示：最后一项显示中的条目不可隐藏。 */
+    fun notifyLastShownGuard() {
+        viewModelScope.launch {
+            _messages.emit(UserMessage.from(R.string.eink_group_keep_last_shown))
+        }
+    }
+
+    /** 管理筛选器面板退出：一次性提交系统筛选器新序与显隐集。 */
+    fun applyFilterAdjustments(orderedFilterIds: List<Long>, shownFilterIds: Set<Long>) {
+        viewModelScope.launch {
+            try {
+                groupEngine?.applyFilterAdjustments(orderedFilterIds, shownFilterIds)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                _messages.emit(UserMessage.from(R.string.eink_group_operation_failed))
+            }
+        }
+    }
+
+    /** 长按条目管理：解散（书籍保留仅清位；Room 回流移除组条目）。 */
+    fun dissolveGroup(groupId: Long) {
+        viewModelScope.launch {
+            try {
+                groupEngine?.dissolveGroup(groupId)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                _messages.emit(UserMessage.from(R.string.eink_group_operation_failed))
+            }
+        }
     }
 
     private var refreshJob: Job? = null

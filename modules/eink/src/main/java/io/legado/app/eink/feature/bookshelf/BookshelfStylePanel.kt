@@ -45,6 +45,8 @@ private val BookshelfBottomBarInset = 57.dp
 fun BookshelfStylePanel(
     style: BookshelfStyle,
     onStyleChange: (BookshelfStyle) -> Unit,
+    onGroupsEnabledChange: (Boolean) -> Unit,
+    showGroupsToggle: Boolean,
     onDismiss: () -> Unit,
 ) {
     BoxWithConstraints(
@@ -95,6 +97,13 @@ fun BookshelfStylePanel(
                     .heightIn(max = maxContentHeight)
                     .padding(horizontal = EInkSpacing.m, vertical = EInkSpacing.s),
             ) {
+                // 首项：支持分组展示（仅在筛选视图显示——分组展示态（无筛选/
+                // 组视图）不显示本项，避免就地撕裂当前视图的交互）
+                if (showGroupsToggle) {
+                    ChoiceRow("支持分组展示", style.groupsEnabled, onText = "开启", offText = "关闭") { target ->
+                        onGroupsEnabledChange(target)
+                    }
+                }
                 ChoiceRow("书架布局", style.isGridLayout, onText = "网格", offText = "列表") { target ->
                     onStyleChange(style.copy(isGridLayout = target))
                 }
@@ -135,9 +144,9 @@ fun BookshelfStylePanel(
 }
 
 /**
- * 二选一配置行（面板统一行形态）：标签 + 双枚 64×44dp 按钮并排，
- * 选中态实心反白（[EInkButton.selected]），按钮文案随态固定
- * （[onText]/[offText]，如 显示/隐藏、网格/列表）；同值点击不提交。
+ * 二选一配置行（2026-10-17 统一）：标签 + [EInkSegmentedButton]
+ * 多状态组合按钮（轨道相连两端圆角、选中圆角矩形实心高亮）；
+ * 同值点击不提交。
  */
 @Composable
 private fun ChoiceRow(
@@ -159,19 +168,11 @@ private fun ChoiceRow(
             style = EInkTheme.typography.bodyMedium,
             modifier = Modifier.weight(1f),
         )
-        EInkButton(
-            text = onText,
-            selected = checked,
-            onClick = { if (!checked) onSelect(true) },
-            modifier = Modifier.width(64.dp),
-            height = 44.dp,
-        )
-        EInkButton(
-            text = offText,
-            selected = !checked,
-            onClick = { if (checked) onSelect(false) },
-            modifier = Modifier.width(64.dp),
-            height = 44.dp,
+        io.legado.app.eink.designsystem.control.EInkSegmentedButton(
+            options = listOf(onText, offText),
+            selectedIndex = if (checked) 0 else 1,
+            onSelect = { index -> onSelect(index == 0) },
+            modifier = Modifier.width(128.dp),
         )
     }
 }

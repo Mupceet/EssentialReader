@@ -5,6 +5,10 @@
     <string name="eink_book_not_found">未找到书籍</string>
     <string name="eink_operation_failed">操作失败</string>
     <string name="eink_removed_from_bookshelf">已移出书架</string>
+    <string name="eink_group_name_exists">已有同名分组</string>
+    <string name="eink_group_keep_last_shown">至少保留一项显示</string>
+    <string name="eink_group_limit_reached">分组数量已达上限</string>
+    <string name="eink_group_operation_failed">分组操作失败，请重试</string>
     <string name="eink_reader_auto_page_end">已是最后一页，自动翻页已停止</string>
     <string name="eink_reader_cache_started">开始缓存章节</string>
     <string name="eink_reader_local_no_cache">本地书籍无需缓存</string>

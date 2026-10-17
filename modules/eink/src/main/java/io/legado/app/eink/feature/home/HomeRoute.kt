@@ -1,5 +1,7 @@
 package io.legado.app.eink.feature.home
 
+import android.widget.Toast
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -29,6 +31,7 @@ import io.legado.app.eink.R
 import io.legado.app.eink.app.EInkAppUpdateViewModel
 import io.legado.app.eink.contract.BookshelfGroupIds
 import io.legado.app.eink.contract.BookshelfItemUiModel
+import io.legado.app.eink.contract.BookshelfShelfEntryUiModel
 import io.legado.app.eink.designsystem.control.EInkSearchHintBar
 import io.legado.app.eink.designsystem.navigation.EInkOperationBar
 import io.legado.app.eink.designsystem.navigation.EInkOperationBarIcon
@@ -42,11 +45,17 @@ import io.legado.app.eink.designsystem.refresh.EInkRefreshIntent
 import io.legado.app.eink.designsystem.refresh.LocalEInkRefreshController
 import io.legado.app.eink.designsystem.theme.EInkSpacing
 import io.legado.app.eink.designsystem.theme.EInkTheme
+import io.legado.app.eink.feature.bookshelf.BookAssignPanel
+import io.legado.app.eink.feature.bookshelf.BookContextMenu
 import io.legado.app.eink.feature.bookshelf.BookshelfScreen
 import io.legado.app.eink.feature.bookshelf.BookshelfStylePanel
 import io.legado.app.eink.feature.bookshelf.BookshelfViewModel
-import io.legado.app.eink.feature.bookshelf.ShelfGroupChip
-import io.legado.app.eink.feature.bookshelf.ShelfSelectorPanel
+import io.legado.app.eink.feature.bookshelf.ADJUST_PAGE_SIZE_FALLBACK
+import io.legado.app.eink.feature.bookshelf.FilterMenuAction
+import io.legado.app.eink.feature.bookshelf.FilterAdjustPanel
+import io.legado.app.eink.feature.bookshelf.ShelfFilterMenu
+import io.legado.app.eink.feature.bookshelf.GroupAdjustPanel
+import io.legado.app.eink.feature.bookshelf.ShelfGroupEntryDialogs
 import io.legado.app.eink.feature.bookshelf.adaptiveGridColumns
 import io.legado.app.eink.feature.bookshelf.bookshelfGridCellWidth
 import io.legado.app.eink.feature.bookshelf.bookshelfListRowHeight
@@ -105,6 +114,14 @@ internal fun HomeRoute(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
+    // 一次性消息 → Toast（分组管理操作失败反馈；与 BookDetailRoute 等同一消费模式）
+    val context = LocalContext.current
+    LaunchedEffect(viewModel) {
+        viewModel.messages.collect { msg ->
+            Toast.makeText(context, msg.format(context), Toast.LENGTH_SHORT).show()
+        }
+    }
+
     // 分页几何键（旋转/分屏改变列数或行高）：变化后书架分页状态整体重建，
     // 页首回第一页并按新布局重新实测页项数
     val orientation = LocalConfiguration.current.orientation
@@ -117,9 +134,30 @@ internal fun HomeRoute(
     // 书架界面在场的这段时间，离开首页即收起，返回不复活
     var showStylePanel by remember { mutableStateOf(false) }
 
-    // 书架分组选择器显隐（UI 局部状态，同 showStylePanel 纪律：
-    // 不随导航栈保存，切 Tab/离开首页即收起）
-    var showGroupSelector by remember { mutableStateOf(false) }
+    // 书架筛选面板显隐（UI 局部状态，同 showStylePanel 纪律：
+    // 筛选下拉/管理筛选器面板显隐（同面板纪律：不随导航栈保存）
+    var showFilterMenu by remember { mutableStateOf(false) }
+    var showFilterManage by remember { mutableStateOf(false) }
+    // 两个底部调整面板页索引（底部操作栏 ▲▼ 驱动；打开时归零/定位）
+    var filterManagePage by remember { mutableIntStateOf(0) }
+    var groupAdjustPage by remember { mutableIntStateOf(0) }
+    // 底部调整面板每页行数：根 BoxWithConstraints 内按内容区高度更新
+    //（箭头槽与对话框回调在其作用域外，经本状态读取）
+    val adjustPageSizeState = remember { mutableIntStateOf(ADJUST_PAGE_SIZE_FALLBACK) }
+
+    // 条目长按菜单三态（UI 局部状态，同面板纪律：不随导航栈保存）
+    var menuGroup by remember { mutableStateOf<BookshelfShelfEntryUiModel.Group?>(null) }
+    var renamingGroup by remember { mutableStateOf<BookshelfShelfEntryUiModel.Group?>(null) }
+    var dissolvingGroup by remember { mutableStateOf<BookshelfShelfEntryUiModel.Group?>(null) }
+
+    // 分组排序面板（UI 局部状态，同面板纪律）：非空 = 打开，打开时定位到
+    // 该组所在页；退出经面板回调一次性提交新序（无变则零落库）
+    var sortPanel by remember { mutableStateOf<BookshelfShelfEntryUiModel.Group?>(null) }
+
+    // 长按书菜单（UI 局部状态，同面板纪律；归组面板显隐由 VM assignBook 驱动）
+    var menuBook by remember { mutableStateOf<BookshelfItemUiModel?>(null) }
+    var creatingGroup by remember { mutableStateOf(false) }
+
 
     // 列表封面尺寸单点解析（同网格格宽约定：显示与预取共用同一 Dp 值，
     // 封面缓存键逐字节一致）：行高取基础封面高与字体缩放下文字实需高的
@@ -142,22 +180,26 @@ internal fun HomeRoute(
     // 列表与网格各一套状态，切换布局后各自停在离开时的页。
     // 行高是列表分页几何键（行高随字体缩放伸缩，不再恒定）：改变后
     // 分页状态重建、页首回第一页并按新行高重新实测页项数
-    // 选中分组同入几何键：切组即换书集，分页状态重建回第一页
-    val listPager = rememberEInkListPagerState(orientation, listCoverHeight, uiState.selectedGroupId)
+    // 范围与筛选同入几何键：切组或切筛选即换书集，分页状态重建回第一页
+    val listPager = rememberEInkListPagerState(
+        orientation, listCoverHeight,
+        uiState.selectedScopeId, uiState.selectedFilterId,
+    )
     // 标题最大行数与封面宽都改变网格条目几何（行高/列数），必须重建并
     // 重测页项数；对齐只改文字位置，不影响几何，不入键
     val gridPager = rememberEInkGridPagerState(
         orientation,
         uiState.style.gridCoverWidth,
         uiState.style.titleMaxLines,
-        uiState.selectedGroupId,
+        uiState.selectedScopeId,
+        uiState.selectedFilterId,
     )
     val pager: EInkPageController = if (uiState.isGridLayout) gridPager else listPager
     // 「我的」页独立分页状态（条目整页翻页，对齐书架约定；行高与方向
     // 无关，保持无参——不作为几何键）
     val minePager = rememberEInkListPagerState()
     val scope = rememberCoroutineScope()
-    val totalBooks = uiState.books.size
+    val totalBooks = uiState.entries.size
 
     // 翻页动作：底部操作栏 ▲▼ 与列表/网格滑动手势共用（固定页项数，零动画整页跳转）。
     // remember 稳定实例：下传后接收方（BookshelfScreen / 分页输入）不因
@@ -198,8 +240,8 @@ internal fun HomeRoute(
     // 保存恢复，从阅读页/搜索页返回时恢复离开时的 pageStart（不回
     // 第一页），本 realign 负责把恢复的滚动位置对齐到该页首；
     // 布局切换也走此处（对新分页状态对齐，未测量前 no-op）
-    LaunchedEffect(uiState.books, uiState.isGridLayout) {
-        pager.realignToPageStart(uiState.books.size)
+    LaunchedEffect(uiState.entries, uiState.isGridLayout) {
+        pager.realignToPageStart(uiState.entries.size)
     }
 
     // 预取所需 Context 与 Density（Route 作用域取一次，effect 内不重复解析）
@@ -213,15 +255,35 @@ internal fun HomeRoute(
     // 分页（条目未满一页时两箭头同样置灰）
     val pageArrows: @Composable () -> Unit = {
         val isBookshelfTab = selectedTab == HomeTabs.BOOKSHELF
-        val activePager: EInkPageController = if (isBookshelfTab) pager else minePager
-        val activeTotal = if (isBookshelfTab) totalBooks
-        else minePager.listState.layoutInfo.totalItemsCount
-        EInkPageArrows(
-            pageUpEnabled = activePager.canPageUp(),
-            pageDownEnabled = activePager.canPageDown(activeTotal),
-            onPageUp = { if (isBookshelfTab) pageUp() else minePageUp() },
-            onPageDown = { if (isBookshelfTab) pageDown() else minePageDown() }
-        )
+        if (isBookshelfTab && showFilterManage) {
+            // 调整筛选器面板在场：底部箭头翻面板页（书架分页不动）
+            val pageCount = (uiState.manageableFilters.size + adjustPageSizeState.intValue - 1) / adjustPageSizeState.intValue
+            EInkPageArrows(
+                pageUpEnabled = filterManagePage > 0,
+                pageDownEnabled = filterManagePage < pageCount - 1,
+                onPageUp = { if (filterManagePage > 0) filterManagePage -= 1 },
+                onPageDown = { if (filterManagePage < pageCount - 1) filterManagePage += 1 },
+            )
+        } else if (isBookshelfTab && sortPanel != null) {
+            // 调整分组面板在场：同款底部翻页
+            val pageCount = (uiState.userGroups.size + adjustPageSizeState.intValue - 1) / adjustPageSizeState.intValue
+            EInkPageArrows(
+                pageUpEnabled = groupAdjustPage > 0,
+                pageDownEnabled = groupAdjustPage < pageCount - 1,
+                onPageUp = { if (groupAdjustPage > 0) groupAdjustPage -= 1 },
+                onPageDown = { if (groupAdjustPage < pageCount - 1) groupAdjustPage += 1 },
+            )
+        } else {
+            val activePager: EInkPageController = if (isBookshelfTab) pager else minePager
+            val activeTotal = if (isBookshelfTab) totalBooks
+            else minePager.listState.layoutInfo.totalItemsCount
+            EInkPageArrows(
+                pageUpEnabled = activePager.canPageUp(),
+                pageDownEnabled = activePager.canPageDown(activeTotal),
+                onPageUp = { if (isBookshelfTab) pageUp() else minePageUp() },
+                onPageDown = { if (isBookshelfTab) pageDown() else minePageDown() }
+            )
+        }
     }
 
     // 格宽单点解析：显示（BookshelfScreen）与预取共用同一 Dp，封面缓存
@@ -233,7 +295,7 @@ internal fun HomeRoute(
 
         // 封面预取：当前页落定后预热下一页封面进内存缓存。加格宽/列表
         // 行高键：列数/屏宽/字体缩放变化时按新尺寸重新预热
-        LaunchedEffect(uiState.books, uiState.isGridLayout, gridCellWidth, listCoverHeight) {
+        LaunchedEffect(uiState.entries, uiState.isGridLayout, gridCellWidth, listCoverHeight) {
             val activePager = if (uiState.isGridLayout) gridPager else listPager
             // 与显示严格同源：网格用 bookshelfGridCellWidth、列表用
             // bookshelfListRowHeight 的同一 Dp 值（coverTargetSizePx 单点
@@ -252,9 +314,15 @@ internal fun HomeRoute(
                     val start = page.first
                     val pageSize = page.second
                     if (pageSize <= 0) return@collect
+                    // 混合条目只预取书籍封面：组磁贴封面不在翻页预取口径内
+                    //（组视图内容为纯书籍条目，不受影响），书籍预取管线保持不变
+                    val pageItems = uiState.entries
+                        .drop(start + pageSize).take(pageSize)
+                        .filterIsInstance<BookshelfShelfEntryUiModel.Book>()
+                        .map { it.book }
                     prefetchCovers(
                         context = prefetchContext,
-                        items = uiState.books.drop(start + pageSize).take(pageSize),
+                        items = pageItems,
                         widthPx = coverWidthPx,
                         heightPx = coverHeightPx,
                         coverUrl = { it.coverUrl },
@@ -269,39 +337,111 @@ internal fun HomeRoute(
                 // 面板仅属于书架界面：切到「我的」即收起（底部操作条在面板
                 // 点击层之外，Tab 切换是面板打开期间唯一可达的其它界面）
                 if (selectedTab != target) {
+                    // 面板仅属于书架界面：切 Tab 全量收起（样式/筛选/两调整
+                    // 面板/长按菜单与输入弹框/归组面板，与样式面板同纪律）
                     showStylePanel = false
-                    showGroupSelector = false
+                    showFilterMenu = false
+                    showFilterManage = false
+                    sortPanel = null
+                    creatingGroup = false
+                    menuBook = null
+                    menuGroup = null
+                    renamingGroup = null
+                    dissolvingGroup = null
+                    viewModel.closeAssign()
                 }
                 selectedTab = target
             },
-            headerTitle = HomeTabLabels[selectedTab],
-            titleTrailing = if (selectedTab == HomeTabs.BOOKSHELF && uiState.groupSelectorAvailable) {
-                {
-                    val groupName = uiState.groups
-                        .firstOrNull { it.groupId == uiState.selectedGroupId }?.name ?: "全部"
-                    ShelfGroupChip(
-                        text = groupName,
-                        expanded = showGroupSelector,
-                        onClick = { showGroupSelector = !showGroupSelector },
-                    )
-                }
+            headerTitle = if (selectedTab == HomeTabs.BOOKSHELF) {
+                uiState.scopeGroupName ?: HomeTabLabels[selectedTab]
+            } else {
+                HomeTabLabels[selectedTab]
+            },
+            // 组视图：点击顶栏分组名退到顶层（会话级，所选分组记录保留）
+            onTitleClick = if (
+                selectedTab == HomeTabs.BOOKSHELF &&
+                uiState.selectedScopeId != BookshelfGroupIds.ALL
+            ) {
+                { viewModel.exitGroup() }
             } else {
                 null
             },
             contentOverlay = {
-                if (showGroupSelector) {
-                    ShelfSelectorPanel(
-                        groups = uiState.groups,
-                        selectedGroupId = uiState.selectedGroupId,
-                        onSelectGroup = viewModel::selectGroup,
-                        onDismiss = { showGroupSelector = false },
+                // 底部调整面板挂内容区（不盖底部操作栏——▲▼ 承担面板翻页）；
+                // 顶栏侧不共存由各入口的全量互斥状态保证（点其他入口即关面板）
+                if (sortPanel != null && selectedTab == HomeTabs.BOOKSHELF &&
+                    uiState.userGroups.isNotEmpty()
+                ) {
+                    GroupAdjustPanel(
+                        groups = uiState.userGroups,
+                        pageSize = adjustPageSizeState.intValue,
+                        pageIndex = groupAdjustPage,
+                        onPageSizeMeasured = { adjustPageSizeState.intValue = it },
+                        onApplyAdjustments = viewModel::applyGroupAdjustments,
+                        onHideBlocked = viewModel::notifyLastShownGuard,
+                        onDismiss = { sortPanel = null },
+                    )
+                }
+                if (showFilterManage && selectedTab == HomeTabs.BOOKSHELF &&
+                    uiState.manageableFilters.isNotEmpty()
+                ) {
+                    FilterAdjustPanel(
+                        filters = uiState.manageableFilters,
+                        pageSize = adjustPageSizeState.intValue,
+                        pageIndex = filterManagePage,
+                        onPageSizeMeasured = { adjustPageSizeState.intValue = it },
+                        onApplyAdjustments = viewModel::applyFilterAdjustments,
+                        onHideBlocked = viewModel::notifyLastShownGuard,
+                        onDismiss = { showFilterManage = false },
+                    )
+                }
+                if (showFilterMenu && selectedTab == HomeTabs.BOOKSHELF &&
+                    uiState.selectedScopeId == BookshelfGroupIds.ALL
+                ) {
+                    ShelfFilterMenu(
+                        filters = uiState.filters,
+                        selectedFilterId = uiState.selectedFilterId,
+                        onSelectFilter = viewModel::selectFilter,
+                        onOpenManage = {
+                            showStylePanel = false
+                            sortPanel = null
+                            filterManagePage = 0
+                            showFilterManage = true
+                        },
+                        onDismiss = { showFilterMenu = false },
                     )
                 }
             },
             showRefresh = selectedTab == HomeTabs.BOOKSHELF,
             isRefreshing = uiState.isRefreshing,
             onRefresh = viewModel::refresh,
-            onShowStylePanel = { showStylePanel = true },
+            onShowStylePanel = {
+                showFilterMenu = false
+                showFilterManage = false
+                sortPanel = null
+                showStylePanel = true
+            },
+            filterAction = if (
+                selectedTab == HomeTabs.BOOKSHELF &&
+                uiState.filterSelectorAvailable &&
+                uiState.selectedScopeId == BookshelfGroupIds.ALL   // 组视图无筛选入口（spec D7）
+            ) {
+                {
+                    FilterMenuAction(
+                        activeFilterName = if (uiState.selectedFilterId == BookshelfGroupIds.NONE) null
+                        else uiState.filters
+                            .firstOrNull { it.groupId == uiState.selectedFilterId }?.name,
+                        onClick = {
+                            showStylePanel = false
+                            showFilterManage = false
+                            sortPanel = null
+                            showFilterMenu = !showFilterMenu
+                        },
+                    )
+                }
+            } else {
+                null
+            },
             onSearchClick = onSearch,
             pageArrows = pageArrows,
             bookshelf = {
@@ -312,13 +452,22 @@ internal fun HomeRoute(
                     listCoverWidth = listCoverWidth,
                     listCoverHeight = listCoverHeight,
                     onBookClick = onBookClick,
-                    onBookLongClick = onBookLongClick,
+                    // 长按拦截：不再直达详情，弹上下文菜单（详情/加入分组…）
+                                    // 分组展示关闭：长按直达详情（旧行为）；开启：长按菜单
+                onBookLongClick = { book ->
+                    if (uiState.style.groupsEnabled) menuBook = book else onBookLongClick(book)
+                },
+                    onGroupClick = { group -> viewModel.enterGroup(group.groupId) },
+                    onGroupLongClick = { group -> menuGroup = group },
                     listState = listPager.listState,
                     gridState = gridPager.gridState,
                     onPageUp = pageUp,
                     onPageDown = pageDown,
-                    emptyMessage = if (uiState.selectedGroupId == BookshelfGroupIds.ALL) "书架为空"
-                    else "此分组暂无书籍",
+                    emptyMessage = when {
+                        uiState.selectedScopeId != BookshelfGroupIds.ALL -> "此分组暂无书籍"
+                        uiState.selectedFilterId != BookshelfGroupIds.NONE -> "没有符合筛选的书籍"
+                        else -> "书架为空"
+                    },
                     // 双 Tab 常驻组合：仅当前 Tab 的分页区注册音量键，
                     // 隐藏分页区不得占住按键枢纽栈顶
                     inputEnabled = selectedTab == HomeTabs.BOOKSHELF,
@@ -346,7 +495,88 @@ internal fun HomeRoute(
         BookshelfStylePanel(
             style = uiState.style,
             onStyleChange = viewModel::updateStyle,
+            onGroupsEnabledChange = viewModel::setGroupsEnabled,
+            // 约束：顶层书架（无筛选/筛选视图）均可显示该开关——过渡默认
+            // 选中已覆盖就地切换；仅组视图（点聚合条目进入）隐藏
+            showGroupsToggle = uiState.selectedScopeId == BookshelfGroupIds.ALL,
             onDismiss = { showStylePanel = false },
+        )
+    }
+
+
+    // 条目长按管理菜单三态（spec D11 修订，P1）：动作菜单 → 重命名/解散
+    // 二级弹框 / 排序面板，互斥由上方局部状态保证
+    ShelfGroupEntryDialogs(
+        menuGroup = menuGroup,
+        renamingGroup = renamingGroup,
+        dissolvingGroup = dissolvingGroup,
+        onRename = { groupId, name ->
+            viewModel.renameGroup(groupId, name)
+            renamingGroup = null
+        },
+        onOpenAdjust = { group ->
+            menuGroup = null
+            showFilterMenu = false
+            showStylePanel = false
+            showFilterManage = false
+            sortPanel = group
+            val idx = uiState.userGroups.indexOfFirst { it.groupId == group.groupId }
+            groupAdjustPage = (if (idx >= 0) idx else 0) / adjustPageSizeState.intValue
+        },
+        onDissolve = { groupId ->
+            viewModel.dissolveGroup(groupId)
+            dissolvingGroup = null
+        },
+        onDismiss = {
+            menuGroup = null; renamingGroup = null; dissolvingGroup = null
+        },
+        onSwitchToRename = { group ->
+            menuGroup = null; renamingGroup = group
+        },
+        onSwitchToDissolve = { group ->
+            menuGroup = null; dissolvingGroup = group
+        },
+    )
+
+    // 分组排序面板：组集合非空才挂载（外部解散至空时自然收起）；退出时
+    // 顺序有变才经 VM 整表提交（面板内翻页/换位零落库）
+
+
+    // 长按书上下文菜单（spec D1，P1）：详情走既有导航管线，加入分组打开归组面板
+    BookContextMenu(
+        book = menuBook,
+        onOpenDetail = { book ->
+            menuBook = null
+            onBookLongClick(book)   // 既有 BookDetail 导航管线
+        },
+        onOpenAssign = { book ->
+            menuBook = null
+            viewModel.openAssign(book)
+        },
+        onDismiss = { menuBook = null },
+    )
+    // 创建分组弹框在场时隐藏归组面板（VM 目标书状态保留，创建关闭即复现）
+    if (uiState.assignBook != null && !creatingGroup) {
+        BookAssignPanel(
+            book = uiState.assignBook,
+            groups = uiState.userGroups,
+            membership = uiState.assignMembership,
+            onToggle = viewModel::toggleAssignMembership,
+            onCreateGroupRequested = { creatingGroup = true },
+            onDismiss = viewModel::closeAssign,
+        )
+    }
+
+    // 创建分组弹框（与重命名同款交互；确认 = 建组并勾选当前书）
+    if (creatingGroup && uiState.assignBook != null) {
+        io.legado.app.eink.feature.bookshelf.GroupNameEditDialog(
+            initialName = "",
+            title = "创建分组",
+            onConfirm = {
+                viewModel.createGroupAndAssign(it)
+                creatingGroup = false
+            },
+            onDismiss = { creatingGroup = false },
         )
     }
 }
@@ -369,6 +599,8 @@ internal fun HomeScreen(
     onRefresh: () -> Unit,
     onShowStylePanel: () -> Unit,
     onSearchClick: () -> Unit,
+    filterAction: (@Composable () -> Unit)? = null,
+    onTitleClick: (() -> Unit)? = null,
     titleTrailing: (@Composable () -> Unit)? = null,
     contentOverlay: @Composable () -> Unit = {},
     pageArrows: @Composable () -> Unit,
@@ -385,10 +617,12 @@ internal fun HomeScreen(
         //（动作按钮新规格：撑满顶栏高、贴右屏，自带底部分隔线）
         EInkTopBar(
             title = headerTitle,
+            onTitleClick = onTitleClick,
             titleTrailing = titleTrailing,
             actionsFillMax = true,
             actions = {
                 if (showRefresh) {
+                    filterAction?.invoke()
                     StyleConfigAction(onShowStylePanel)
                     RefreshAction(
                         isRefreshing = isRefreshing,

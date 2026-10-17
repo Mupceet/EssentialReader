@@ -10,32 +10,35 @@ import kotlinx.coroutines.flow.scan
 import kotlinx.coroutines.launch
 
 /**
- * 书架分组状态宿主：分组列表流 + 选中分组（宿主快照 + 面板乐观覆盖），
- * 合并为对外唯一选中流。结构与语义镜像 [BookshelfStyleState]。
+ * 书架选择状态宿主（筛选/范围两个维度各持一份实例共用）：选项列表流 +
+ * 选中值（宿主快照 + 面板乐观覆盖），合并为对外唯一选中流。结构与语义
+ * 镜像 [BookshelfStyleState]。
  *
- * - [submit] 同步置覆盖：切组渲染即时生效，不等待宿主落库
- *  （saveTabPosition 经 DataStore 原子提交）；
+ * - [submit] 同步置覆盖：切换渲染即时生效，不等待宿主落库
+ *  （saveTabPosition / einkShelfFilter 经 DataStore 原子提交）；
  * - 覆盖在宿主快照追平后清除：落库完成与流发射之间的空窗不回跳旧值；
- * - 选中组不在已加载列表中（被隐藏/删除，含加载后清空）时回退「全部」：
- *   避免 chip 与列表失联导致空书架假象；列表未加载（尚未出现过非空
- *   列表，空列表视为未加载）时保持快照值不误回退。
+ * - 选中项不在已加载列表中（被隐藏/删除/移出精选集，含加载后清空）时
+ *   回退「全部」：避免 chip 与列表失联导致空书架假象；列表未加载（尚未
+ *   出现过非空列表，空列表视为未加载）时保持快照值不误回退。
  *
- * 快照流与分组流均为纯输入，本类不修改它们（纯函数式合并 + 一处
+ * 快照流与选项流均为纯输入，本类不修改它们（纯函数式合并 + 一处
  * 覆盖清除副作用，可在纯 JVM 测试中验证——AndroidViewModel 不可直测）。
  */
 internal class BookshelfGroupState(
     savedSelected: Flow<Long>,
     groupsFlow: Flow<List<BookshelfGroupUiModel>>,
     scope: CoroutineScope,
+    /** 选中值失联回退 id（范围轴 ALL；筛选轴 NONE——回退到文件夹视图）。 */
+    private val fallbackId: Long = BookshelfGroupIds.ALL,
 ) {
     private val _override = MutableStateFlow<Long?>(null)
 
-    /** 分组列表直通（宿主一次映射快照，模块零计算）。 */
+    /** 选项列表直通（宿主一次映射快照，模块零计算）。 */
     val groups: Flow<List<BookshelfGroupUiModel>> = groupsFlow
 
     /**
-     * 分组列表的加载投影：首个非空列表出现前为 null（未加载），此后
-     * 直通当前列表（含空列表 = 全部隐藏）。scan 状态随收集器独立，
+     * 选项列表的加载投影：首个非空列表出现前为 null（未加载），此后
+     * 直通当前列表（含空列表 = 全部隐藏/移出）。scan 状态随收集器独立，
      * 不跨收集器共享。
      */
     private val loadedGroups: Flow<List<BookshelfGroupUiModel>?> =
@@ -48,7 +51,7 @@ internal class BookshelfGroupState(
         combine(savedSelected, _override, loadedGroups) { saved, override, groups ->
             val effective = override ?: saved
             if (groups != null && groups.none { it.groupId == effective }) {
-                BookshelfGroupIds.ALL
+                fallbackId
             } else {
                 effective
             }
@@ -62,7 +65,7 @@ internal class BookshelfGroupState(
         }
     }
 
-    /** 提交切组：同步置覆盖，宿主落库由调用方另行发起。 */
+    /** 提交切换：同步置覆盖，宿主落库由调用方另行发起。 */
     fun submit(groupId: Long) {
         _override.value = groupId
     }

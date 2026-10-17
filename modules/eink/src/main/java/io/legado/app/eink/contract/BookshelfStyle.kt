@@ -54,6 +54,13 @@ data class BookshelfStyle(
      * [BookshelfEngine.setStyle] 反向写宿主竖屏键（横屏变体不投影，
      * E-Ink 按竖屏形态设计）。
      */
+    /**
+     * 分组展示支持开关（宿主 `einkGroupsEnabled`，默认关）。关 = 顶层恒为
+     * 平铺视图（筛选菜单无「无筛选」项）、长按书籍直达详情；开 = 完整分组
+     * 能力（文件夹视图/分组条目/长按菜单/归组）。
+     */
+    val groupsEnabled: Boolean = false,
+
     val isGridLayout: Boolean = true,
 
     /**
