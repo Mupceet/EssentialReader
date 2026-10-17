@@ -66,7 +66,8 @@ private const val CurrentItemKey = "eink_change_source_current"
  *
  * 骨架对齐搜索页（固定页分页 + 底部操作条）：
  *  - 顶栏动作区为刷新/中止图标按钮（对齐主项目换源弹层 startOrStopSearch），
- *    搜索中图标切换为中止；进度以顶栏被动文本呈现，不再作为按钮；
+ *    搜索中图标切换为中止；进度以顶栏被动文本「进度 n/m」呈现（仅
+ *    搜索中显示、实时更新），不再作为按钮；
  *  - 结果列表固定页分页（[rememberEInkListPagerState]），
  *    上下滑动手势与底部 ▲▼ 翻页同一动作；当前源常驻首项计入分页总数；
  *  - 底部操作栏：左侧返回按钮，右侧上下翻页箭头。
@@ -136,10 +137,11 @@ fun ChangeSourceRoute(
             title = "换源 - ${uiState.book?.name ?: ""}",
             actionsFillMax = true,
             actions = {
-                // 搜索进度为被动文本（非按钮），中止态时让位给图标按钮
+                // 搜索进度为被动文本（非按钮）：仅搜索中显示、实时更新，
+                // 停止/完成即随搜索态退场（交互保持 停止/重搜 两态）
                 if (uiState.isSearching) {
                     EInkText(
-                        text = "搜索中 ${uiState.searchedCount}/${uiState.totalSourceCount}",
+                        text = "进度 ${uiState.searchedCount}/${uiState.totalSourceCount}",
                         style = EInkTheme.typography.labelMedium,
                         color = EInkTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(end = EInkSpacing.s),
