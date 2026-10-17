@@ -2007,6 +2007,7 @@
     <string name="show_tip">Show Book Type</string>
     <string name="show_book_count">Show Book Count</string>
     <string name="is_reading">Reading</string>
+    <string name="eink_shelf_filter_none">No filter</string>
     <string name="is_unread">Unread</string>
     <string name="is_read_finished">Finished</string>
     <string name="is_read_finished_update">Finished (Serial)</string>

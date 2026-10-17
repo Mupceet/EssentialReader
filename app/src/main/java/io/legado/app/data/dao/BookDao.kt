@@ -24,6 +24,14 @@ data class GroupBookCount(
     val count: Int
 )
 
+/** 组内前 N 本封面引用投影（eink 聚合条目拼贴；无图封面由 UI 文字封面兜底）。 */
+data class BookGroupCoverRef(
+    val coverUrl: String?,
+    val name: String,
+    val author: String?,
+    val origin: String?,
+)
+
 private const val PRIVATE_GROUP_MASK =
     "(SELECT COALESCE(SUM(groupId), 0) FROM book_groups WHERE groupId > 0 AND isPrivate = 1)"
 
@@ -32,6 +40,11 @@ private const val PUBLIC_GROUP_MASK =
 
 private const val PUBLIC_BOOK_FILTER =
     "(`group` = 0 OR (`group` & $PRIVATE_GROUP_MASK) = 0)"
+
+/** 智能分组谓词常量：单组查询（flowUnread/flowReading）、系统组计数与 eink 组合查询共用，防两处漂移。 */
+internal const val UNREAD_PREDICATE = "durChapterIndex = 0 AND durChapterPos = 0"
+internal const val READING_PREDICATE =
+    "totalChapterNum > 0 AND durChapterIndex > 0 AND durChapterIndex < totalChapterNum - 1"
 
 @Dao
 interface BookDao {
@@ -447,7 +460,7 @@ interface BookDao {
     )
     fun flowBookShelfUpdateError(): Flow<List<BookShelfItem>>
 
-    @Query("""SELECT * FROM books WHERE durChapterIndex = 0 AND durChapterPos = 0""")
+    @Query("""SELECT * FROM books WHERE $UNREAD_PREDICATE""")
     fun flowUnread(): Flow<List<Book>>
 
     @Query(
@@ -595,7 +608,7 @@ interface BookDao {
     )
     fun flowBookShelfReadFinishedComplete(): Flow<List<BookShelfItem>>
 
-    @Query("""SELECT * FROM books WHERE totalChapterNum > 0 AND durChapterIndex > 0 AND durChapterIndex < totalChapterNum - 1""")
+    @Query("""SELECT * FROM books WHERE $READING_PREDICATE""")
     fun flowReading(): Flow<List<Book>>
 
     @Query(
@@ -890,8 +903,8 @@ interface BookDao {
         UNION ALL SELECT ${BookGroup.IdManga}, COUNT(*) FROM books WHERE type & ${BookType.image} > 0 AND $PUBLIC_BOOK_FILTER
         UNION ALL SELECT ${BookGroup.IdText}, COUNT(*) FROM books WHERE type & ${BookType.text} > 0 AND $PUBLIC_BOOK_FILTER
         UNION ALL SELECT ${BookGroup.IdError}, COUNT(*) FROM books WHERE type & ${BookType.updateError} > 0 AND $PUBLIC_BOOK_FILTER
-        UNION ALL SELECT ${BookGroup.IdUnread}, COUNT(*) FROM books WHERE durChapterIndex = 0 AND durChapterPos = 0 AND $PUBLIC_BOOK_FILTER
-        UNION ALL SELECT ${BookGroup.IdReading}, COUNT(*) FROM books WHERE totalChapterNum > 0 AND durChapterIndex > 0 AND durChapterIndex < totalChapterNum - 1 AND $PUBLIC_BOOK_FILTER
+        UNION ALL SELECT ${BookGroup.IdUnread}, COUNT(*) FROM books WHERE $UNREAD_PREDICATE AND $PUBLIC_BOOK_FILTER
+        UNION ALL SELECT ${BookGroup.IdReading}, COUNT(*) FROM books WHERE $READING_PREDICATE AND $PUBLIC_BOOK_FILTER
         UNION ALL SELECT ${BookGroup.IdReadFinished}, COUNT(*) FROM books WHERE totalChapterNum > 0 AND durChapterIndex >= totalChapterNum - 1 AND $PUBLIC_BOOK_FILTER
         UNION ALL SELECT ${BookGroup.IdReadFinishedUpdate}, COUNT(*) FROM books WHERE totalChapterNum > 0 AND durChapterIndex >= totalChapterNum - 1 AND canUpdate = 1 AND $PUBLIC_BOOK_FILTER
         UNION ALL SELECT ${BookGroup.IdReadFinishedComplete}, COUNT(*) FROM books WHERE totalChapterNum > 0 AND durChapterIndex >= totalChapterNum - 1 AND canUpdate = 0 AND $PUBLIC_BOOK_FILTER
@@ -907,6 +920,49 @@ interface BookDao {
         """
     )
     fun flowUserGroupBookCount(groupId: Long): Flow<Int>
+
+    // ---- eink 书架分组（spec 2026-10-14）：组合查询 ----
+    // 未归组谓词与「网络未分组」查询同源：sum(用户组位) 掩码按位与为 0，
+    // 但不带 NetNone 的「非本地非音频」限制（本地书同样可归组）
+
+    /** 未归组书籍流（不属于任何用户组；eink 顶层文件夹视图）。 */
+    @Query(
+        """
+        SELECT * FROM books
+        WHERE ((ifnull((SELECT sum(groupId) FROM book_groups WHERE groupId > 0 AND show = 1), 0)) & `group`) = 0
+        """
+    )
+    fun flowUngroupedBooks(): Flow<List<Book>>
+
+
+
+
+
+    /**
+     * 组内前 N 本封面引用流（eink 聚合条目拼贴）：口径与
+     * [flowUserGroupBookCount] 一致（私有组豁免 + 下架过滤），
+     * 按 durChapterTime DESC 取最近阅读的前 N 本。封面取
+     * ifnull(customCoverUrl, coverUrl) 近似 [Book.getDisplayCover]——
+     * 后者对空串自定义封面亦回退 coverUrl，SQL 仅处理 NULL（空串为
+     * 罕见脏数据，桥层空白过滤兜底）。
+     */
+    @Query(
+        """
+        SELECT ifnull(customCoverUrl, coverUrl) AS coverUrl, name, author, origin
+        FROM books
+        WHERE (`group` & :groupId) > 0
+        AND ((SELECT isPrivate FROM book_groups WHERE groupId = :groupId) = 1 OR $PUBLIC_BOOK_FILTER)
+        ORDER BY durChapterTime DESC
+        LIMIT :limit
+        """
+    )
+    fun flowUserGroupCoverRefs(groupId: Long, limit: Int): Flow<List<BookGroupCoverRef>>
+
+
+
+    /** 书籍分组位掩码流（eink 归组面板回显观察）。 */
+    @Query("SELECT `group` FROM books WHERE bookUrl = :bookUrl")
+    fun flowBookGroupMask(bookUrl: String): Flow<Long?>
 
     fun flowGroupPreview(groupId: Long): Flow<List<BookShelfItem>> {
         return when (groupId) {

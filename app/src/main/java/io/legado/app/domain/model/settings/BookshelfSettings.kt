@@ -51,4 +51,8 @@ data class BookshelfSettings(
     val bookshelfSearchActionDirectToSearch: Boolean = true,
     val autoRefreshBook: Boolean = false,
     val saveTabPosition: Long = BookGroup.IdAll,
+    /** eink 顶层筛选器（精选系统组 ID 或 IdAll；仅 eink 读写，完整模式不消费）。 */
+    val einkShelfFilter: Long = 0L, // 0 = 无筛选（文件夹视图）；-1 在双模式语义下是「全部」平铺筛选
+    /** eink 分组展示支持开关（默认关：无分组条目/无「无筛选」项/长按书直达详情）。 */
+    val einkGroupsEnabled: Boolean = false,
 )

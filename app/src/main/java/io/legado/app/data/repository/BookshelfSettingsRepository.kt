@@ -80,10 +80,20 @@ internal fun Preferences.toBookshelfSettings() = BookshelfSettings(
     bookshelfGridCoverWidth = compatDsInt(PreferKey.bookshelfGridCoverWidth) ?: 120,
     bookshelfSearchActionDirectToSearch = compatDsBoolean(PreferKey.bookshelfSearchActionDirectToSearch) ?: true,
     autoRefreshBook = compatDsBoolean(PreferKey.autoRefresh) ?: false,
-    saveTabPosition = compatDsLong(PreferKey.bookshelfSelectedGroupId)
-        ?: (rawPrefValue(PreferKey.saveTabPosition) as? Long)
-        ?: BookGroup.IdAll,
+    saveTabPosition = legacySelectedGroupId(),
+    einkShelfFilter = compatDsLong(PreferKey.einkBookshelfFilterId)
+        ?: legacySelectedGroupId().takeIf {
+            it == BookGroup.IdReading || it == BookGroup.IdUnread
+        }
+        ?: 0L,
+    einkGroupsEnabled = compatDsBoolean(PreferKey.einkBookshelfGroupsEnabled) ?: false,
 )
+
+/** 单值时代遗留：新键缺失时的旧选中组 ID（含 saveTabPosition 原始键兜底）。 */
+private fun Preferences.legacySelectedGroupId(): Long =
+    compatDsLong(PreferKey.bookshelfSelectedGroupId)
+        ?: (rawPrefValue(PreferKey.saveTabPosition) as? Long)
+        ?: BookGroup.IdAll
 
 internal fun BookshelfSettings.toPrefMap(): Map<String, Any?> = mapOf(
     PreferKey.bookGroupStyle to bookGroupStyle,
@@ -134,4 +144,6 @@ internal fun BookshelfSettings.toPrefMap(): Map<String, Any?> = mapOf(
     PreferKey.bookshelfSearchActionDirectToSearch to bookshelfSearchActionDirectToSearch,
     PreferKey.autoRefresh to autoRefreshBook,
     PreferKey.bookshelfSelectedGroupId to saveTabPosition,
+    PreferKey.einkBookshelfFilterId to einkShelfFilter,
+    PreferKey.einkBookshelfGroupsEnabled to einkGroupsEnabled,
 )

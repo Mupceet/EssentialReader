@@ -12,6 +12,7 @@ import io.legado.app.eink.contract.BookshelfStyle
  * 演进规则走「契约字段 + 本函数映射 + 模块消费」三处一次提交。
  */
 internal fun BookshelfSettings.toBookshelfStyle(): BookshelfStyle = BookshelfStyle(
+    groupsEnabled = einkGroupsEnabled,
     showUnreadBadge = showUnread,
     highlightNewChapter = showUnreadNew,
     showLatestChapter = bookshelfShowLatestChapter,
@@ -25,6 +26,7 @@ internal fun BookshelfSettings.toBookshelfStyle(): BookshelfStyle = BookshelfSty
  * 非本通道键（排序/横屏等）由调用方 update 语义保持原值。
  */
 internal fun BookshelfSettings.withStyleProjection(style: BookshelfStyle): BookshelfSettings = copy(
+    einkGroupsEnabled = style.groupsEnabled,
     showUnread = style.showUnreadBadge,
     showUnreadNew = style.highlightNewChapter,
     bookshelfShowLatestChapter = style.showLatestChapter,

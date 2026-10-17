@@ -1950,6 +1950,7 @@
     <string name="show_tip">显示书籍类型</string>
     <string name="show_book_count">显示分组书籍数量</string>
     <string name="is_reading">在读</string>
+    <string name="eink_shelf_filter_none">无筛选</string>
     <string name="is_unread">未读</string>
     <string name="is_read_finished">已读</string>
     <string name="is_read_finished_update">连载已读</string>

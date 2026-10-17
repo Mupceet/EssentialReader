@@ -70,6 +70,8 @@ object PreferKey {
     const val processText = "process_text"
     const val saveTabPosition = "saveTabPosition"
     const val bookshelfSelectedGroupId = "bookshelfSelectedGroupId"
+    const val einkBookshelfFilterId = "einkBookshelfFilterId"
+    const val einkBookshelfGroupsEnabled = "einkBookshelfGroupsEnabled"
     const val exploreMainContent = "exploreMainContent"
     const val exploreMainSourceUrl = "exploreMainSourceUrl"
     const val exploreMainKind = "exploreMainKind"
