@@ -131,6 +131,16 @@ abstract class EInkHostActivity : AppCompatActivity() {
      * 在组合内调用：宿主可订阅自身状态流（如外观设置网关）实现换字
      * 实时重组生效，也可只读一次依赖入口 recreate 生效。加载自定义字体
      * 文件的开销由宿主自管（建议复用宿主既有缓存，避免逐组合重复加载）。
+     *
+     * **字重约束（覆写必读）**：返回族必须字重可解析——FontList 形态
+     * （如 `FontFamily(Font(file = ...))`），**禁止** `FontFamily(typeface)`
+     * 直接包装已加载的 android.graphics.Typeface。LoadedFontFamily 对
+     * 所有字重请求原样返回该 Typeface（不进 Compose 字重合成路径），
+     * 排版系统 12 个 FontWeight.Bold 样式（display/headline/title/label）
+     * 会静默降为 Regular——界面标题整体丢失加粗，且模块侧无法从返回值
+     * 探测或修复。正确形态下 Bold 请求经 Typeface.create 合成假粗，与
+     * 平台默认字体的加粗渲染同机制（参照本仓 ui/theme/ThemeComponents.kt
+     * 的 loadCustomFont；细节见 contract/EINK-PORTING.md §4）。
      */
     @Composable
     protected open fun uiFontFamily(): FontFamily? = null

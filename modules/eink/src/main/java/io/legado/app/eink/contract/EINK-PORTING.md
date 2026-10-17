@@ -120,6 +120,8 @@ KDoc 为权威**。
    按 §1 清单逐端口实现（§3 差异表只列各宿主与通版的差异）。可选覆写
    `uiFontFamily()` 为 E-Ink 界面提供全局 UI 字体（默认 null = 平台默认
    字体；组合内调用，可订阅宿主状态流实时生效），不覆写不影响移植。
+   **覆写时返回族必须字重可解析**（约束与参照实现见 §4「UI 字体钩子的
+   字重约束」），否则界面标题加粗会整体静默丢失。
 6. **Manifest**：注册入口（无桌面图标，由分流点进入）：
    ```xml
    <activity
@@ -228,6 +230,20 @@ Koin / 无 AppConfigStore。
   选择列表预览回落平台默认字体，选择行为不受影响）。加粗
   能力由字重参数表达（body.weight / title.weight：0 常规 / 1 粗 / 2 细
   预设 + 100..900 自定义），端口无独立加粗键。
+- **UI 字体钩子的字重约束**：覆写 `EInkHostActivity.uiFontFamily()` 时，
+  返回族必须是字重可解析的 FontList 形态（如 `FontFamily(Font(file =
+  ...))` 单 Normal 声明）；**禁止** `FontFamily(typeface)` 直接包装已加载
+  的 `android.graphics.Typeface`——LoadedFontFamily 对所有字重请求原样
+  返回该 Typeface，不进 Compose 字重合成（synthesizeTypeface），模块
+  排版系统 display/headline/title/label 共 12 个 Bold 样式会静默降为
+  Regular（界面标题全不加粗），且模块侧无法从 FontFamily 返回值探测或
+  修复。正确形态下 Bold 请求经 `Typeface.create(typeface, weight,
+  italic)` 合成假粗（API<28 走 BOLD 样式），与平台默认字体的加粗渲染
+  同机制。经 SAF content:// 取字体时勿用 `Font(fileDescriptor)`（实际
+  读取在 Compose 解析期，PFD 关闭即加载失败——复制到文件再走
+  Font(file)）。本仓参照 `ui/theme/ThemeComponents.kt` 的 `loadCustomFont`
+  （含回归锚点单测 `LoadCustomFontTest`）；模块内字体设置页预览走自身
+  双字重族（`FontPreviewFamilies`），不经宿主此钩子，无此约束。
 - **云端进度同步**：`ReaderEngine` 的 `syncCloudProgress` /
   `applyCloudProgress` 与回调 `onCloudProgressNewer` 均默认实现，旧宿主
   零改动降级（无同步行为，本地进度落库不受影响）。要启用须按
@@ -263,4 +279,7 @@ Koin / 无 AppConfigStore。
 5. 目录页：跳章写回进度、缓存标记。
 6. 换源：跨源搜索→应用换源→返回阅读页续读。
 7. 回归重点：ReaderEngine 的 CallBack 转发链路（注册/注销/进度落库）。
-8. 门槛项（§0 有变动时）：minSdk 低档真机与旧 AGP 宿主构建复核。
+8. 界面字体（若宿主覆写 uiFontFamily）：选中自定义字体后对比系统默认
+   态——界面标题（「我的」条目主标题、各页顶栏标题）加粗仍在；字体
+   设置页预览标题与选中行名称加粗仍在（字重约束见 §4）。
+9. 门槛项（§0 有变动时）：minSdk 低档真机与旧 AGP 宿主构建复核。
