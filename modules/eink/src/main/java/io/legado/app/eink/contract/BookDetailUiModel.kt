@@ -36,7 +36,7 @@ data class BookDetailUiModel(
 
     /**
      * 展示书源名（originName 优先、回落书源表名与 origin；本地书/解析不出为 null）。
-     * 2026-09 详情页暂不展示书源（展示位置待定），字段与宿主映射链保留。
+     * 详情页作者行之下居中展示（带下划线，点击进入换源）；null 时该行不出现。
      */
     val displaySource: String?,
 
