@@ -181,7 +181,7 @@ fun FontSettingsRoute(
 
     // 顶部示例文字的预览字体 = 当前选中字体（阅读模式=引擎样式、我的
     // 模式=反显源 path），点选/预设切换即时跟随；null = 平台默认
-    val previewFontFamily = rememberFontFamily(
+    val previewFontFamilies = rememberFontFamilies(
         if (fromReader) selectedReaderPath else selectedListPath
     )
 
@@ -246,7 +246,7 @@ fun FontSettingsRoute(
         selectedFontPath = if (fromReader) selectedReaderPath else selectedListPath,
         selectedPreset = if (fromReader) null else selectedPreset,
         pendingScale = pendingScale,
-        previewFontFamily = previewFontFamily,
+        previewFontFamilies = previewFontFamilies,
         onScaleChange = onScaleChange,
         onScaleChangeFinished = onScaleChangeFinished,
         onScaleStep = onScaleStep,
@@ -277,7 +277,7 @@ private fun FontSettingsScreen(
     selectedFontPath: String?,
     selectedPreset: Int?,
     pendingScale: Int,
-    previewFontFamily: FontFamily?,
+    previewFontFamilies: FontPreviewFamilies?,
     onScaleChange: (Int) -> Unit,
     onScaleChangeFinished: () -> Unit,
     onScaleStep: (Int) -> Unit,
@@ -359,7 +359,7 @@ private fun FontSettingsScreen(
             ) {
                 EInkText(
                     text = "排版是一本书的呼吸",
-                    fontFamily = previewFontFamily,
+                    fontFamily = previewFontFamilies?.bold,
                     style = heading.copy(
                         fontSize = heading.fontSize * previewScale,
                         lineHeight = heading.lineHeight * previewScale,
@@ -368,7 +368,7 @@ private fun FontSettingsScreen(
                 EInkText(
                     text = "合适的字号与字体，让目光在字里行间从容行走，不必停留，" +
                             "也不必追赶。在下方进行调整直到这一段文字读起来最舒服为止。",
-                    fontFamily = previewFontFamily,
+                    fontFamily = previewFontFamilies?.normal,
                     style = body.copy(
                         fontSize = body.fontSize * previewScale,
                         lineHeight = body.lineHeight * previewScale,
@@ -437,17 +437,17 @@ private fun FontSettingsScreen(
                         item(key = "preset-$preset") {
                             FontListRow(
                                 label = appFontPresetLabel(preset),
-                                fontFamily = null,
+                                fonts = null,
                                 selected = selectedPreset == preset,
                                 onClick = { onSelectPreset(preset) },
                             )
                         }
                     }
                     items(fontOptions, key = { it.path }) { option ->
-                        val fontFamily = rememberFontFamily(option.path)
+                        val fonts = rememberFontFamilies(option.path)
                         FontListRow(
                             label = option.name.substringBeforeLast("."),
-                            fontFamily = fontFamily,
+                            fonts = fonts,
                             selected = option.path == selectedFontPath,
                             onClick = { onSelect(option) },
                         )
@@ -580,13 +580,25 @@ private const val FontSampleTextCn = "合适的字体，让目光在字里行间
 private const val FontSampleTextEn = "Good type makes reading a quiet joy."
 
 /**
- * 字体文件 path → FontFamily（每行/预览一份）：经宿主端口 loadFontTypeface
- * 在 IO 上下文异步加载（宿主侧进程级缓存，同路径不重复解码），加载失败
- * 为 null → 不指定 fontFamily 回落平台默认字体。path 不变不重新加载；
- * null（无自定义/系统默认）直接为 null。
+ * 端口加载的 Typeface 派生的双字重预览族：[normal] 原样；[bold] 为
+ * Typeface.create 合成假粗。为什么不共用单一 FontFamily：FontFamily(typeface)
+ * 对所有字重请求原样返回该 Typeface（不进 Compose 字重合成路径），Bold
+ * 样式会静默降为 Regular——预览标题与选中行名称的加粗靠 [bold] 显式分档
+ * （与宿主全局 UI 字体的 FontList 合成同渲染机制）。
+ */
+private class FontPreviewFamilies(typeface: Typeface) {
+    val normal: FontFamily = FontFamily(typeface)
+    val bold: FontFamily = FontFamily(Typeface.create(typeface, Typeface.BOLD))
+}
+
+/**
+ * 字体文件 path → 双字重预览族（每行/预览一份）：经宿主端口 loadFontTypeface
+ * 在 IO 上下文异步加载 Typeface（宿主侧进程级缓存，同路径不重复解码），
+ * 加载失败为 null → 不指定 fontFamily 回落平台默认字体。path 不变不重新
+ * 加载；null（无自定义/系统默认）直接为 null。
  */
 @Composable
-private fun rememberFontFamily(path: String?): FontFamily? {
+private fun rememberFontFamilies(path: String?): FontPreviewFamilies? {
     if (path == null) return null
     val typeface by produceState<Typeface?>(initialValue = null, path) {
         value = withContext(Dispatchers.IO) {
@@ -594,20 +606,21 @@ private fun rememberFontFamily(path: String?): FontFamily? {
                 .getOrNull()
         }
     }
-    return remember(typeface) { typeface?.let(::FontFamily) }
+    return remember(typeface) { typeface?.let(::FontPreviewFamilies) }
 }
 
 /**
  * 列表行（预设项与字体文件行共用）：定高 88dp（名称 + 中英示例两行；
- * 等高行是分页不变量）。字体文件行以该字体的 Typeface 渲染
- * （[rememberFontFamily]），系统预设项 fontFamily 为 null（平台默认）。
- * 选中 = 左侧实心竖条 + 名称加粗（§42 不用整行持久反色）；按压瞬时
- * 反色（§35）。写法同目录页 ChapterItem（TocScreen.kt）。
+ * 等高行是分页不变量）。字体文件行以该字体渲染（[rememberFontFamilies]
+ * 双字重族——选中名称加粗走 [FontPreviewFamilies.bold]），系统预设项
+ * fonts 为 null（平台默认）。选中 = 左侧实心竖条 + 名称加粗（§42 不用
+ * 整行持久反色）；按压瞬时反色（§35）。写法同目录页 ChapterItem
+ * （TocScreen.kt）。
  */
 @Composable
 private fun FontListRow(
     label: String,
-    fontFamily: FontFamily?,
+    fonts: FontPreviewFamilies?,
     selected: Boolean,
     onClick: () -> Unit,
 ) {
@@ -636,7 +649,7 @@ private fun FontListRow(
         Column(verticalArrangement = Arrangement.spacedBy(EInkSpacing.xs)) {
             EInkText(
                 text = label,
-                fontFamily = fontFamily,
+                fontFamily = fonts?.let { if (selected) it.bold else it.normal },
                 style = EInkTheme.typography.bodyLarge,
                 fontWeight = if (selected) FontWeight.Bold else null,
                 color = when {
@@ -651,7 +664,7 @@ private fun FontListRow(
             // （灰阶做减法，不用字重/字号层级）；按压跟随整行反色
             EInkText(
                 text = FontSampleTextCn,
-                fontFamily = fontFamily,
+                fontFamily = fonts?.normal,
                 style = EInkTheme.typography.bodySmall,
                 color = if (press.isPressed) colors.contentColor else scheme.tertiaryContent,
                 maxLines = 1,
@@ -659,7 +672,7 @@ private fun FontListRow(
             )
             EInkText(
                 text = FontSampleTextEn,
-                fontFamily = fontFamily,
+                fontFamily = fonts?.normal,
                 style = EInkTheme.typography.bodySmall,
                 color = if (press.isPressed) colors.contentColor else scheme.tertiaryContent,
                 maxLines = 1,

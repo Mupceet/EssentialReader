@@ -39,6 +39,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
@@ -515,9 +516,10 @@ private fun DetailContent(
 }
 
 /**
- * 基础信息区：书名 → 作者（均居中）→ 章节两行（最新/在读，组件整体
- * 居中）→（非紧凑）目录/换源最小按钮行（宽度随内容收缩、整行居中，
- * 两侧留白）。作为详情滚动页的头部，随滚动流整体翻页。
+ * 基础信息区：书名 → 作者 → 书源（均居中；书源行与作者同款排版，下划线
+ * 示意可点、点击进入换源，本地书 displaySource 为 null 时该行不出现）
+ * → 章节两行（最新/在读，组件整体居中）→（非紧凑）目录/换源最小按钮行
+ * （宽度随内容收缩、整行居中，两侧留白）。作为详情滚动页的头部，随滚动流整体翻页。
  */
 @Composable
 private fun BookInfoBlock(
@@ -553,6 +555,27 @@ private fun BookInfoBlock(
                 .fillMaxWidth()
                 .padding(top = EInkSpacing.xs)
         )
+        // 书源：与作者同款排版（titleSmall/居中/单行截断），下划线示意
+        // 可点，点击直达换源；整行可点放宽触控目标（本地书无此行）
+        book.displaySource?.takeIf { it.isNotBlank() }?.let { source ->
+            EInkText(
+                text = source,
+                style = EInkTheme.typography.titleSmall,
+                color = EInkTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center,
+                textDecoration = TextDecoration.Underline,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = EInkSpacing.xs)
+                    .einkClickable(
+                        role = Role.Button,
+                        onClickLabel = "切换书源",
+                        onClick = onChangeSource
+                    )
+            )
+        }
 
         // 最新章节 + 当前进度章节：两行左对齐、整体居中
         ChapterRows(
