@@ -39,11 +39,38 @@ internal class ReaderScreensaverRenderer {
 
         val sourceWidth = request.viewportWidthPx.coerceAtLeast(1)
         val sourceHeight = request.viewportHeightPx.coerceAtLeast(1)
-        val scaleX = TARGET_WIDTH.toFloat() / sourceWidth
-        val scaleY = TARGET_HEIGHT.toFloat() / sourceHeight
+        val viewport = resolveReaderScreensaverViewport(
+            contentWidthPx = sourceWidth,
+            contentHeightPx = sourceHeight,
+            systemBarTopInsetPx = request.systemBarTopInsetPx,
+            systemBarBottomInsetPx = request.systemBarBottomInsetPx,
+            targetWidthPx = TARGET_WIDTH,
+            targetHeightPx = TARGET_HEIGHT,
+        )
 
         canvas.save()
-        canvas.scale(scaleX, scaleY)
+        canvas.scale(viewport.scaleX, viewport.scaleY)
+        if (!request.headerVisible && request.systemBarTopInsetPx > 0f) {
+            drawBookName(
+                canvas = canvas,
+                request = request,
+                top = 0f,
+                bottom = request.systemBarTopInsetPx,
+            )
+        }
+        canvas.translate(0f, request.systemBarTopInsetPx)
+        val bodyBottomPx = if (request.footerVisible && request.footerExtentPx > 0f) {
+            sourceHeight - request.footerExtentPx
+        } else {
+            sourceHeight.toFloat()
+        }
+        canvas.save()
+        canvas.clipRect(
+            0f,
+            request.headerExtentPx,
+            sourceWidth.toFloat(),
+            bodyBottomPx,
+        )
         ReaderPageSnapshotPainter().draw(
             canvas = canvas,
             snapshot = request.page,
@@ -58,7 +85,17 @@ internal class ReaderScreensaverRenderer {
                 headerExtentPx = request.headerExtentPx,
             ),
         )
-        drawHeader(canvas, request)
+        canvas.restore()
+        if (request.headerVisible) {
+            val density = request.density
+            drawBookName(
+                canvas = canvas,
+                request = request,
+                top = request.style.headerPaddingTop * density,
+                bottom = request.headerExtentPx -
+                    request.style.headerPaddingBottom * density,
+            )
+        }
         drawFooter(canvas, request)
         canvas.restore()
 
@@ -73,32 +110,35 @@ internal class ReaderScreensaverRenderer {
         return bitmap
     }
 
-    private fun drawHeader(canvas: Canvas, request: ReaderScreensaverRequest) {
-        if (!request.headerVisible || request.headerExtentPx <= 0f) return
+    private fun drawBookName(
+        canvas: Canvas,
+        request: ReaderScreensaverRequest,
+        top: Float,
+        bottom: Float,
+    ) {
+        if (bottom <= top) return
         val density = request.density
-        val extent = request.headerExtentPx
         val left = request.style.headerPaddingLeft * density
-        val top = request.style.headerPaddingTop * density
         val right = request.viewportWidthPx -
             request.style.headerPaddingRight * density
-        val bottom = extent - request.style.headerPaddingBottom * density
         val availableHeight = (bottom - top).coerceAtLeast(1f)
-        val paint = tipPaint(
-            typeface = request.headerTypeface,
-            configuredSizeSp = request.style.headerSize,
-            availablePx = availableHeight,
-            density = density,
-            colorArgb = request.colors.tipArgb,
+        val paint = TextPaint(
+            tipPaint(
+                typeface = request.headerTypeface,
+                configuredSizeSp = request.style.headerSize,
+                availablePx = availableHeight,
+                density = density,
+                colorArgb = request.colors.tipArgb,
+            ),
         )
         val baseline = centeredBaseline(top, availableHeight, paint)
-        canvas.drawText(request.headerTime, left, baseline, paint)
-        val batteryText = "${request.batteryPercent}%"
-        canvas.drawText(
-            batteryText,
-            right - paint.measureText(batteryText),
-            baseline,
+        val title = TextUtils.ellipsize(
+            request.bookName,
             paint,
+            (right - left).coerceAtLeast(0f),
+            TextUtils.TruncateAt.END,
         )
+        canvas.drawText(title, 0, title.length, left, baseline, paint)
     }
 
     private fun drawFooter(canvas: Canvas, request: ReaderScreensaverRequest) {

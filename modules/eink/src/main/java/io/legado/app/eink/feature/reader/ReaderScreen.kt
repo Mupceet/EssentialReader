@@ -203,6 +203,18 @@ fun ReaderRoute(
     var contentHeightPx by remember { mutableIntStateOf(0) }
     val colorScheme = EInkTheme.colorScheme
     val tipTypefaces = EInkEngineRegistry.readerEngine.headerFooterTypefaces()
+    val rootWindowInsets = ViewCompat.getRootWindowInsets(view)
+    val systemBarInsets = rootWindowInsets?.getInsets(WindowInsetsCompat.Type.systemBars())
+    val displayCutoutInsets = rootWindowInsets?.getInsets(WindowInsetsCompat.Type.displayCutout())
+    val screensaverTopInsetPx = if (uiState.hideStatusBar) {
+        0f
+    } else {
+        maxOf(
+            systemBarInsets?.top ?: 0,
+            displayCutoutInsets?.top ?: 0,
+        ).toFloat()
+    }
+    val screensaverBottomInsetPx = (systemBarInsets?.bottom ?: 0).toFloat()
     val screensaverRequest = uiState.toScreensaverRequest(
         viewportWidthPx = contentWidthPx,
         viewportHeightPx = contentHeightPx,
@@ -219,6 +231,8 @@ fun ReaderRoute(
         imageAntiAlias = EInkEngineRegistry.globalSettings.useAntiAlias,
         headerExtentPx = EInkEngineRegistry.readerEngine.headerDecorationExtentPx,
         footerExtentPx = EInkEngineRegistry.readerEngine.footerDecorationExtentPx,
+        systemBarTopInsetPx = screensaverTopInsetPx,
+        systemBarBottomInsetPx = screensaverBottomInsetPx,
     )
     val latestScreensaverRequest by rememberUpdatedState(screensaverRequest)
 

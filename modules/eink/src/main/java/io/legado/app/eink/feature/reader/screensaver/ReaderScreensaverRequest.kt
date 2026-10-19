@@ -20,15 +20,14 @@ internal data class ReaderScreensaverColors(
  * The reader viewport can exclude system bars while the `.rmb` target is a
  * fixed full-screen bitmap, so both source dimensions and density are kept.
  */
-internal class ReaderScreensaverRequest(
+internal data class ReaderScreensaverRequest(
     val page: ReaderPageSnapshot,
     val chapterTitle: String,
+    val bookName: String,
     val pageAndTotal: String,
     val readProgress: String,
     val headerVisible: Boolean,
     val footerVisible: Boolean,
-    val headerTime: String,
-    val batteryPercent: Int,
     val autoPlay: Boolean,
     val style: ReaderTextStyle,
     val viewportWidthPx: Int,
@@ -40,6 +39,8 @@ internal class ReaderScreensaverRequest(
     val imageAntiAlias: Boolean,
     val headerExtentPx: Float,
     val footerExtentPx: Float,
+    val systemBarTopInsetPx: Float,
+    val systemBarBottomInsetPx: Float,
 )
 
 internal fun ReaderUiState.toScreensaverRequest(
@@ -52,18 +53,19 @@ internal fun ReaderUiState.toScreensaverRequest(
     imageAntiAlias: Boolean,
     headerExtentPx: Float,
     footerExtentPx: Float,
+    systemBarTopInsetPx: Float,
+    systemBarBottomInsetPx: Float,
 ): ReaderScreensaverRequest? {
     val currentPage = page ?: return null
     if (viewportWidthPx <= 0 || viewportHeightPx <= 0) return null
     return ReaderScreensaverRequest(
         page = currentPage,
         chapterTitle = chapterTitle,
+        bookName = bookName.ifBlank { chapterTitle },
         pageAndTotal = pageAndTotal,
         readProgress = readProgress,
         headerVisible = headerVisible,
         footerVisible = footerVisible,
-        headerTime = headerTime,
-        batteryPercent = batteryPercent,
         autoPlay = autoPlay,
         style = style,
         viewportWidthPx = viewportWidthPx,
@@ -75,6 +77,8 @@ internal fun ReaderUiState.toScreensaverRequest(
         imageAntiAlias = imageAntiAlias,
         headerExtentPx = headerExtentPx,
         footerExtentPx = footerExtentPx,
+        systemBarTopInsetPx = systemBarTopInsetPx.coerceAtLeast(0f),
+        systemBarBottomInsetPx = systemBarBottomInsetPx.coerceAtLeast(0f),
     )
 }
 
@@ -143,12 +147,11 @@ internal object ReaderScreensaverFingerprint {
         digest.float(page.contentFillRatio)
 
         digest.text(request.chapterTitle)
+        digest.text(request.bookName)
         digest.text(request.pageAndTotal)
         digest.text(request.readProgress)
         digest.int(if (request.headerVisible) 1 else 0)
         digest.int(if (request.footerVisible) 1 else 0)
-        digest.text(request.headerTime)
-        digest.int(request.batteryPercent)
         digest.int(if (request.autoPlay) 1 else 0)
         digest.text(request.style.toString())
         digest.int(request.viewportWidthPx)
@@ -164,6 +167,8 @@ internal object ReaderScreensaverFingerprint {
         digest.int(if (request.imageAntiAlias) 1 else 0)
         digest.float(request.headerExtentPx)
         digest.float(request.footerExtentPx)
+        digest.float(request.systemBarTopInsetPx)
+        digest.float(request.systemBarBottomInsetPx)
 
         digest.int(if (settings.screensaverEnabled) 1 else 0)
         digest.int(settings.bookScreenSaverStyle)

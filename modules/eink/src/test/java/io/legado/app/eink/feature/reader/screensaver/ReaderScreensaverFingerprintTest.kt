@@ -39,6 +39,10 @@ class ReaderScreensaverFingerprintTest {
                 settings.copy(illustrationValue = "custom.png"),
             ),
         )
+        assertNotEquals(
+            ReaderScreensaverFingerprint.of(request, settings),
+            ReaderScreensaverFingerprint.of(request.copyWithBookName("another book"), settings),
+        )
     }
 
     @Test
@@ -82,12 +86,11 @@ class ReaderScreensaverFingerprintTest {
         return ReaderScreensaverRequest(
             page = page,
             chapterTitle = "chapter",
+            bookName = "book",
             pageAndTotal = "2/20 10%",
             readProgress = "10%",
             headerVisible = true,
             footerVisible = true,
-            headerTime = "09:30",
-            batteryPercent = 80,
             autoPlay = false,
             style = ReaderTextStyle(),
             viewportWidthPx = 1860,
@@ -105,6 +108,32 @@ class ReaderScreensaverFingerprintTest {
             imageAntiAlias = true,
             headerExtentPx = 60f,
             footerExtentPx = 90f,
+            systemBarTopInsetPx = 50f,
+            systemBarBottomInsetPx = 30f,
         )
     }
+
+    private fun ReaderScreensaverRequest.copyWithBookName(name: String): ReaderScreensaverRequest =
+        ReaderScreensaverRequest(
+            page = page,
+            chapterTitle = chapterTitle,
+            bookName = name,
+            pageAndTotal = pageAndTotal,
+            readProgress = readProgress,
+            headerVisible = headerVisible,
+            footerVisible = footerVisible,
+            autoPlay = autoPlay,
+            style = style,
+            viewportWidthPx = viewportWidthPx,
+            viewportHeightPx = viewportHeightPx,
+            density = density,
+            colors = colors,
+            headerTypeface = headerTypeface,
+            footerTypeface = footerTypeface,
+            imageAntiAlias = imageAntiAlias,
+            headerExtentPx = headerExtentPx,
+            footerExtentPx = footerExtentPx,
+            systemBarTopInsetPx = systemBarTopInsetPx,
+            systemBarBottomInsetPx = systemBarBottomInsetPx,
+        )
 }
