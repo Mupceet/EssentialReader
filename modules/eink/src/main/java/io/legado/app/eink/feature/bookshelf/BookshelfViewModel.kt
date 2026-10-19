@@ -274,7 +274,15 @@ class BookshelfViewModel(application: Application) : AndroidViewModel(applicatio
      */
     fun updateStyle(style: BookshelfStyle) {
         styleState.submit(style)
-        viewModelScope.launch { engine.setStyle(style) }
+        viewModelScope.launch {
+            try {
+                engine.setStyle(style)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                _messages.emit(UserMessage.from(R.string.eink_group_operation_failed))
+            }
+        }
     }
 
     /** 切换筛选（仅顶层入口可达；乐观置覆盖，筛选与范围=ALL 一并落库——
@@ -282,8 +290,14 @@ class BookshelfViewModel(application: Application) : AndroidViewModel(applicatio
     fun selectFilter(filterId: Long) {
         filterState.submit(filterId)
         viewModelScope.launch {
-            groupEngine?.setSelectedFilter(filterId)
-            groupEngine?.setSelectedGroup(BookshelfGroupIds.ALL)
+            try {
+                groupEngine?.setSelectedFilter(filterId)
+                groupEngine?.setSelectedGroup(BookshelfGroupIds.ALL)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                _messages.emit(UserMessage.from(R.string.eink_group_operation_failed))
+            }
         }
     }
 
@@ -342,14 +356,30 @@ class BookshelfViewModel(application: Application) : AndroidViewModel(applicatio
     /** 进入组视图（聚合条目点击）。 */
     fun enterGroup(groupId: Long) {
         groupState.submit(groupId)
-        viewModelScope.launch { groupEngine?.setSelectedGroup(groupId) }
+        viewModelScope.launch {
+            try {
+                groupEngine?.setSelectedGroup(groupId)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                _messages.emit(UserMessage.from(R.string.eink_group_operation_failed))
+            }
+        }
     }
 
     /** 退出组视图（点击顶栏分组名）：乐观置覆盖并落库 saveTabPosition=ALL——
      *  当前视图即记录，冷启动按退出后的状态恢复。 */
     fun exitGroup() {
         groupState.submit(BookshelfGroupIds.ALL)
-        viewModelScope.launch { groupEngine?.setSelectedGroup(BookshelfGroupIds.ALL) }
+        viewModelScope.launch {
+            try {
+                groupEngine?.setSelectedGroup(BookshelfGroupIds.ALL)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                _messages.emit(UserMessage.from(R.string.eink_group_operation_failed))
+            }
+        }
     }
 
     /** 长按条目管理：重命名（IAE=重名/空名，toast 反馈；Room 回流驱动 UI 更新）。 */
@@ -388,7 +418,14 @@ class BookshelfViewModel(application: Application) : AndroidViewModel(applicatio
         val currentStyle = uiState.value.style
         styleState.submit(currentStyle.copy(groupsEnabled = enabled))
         viewModelScope.launch {
-            engine.setStyle(currentStyle.copy(groupsEnabled = enabled))
+            try {
+                engine.setStyle(currentStyle.copy(groupsEnabled = enabled))
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                _messages.emit(UserMessage.from(R.string.eink_group_operation_failed))
+                return@launch
+            }
             if (enabled) {
                 selectFilter(BookshelfGroupIds.NONE)
             } else if (uiState.value.selectedFilterId == BookshelfGroupIds.NONE) {

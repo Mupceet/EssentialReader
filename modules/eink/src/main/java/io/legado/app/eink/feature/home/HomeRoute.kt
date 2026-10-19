@@ -1,7 +1,6 @@
 package io.legado.app.eink.feature.home
 
 import android.widget.Toast
-import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -452,8 +451,8 @@ internal fun HomeRoute(
                     listCoverWidth = listCoverWidth,
                     listCoverHeight = listCoverHeight,
                     onBookClick = onBookClick,
-                    // 长按拦截：不再直达详情，弹上下文菜单（详情/加入分组…）
-                                    // 分组展示关闭：长按直达详情（旧行为）；开启：长按菜单
+                    // 长按拦截：分组展示关闭时直达详情（旧行为）；开启时长按菜单
+                    // （详情/加入分组…）
                 onBookLongClick = { book ->
                     if (uiState.style.groupsEnabled) menuBook = book else onBookLongClick(book)
                 },

@@ -49,6 +49,14 @@ fun BookshelfStylePanel(
     showGroupsToggle: Boolean,
     onDismiss: () -> Unit,
 ) {
+    // 样式改动即提交，返回键只需收面板；不拦截会透传系统退出应用
+    androidx.activity.compose.BackHandler(onBack = onDismiss)
+    // 模态在场登记：面板打开期间音量键翻页放行系统，不穿透翻动书架
+    androidx.compose.runtime.DisposableEffect(Unit) {
+        io.legado.app.eink.designsystem.control.EInkModalPresence.acquire()
+        onDispose { io.legado.app.eink.designsystem.control.EInkModalPresence.release() }
+    }
+
     BoxWithConstraints(
         modifier = Modifier
             .fillMaxSize()

@@ -31,6 +31,7 @@ internal class RmbFilePublisher {
         require(targetDirectory.exists() || targetDirectory.mkdirs()) {
             "Cannot create ${targetDirectory.absolutePath}"
         }
+        deleteStaleTempFiles(targetDirectory)
 
         val target = uniqueTarget(encoded, targetDirectory)
         val temp = File(
@@ -90,6 +91,23 @@ internal class RmbFilePublisher {
         }
     }
 
+    /**
+     * 回收进程死于写入中途遗留的 .tmp（cleanupObsolete 只匹配正式 .rmb，
+     * tmp 没有其它清理路径）。发布常发生在 ON_STOP 后台窗口——正是设备
+     * 桌面清杀后台进程的高危期，单次被杀即泄漏一份 9MB 级垃圾；只在
+     * 超过 [STALE_TMP_MS] 后回收，避免误删并发写入者的在途 tmp。
+     */
+    private fun deleteStaleTempFiles(targetDirectory: File) {
+        val cutoff = System.currentTimeMillis() - STALE_TMP_MS
+        targetDirectory.listFiles()
+            ?.asSequence()
+            ?.filter { it.isFile && it.name.endsWith(".tmp") && it.lastModified() < cutoff }
+            ?.forEach { file ->
+                runCatching { file.delete() }
+                    .onFailure { Log.w(TAG, "stale tmp cleanup failed: ${it.javaClass.simpleName}") }
+            }
+    }
+
     private fun validateFile(file: File, encoded: EncodedRmb) {
         val expectedLength = RmbEncoder.HEADER_SIZE.toLong() +
             encoded.width.toLong() * encoded.height.toLong() * encoded.format.bytesPerPixel
@@ -112,5 +130,8 @@ internal class RmbFilePublisher {
     companion object {
         private const val TAG = "ReaderScreensaver"
         internal val TARGET_DIRECTORY = File("/data/zhangyue/logo/reading_progress")
+
+        /** tmp 视为陈旧的门槛：单次写入为毫秒级，10 分钟足以覆盖并发写入者。 */
+        private const val STALE_TMP_MS = 10 * 60 * 1000L
     }
 }

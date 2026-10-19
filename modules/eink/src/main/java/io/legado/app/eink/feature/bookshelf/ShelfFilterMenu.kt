@@ -93,6 +93,15 @@ fun ShelfFilterMenu(
 ) {
     val colors = EInkTheme.colorScheme
     val selectedName = filters.firstOrNull { it.groupId == selectedFilterId }?.name
+
+    // 返回键收起菜单（与点面板外同义）；不拦截会透传系统退出应用
+    androidx.activity.compose.BackHandler(onBack = onDismiss)
+    // 模态在场登记：菜单打开期间音量键翻页放行系统，不穿透翻动书架
+    androidx.compose.runtime.DisposableEffect(Unit) {
+        io.legado.app.eink.designsystem.control.EInkModalPresence.acquire()
+        onDispose { io.legado.app.eink.designsystem.control.EInkModalPresence.release() }
+    }
+
     Box(
         modifier = Modifier
             .fillMaxSize()

@@ -110,6 +110,17 @@ internal fun BottomAdjustPanel(
         onDismiss()
     }
 
+    // 返回键与点面板外同义（提交并退出）：首页是导航栈根，不拦截返回会
+    // 直接透传系统退出应用，静默丢弃未提交的重排/显隐
+    androidx.activity.compose.BackHandler(onBack = ::applyAndDismiss)
+
+    // 模态在场登记（与 EInkDialog 弹框同一登记点）：面板打开期间音量键
+    // 翻页等外围按键输入放行系统，不在面板背后穿透翻动书架
+    androidx.compose.runtime.DisposableEffect(Unit) {
+        io.legado.app.eink.designsystem.control.EInkModalPresence.acquire()
+        onDispose { io.legado.app.eink.designsystem.control.EInkModalPresence.release() }
+    }
+
     androidx.compose.foundation.layout.BoxWithConstraints(
         modifier = Modifier
             .fillMaxSize()

@@ -88,16 +88,28 @@ interface BookshelfGroupEngine {
     /** 持久化筛选；仅接受 [BookshelfGroupIds.NONE] 或系统筛选器 id（IdRoot 除外）。 */
     suspend fun setSelectedFilter(filterId: Long)
 
-    /** 当前范围：ALL 或用户组 id（saveTabPosition 投影，负值收敛为 ALL）。 */
+    /**
+     * 当前范围：ALL 或用户组 id（saveTabPosition 投影，负值收敛为 ALL；
+     * 指向私密组时宿主应回落 ALL——模块侧无隐私解锁端口，不得明文列出
+     * 私密组书籍）。
+     */
     val selectedGroup: Flow<Long>
 
     /** 持久化范围（组视图进入/退出）；仅接受 ALL 或用户组 id。 */
     suspend fun setSelectedGroup(groupId: Long)
 
-    /** 用户组全量流（含隐藏组；范围状态的失联回退参考列表与调整分组面板数据源）。 */
+    /**
+     * 用户组全量流（含隐藏组；范围状态的失联回退参考列表与调整分组面板数据源）。
+     * 宿主必须排除私密组（isPrivate）——模块无隐私门控 UI，出现即等于绕过
+     * 完整模式的隐私边界。
+     */
     fun observeUserGroups(): Flow<List<BookshelfGroupUiModel>>
 
-    /** 无筛选（文件夹）视图：可见（show=1）非空组条目 + 未归组书（仅被可见组收纳的书才隐藏）。 */
+    /**
+     * 无筛选（文件夹）视图：可见（show=1）非空组条目 + 未归组书（仅被可见组
+     * 收纳的书才隐藏）。私密组不产出条目；其书籍由未归组掩码（含私密组位）
+     * 排除在顶层之外，与完整模式平铺书架口径一致。
+     */
     fun observeShelfWithGroups(): Flow<List<BookshelfShelfEntryUiModel>>
 
     /** 筛选（平铺）视图：全量匹配书单（含已归组书），无分组条目。 */

@@ -22,6 +22,16 @@ internal data class ReaderScreensaverCover(
     val sourceHeight: Int,
 )
 
+/** 封面源阶段产物（无位图分配）：字节 + 摘要 + 源尺寸，供判重前置用。 */
+internal class ReaderScreensaverCoverSource(
+    val bytes: ByteArray,
+    val digest: String,
+    val sourceWidth: Int,
+    val sourceHeight: Int,
+    val coverUrl: String,
+    val origin: String?,
+)
+
 /**
  * Loads the current Legado book cover through the same host cover pipeline used
  * by bookshelf/detail images.
@@ -29,6 +39,10 @@ internal data class ReaderScreensaverCover(
  * The fingerprint is calculated from the source bytes rather than the cover URL:
  * imported books and custom covers can keep the same path while their content
  * changes, and style 2 must republish in that case.
+ *
+ * Split into [loadSource] (bytes + digest, no bitmap) and [decodeAndUpgrade]
+ * (decode + high-res reload) so the publisher can gate on the digest before
+ * paying for the decode on every page turn.
  */
 internal class ReaderScreensaverCoverLoader(
     context: Context,
@@ -54,7 +68,8 @@ internal class ReaderScreensaverCoverLoader(
         }
     }
 
-    suspend fun load(bookUrl: String): ReaderScreensaverCover? {
+    /** 源阶段：读字节 + 摘要 + 边界尺寸，不分配像素内存。 */
+    suspend fun loadSource(bookUrl: String): ReaderScreensaverCoverSource? {
         if (bookUrl.isBlank()) return null
         val detail = try {
             loadBookDetail(bookUrl)
@@ -73,30 +88,39 @@ internal class ReaderScreensaverCoverLoader(
         ) ?: return null
         if (!isValidCoverBytes(sourceBytes)) return null
 
-        val sourceDigest = ReaderScreensaverFingerprint.sha256Hex(sourceBytes)
-        var cover = decodeCover(sourceBytes, sourceDigest) ?: return null
+        val bounds = decodeBounds(sourceBytes) ?: return null
+        return ReaderScreensaverCoverSource(
+            bytes = sourceBytes,
+            digest = ReaderScreensaverFingerprint.sha256Hex(sourceBytes),
+            sourceWidth = bounds.first,
+            sourceHeight = bounds.second,
+            coverUrl = coverUrl,
+            origin = detail.origin.takeIf { it.isNotBlank() },
+        )
+    }
+
+    /** 解码阶段：采样解码 + 必要时网络大图重载升级（摘要随之变化）。 */
+    suspend fun decodeAndUpgrade(source: ReaderScreensaverCoverSource): ReaderScreensaverCover? {
+        var cover = decodeCover(source.bytes, source.digest) ?: return null
         if (
-            coverUrl.startsWith("http", ignoreCase = true) &&
+            source.coverUrl.startsWith("http", ignoreCase = true) &&
             coverNeedsHighResolutionReload(
                 width = cover.bitmap.width,
                 height = cover.bitmap.height,
             )
         ) {
-            val attemptKey = "$coverUrl|$sourceDigest"
+            val attemptKey = "${source.coverUrl}|${source.digest}"
             val shouldReload = synchronized(attemptedReloads) {
                 attemptedReloads.markAttempt(attemptKey)
             }
             if (shouldReload) {
-                val reloadedBytes = reloadRemoteCoverBytes(
-                    coverUrl,
-                    detail.origin.takeIf { it.isNotBlank() },
-                )
+                val reloadedBytes = reloadRemoteCoverBytes(source.coverUrl, source.origin)
                 if (reloadedBytes != null && isValidCoverBytes(reloadedBytes)) {
                     val reloadedDigest = ReaderScreensaverFingerprint.sha256Hex(reloadedBytes)
                     synchronized(attemptedReloads) {
-                        attemptedReloads.markAttempt("$coverUrl|$reloadedDigest")
+                        attemptedReloads.markAttempt("${source.coverUrl}|$reloadedDigest")
                     }
-                    if (reloadedDigest != sourceDigest) {
+                    if (reloadedDigest != source.digest) {
                         val reloaded = decodeCover(reloadedBytes, reloadedDigest)
                         if (reloaded != null) {
                             if (reloaded.pixelCount > cover.pixelCount) {
@@ -168,6 +192,13 @@ internal class ReaderScreensaverCoverLoader(
         } else {
             Uri.decode(payload).toByteArray(Charsets.UTF_8)
         }
+    }
+
+    private fun decodeBounds(bytes: ByteArray): Pair<Int, Int>? {
+        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
+        if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null
+        return bounds.outWidth to bounds.outHeight
     }
 
     private fun decodeCover(bytes: ByteArray, digest: String): ReaderScreensaverCover? {

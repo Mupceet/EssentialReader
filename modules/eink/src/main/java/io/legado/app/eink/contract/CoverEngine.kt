@@ -52,6 +52,12 @@ interface CoverEngine {
      * without changing source semantics. The default preserves compatibility
      * for hosts that only expose the normal cover pipeline.
      *
+     * A host MAY persist the reloaded original into its shared cover cache
+     * (upgrade-only: never overwrite an equal-or-larger existing entry), so
+     * later fast-path reads return the same bytes. Cache-budget pressure from
+     * the larger entry is an accepted host trade-off and must be documented
+     * by the host implementation.
+     *
      * Returns null on failure; CancellationException must be rethrown.
      */
     suspend fun reloadCoverBytes(url: String, sourceOrigin: String?): ByteArray? =
