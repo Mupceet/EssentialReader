@@ -24,6 +24,8 @@ internal data class ReaderScreensaverRequest(
     val page: ReaderPageSnapshot,
     val chapterTitle: String,
     val bookName: String,
+    val bookAuthor: String,
+    val bookUrl: String,
     val pageAndTotal: String,
     val readProgress: String,
     val headerVisible: Boolean,
@@ -62,6 +64,8 @@ internal fun ReaderUiState.toScreensaverRequest(
         page = currentPage,
         chapterTitle = chapterTitle,
         bookName = bookName.ifBlank { chapterTitle },
+        bookAuthor = bookAuthor,
+        bookUrl = bookUrl,
         pageAndTotal = pageAndTotal,
         readProgress = readProgress,
         headerVisible = headerVisible,
@@ -93,10 +97,23 @@ internal object ReaderScreensaverFingerprint {
     fun of(
         request: ReaderScreensaverRequest,
         settings: ReaderScreensaverSettings,
+        coverDigest: String? = null,
     ): String {
         val digest = MessageDigest.getInstance("SHA-256")
-        val page = request.page
+        val mode = settings.mode
 
+        if (mode == ReaderScreensaverMode.COVER) {
+            digest.text(request.bookUrl)
+            digest.text(request.bookName)
+            digest.text(request.bookAuthor)
+            digest.text(coverDigest ?: "")
+            digest.int(settings.bookScreenSaverStyle)
+            digest.int(if (settings.illustrationEnabled) 1 else 0)
+            digest.text(settings.illustrationValue ?: "")
+            return digest.hex()
+        }
+
+        val page = request.page
         digest.text(page.title)
         digest.text(page.readProgress)
         digest.paintSpec(page.titleSpec)
@@ -175,10 +192,16 @@ internal object ReaderScreensaverFingerprint {
         digest.int(if (settings.illustrationEnabled) 1 else 0)
         digest.text(settings.illustrationValue ?: "")
 
-        return digest.digest().joinToString(separator = "") { byte ->
+        return digest.hex()
+    }
+
+    fun sha256Hex(bytes: ByteArray): String =
+        MessageDigest.getInstance("SHA-256").apply { update(bytes) }.hex()
+
+    private fun MessageDigest.hex(): String =
+        digest().joinToString(separator = "") { byte ->
             "%02x".format(byte.toInt() and 0xff)
         }
-    }
 
     private fun MessageDigest.paintSpec(spec: io.legado.app.eink.contract.ReaderPaintSpec) {
         float(spec.textSizePx)

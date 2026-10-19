@@ -1,6 +1,8 @@
 package io.legado.app.eink.feature.reader.screensaver
 
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -48,7 +50,19 @@ class ReaderScreensaverCapabilityTest {
     }
 
     @Test
-    fun requiresScreensaverEnabledAndBookStyleFive() {
+    fun requiresScreensaverEnabledAndSupportedBookStyle() {
+        assertTrue(
+            resolveReaderScreensaverCapability(
+                ReaderScreensaverCapabilityInput(
+                    manufacturer = "iReader",
+                    brand = "iReader",
+                    systemUiInstalled = true,
+                    settings = activeSettings.copy(
+                        bookScreenSaverStyle = ReaderScreensaverSettings.BOOK_COVER_STYLE,
+                    ),
+                ),
+            ),
+        )
         assertFalse(
             resolveReaderScreensaverCapability(
                 ReaderScreensaverCapabilityInput(
@@ -69,5 +83,18 @@ class ReaderScreensaverCapabilityTest {
                 ),
             ),
         )
+    }
+
+    @Test
+    fun mapsBookStylesToTheirFirmwareProtocols() {
+        assertEquals(
+            ReaderScreensaverMode.COVER,
+            ReaderScreensaverMode.fromStyle(ReaderScreensaverSettings.BOOK_COVER_STYLE),
+        )
+        assertEquals(
+            ReaderScreensaverMode.READING_PROGRESS,
+            ReaderScreensaverMode.fromStyle(ReaderScreensaverSettings.BOOK_READING_STYLE),
+        )
+        assertNull(ReaderScreensaverMode.fromStyle(4))
     }
 }

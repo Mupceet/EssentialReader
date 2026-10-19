@@ -22,6 +22,26 @@ import io.legado.app.eink.feature.reader.fontLineRequirementRatio
  */
 internal class ReaderScreensaverRenderer {
 
+    /**
+     * Style 2: cover is the base layer and the system illustration is stretched
+     * over the full cover. This mirrors iReader's `WallpaperBookManager`
+     * composition instead of sharing the current page renderer.
+     */
+    fun renderCover(
+        cover: Bitmap,
+        illustration: Bitmap?,
+    ): Bitmap {
+        val bitmap = Bitmap.createBitmap(TARGET_WIDTH, TARGET_HEIGHT, Bitmap.Config.RGB_565)
+        val canvas = Canvas(bitmap)
+        val paint = illustrationPaint()
+        val destination = RectF(0f, 0f, TARGET_WIDTH.toFloat(), TARGET_HEIGHT.toFloat())
+        canvas.drawBitmap(cover, null, destination, paint)
+        if (illustration != null && !illustration.isRecycled) {
+            canvas.drawBitmap(illustration, null, destination, paint)
+        }
+        return bitmap
+    }
+
     fun render(
         request: ReaderScreensaverRequest,
         illustration: Bitmap?,
@@ -104,10 +124,15 @@ internal class ReaderScreensaverRenderer {
                 illustration,
                 null,
                 RectF(0f, 0f, TARGET_WIDTH.toFloat(), TARGET_HEIGHT.toFloat()),
-                Paint().apply { isAntiAlias = true },
+                illustrationPaint(),
             )
         }
         return bitmap
+    }
+
+    private fun illustrationPaint(): Paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        isFilterBitmap = true
+        isDither = true
     }
 
     private fun drawBookName(

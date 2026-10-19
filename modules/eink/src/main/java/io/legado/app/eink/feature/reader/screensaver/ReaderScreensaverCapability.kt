@@ -3,9 +3,13 @@ package io.legado.app.eink.feature.reader.screensaver
 /**
  * Settings that control the iReader book lock-screen implementation.
  *
- * The illustration fields are independent from the page screenshot. A failed
- * or disabled illustration degrades to a page-only image and must not block
- * publication.
+ * iReader exposes two book wallpaper styles through the same setting:
+ * style 2 composites the current book cover with the selected illustration;
+ * style 5 publishes the current page as reading progress.
+ *
+ * The illustration fields are independent from the base image. A failed or
+ * disabled illustration degrades to the page/cover-only image and must not
+ * block publication.
  */
 internal data class ReaderScreensaverSettings(
     val screensaverEnabled: Boolean,
@@ -13,12 +17,50 @@ internal data class ReaderScreensaverSettings(
     val illustrationEnabled: Boolean,
     val illustrationValue: String?,
 ) {
-    /** iReader book-reading style 5 is the third-party `.rmb` wallpaper mode. */
+    /** Selected protocol mode, or null when book wallpapers are disabled. */
+    val mode: ReaderScreensaverMode?
+        get() = if (screensaverEnabled) {
+            ReaderScreensaverMode.fromStyle(bookScreenSaverStyle)
+        } else {
+            null
+        }
+
     val active: Boolean
-        get() = screensaverEnabled && bookScreenSaverStyle == BOOK_READING_STYLE
+        get() = mode != null
 
     companion object {
+        const val BOOK_COVER_STYLE = 2
         const val BOOK_READING_STYLE = 5
+    }
+}
+
+/**
+ * The two iReader book wallpaper protocols supported by this adapter.
+ *
+ * The type and directory values are part of the firmware contract: SystemUI
+ * resolves the broadcast type to its directory, then scans `.rmb` files in
+ * that directory.
+ */
+internal enum class ReaderScreensaverMode(
+    val style: Int,
+    val wallpaperType: String,
+    val targetDirectory: String,
+) {
+    COVER(
+        style = ReaderScreensaverSettings.BOOK_COVER_STYLE,
+        wallpaperType = "BOOK",
+        targetDirectory = "/data/zhangyue/logo/book",
+    ),
+    READING_PROGRESS(
+        style = ReaderScreensaverSettings.BOOK_READING_STYLE,
+        wallpaperType = "BOOK_READING_PROGRESS",
+        targetDirectory = "/data/zhangyue/logo/reading_progress",
+    ),
+    ;
+
+    companion object {
+        fun fromStyle(style: Int): ReaderScreensaverMode? =
+            entries.firstOrNull { it.style == style }
     }
 }
 

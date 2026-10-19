@@ -44,4 +44,16 @@ interface CoverEngine {
      * @return 封面原始字节（可能仍需解码，模块负责）；不可得返回 null。
      */
     suspend fun fetchCoverBytes(url: String, sourceOrigin: String?): ByteArray?
+
+    /**
+     * Re-fetches original cover bytes for a surface that needs a larger image.
+     *
+     * Hosts should bypass display-sized/thumbnail caches when they can do so
+     * without changing source semantics. The default preserves compatibility
+     * for hosts that only expose the normal cover pipeline.
+     *
+     * Returns null on failure; CancellationException must be rethrown.
+     */
+    suspend fun reloadCoverBytes(url: String, sourceOrigin: String?): ByteArray? =
+        fetchCoverBytes(url, sourceOrigin)
 }

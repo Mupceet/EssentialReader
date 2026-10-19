@@ -16,7 +16,10 @@ internal data class PublishedRmbFile(
  */
 internal class RmbFilePublisher {
 
-    fun write(encoded: EncodedRmb): PublishedRmbFile {
+    fun write(
+        encoded: EncodedRmb,
+        targetDirectory: File = TARGET_DIRECTORY,
+    ): PublishedRmbFile {
         val header = RmbEncoder.inspectHeader(encoded.bytes)
             ?: error("Invalid BWAR header")
         require(header.width == encoded.width && header.height == encoded.height)
@@ -25,13 +28,13 @@ internal class RmbFilePublisher {
             encoded.width.toLong() * encoded.height.toLong() * encoded.format.bytesPerPixel
         require(encoded.bytes.size.toLong() == expectedLength)
 
-        require(TARGET_DIRECTORY.exists() || TARGET_DIRECTORY.mkdirs()) {
-            "Cannot create ${TARGET_DIRECTORY.absolutePath}"
+        require(targetDirectory.exists() || targetDirectory.mkdirs()) {
+            "Cannot create ${targetDirectory.absolutePath}"
         }
 
-        val target = uniqueTarget(encoded)
+        val target = uniqueTarget(encoded, targetDirectory)
         val temp = File(
-            TARGET_DIRECTORY,
+            targetDirectory,
             ".${target.name}.${Thread.currentThread().id}.${System.nanoTime()}.tmp",
         )
         var moved = false
@@ -58,7 +61,7 @@ internal class RmbFilePublisher {
 
         return PublishedRmbFile(
             target = target,
-            obsolete = TARGET_DIRECTORY.listFiles()
+            obsolete = targetDirectory.listFiles()
                 ?.asSequence()
                 ?.filter { it.isFile && it != target && it.extension == "rmb" }
                 ?.toList()
@@ -77,11 +80,11 @@ internal class RmbFilePublisher {
         }
     }
 
-    private fun uniqueTarget(encoded: EncodedRmb): File {
+    private fun uniqueTarget(encoded: EncodedRmb, targetDirectory: File): File {
         var suffix = encoded.renderTimeMillis
         while (true) {
             val replacement = encoded.copy(renderTimeMillis = suffix)
-            val candidate = File(TARGET_DIRECTORY, replacement.fileName)
+            val candidate = File(targetDirectory, replacement.fileName)
             if (!candidate.exists()) return candidate
             suffix++
         }

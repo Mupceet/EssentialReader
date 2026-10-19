@@ -30,6 +30,8 @@ internal class ReaderScreensaverPublisher(
     private val system: ReaderScreensaverSystem = ReaderScreensaverSystem(context),
     private val renderer: ReaderScreensaverRenderer = ReaderScreensaverRenderer(),
     private val writer: RmbFilePublisher = RmbFilePublisher(),
+    private val coverLoader: ReaderScreensaverCoverLoader =
+        ReaderScreensaverCoverLoader(context),
 ) {
     private val appContext = context.applicationContext
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -108,48 +110,73 @@ internal class ReaderScreensaverPublisher(
     }
 
     private suspend fun publishLatest() {
-        val request = latestRequest ?: return
-        val settings = system.readSettings()
-        if (!isCapable(settings)) {
-            gate.reset()
-            return
-        }
-        val fingerprint = ReaderScreensaverFingerprint.of(request, settings)
-        val force = synchronized(this) {
-            val value = forceNextPublish
-            forceNextPublish = false
-            value
-        }
-        if (!gate.shouldPublish(fingerprint, force)) return
-
         publishMutex.withLock {
-            if (!gate.shouldPublish(fingerprint, force)) return@withLock
-            val renderSettings = system.readSettings()
-            if (!isCapable(renderSettings)) {
+            val request = latestRequest ?: return@withLock
+            val settings = system.readSettings()
+            val mode = settings.mode
+            if (!isCapable(settings) || mode == null) {
                 gate.reset()
                 return@withLock
             }
 
+            var cover: ReaderScreensaverCover? = null
             var illustration: android.graphics.Bitmap? = null
             var bitmap: android.graphics.Bitmap? = null
             try {
+                if (mode == ReaderScreensaverMode.COVER) {
+                    cover = coverLoader.load(request.bookUrl)
+                    if (cover == null) {
+                        Log.i(TAG, "cover unavailable book_url=${request.bookUrl.take(24)}")
+                        return@withLock
+                    }
+                }
+                val fingerprint = ReaderScreensaverFingerprint.of(
+                    request = request,
+                    settings = settings,
+                    coverDigest = cover?.digest,
+                )
+                val force = synchronized(this) {
+                    val value = forceNextPublish
+                    forceNextPublish = false
+                    value
+                }
+                if (!gate.shouldPublish(fingerprint, force)) return@withLock
+
+                val renderSettings = system.readSettings()
+                if (!isCapable(renderSettings) || renderSettings.mode != mode) {
+                    gate.reset()
+                    return@withLock
+                }
                 illustration = system.loadIllustration(renderSettings)
-                bitmap = renderer.render(request, illustration)
+                bitmap = when (mode) {
+                    ReaderScreensaverMode.COVER -> renderer.renderCover(
+                        cover = requireNotNull(cover).bitmap,
+                        illustration = illustration,
+                    )
+
+                    ReaderScreensaverMode.READING_PROGRESS -> renderer.render(
+                        request = request,
+                        illustration = illustration,
+                    )
+                }
                 currentCoroutineContext().ensureActive()
 
                 // Recheck immediately before encoding/writing: switching the
                 // feature off while a frame is being rendered must not publish.
                 val writeSettings = system.readSettings()
-                if (!isCapable(writeSettings)) {
+                if (!isCapable(writeSettings) || writeSettings.mode != mode) {
                     gate.reset()
                     return@withLock
                 }
 
                 val renderTimeMillis = System.currentTimeMillis()
                 val encoded = RmbBitmapEncoder.encode(bitmap, renderTimeMillis)
-                val published = writer.write(encoded)
+                val published = writer.write(
+                    encoded = encoded,
+                    targetDirectory = java.io.File(mode.targetDirectory),
+                )
                 try {
-                    ReaderScreensaverNotifier.notifyChanged(appContext)
+                    ReaderScreensaverNotifier.notifyChanged(appContext, mode)
                 } catch (throwable: Throwable) {
                     Log.w(TAG, "broadcast failed: ${throwable.javaClass.simpleName}")
                     return@withLock
@@ -159,6 +186,7 @@ internal class ReaderScreensaverPublisher(
                 Log.i(
                     TAG,
                     "published page_content_hash=${fingerprint.take(12)} " +
+                        "mode=${mode.wallpaperType} " +
                         "bitmap=${encoded.width}x${encoded.height} " +
                         "config=${encoded.format.bitmapConfigName} " +
                         "bytes=${encoded.bytes.size}",
@@ -172,6 +200,7 @@ internal class ReaderScreensaverPublisher(
             } finally {
                 bitmap?.recycle()
                 illustration?.recycle()
+                cover?.bitmap?.recycle()
             }
         }
     }

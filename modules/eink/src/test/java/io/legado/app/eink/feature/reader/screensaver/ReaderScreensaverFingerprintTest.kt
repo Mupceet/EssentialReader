@@ -58,6 +58,41 @@ class ReaderScreensaverFingerprintTest {
         assertTrue(gate.shouldPublish("a", force = false))
     }
 
+    @Test
+    fun coverModeIgnoresPagesButReflectsCoverAndBookIdentity() {
+        val coverSettings = settings.copy(bookScreenSaverStyle = 2)
+        val request = request(text = "same page")
+
+        assertEquals(
+            ReaderScreensaverFingerprint.of(request, coverSettings, coverDigest = "cover-a"),
+            ReaderScreensaverFingerprint.of(
+                request(text = "different page"),
+                coverSettings,
+                coverDigest = "cover-a",
+            ),
+        )
+        assertNotEquals(
+            ReaderScreensaverFingerprint.of(request, coverSettings, coverDigest = "cover-a"),
+            ReaderScreensaverFingerprint.of(request, coverSettings, coverDigest = "cover-b"),
+        )
+        assertNotEquals(
+            ReaderScreensaverFingerprint.of(request, coverSettings, coverDigest = "cover-a"),
+            ReaderScreensaverFingerprint.of(
+                request.copyWithBookAuthor("another author"),
+                coverSettings,
+                coverDigest = "cover-a",
+            ),
+        )
+        assertNotEquals(
+            ReaderScreensaverFingerprint.of(request, coverSettings, coverDigest = "cover-a"),
+            ReaderScreensaverFingerprint.of(
+                request.copyWithBookUrl("another url"),
+                coverSettings,
+                coverDigest = "cover-a",
+            ),
+        )
+    }
+
     private fun request(text: String): ReaderScreensaverRequest {
         val spec = ReaderPaintSpec(
             textSizePx = 40f,
@@ -87,6 +122,8 @@ class ReaderScreensaverFingerprintTest {
             page = page,
             chapterTitle = "chapter",
             bookName = "book",
+            bookAuthor = "author",
+            bookUrl = "book-url",
             pageAndTotal = "2/20 10%",
             readProgress = "10%",
             headerVisible = true,
@@ -118,6 +155,64 @@ class ReaderScreensaverFingerprintTest {
             page = page,
             chapterTitle = chapterTitle,
             bookName = name,
+            bookAuthor = bookAuthor,
+            bookUrl = bookUrl,
+            pageAndTotal = pageAndTotal,
+            readProgress = readProgress,
+            headerVisible = headerVisible,
+            footerVisible = footerVisible,
+            autoPlay = autoPlay,
+            style = style,
+            viewportWidthPx = viewportWidthPx,
+            viewportHeightPx = viewportHeightPx,
+            density = density,
+            colors = colors,
+            headerTypeface = headerTypeface,
+            footerTypeface = footerTypeface,
+            imageAntiAlias = imageAntiAlias,
+            headerExtentPx = headerExtentPx,
+            footerExtentPx = footerExtentPx,
+            systemBarTopInsetPx = systemBarTopInsetPx,
+            systemBarBottomInsetPx = systemBarBottomInsetPx,
+        )
+
+    private fun ReaderScreensaverRequest.copyWithBookAuthor(
+        author: String,
+    ): ReaderScreensaverRequest =
+        ReaderScreensaverRequest(
+            page = page,
+            chapterTitle = chapterTitle,
+            bookName = bookName,
+            bookAuthor = author,
+            bookUrl = bookUrl,
+            pageAndTotal = pageAndTotal,
+            readProgress = readProgress,
+            headerVisible = headerVisible,
+            footerVisible = footerVisible,
+            autoPlay = autoPlay,
+            style = style,
+            viewportWidthPx = viewportWidthPx,
+            viewportHeightPx = viewportHeightPx,
+            density = density,
+            colors = colors,
+            headerTypeface = headerTypeface,
+            footerTypeface = footerTypeface,
+            imageAntiAlias = imageAntiAlias,
+            headerExtentPx = headerExtentPx,
+            footerExtentPx = footerExtentPx,
+            systemBarTopInsetPx = systemBarTopInsetPx,
+            systemBarBottomInsetPx = systemBarBottomInsetPx,
+        )
+
+    private fun ReaderScreensaverRequest.copyWithBookUrl(
+        url: String,
+    ): ReaderScreensaverRequest =
+        ReaderScreensaverRequest(
+            page = page,
+            chapterTitle = chapterTitle,
+            bookName = bookName,
+            bookAuthor = bookAuthor,
+            bookUrl = url,
             pageAndTotal = pageAndTotal,
             readProgress = readProgress,
             headerVisible = headerVisible,
