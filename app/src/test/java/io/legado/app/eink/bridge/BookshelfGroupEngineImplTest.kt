@@ -268,4 +268,30 @@ class BookshelfGroupEngineImplTest {
         assertFalse(validateClassSubmission(all, listOf(0b1L, 0b100L)) { it.groupId > 0 }) // 含未知组 id
         assertTrue(validateClassSubmission(all, listOf(0b10L, 0b1L)) { it.groupId > 0 })    // 同元素集不同序
     }
+
+    // ---- folderVisibleGroups / rangeVisibleGroups（私密组过滤） ----
+
+    @Test
+    fun `文件夹可见组过滤隐藏组与私密组`() {
+        val groups = listOf(
+            group(0b1),
+            group(0b10).copy(show = false),
+            group(0b100).copy(isPrivate = true),
+            group(0b1000).copy(show = false, isPrivate = true),
+            group(BookGroup.IdAll),
+            group(BookGroup.IdRoot),
+        )
+        assertEquals(listOf(0b1L), folderVisibleGroups(groups).map { it.groupId })
+    }
+
+    @Test
+    fun `范围可见组过滤私密组但保留隐藏组`() {
+        val groups = listOf(
+            group(0b1),
+            group(0b10).copy(show = false),
+            group(0b100).copy(isPrivate = true),
+            group(BookGroup.IdReading),
+        )
+        assertEquals(listOf(0b1L, 0b10L), rangeVisibleGroups(groups).map { it.groupId })
+    }
 }

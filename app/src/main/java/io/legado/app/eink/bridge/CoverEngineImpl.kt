@@ -31,7 +31,10 @@ import java.util.concurrent.TimeUnit
  * 与完整模式的有意差异：eink 请求不带 bookUrl/PreferCache——不写持久
  * 缓存别名键、不走断网别名回退（完整模式继续经拦截器链承担写入侧）。
  * [reloadCoverBytes] 另走无缓存路径，仅供锁屏等需要原图大尺寸的调用方
- * 在缓存图仍小于目标尺寸时重新拉取。
+ * 在缓存图仍小于目标尺寸时重新拉取；成功时按「仅升级」策略回写共享
+ * CoverFileCache（现有条目更小时才覆盖）——20MB 级原图进入 100MB LRU
+ * 预算、可能挤掉数本普通封面是已接受的取舍（eink 独占设备上锁屏质量
+ * 优先），完整模式封面快路径读到的是同一张原图字节，无内容分叉。
  * 失败一律返回 null（模块回退占位封面），CancellationException 透传。
  */
 internal object CoverEngineImpl : CoverEngine {
@@ -107,7 +110,12 @@ internal object CoverEngineImpl : CoverEngine {
         CoverFetcher.clearFailure(finalUrl)
         if (bypassCaches) {
             withContext(Dispatchers.IO) {
-                CoverFileCache.write(url, decoded)
+                // 仅升级不降级：现有条目更大或同尺寸时跳过回写，避免同字节
+                // 重写制造 LRU churn（lastModified 变化会把别的封面挤出预算）
+                val existing = CoverFileCache.fileFor(url)
+                if (!existing.exists() || existing.length() < decoded.size) {
+                    CoverFileCache.write(url, decoded)
+                }
             }
         }
         return decoded

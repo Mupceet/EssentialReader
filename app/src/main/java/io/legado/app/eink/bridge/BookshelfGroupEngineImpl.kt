@@ -34,6 +34,11 @@ import splitties.init.appCtx
  * 书架分组端口实现（2026-10-16 双模式修订）：无筛选=文件夹视图 /
  * 精选筛选=平铺视图 + 分组管理（排序与显隐）。位掩码运算全部封闭在
  * 本层，不进契约。
+ *
+ * 私密边界（2026-10-19 修复）：eink 侧无隐私解锁端口，所有组策展
+ * （文件夹条目/范围下拉/选中组回放）一律排除 isPrivate 组——其书籍由
+ * 未归组掩码（含私密组位）自然排除在顶层之外，与完整模式平铺书架的
+ * PUBLIC_BOOK_FILTER 口径一致；宁可不显示，不绕过完整模式的隐私门控。
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 internal object BookshelfGroupEngineImpl : BookshelfGroupEngine, KoinComponent {
@@ -127,10 +132,22 @@ internal object BookshelfGroupEngineImpl : BookshelfGroupEngine, KoinComponent {
 
     // —— 范围 ——
 
-    override val selectedGroup: Flow<Long> =
-        bookshelfSettingsGateway.settings
-            .map { if (it.saveTabPosition > 0) it.saveTabPosition else BookshelfGroupIds.ALL }
-            .distinctUntilChanged()
+    // by lazy：object clinit 不强制解析 bookGroupRepository（守卫方法
+    // require 先于任何网关访问；单测 Koin 可只定义 settings 网关）
+    override val selectedGroup: Flow<Long> by lazy {
+        combine(
+            bookshelfSettingsGateway.settings
+                .map { if (it.saveTabPosition > 0) it.saveTabPosition else BookshelfGroupIds.ALL }
+                .distinctUntilChanged(),
+            bookGroupRepository.flowAll(),
+        ) { selected, groups ->
+            // 完整模式可能把书架停在私密组（共享 saveTabPosition）；eink 无
+            // 隐私解锁端口，回落全部而非明文列出私密组书籍
+            val isPrivateSelection = selected > 0 &&
+                groups.any { it.groupId == selected && it.groupId > 0 && it.isPrivate }
+            if (isPrivateSelection) BookshelfGroupIds.ALL else selected
+        }.distinctUntilChanged()
+    }
 
     override suspend fun setSelectedGroup(groupId: Long) {
         require(groupId == BookshelfGroupIds.ALL || groupId > 0) { "范围仅接受全部或用户组: $groupId" }
@@ -139,7 +156,7 @@ internal object BookshelfGroupEngineImpl : BookshelfGroupEngine, KoinComponent {
 
     override fun observeUserGroups(): Flow<List<BookshelfGroupUiModel>> =
         bookGroupRepository.flowAll().flatMapLatest { groups ->
-            val userGroups = groups.filter { it.groupId > 0 }
+            val userGroups = rangeVisibleGroups(groups)
             if (userGroups.isEmpty()) {
                 flowOf(emptyList())
             } else {
@@ -165,9 +182,10 @@ internal object BookshelfGroupEngineImpl : BookshelfGroupEngine, KoinComponent {
 
     override fun observeShelfWithGroups(): Flow<List<BookshelfShelfEntryUiModel>> =
         bookGroupRepository.flowAll().flatMapLatest { groups ->
-            // 仅可见（show=1）组产出条目与封面查询；隐藏组的书由未归组
-            // 查询（掩码仅统计 show=1 组）平铺回顶层
-            val visibleGroups = groups.filter { it.groupId > 0 && it.show }.sortedBy { it.order }
+            // 仅可见（show=1）且非私密的组产出条目与封面查询；隐藏组的书由
+            // 未归组查询（掩码仅统计 show=1 组）平铺回顶层，私密组的书则被
+            // 同一掩码排除（掩码含私密组位）——与完整模式隐私口径一致
+            val visibleGroups = folderVisibleGroups(groups).sortedBy { it.order }
             val countsFlow = if (visibleGroups.isEmpty()) {
                 flowOf(emptyMap())
             } else {
@@ -330,9 +348,9 @@ internal object BookshelfGroupEngineImpl : BookshelfGroupEngine, KoinComponent {
                 ?: emptySet()
         }
 
-    // —— 私有装配 ——
+// —— 私有装配 ——
 
-    private suspend fun requireUserGroupNameFree(name: String, excludeGroupId: Long?) {
+private suspend fun requireUserGroupNameFree(name: String, excludeGroupId: Long?) {
         val dup = withContext(Dispatchers.IO) { appDb.bookGroupDao.getByName(name) }
         require(dup == null || dup.groupId !in 1L..Long.MAX_VALUE || dup.groupId == excludeGroupId) {
             "已有同名分组: $name"
@@ -344,6 +362,18 @@ internal object BookshelfGroupEngineImpl : BookshelfGroupEngine, KoinComponent {
         enableRefresh = enableRefresh, show = show, bookSort = bookSort, isPrivate = isPrivate,
     )
 }
+
+/**
+ * 文件夹视图可见组策展（纯函数，便于 JVM 测试）：用户组 + show=1 + 非私密。
+ * 私密组不产出条目、不产出封面查询，其书籍靠未归组掩码（含私密组位）
+ * 排除在顶层之外。
+ */
+internal fun folderVisibleGroups(groups: List<BookGroup>): List<BookGroup> =
+    groups.filter { it.groupId > 0 && it.show && !it.isPrivate }
+
+/** 范围下拉可见组（纯函数）：用户组 + 非私密；不看 show（范围选择≠显隐策展）。 */
+internal fun rangeVisibleGroups(groups: List<BookGroup>): List<BookGroup> =
+    groups.filter { it.groupId > 0 && !it.isPrivate }
 
 /**
  * 筛选器菜单装配（纯函数，注入名称解析便于 JVM 测试）：
