@@ -19,6 +19,12 @@
 -->
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
+    <!-- Android 11+ package visibility for the iReader book wallpaper protocol. -->
+    <queries>
+        <package android:name="com.szzy.ireader.systemui" />
+        <package android:name="com.szzy.ireader.ink.wallpaper" />
+    </queries>
+
     <application>
         <meta-data
             android:name="xposedmodule"

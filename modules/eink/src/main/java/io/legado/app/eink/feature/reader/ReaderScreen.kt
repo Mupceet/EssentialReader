@@ -42,8 +42,10 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -117,6 +119,9 @@ import io.legado.app.eink.feature.reader.selection.selectionActions
 import io.legado.app.eink.feature.reader.selection.selectionOfDecoration
 import io.legado.app.eink.feature.reader.selection.selectionRuns
 import io.legado.app.eink.feature.reader.selection.snapToWordRange
+import io.legado.app.eink.feature.reader.screensaver.ReaderScreensaverColors
+import io.legado.app.eink.feature.reader.screensaver.ReaderScreensaverPublisher
+import io.legado.app.eink.feature.reader.screensaver.toScreensaverRequest
 import kotlinx.coroutines.launch
 
 /** 排版设置的居中弹层形态。 */
@@ -190,6 +195,54 @@ fun ReaderRoute(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val view = LocalView.current
+    val density = LocalDensity.current.density
+    val screensaverPublisher = remember(context.applicationContext) {
+        ReaderScreensaverPublisher(context.applicationContext)
+    }
+    var contentWidthPx by remember { mutableIntStateOf(0) }
+    var contentHeightPx by remember { mutableIntStateOf(0) }
+    val colorScheme = EInkTheme.colorScheme
+    val tipTypefaces = EInkEngineRegistry.readerEngine.headerFooterTypefaces()
+    val screensaverRequest = uiState.toScreensaverRequest(
+        viewportWidthPx = contentWidthPx,
+        viewportHeightPx = contentHeightPx,
+        density = density,
+        colors = ReaderScreensaverColors(
+            backgroundArgb = colorScheme.background.toArgb(),
+            textArgb = colorScheme.onBackground.toArgb(),
+            highlightArgb = colorScheme.secondaryContainer.toArgb(),
+            badgeArgb = colorScheme.selectionContainer.toArgb(),
+            tipArgb = colorScheme.onSurfaceVariant.toArgb(),
+        ),
+        headerTypeface = tipTypefaces.header,
+        footerTypeface = tipTypefaces.footer,
+        imageAntiAlias = EInkEngineRegistry.globalSettings.useAntiAlias,
+        headerExtentPx = EInkEngineRegistry.readerEngine.headerDecorationExtentPx,
+        footerExtentPx = EInkEngineRegistry.readerEngine.footerDecorationExtentPx,
+    )
+    val latestScreensaverRequest by rememberUpdatedState(screensaverRequest)
+
+    DisposableEffect(screensaverPublisher) {
+        screensaverPublisher.start()
+        onDispose {
+            latestScreensaverRequest?.let(screensaverPublisher::updateRequest)
+            screensaverPublisher.close(flush = true)
+        }
+    }
+    SideEffect {
+        screensaverRequest?.let(screensaverPublisher::updateRequest)
+    }
+    LaunchedEffect(
+        uiState.pageVersion,
+        contentWidthPx,
+        contentHeightPx,
+        colorScheme,
+    ) {
+        screensaverRequest?.let { request ->
+            screensaverPublisher.updateRequest(request)
+            screensaverPublisher.requestPublish()
+        }
+    }
     // 按键转发枢纽：宿主入口 Activity onKeyDown/onKeyUp 经注册表下发
     val keyEventHub = EInkEngineRegistry.keyEventHub
     var panel by remember { mutableStateOf<ReaderPanel?>(null) }
@@ -637,9 +690,15 @@ fun ReaderRoute(
     DisposableEffect(lifecycleOwner, viewModel) {
         val observer = LifecycleEventObserver { _, event ->
             when (event) {
-                Lifecycle.Event.ON_STOP -> viewModel.onReaderHidden()
+                Lifecycle.Event.ON_STOP -> {
+                    viewModel.onReaderHidden()
+                    screensaverPublisher.requestPublish(immediate = true)
+                }
                 Lifecycle.Event.ON_START -> viewModel.onReaderShown()
-                Lifecycle.Event.ON_PAUSE -> viewModel.onActivityPaused()
+                Lifecycle.Event.ON_PAUSE -> {
+                    viewModel.onActivityPaused()
+                    screensaverPublisher.requestPublish(immediate = true)
+                }
                 Lifecycle.Event.ON_RESUME -> viewModel.onActivityResumed()
                 else -> Unit
             }
@@ -719,7 +778,11 @@ fun ReaderRoute(
                     panel = ReaderPanel.PROGRESS
                 }
             },
-            onContentSized = viewModel::updateViewSize,
+            onContentSized = { width, height ->
+                contentWidthPx = width
+                contentHeightPx = height
+                viewModel.updateViewSize(width, height)
+            },
             // 加载失败页的退出按钮同走退出门控（装载失败 bookUrl 为空即直退）
             onBack = exitReader,
             onBarBack = onBarBack,
