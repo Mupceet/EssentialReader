@@ -11,6 +11,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextOverflow
@@ -43,6 +44,9 @@ import io.legado.app.eink.designsystem.theme.EInkTheme
  * @param enabled 禁用态：弱化且不可点
  * @param selected 选中态：内缩圆角实心块（如运行中/当前页签/开关开启）
  * @param bordered 描边形态；false 为无描边直角按压块
+ * @param shape 描边形态的圆角形状（默认 medium；仅 [bordered] = true 生效，
+ *   无描边形态恒直角；选中内缩实心块随本形状）——如动作按钮传
+ *   [EInkShapes.capsule] 与条目按钮区隔
  * @param height 按钮高度（对话框按钮 44dp、页签 40dp、常规默认 36dp=分段按钮同高）；
  *   null 时不约束高度，由 [modifier] 决定（如 size / fillMaxHeight）
  * @param style 文案字号
@@ -60,6 +64,7 @@ fun EInkButton(
     enabled: Boolean = true,
     selected: Boolean = false,
     bordered: Boolean = true,
+    shape: Shape = EInkShapes.medium,
     height: Dp? = 36.dp,
     style: TextStyle = EInkTheme.typography.bodyMedium,
     role: Role = Role.Button,
@@ -76,18 +81,18 @@ fun EInkButton(
     )
     // 描边形态与分段按钮同轨：常态轮廓线（描边恒 outline，实心块独立内层），
     // 禁用弱化；无描边形态直角（按压背景可贴容器边缘）
-    val shape = if (bordered) EInkShapes.medium else RectangleShape
+    val effectiveShape = if (bordered) shape else RectangleShape
     Box(
         modifier = modifier
             .then(if (height != null) Modifier.height(height) else Modifier)
             .then(press.modifier)
-            .background(color = colors.containerColor, shape = shape)
+            .background(color = colors.containerColor, shape = effectiveShape)
             .then(
                 if (bordered) {
                     Modifier.border(
                         width = 1.dp,
                         color = if (!enabled) scheme.disabledContent else scheme.outline,
-                        shape = shape,
+                        shape = effectiveShape,
                     )
                 } else {
                     Modifier
@@ -103,7 +108,7 @@ fun EInkButton(
         contentAlignment = contentAlignment,
     ) {
         if (bordered) {
-            // 选中内缩实心块（分段按钮同款）：2dp 内缩 + medium 圆角，
+            // 选中内缩实心块（分段按钮同款）：2dp 内缩 + 随按钮形状，
             // onSurface 底；按压反色期间由整轨反色覆盖，不叠加
             Box(
                 modifier = Modifier
@@ -111,7 +116,7 @@ fun EInkButton(
                     .padding(2.dp)
                     .then(
                         if (selected && !press.isPressed && enabled) {
-                            Modifier.background(scheme.onSurface, EInkShapes.medium)
+                            Modifier.background(scheme.onSurface, shape)
                         } else {
                             Modifier
                         }

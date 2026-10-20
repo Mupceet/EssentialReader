@@ -60,4 +60,13 @@ sealed interface EInkScreen {
      *   选完停留本页，界面字体经设置流实时生效，底栏可清除回落默认。
      */
     data class FontSettings(val fromReader: Boolean = false) : EInkScreen
+
+    /**
+     * 备份与恢复（入口：「我的 → 备份与恢复」，引擎能力位
+     * [io.legado.app.eink.contract.BackupSyncEngine.supportsWebDavManagement]
+     * 开启才渲染入口）：WebDAV 五字段配置（与完整模式同一存储）+
+     * 同步阅读进度开关（依赖配置生效，自「我的」迁入）+ 测试/备份/恢复
+     * 手动闭环；恢复交互为恢复云端最新一份（确认层后执行）。
+     */
+    data object WebDavSync : EInkScreen
 }

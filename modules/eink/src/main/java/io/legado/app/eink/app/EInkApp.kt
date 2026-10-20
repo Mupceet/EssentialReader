@@ -54,6 +54,7 @@ import io.legado.app.eink.feature.bookdetail.BookDetailRoute
 import io.legado.app.eink.feature.changesource.ChangeSourceRoute
 import io.legado.app.eink.feature.home.FontSettingsRoute
 import io.legado.app.eink.feature.home.HomeRoute
+import io.legado.app.eink.feature.home.WebDavSyncRoute
 import io.legado.app.eink.feature.home.releaseNoteToPlainText
 import io.legado.app.eink.feature.reader.ReaderRoute
 import io.legado.app.eink.feature.search.SearchRoute
@@ -207,6 +208,9 @@ fun EInkApp(
                                 onOpenFontSettings = {
                                     controller.navigate(EInkScreen.FontSettings())
                                 },
+                                onOpenWebDavSync = {
+                                    controller.navigate(EInkScreen.WebDavSync)
+                                },
                                 onOpenThemeDebug = {
                                     controller.navigate(EInkScreen.ThemeDebug)
                                 },
@@ -289,6 +293,12 @@ fun EInkApp(
                         is EInkScreen.FontSettings -> {
                             FontSettingsRoute(
                                 fromReader = screen.fromReader,
+                                onBack = { controller.pop() },
+                            )
+                        }
+
+                        is EInkScreen.WebDavSync -> {
+                            WebDavSyncRoute(
                                 onBack = { controller.pop() },
                             )
                         }

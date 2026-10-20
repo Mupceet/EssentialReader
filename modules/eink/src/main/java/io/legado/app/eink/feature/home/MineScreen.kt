@@ -77,6 +77,7 @@ internal fun MineScreen(
     onPageDown: () -> Unit = {},
     updateViewModel: EInkAppUpdateViewModel,
     onOpenFontSettings: () -> Unit = {},
+    onOpenWebDavSync: () -> Unit = {},
     onOpenFullMode: () -> Unit = {},
     onOpenThemeDebug: () -> Unit = {},
     onOpenComponentGallery: () -> Unit = {},
@@ -86,11 +87,10 @@ internal fun MineScreen(
 ) {
     val globalSettings = EInkEngineRegistry.globalSettings
     val appUpdateEngine = EInkEngineRegistry.appUpdateEngine
+    val backupSyncEngine = EInkEngineRegistry.backupSyncEngine
     val context = LocalContext.current
     var autoRefresh by remember { mutableStateOf(globalSettings.autoRefreshBook) }
     var defaultToRead by remember { mutableStateOf(globalSettings.defaultToRead) }
-    // 写路径 fire-and-forget（getter 不保证立即可见新值），本地乐观状态
-    var syncProgress by remember { mutableStateOf(globalSettings.syncReadingProgress) }
     var volumeKeyPage by remember { mutableStateOf(globalSettings.volumeKeyPage) }
     val currentVersionName = remember(context) { context.readAppVersionName() }
     val scope = rememberCoroutineScope()
@@ -115,6 +115,20 @@ internal fun MineScreen(
             )
         }
         item { EInkHorizontalDivider() }
+        // 备份与恢复：云端备份端口开放管理能力位才渲染（WebDAV 配置、
+        // 手动备份/恢复与同步阅读进度开关的模块内闭环入口，见
+        // WebDavSyncScreen——进度同步依赖 WebDAV 配置才生效，开关随迁该页）。
+        // 紧跟字体设置排布：两个跳转条目相邻成组，其后为开关行
+        if (backupSyncEngine?.supportsWebDavManagement == true) {
+            item {
+                MineEntry(
+                    label = "备份与恢复",
+                    sublabel = "WebDAV 备份、恢复与进度同步",
+                    onClick = onOpenWebDavSync
+                )
+            }
+            item { EInkHorizontalDivider() }
+        }
         item {
             MineToggleRow(
                 label = "自动刷新",
@@ -150,19 +164,6 @@ internal fun MineScreen(
                 checked = globalSettings.useDefaultCover,
                 onToggle = {
                     globalSettings.useDefaultCover = !globalSettings.useDefaultCover
-                }
-            )
-        }
-        item { EInkHorizontalDivider() }
-        item {
-            MineToggleRow(
-                label = "同步阅读进度",
-                description = "进入/退出阅读时与云端同步",
-                checked = syncProgress,
-                onToggle = {
-                    val next = !syncProgress
-                    globalSettings.syncReadingProgress = next
-                    syncProgress = next
                 }
             )
         }
