@@ -1,49 +1,49 @@
 {
   "tag_name": "3.26.17-beta.34",
   "name": "Pre-release 3.26.17-beta.34",
-  "body": "**此版本为测试版，会存在不稳定问题。**\n\n# 更新日志\n\n墨本阅读——开源阅读 legado 的墨水屏增强发行版：同一本书，两种读法。\n\n## 3.26.17-beta（预发布）\n\n本次更新：掌阅定制机型支持阅读锁屏——息屏后锁屏壁纸自动变成当前在读的书；同时修复墨水屏书架分组的几处使用问题。\n\n### 新增\n\n* 阅读锁屏（掌阅定制机型）：跟随设备的锁屏显示设置，息屏后系统锁屏壁纸自动显示当前在读的书，封面样式会自动优先加载清晰大图\n\n### 修复\n\n* 完整模式中设为私密的分组，不会再出现在墨水屏书架和分组列表里，也不会因上次的浏览位置被带出\n\n* 打开调整分组、筛选菜单或书架样式面板时，音量键不再误翻面板背后的书架页\n\n* 在这些面板里按返回键，会先收起面板并保存调整，不再直接退出应用\n\n* 存储写入异常时切换筛选、进出分组可能闪退——已加固\n\n* 字体设置面板的行距与滑条对齐细节修正",
+  "body": "**此版本为测试版，会存在不稳定问题。**\n\n# 更新日志\n\n墨本阅读——开源阅读 legado 的墨水屏增强发行版：同一本书，两种读法。\n\n## 3.26.17-beta（预发布）\n\n本次更新：墨水屏新增「备份与恢复」设置页——不进完整模式也能配置 WebDAV 并完成云端备份与恢复。\n\n### 新增\n\n* 备份与恢复（墨水屏）：「我的」页新增设置页，可直接配置 WebDAV 服务器地址、账号、密码、同步文件夹与设备名称，支持测试服务、立即备份与恢复云端最新备份；「同步阅读进度」开关移入该页，配置账号密码后即可开启。配置与完整模式共用同一份，两侧改动互相同步",
   "prerelease": true,
   "created_at": "2026-10-19T13:41:34Z",
   "assets": [
     {
       "browser_download_url": "https://github.com/Mupceet/EssentialReader/releases/download/3.26.17-beta.34/mapping.txt",
       "content_type": "text/plain",
-      "created_at": "2026-10-19T14:52:06Z",
+      "created_at": "2026-10-20T14:51:04Z",
       "download_count": 0,
-      "id": 656568954,
+      "id": 659608532,
       "name": "mapping.txt",
       "state": "uploaded",
-      "url": "https://api.github.com/repos/Mupceet/EssentialReader/releases/assets/656568954"
+      "url": "https://api.github.com/repos/Mupceet/EssentialReader/releases/assets/659608532"
     },
     {
       "browser_download_url": "https://github.com/Mupceet/EssentialReader/releases/download/3.26.17-beta.34/moben-3.26.17-beta.34-arm64-v8a.apk",
       "content_type": "application/vnd.android.package-archive",
-      "created_at": "2026-10-19T14:52:06Z",
+      "created_at": "2026-10-20T14:51:04Z",
       "download_count": 0,
-      "id": 656568956,
+      "id": 659608529,
       "name": "moben-3.26.17-beta.34-arm64-v8a.apk",
       "state": "uploaded",
-      "url": "https://api.github.com/repos/Mupceet/EssentialReader/releases/assets/656568956"
+      "url": "https://api.github.com/repos/Mupceet/EssentialReader/releases/assets/659608529"
     },
     {
       "browser_download_url": "https://github.com/Mupceet/EssentialReader/releases/download/3.26.17-beta.34/moben-3.26.17-beta.34-armeabi-v7a.apk",
       "content_type": "application/vnd.android.package-archive",
-      "created_at": "2026-10-19T14:52:06Z",
+      "created_at": "2026-10-20T14:51:04Z",
       "download_count": 0,
-      "id": 656568963,
+      "id": 659608525,
       "name": "moben-3.26.17-beta.34-armeabi-v7a.apk",
       "state": "uploaded",
-      "url": "https://api.github.com/repos/Mupceet/EssentialReader/releases/assets/656568963"
+      "url": "https://api.github.com/repos/Mupceet/EssentialReader/releases/assets/659608525"
     },
     {
       "browser_download_url": "https://github.com/Mupceet/EssentialReader/releases/download/3.26.17-beta.34/moben-3.26.17-beta.34.apk",
       "content_type": "application/vnd.android.package-archive",
-      "created_at": "2026-10-19T14:52:06Z",
+      "created_at": "2026-10-20T14:51:04Z",
       "download_count": 0,
-      "id": 656568952,
+      "id": 659608522,
       "name": "moben-3.26.17-beta.34.apk",
       "state": "uploaded",
-      "url": "https://api.github.com/repos/Mupceet/EssentialReader/releases/assets/656568952"
+      "url": "https://api.github.com/repos/Mupceet/EssentialReader/releases/assets/659608522"
     }
   ]
 }
