@@ -80,8 +80,9 @@ jobs:
           elif [[ ("${{ github.event_name }}" == "push" || "${{ inputs.publish }}" == "true") && "${{ github.ref }}" == "refs/heads/eink/port/md3/modules" ]]; then
             # 标记为测试版 (VERSION_SUFFIX=1 或其他/空)，且在发布分支推送
 
-            # 查找匹配当前 CURRENT_VERSION 的上一个 BETA TAG (e.g., 3.26.4-beta.X)
-            LAST_MATCHING_TAG=$(git tag --list "$CURRENT_VERSION-beta.*" --sort=-committerdate | head -n 1)
+            # 查找匹配当前 CURRENT_VERSION 的最大 BETA TAG (e.g., 3.26.4-beta.X)
+            # 按版本序而非提交时间排序：多个 tag 指向同一提交时 committerdate 打平，会取到旧号
+            LAST_MATCHING_TAG=$(git tag --list "$CURRENT_VERSION-beta.*" --sort=-v:refname | head -n 1)
 
             if [[ $LAST_MATCHING_TAG =~ [0-9]+\.[0-9]+\.[0-9]+-beta\.([0-9]+) ]]; then
               LAST_BUILD_NUM="${BASH_REMATCH[1]}"
@@ -320,12 +321,21 @@ jobs:
 
       - name: 创建 Tag
         run: |
-          # 检查 Tag 是否已存在，避免重复创建
-          if ! git tag -l ${{ needs.prepare.outputs.versionL }} | grep -q ${{ needs.prepare.outputs.versionL }}; then
-            git tag ${{ needs.prepare.outputs.versionL }} 
-            git push origin ${{ needs.prepare.outputs.versionL }}
+          TAG_NAME="${{ needs.prepare.outputs.versionL }}"
+          # Tag 已存在时分两种情况：指向当前提交 = 同一代码重跑补发布，放行；
+          # 指向其他提交 = 算出的号撞上历史发布，继续会把已发布版本的资产静默覆盖掉，直接失败
+          if git rev-parse -q --verify "refs/tags/$TAG_NAME" >/dev/null; then
+            TAG_COMMIT=$(git rev-parse "$TAG_NAME^{commit}")
+            HEAD_COMMIT=$(git rev-parse HEAD)
+            if [[ "$TAG_COMMIT" == "$HEAD_COMMIT" ]]; then
+              echo "Tag $TAG_NAME 已存在且指向当前提交（重跑补发布），跳过创建。"
+            else
+              echo "::error::Tag $TAG_NAME 已存在且指向 $TAG_COMMIT（当前构建提交为 $HEAD_COMMIT）。为避免覆盖已发布版本，本次发布中止；请先核对 tag 布局。"
+              exit 1
+            fi
           else
-            echo "Tag ${{ needs.prepare.outputs.versionL }} 已存在，跳过创建。"
+            git tag "$TAG_NAME"
+            git push origin "$TAG_NAME"
           fi
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
