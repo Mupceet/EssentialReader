@@ -1031,13 +1031,11 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application),
 
     /**
      * 水波纹翻页档位（E-InK 自有偏好，默认关）：写入 + 乐观更新，翻页时
-     * 实时读 UiState。点按循环 关闭→慢速→标准→快速→关闭。
+     * 实时读 UiState。段选按钮直接选定目标档（关/慢速/标准/快速）。
      */
-    fun cyclePageTurnRippleMode() {
-        val current = EInkEngineRegistry.globalSettings.pageTurnRippleMode
-        val next = PageTurnRippleMode.entries[(current.ordinal + 1) % PageTurnRippleMode.entries.size]
-        EInkEngineRegistry.globalSettings.pageTurnRippleMode = next
-        _uiState.update { it.copy(pageTurnRippleMode = next) }
+    fun setPageTurnRippleMode(mode: PageTurnRippleMode) {
+        EInkEngineRegistry.globalSettings.pageTurnRippleMode = mode
+        _uiState.update { it.copy(pageTurnRippleMode = mode) }
     }
 
     /**

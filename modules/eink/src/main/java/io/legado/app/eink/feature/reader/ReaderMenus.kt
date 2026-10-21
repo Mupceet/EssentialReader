@@ -36,6 +36,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import io.legado.app.eink.R
+import io.legado.app.eink.contract.PageTurnRippleMode
 import io.legado.app.eink.contract.ReaderStyleCatalog
 import io.legado.app.eink.contract.ReaderStyleParamIds as Ids
 import io.legado.app.eink.contract.ReaderTextStyle
@@ -44,6 +45,7 @@ import io.legado.app.eink.designsystem.content.EInkText
 import io.legado.app.eink.designsystem.control.EInkButton
 import io.legado.app.eink.designsystem.control.EInkCloseButton
 import io.legado.app.eink.designsystem.control.EInkDialog
+import io.legado.app.eink.designsystem.control.EInkSegmentedButton
 import io.legado.app.eink.designsystem.control.EInkSliderRow
 import io.legado.app.eink.designsystem.control.EInkSteppedSlider
 import io.legado.app.eink.designsystem.interaction.eInkActionColors
@@ -663,27 +665,18 @@ internal fun ReaderOtherPanel(
     state: ReaderUiState,
     onToggleVolumeKeyPage: () -> Unit,
     onTogglePullDownBookmark: () -> Unit,
-    onCyclePageTurnRippleMode: () -> Unit,
+    onSetPageTurnRippleMode: (PageTurnRippleMode) -> Unit,
     onToggleHideStatusBar: () -> Unit,
     onToggleShowReviewBubbles: () -> Unit,
     onOpenTapZones: () -> Unit,
 ) {
     // 行序按功能域分组：翻页交互 → 界面显示 → 阅读区手势（点击区域设置
     // 是面板内唯一的子界面入口行，箭头样式与开关行不同，固定收尾避免
-    // 异质样式插在中间；能力门控产生的洞在各宿主上仍保持组结构完整）
+    // 异质样式插在中间；能力门控产生的洞在各宿主上仍保持组结构完整。
+    // 例外：水波纹段选行虽属翻页交互，因形态与开关行不同，收在开关组
+    // 尾部紧贴点击区域设置）
     // 音量键翻页纯按键语义（阅读页按键处理器实时读端口值），切换不触发重排
     ToggleRow(label = "音量键翻页", checked = state.volumeKeyPage, onToggle = onToggleVolumeKeyPage)
-    // 水波纹翻页档位：宿主未注册波纹端口或设备不支持时隐藏（能力门控，
-    // 同下书签/段评——不留点了无效的死开关）
-    if (io.legado.app.eink.contract.EInkEngineRegistry.pageTurnEffectEngine?.supported == true) {
-        CycleValueRow(
-            label = "水波纹翻页动画",
-            value = pageTurnRippleModeLabel(state.pageTurnRippleMode),
-            selected = state.pageTurnRippleMode !=
-                io.legado.app.eink.contract.PageTurnRippleMode.OFF,
-            onClick = onCyclePageTurnRippleMode,
-        )
-    }
     ToggleRow(label = "隐藏状态栏", checked = state.hideStatusBar, onToggle = onToggleHideStatusBar)
     if (io.legado.app.eink.contract.EInkEngineRegistry.globalSettings.supportsReviewBubbles) {
         ToggleRow(label = "显示段评气泡", checked = state.showReviewBubbles, onToggle = onToggleShowReviewBubbles)
@@ -692,42 +685,55 @@ internal fun ReaderOtherPanel(
     if (io.legado.app.eink.contract.EInkEngineRegistry.marksEngine?.supportsBookmarks == true) {
         ToggleRow(label = "下拉添加书签", checked = state.pullDownBookmark, onToggle = onTogglePullDownBookmark)
     }
+    // 水波纹翻页档位：段选行与上方开关行形态不同，收在开关组尾部
+    // （点击区域设置之前）；宿主未注册波纹端口或设备不支持时隐藏
+    // （能力门控，同上书签/段评——不留点了无效的死开关）
+    if (io.legado.app.eink.contract.EInkEngineRegistry.pageTurnEffectEngine?.supported == true) {
+        RippleModeRow(
+            mode = state.pageTurnRippleMode,
+            onSelect = onSetPageTurnRippleMode,
+        )
+    }
     OptionRow(label = "点击区域设置", onClick = onOpenTapZones)
 }
 
-/** 水波纹档位界面文案（枚举 → 关/慢速/标准/快速；关闭档与面板其它开关行的「关」一致）。 */
-private fun pageTurnRippleModeLabel(mode: io.legado.app.eink.contract.PageTurnRippleMode): String =
-    when (mode) {
-        io.legado.app.eink.contract.PageTurnRippleMode.OFF -> "关"
-        io.legado.app.eink.contract.PageTurnRippleMode.SLOW -> "慢速"
-        io.legado.app.eink.contract.PageTurnRippleMode.STANDARD -> "标准"
-        io.legado.app.eink.contract.PageTurnRippleMode.FAST -> "快速"
-    }
+/** 水波纹四档段选文案（序 = [PageTurnRippleMode] 声明序：关闭/慢速/标准/快速）。 */
+private val pageTurnRippleModeOptions = listOf("关闭", "慢速", "标准", "快速")
 
 /**
- * 循环档位行：形态同 [ToggleRow]——标签在左（纯展示），档位按钮在右
- * （[EInkButton]，文案随当前档位，如 关/慢速/标准/快速），点按按钮
- * 循环切下一档；选中态（实心反白）= 非关闭档。
+ * 水波纹档位行：标签在左，右侧 [EInkSegmentedButton] 四段（关闭/慢速/
+ * 标准/快速）直接选定目标档，当前档实心反白；同档点击不提交
+ * （与书架 ChoiceRow 同约定）。段选按内容自适应宽度，靠右占位最小
+ * （区别于书架 ChoiceRow 的定宽段选）。
  */
 @Composable
-private fun CycleValueRow(label: String, value: String, selected: Boolean, onClick: () -> Unit) {
+private fun RippleModeRow(
+    mode: PageTurnRippleMode,
+    onSelect: (PageTurnRippleMode) -> Unit,
+) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .height(48.dp)
             .padding(start = EInkSpacing.m, end = EInkSpacing.m + EInkSpacing.s),
         verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(EInkSpacing.s),
     ) {
         EInkText(
-            text = label,
+            text = "水波纹翻页动画",
             modifier = Modifier.weight(1f),
             style = EInkTheme.typography.bodyMedium,
         )
-        EInkButton(
-            text = value,
-            onClick = onClick,
-            modifier = Modifier.width(64.dp),
-            selected = selected,
+        EInkSegmentedButton(
+            options = pageTurnRippleModeOptions,
+            selectedIndex = mode.ordinal,
+            onSelect = { index ->
+                if (index != mode.ordinal) {
+                    onSelect(PageTurnRippleMode.entries[index])
+                }
+            },
+            // 按内容自适应宽度：无 weight 收紧轨道，靠右占位最小
+            distributeEvenly = false,
         )
     }
 }

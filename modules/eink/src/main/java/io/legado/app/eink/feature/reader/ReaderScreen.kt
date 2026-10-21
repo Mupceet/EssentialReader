@@ -995,7 +995,7 @@ fun ReaderRoute(
                             state = uiState,
                             onToggleVolumeKeyPage = viewModel::toggleVolumeKeyPage,
                             onTogglePullDownBookmark = viewModel::togglePullDownBookmark,
-                            onCyclePageTurnRippleMode = viewModel::cyclePageTurnRippleMode,
+                            onSetPageTurnRippleMode = viewModel::setPageTurnRippleMode,
                             onToggleHideStatusBar = viewModel::toggleHideStatusBar,
                             onToggleShowReviewBubbles = viewModel::toggleShowReviewBubbles,
                             onOpenTapZones = { tapZoneEditor = true },

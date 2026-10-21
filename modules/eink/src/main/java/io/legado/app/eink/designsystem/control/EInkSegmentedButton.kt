@@ -20,12 +20,17 @@ import io.legado.app.eink.designsystem.theme.EInkSpacing
 import io.legado.app.eink.designsystem.theme.EInkTheme
 
 /**
- * 多状态分段按钮（2026-10-17 沉淀；首个消费者=底部调整面板显隐开关，
- * 后续扩展：阅读设置面板水波纹档位等多档互斥项）。
+ * 多状态分段按钮（2026-10-17 沉淀；消费者：底部调整面板显隐开关、
+ * 阅读设置面板水波纹档位等多档互斥项）。
  *
  * 形态：相连多段——**轨道整体仅左右两端圆角**，段间结合处无分割线、
  * 无圆角（通高矩形）；**选中段为正常圆角矩形实心高亮**（四角圆角、
  * 2dp 内缩，onSurface 底 + background 反色字）；未选中段透明底 onSurface 字。
+ * 轨道宽度两模式（[distributeEvenly]）：定宽均分（消费方传定宽
+ * modifier，段 weight 均分、高亮盒铺满整段）；内容自适应（各段按
+ * 文案收紧、轨道随内容收缩——段与高亮盒均不得用 weight/
+ * fillMaxWidth，二者会把不定宽段撑满可用最大宽，挤掉兄弟段与
+ * 同行标签）。
  * E-Ink 约束：静态单帧、零动画零阴影。
  */
 @Composable
@@ -34,6 +39,10 @@ fun EInkSegmentedButton(
     selectedIndex: Int,
     onSelect: (Int) -> Unit,
     modifier: Modifier = Modifier,
+    // true=各段均分给定宽度（定宽消费方，如书架 ChoiceRow）；
+    // false=各段按文案收紧、轨道随内容收缩（不定宽消费方，如阅读
+    // 面板水波纹档位行——weight 会强制各段吃满余宽挤没同行标签）
+    distributeEvenly: Boolean = true,
 ) {
     val colors = EInkTheme.colorScheme
     Row(
@@ -44,8 +53,7 @@ fun EInkSegmentedButton(
         options.forEachIndexed { index, option ->
             val selected = index == selectedIndex
             Box(
-                modifier = Modifier
-                    .weight(1f)
+                modifier = (if (distributeEvenly) Modifier.weight(1f) else Modifier)
                     .fillMaxHeight()
                     .einkClickable(
                         enabled = true,
@@ -59,7 +67,12 @@ fun EInkSegmentedButton(
                 Box(
                     modifier = Modifier
                         .fillMaxHeight()
-                        .fillMaxWidth()
+                        .then(
+                            // 定宽均分：高亮盒铺满整段；自适应：随文案收紧
+                            // （fillMaxWidth 会把不定宽段撑满可用宽，挤掉
+                            // 兄弟段与同行标签）
+                            if (distributeEvenly) Modifier.fillMaxWidth() else Modifier
+                        )
                         .padding(
                             start = if (index == 0) 2.dp else 0.dp,
                             end = if (index == options.lastIndex) 2.dp else 0.dp,
@@ -81,9 +94,14 @@ fun EInkSegmentedButton(
                         color = if (selected) colors.background else colors.onSurface,
                         maxLines = 1,
                         softWrap = false,
-                        // 未选中态收窄边距（宽度紧张时保证四字完整显示）
+                        // 定宽均分：未选中态收窄边距（宽度紧张时保证四字完整
+                        // 显示）；自适应：统一 s 边距，切换选中不改段宽
                         modifier = Modifier.padding(
-                            horizontal = if (selected) EInkSpacing.s else EInkSpacing.xxs
+                            horizontal = if (distributeEvenly && !selected) {
+                                EInkSpacing.xxs
+                            } else {
+                                EInkSpacing.s
+                            }
                         ),
                     )
                 }
