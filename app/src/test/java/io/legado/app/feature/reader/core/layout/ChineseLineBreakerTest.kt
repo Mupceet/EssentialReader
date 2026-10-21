@@ -69,6 +69,34 @@ class ChineseLineBreakerTest {
         assertArrayEquals(floatArrayOf(20f, 20f, 20f), result.lineWidthsPx, 0f)
     }
 
+    /**
+     * 词间空格只作行尾断点：断在空格上时，空格留在上一行行尾（尾随空格不可见），
+     * 下一行仍从词首开始。否则英文正文每换一行都会在第一个词前多出一个空格。
+     */
+    @Test
+    fun wordSpaceStaysAtTheEndOfThePreviousLine() {
+        val clusters = "one two three four five six seven".map(Char::toString)
+        for (limit in 25..120) {
+            val result = breakText(clusters, limit)
+            val starts = result.lineClusterStarts
+            for (line in 1 until result.lineCount) {
+                assertFalse(
+                    "limit=$limit 第 $line 行以空格开头",
+                    ChineseLineBreaker.isWordSpace(clusters[starts[line]]),
+                )
+            }
+        }
+    }
+
+    /** 连续多个空格同样不能把后面的空格带到行首。 */
+    @Test
+    fun consecutiveWordSpacesStayAtTheEndOfThePreviousLine() {
+        val result = breakText("aa  bb".map(Char::toString), 35)
+
+        assertArrayEquals(intArrayOf(0, 4, 6), result.lineClusterStarts)
+        assertArrayEquals(floatArrayOf(40f, 20f), result.lineWidthsPx, 0f)
+    }
+
     @Test
     fun latinHandlingDoesNotInterceptCjkPunctuation() {
         val result = breakText(listOf("我", "是", "，", "三"), 25)
@@ -191,5 +219,22 @@ class ChineseLineBreakerTest {
 
         assertArrayEquals(intArrayOf(0, 2, 10, 11), result.lineStarts)
         assertArrayEquals(floatArrayOf(20f, 80f, 10f), result.lineWidthsPx, 0f)
+    }
+
+    /**
+     * 一整串连续收尾标点（`Yes！！！！！！！ ”`）比行尾剩余空间宽时，不许整块掉到下一行
+     * 留下空洞：标点与标点之间允许断开，本行填满。
+     * 单个收尾标点（`。”` 这类不同标点之间）归悬挂与回退分支管，这条只放开同一标点连打。
+     */
+    @Test
+    fun consecutiveClosingPunctuationSplitsToFillTheLine() {
+        val result = ChineseLineBreaker(
+            listOf("“", "￼", "Y", "e", "s", "！", "！", "！",
+                "！", "！", "！", "！", "”"),
+            listOf(10f, 40f, 6f, 6f, 6f, 10f, 10f, 10f, 10f, 10f, 10f, 10f, 10f),
+            0, 100, 10f, 0f,
+        )
+        assertArrayEquals(intArrayOf(0, 8, 13), result.lineClusterStarts)
+        assertArrayEquals(floatArrayOf(98f, 50f), result.lineWidthsPx, 0f)
     }
 }

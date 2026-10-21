@@ -30,7 +30,10 @@ import io.legado.app.utils.postEvent
 import kotlinx.collections.immutable.toImmutableSet
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
 
@@ -55,6 +58,13 @@ class ReadAloudDelegate(
     private val aiProfileGateway: AiProfileGateway,
     private val syncReadAloudVoicesUseCase: SyncReadAloudVoicesUseCase,
 ) {
+
+    val readerSessions = combine(
+        readAloudSessionStore.state, ReadBook.snapshot,
+        ReadAloud.bookSession.state.map { it.book?.bookUrl }.distinctUntilChanged(),
+    ) { session, reader, playingBookUrl ->
+        session to (reader.bookUrl != null && reader.bookUrl == playingBookUrl)
+    }
 
     interface Host {
         val uiState: ReadBookUiState
@@ -170,7 +180,7 @@ class ReadAloudDelegate(
     // --- 播放控制 ---
 
     fun updateProgress(chapterStart: Int) {
-        if (BaseReadAloudService.isPlay() && chapterStart > 0) {
+        if (ReadBook.isCurrentBookReadAloud && BaseReadAloudService.isPlay() && chapterStart > 0) {
             host.publishReadAloudProgress(chapterStart)
         }
     }
@@ -185,16 +195,13 @@ class ReadAloudDelegate(
     fun nextParagraph() = ReadAloud.nextParagraph(context)
 
     /** 朗读面板换章：朗读驱动的章节移动，页面跟随朗读，不视为手动脱离。 */
-    fun prevChapter() = BaseReadAloudService.withSpeechNavigation {
-        ReadBook.moveToPrevChapter(upContent = true, toLast = false)
-    }
+    fun prevChapter() = ReadAloud.previousChapter(context)
 
-    fun nextChapter() = BaseReadAloudService.withSpeechNavigation {
-        ReadBook.moveToNextChapter(true)
-    }
+    fun nextChapter() = ReadAloud.nextChapter(context)
 
     /** 回到朗读位置：恢复页面跟随朗读，并跳到朗读所在章节/字符位置。全程不打断当前朗读。 */
     fun backToSpeakingPosition() {
+        if (!ReadBook.isCurrentBookReadAloud) return
         readAloudSessionStore.restoreReadAloudFollow()
         val speakingChapterIndex = BaseReadAloudService.currentChapterIndex
         val speakingChapterStart = BaseReadAloudService.currentProgress
@@ -236,27 +243,27 @@ class ReadAloudDelegate(
      * 关闭播放弹层时不会停在半开的菜单上。
      */
     fun openPlayer() {
-        host.updateState { it.copy(menuState = ReadBookMenuState(), activeSheet = null) }
+        host.updateState { it.copy(menuState = ReadBookMenuState()).clearSheets() }
         ReadAloudPlayerOverlayBus.request()
     }
 
     /** 经典朗读控制面板：阅读菜单里的一页，不遮挡正文区域之外的交互。 */
     fun openClassicControls() {
-        host.updateState { it.copy(activeSheet = null) }
+        host.updateState { it.clearSheets() }
         host.openReadMenuRoute(ReadBookMenuRoute.ReadAloud)
     }
 
     fun openConfigSheet() {
         // 从底栏重新打开算「新一次设置」，回到常规页；被整屏页盖住再回来才停在那一 tab
         host.updateState {
-            it.copy(activeSheet = ReadBookSheet.ReadAloudConfig, readAloudConfigTab = 0)
+            it.copy(readAloudConfigTab = 0).withSheet(ReadBookSheet.ReadAloudConfig)
         }
         scope.launch { syncConfiguredTtsVoices() }
     }
 
     /** 卡片里滑页/点 tab：tab 住在状态里，弹层被拆掉重建才不会退回常规。 */
     fun setConfigTab(tab: Int) {
-        host.updateState { it.copy(readAloudConfigTab = tab.coerceIn(0, 1)) }
+        host.updateState { it.copy(readAloudConfigTab = tab.coerceIn(0, 2)) }
     }
 
     /*
@@ -279,6 +286,11 @@ class ReadAloudDelegate(
         }
     }
 
+    /** 朗读设置里的整屏子页（角色声音池 / 背景音乐池 / 朗读胶囊外观）：只负责把意图发出去。 */
+    fun openReadAloudSubPage(page: ReadAloudSubPage) {
+        host.emitEffect(ReadBookEffect.OpenReadAloudSubPage(page))
+    }
+
     fun openSystemTtsSettings() {
         host.emitEffect(ReadBookEffect.OpenSystemTtsSettings)
     }
@@ -296,8 +308,7 @@ class ReadAloudDelegate(
         host.updateState {
             it.copy(
                 preDownloadNum = host.preDownloadNum,
-                activeSheet = ReadBookSheet.PreDownloadConfig,
-            )
+            ).withSheet(ReadBookSheet.PreDownloadConfig)
         }
     }
 
@@ -306,8 +317,7 @@ class ReadAloudDelegate(
             it.copy(
                 preSynthesisConcurrency =
                     readAloudSettingsRepository.currentSettings.ttsPreSynthesisConcurrency,
-                activeSheet = ReadBookSheet.PreSynthesisConcurrencyConfig,
-            )
+            ).withSheet(ReadBookSheet.PreSynthesisConcurrencyConfig)
         }
     }
 
@@ -316,8 +326,7 @@ class ReadAloudDelegate(
             it.copy(
                 readAloudParagraphInterval =
                     readAloudSettingsRepository.currentSettings.ttsParagraphInterval,
-                activeSheet = ReadBookSheet.ParagraphIntervalConfig,
-            )
+            ).withSheet(ReadBookSheet.ParagraphIntervalConfig)
         }
     }
 
@@ -325,8 +334,7 @@ class ReadAloudDelegate(
         host.updateState {
             it.copy(
                 audioCacheCleanTime = readAloudSettingsRepository.currentSettings.audioCacheCleanTime,
-                activeSheet = ReadBookSheet.AudioCacheCleanConfig,
-            )
+            ).withSheet(ReadBookSheet.AudioCacheCleanConfig)
         }
     }
 
@@ -335,7 +343,7 @@ class ReadAloudDelegate(
             readSettingsRepository.setPreDownloadNum(value)
         }
         host.updateState {
-            it.copy(preDownloadNum = value, activeSheet = ReadBookSheet.ReadAloudConfig)
+            it.copy(preDownloadNum = value).withSheet(ReadBookSheet.ReadAloudConfig)
         }
     }
 
@@ -346,7 +354,7 @@ class ReadAloudDelegate(
             }
         }
         host.updateState {
-            it.copy(preSynthesisConcurrency = value, activeSheet = ReadBookSheet.ReadAloudConfig)
+            it.copy(preSynthesisConcurrency = value).withSheet(ReadBookSheet.ReadAloudConfig)
         }
     }
 
@@ -355,7 +363,7 @@ class ReadAloudDelegate(
             readAloudSettingsRepository.update { it.copy(audioCacheCleanTime = value) }
         }
         host.updateState {
-            it.copy(audioCacheCleanTime = value, activeSheet = ReadBookSheet.ReadAloudConfig)
+            it.copy(audioCacheCleanTime = value).withSheet(ReadBookSheet.ReadAloudConfig)
         }
     }
 
@@ -566,7 +574,7 @@ class ReadAloudDelegate(
      */
     fun setMultiRoleCast(value: Boolean) {
         scope.launch {
-            val shouldRestart = BaseReadAloudService.isRun
+            val shouldRestart = ReadBook.isCurrentBookReadAloud
             val resumePlaying = shouldRestart && !BaseReadAloudService.pause
             val chapterPosition = readAloudSessionStore.state.value.playback.chapterPosition
             readAloudSettingsRepository.update { it.copy(multiRoleCast = value) }
@@ -604,7 +612,7 @@ class ReadAloudDelegate(
      * 而不是让它按当前页重新起播（不保位的重载会把读过半章的朗读拽回章首）。
      */
     private fun readsDurChapterAloud(): Boolean =
-        BaseReadAloudService.isRun &&
+        ReadBook.isCurrentBookReadAloud &&
             BaseReadAloudService.currentChapterIndex == ReadBook.durChapterIndex
 
     /**
@@ -624,7 +632,7 @@ class ReadAloudDelegate(
      */
     fun setUseMultiSpeaker(value: Boolean) {
         scope.launch {
-            val shouldRestart = BaseReadAloudService.isRun
+            val shouldRestart = ReadBook.isCurrentBookReadAloud
             val resumePlaying = shouldRestart && !BaseReadAloudService.pause
             val chapterPosition = readAloudSessionStore.state.value.playback.chapterPosition
             readAloudSettingsRepository.update { it.copy(useMultiSpeaker = value) }

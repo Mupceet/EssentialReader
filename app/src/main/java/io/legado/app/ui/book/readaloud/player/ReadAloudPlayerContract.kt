@@ -49,11 +49,26 @@ data class ReadAloudPlayerUiState(
     val timerChapters: Int = 0,
     val bgMode: Int = 0,
     val activeSheet: ReadAloudPlayerSheet? = null,
+    val voices: ImmutableList<ReadAloudVoiceItemUi> = persistentListOf(),
+)
+
+@Stable
+data class ReadAloudVoiceItemUi(
+    val id: String,
+    val name: String,
+    val engineType: String,
+    /** 引擎分组键的一部分：只有 system 会为空。 */
+    val engineId: String = "",
+    val engineName: String,
+    val isSelected: Boolean = false,
+    /** 引擎级条目（没有具体 speaker），在音色列表里作为该引擎的默认音色。 */
+    val isEngineDefault: Boolean = false,
 )
 
 sealed interface ReadAloudPlayerSheet {
     data object Speed : ReadAloudPlayerSheet
     data object Timer : ReadAloudPlayerSheet
+    data object Voice : ReadAloudPlayerSheet
 }
 
 sealed interface ReadAloudPlayerIntent {
@@ -84,6 +99,7 @@ sealed interface ReadAloudPlayerIntent {
     data class OpenSheet(val sheet: ReadAloudPlayerSheet) : ReadAloudPlayerIntent
     data object DismissSheet : ReadAloudPlayerIntent
     data class SeekTo(val chapterPosition: Int) : ReadAloudPlayerIntent
+    data class SelectVoice(val voiceId: String) : ReadAloudPlayerIntent
 }
 
 sealed interface ReadAloudPlayerEffect {

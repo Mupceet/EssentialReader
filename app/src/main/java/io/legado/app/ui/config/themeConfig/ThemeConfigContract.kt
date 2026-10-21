@@ -56,6 +56,7 @@ sealed interface ThemeConfigIntent {
     data class SetThemeMode(val value: String) : ThemeConfigIntent
     data class SetComposeEngine(val value: String) : ThemeConfigIntent
     data class SetPredictiveBackEnabled(val enabled: Boolean) : ThemeConfigIntent
+    data class SetReaderSharedElementEnabled(val enabled: Boolean) : ThemeConfigIntent
     data class SetFontScale(val value: Int) : ThemeConfigIntent
     data class SetShowStatusBar(val visible: Boolean) : ThemeConfigIntent
     data class SetSwipeAnimation(val enabled: Boolean) : ThemeConfigIntent
@@ -63,6 +64,7 @@ sealed interface ThemeConfigIntent {
     data class SetUseFloatingBottomBar(val enabled: Boolean) : ThemeConfigIntent
     data class SetUseFloatingBottomBarLiquidGlass(val enabled: Boolean) : ThemeConfigIntent
     data class SetTabletInterface(val value: String) : ThemeConfigIntent
+    data class SetMultiPaneMode(val value: String) : ThemeConfigIntent
     data class SetLabelVisibilityMode(val value: String) : ThemeConfigIntent
     data class SetMiuixMonet(val enabled: Boolean) : ThemeConfigIntent
     data class SetDynamicColors(val enabled: Boolean) : ThemeConfigIntent

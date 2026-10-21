@@ -16,6 +16,13 @@ package io.legado.app.feature.reader.core.navigation
  */
 object ReaderPartialPagePolicy {
 
+    /** 未排完的当前章不能在翻页预览里提前露出已预排的邻章正文。 */
+    fun canPreviewPage(
+        currentChapterIndex: Int,
+        candidateChapterIndex: Int,
+        currentChapterStreaming: Boolean,
+    ): Boolean = !currentChapterStreaming || currentChapterIndex == candidateChapterIndex
+
     /** 一页成型后是否立刻换窗（旧 View 三条 `upContent(offset)` 触发条件）。 */
     fun shouldPublishPage(
         chapterOffset: Int,
@@ -28,8 +35,53 @@ object ReaderPartialPagePolicy {
         chapterOffset < 0 -> false
         chapterOffset > 0 -> pageIndex <= NEXT_CHAPTER_EARLY_PAGE_LIMIT
         containsReadingPosition -> true
+        // View 的 TextChapter.textPages 原地追加，nextPage 会直接看到新页；Canvas 的
+        // ReaderPageWindow 是不可变快照，紧邻当前页成型后必须主动重发窗口。
+        pageIndex == currentPageIndex + 1 -> true
         continuousScroll -> maxOf(pageIndex - SCROLL_LOOKAHEAD_PAGES, 0) < currentPageIndex
         else -> false
+    }
+
+    /**
+     * 要不要（重新）发布“加载中”占位页 / 消息页。
+     *
+     * 对照旧 View `TextPageFactory.curPage`：`pageSource.msg?.let { TextPage(text = it) }`
+     * 排在章节页**之前**，且 `ReadView.upContent` 每次重绘都重新取页——所以只要 `msg` 非空，
+     * 无论正文是否已排好都会整页换成消息页；`msg` 清空后才回到正文页。
+     *
+     * Canvas 的窗口是不变快照，必须显式判要不要重发，这里把同一套优先级写出来：
+     * 1. 窗口正好在显示同一张页（同章、同文案）→ 不重发（占位页本身幂等）；
+     * 2. 有 `msg` → 一律重发消息页（旧 View 的 msg 优先）；
+     * 3. 没有 `msg` 且当前章正文已装载 → 保留真实页（Canvas 按批成型，把已完成的页换成
+     *    占位页会变成误导性加载屏，这是既有的刻意差异）；
+     * 4. 没有 `msg` 且正文没到位 → 窗口停在本章占位页就不动，否则发占位页。
+     *
+     * @param currentInputReady 当前章正文是否已装载
+     * @param visibleChapterIndex 窗口里可见页所属章节；null 表示还没有页
+     * @param visibleIsPlaceholder 可见页是不是占位页 / 消息页
+     * @param visibleText 可见占位页的文案
+     * @param messageText `ReadBook.msg`；非空表示当前有“加载中 / 打开失败 / 目录更新中”提示
+     * @param placeholderText 没有消息时的占位文案（“加载数据中”）
+     */
+    fun shouldPublishLoadingPlaceholder(
+        targetChapterIndex: Int,
+        currentInputReady: Boolean,
+        visibleChapterIndex: Int?,
+        visibleIsPlaceholder: Boolean,
+        visibleText: String?,
+        messageText: String?,
+        placeholderText: String,
+    ): Boolean {
+        val expectedText = messageText ?: placeholderText
+        if (visibleIsPlaceholder &&
+            visibleChapterIndex == targetChapterIndex &&
+            visibleText == expectedText
+        ) {
+            return false
+        }
+        if (messageText != null) return true
+        if (currentInputReady) return false
+        return visibleChapterIndex != targetChapterIndex
     }
 
     /**

@@ -41,9 +41,12 @@ import io.legado.app.domain.gateway.AppLocaleGateway
 import io.legado.app.domain.gateway.BackupSettingsGateway
 import io.legado.app.domain.gateway.ReadStyleGateway
 import io.legado.app.eink.bridge.EinkLegacyPrefsStore
+import io.legado.app.data.repository.HttpTtsRepository
+import io.legado.app.data.entities.ReadAloudVoiceEntity
 import io.legado.app.help.DirectLinkUpload
 import io.legado.app.help.LauncherIconHelp
 import io.legado.app.help.book.isLocal
+import io.legado.app.help.readaloud.speech.HttpTtsCatalogParser
 import io.legado.app.help.book.upType
 import io.legado.app.help.config.AppConfigStore
 import io.legado.app.help.config.LocalConfig
@@ -258,10 +261,7 @@ object Restore : KoinComponent {
         }
         if (BackupConfig.dbIsNotIgnored("httpTTS")) {
             fileToListT<HttpTTS>(path, "httpTTS.json")?.let {
-                try {
-                    appDb.httpTTSDao.insert(*it.toTypedArray())
-                } catch (_: SQLiteConstraintException) {
-                }
+                restoreHttpTtsCatalogs(path, "httpTTS.json", it)
             }
         }
         if (BackupConfig.dbIsNotIgnored("dictRule")) {
@@ -614,6 +614,29 @@ object Restore : KoinComponent {
             e.printStackTrace()
         }
         return map
+    }
+
+    /**
+     * 恢复源自带的发言人 / 情绪目录。
+     *
+     * `speakersJson` / `emotionsJson` 不写回源行，目录的权威副本在 `read_aloud_voices`，
+     * 所以只能拿原始文本再解析一次——光看反序列化出来的实体拿不到这两个字段。
+     */
+    private suspend fun restoreHttpTtsCatalogs(
+        path: String,
+        fileName: String,
+        sources: List<HttpTTS>,
+    ) {
+        val file = File(path, fileName)
+        if (!file.exists()) return
+        val drafts = HttpTtsCatalogParser.parseList(file.readText())
+        require(drafts.size == sources.size) { "httpTTS 目录条数与源条数不一致" }
+        val voicesFile = File(path, "httpTtsVoices.json")
+        val voices = if (voicesFile.exists()) {
+            // 不能把损坏的新备份当成旧备份忽略，否则会静默丢失排除状态。
+            GSON.fromJsonArray<ReadAloudVoiceEntity>(voicesFile.readText()).getOrThrow()
+        } else null
+        get<HttpTtsRepository>().restore(sources.zip(drafts), voices)
     }
 
     private inline fun <reified T> fileToListT(path: String, fileName: String): List<T>? {

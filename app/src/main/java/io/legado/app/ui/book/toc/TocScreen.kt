@@ -1,6 +1,5 @@
 package io.legado.app.ui.book.toc
 
-import android.content.Intent
 import android.net.Uri
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
@@ -36,6 +35,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.FormatListBulleted
 import androidx.compose.material.icons.filled.BookmarkAdd
@@ -54,8 +54,6 @@ import androidx.compose.material.icons.rounded.LocationOn
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.FloatingToolbarDefaults.ScreenOffset
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -91,7 +89,6 @@ import io.legado.app.R
 import io.legado.app.data.entities.Book
 import io.legado.app.data.entities.Bookmark
 import io.legado.app.help.book.isLocal
-import io.legado.app.ui.book.toc.rule.TxtTocRuleActivity
 import io.legado.app.ui.replace.ReplaceEditRoute
 import io.legado.app.ui.theme.LegadoTheme
 import io.legado.app.ui.theme.adaptiveContentPaddingOnlyVertical
@@ -112,6 +109,7 @@ import io.legado.app.ui.widget.components.card.NormalCard
 import io.legado.app.ui.widget.components.card.TextCard
 import io.legado.app.ui.widget.components.divider.PillDivider
 import io.legado.app.ui.widget.components.divider.PillHeaderDivider
+import io.legado.app.ui.widget.components.icon.AppIcon
 import io.legado.app.ui.widget.components.lazylist.FastScrollLazyColumn
 import io.legado.app.ui.widget.components.list.TopFloatingStickyItem
 import io.legado.app.ui.widget.components.menuItem.RoundDropdownMenu
@@ -140,6 +138,11 @@ fun TocRouteScreen(
     onChapterClick: (Int) -> Unit,
     onOpenReplaceRule: (ReplaceEditRoute?) -> Unit,
     onBookmarkClick: (chapterIndex: Int, chapterPos: Int) -> Unit,
+    /**
+     * 「本地目录规则」入口：宿主导航到规则列表的选择模式，选好后由宿主的
+     * `ConsumeBookPageResult` 回灌 `TocIntent.SaveTocRegex`。
+     */
+    onPickLocalTocRule: (String?) -> Unit,
 ) {
     val state by viewModel.screenState.collectAsStateWithLifecycle()
     val context = LocalContext.current
@@ -148,15 +151,6 @@ fun TocRouteScreen(
         contract = ActivityResultContracts.CreateDocument("*/*")
     ) { uri: Uri? ->
         uri?.let { viewModel.onIntent(TocIntent.ExportBookmarks(it, pendingExportMarkdown)) }
-    }
-    val tocRegexLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.StartActivityForResult()
-    ) { result ->
-        if (result.resultCode == android.app.Activity.RESULT_OK) {
-            viewModel.onIntent(
-                TocIntent.SaveTocRegex(result.data?.getStringExtra("tocRegex").orEmpty())
-            )
-        }
     }
     LaunchedEffect(bookUrl) {
         bookUrl?.let { viewModel.onIntent(TocIntent.LoadBook(it)) }
@@ -176,11 +170,7 @@ fun TocRouteScreen(
         onChapterClick = onChapterClick,
         onOpenReplaceRule = onOpenReplaceRule,
         onBookmarkClick = onBookmarkClick,
-        onEditLocalTocRule = { regex ->
-            tocRegexLauncher.launch(
-                Intent(context, TxtTocRuleActivity::class.java).putExtra("tocRegex", regex)
-            )
-        },
+        onEditLocalTocRule = onPickLocalTocRule,
         onExportBookmarks = { isMarkdown, fileName ->
             pendingExportMarkdown = isMarkdown
             exportLauncher.launch(fileName)
@@ -930,7 +920,7 @@ fun ChapterItem(
             Column(modifier = Modifier.weight(1f)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     if (item.isVip && !item.isPay) {
-                        Icon(
+                        AppIcon(
                             imageVector = Icons.Default.Lock,
                             contentDescription = null,
                             tint = LegadoTheme.colorScheme.error,
@@ -981,7 +971,7 @@ fun ChapterItem(
                     modifier = Modifier
                         .padding(start = 8.dp)
                         .wrapContentSize()
-                        .clip(MaterialTheme.shapes.medium)
+                        .clip(RoundedCornerShape(12.dp))
                         .then(
                             if (canDownload) {
                                 Modifier
@@ -1207,7 +1197,7 @@ private fun StatusIcon(
             }
 
             "DUR" -> {
-                Icon(
+                AppIcon(
                     imageVector = Icons.Rounded.LocationOn,
                     contentDescription = null,
                     modifier = Modifier.size(24.dp),
@@ -1239,7 +1229,7 @@ private fun StatusIcon(
             }
 
             "SUCCESS_ICON" -> {
-                Icon(
+                AppIcon(
                     imageVector = Icons.Default.CheckCircle,
                     contentDescription = null,
                     modifier = Modifier.size(24.dp),
@@ -1248,7 +1238,7 @@ private fun StatusIcon(
             }
 
             "ERROR" -> {
-                Icon(
+                AppIcon(
                     imageVector = Icons.Default.Refresh,
                     contentDescription = null,
                     modifier = Modifier.size(24.dp),
@@ -1257,7 +1247,7 @@ private fun StatusIcon(
             }
 
             else -> {
-                Icon(
+                AppIcon(
                     imageVector = Icons.Outlined.DownloadForOffline,
                     contentDescription = null,
                     modifier = Modifier.size(24.dp),

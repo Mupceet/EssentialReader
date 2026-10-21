@@ -38,12 +38,10 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import kotlinx.coroutines.flow.StateFlow
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -97,6 +95,8 @@ import io.legado.app.ui.widget.components.reader.readerMenuLiquidGlassAvailable
 import io.legado.app.ui.widget.components.reader.readerMenuSurfaceBrush
 import io.legado.app.ui.widget.components.settingItem.LocalSliderDragState
 import io.legado.app.ui.widget.components.settingItem.SliderDragState
+import io.legado.app.ui.widget.components.text.AppText
+import kotlinx.coroutines.flow.StateFlow
 import kotlin.math.roundToInt
 
 /**
@@ -160,11 +160,11 @@ fun ReadBookMenuBar(
                     backdrop = backdrop,
                     hazeState = hazeState,
                     titleBarMode = preferences.titleBarMode,
+                    eyeProtectionActive = eyeProtectionActive,
                 )
                 if (state.menuConfig.showTitleBarIcons && state.menuConfig.titleBarIconPosition <= 1) {
                     FloatingIconRow(
                         state = state,
-                        preferences = preferences,
                         eyeProtectionActive = eyeProtectionActive,
                         colors = menuColors,
                         alignment = if (state.menuConfig.titleBarIconPosition == 0) {
@@ -275,7 +275,6 @@ fun ReadBookMenuBar(
                 ) {
                     FloatingIconRow(
                         state = state,
-                        preferences = preferences,
                         eyeProtectionActive = eyeProtectionActive,
                         colors = menuColors,
                         alignment = if (state.menuConfig.titleBarIconPosition == 2) {
@@ -838,7 +837,7 @@ private fun ReadBookMenuRoutePage(
                 icon = Icons.AutoMirrored.Filled.ArrowBack,
                 contentDescription = stringResource(R.string.back),
             )
-            Text(
+            AppText(
                 text = title,
                 modifier = Modifier
                     .weight(1f)

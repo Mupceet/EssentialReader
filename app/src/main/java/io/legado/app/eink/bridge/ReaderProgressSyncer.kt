@@ -16,7 +16,6 @@ import io.legado.app.eink.contract.ReaderSyncTrigger
 import io.legado.app.help.book.simulatedTotalChapterNum
 import io.legado.app.help.storage.Backup
 import io.legado.app.model.ReadBook
-import io.legado.app.service.BaseReadAloudService
 import io.legado.app.utils.NetworkUtils
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -182,13 +181,12 @@ internal class ReaderProgressSyncer(
         // saveRead 无条件先行（宿主顺序：落库 → 同步）；同步+备份整段 DEBUG 跳过
         ReadBook.saveRead()
         // 会话同位（宿主 handleOnPause）：暂停即以最后一次翻页为终点提交
-        // 阅读时段，放置/锁屏期间不再挂账；朗读播放中不提交，由朗读服务
-        // 自己的暂停路径处理。会话提交纯本地，不受下方 DEBUG 同步 gate 影响。
+        // 阅读时段，放置/锁屏期间不再挂账。上游听书/阅读分离后改为无条件提交
+        // （朗读另一本书不再拦截本书会话；朗读本书的会话终点由朗读服务
+        // 自己的暂停路径处理）。会话提交纯本地，不受下方 DEBUG 同步 gate 影响。
         ReadBook.isUiActive = false
-        if (!BaseReadAloudService.isPlay()) {
-            ReadBook.stopAutoSaveSession()
-            ReadBook.commitReadSession()
-        }
+        ReadBook.stopAutoSaveSession()
+        ReadBook.commitReadSession()
         if (BuildConfig.DEBUG) {
             log("暂停同步：DEBUG 构建跳过（宿主同位 gate），本地已落库")
             return

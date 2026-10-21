@@ -60,5 +60,31 @@ fun ReaderPage.contentClipRect(backgroundRuns: List<ReaderTextBackgroundRun>): R
     return ReaderRect(left, top, right, bottom)
 }
 
+/**
+ * 滚动四页共用固定视口，对照旧 ContentTextView 在绘制整栈前 clipRect(visibleRect)。
+ * 邻页的局部坐标、提示页的尺寸与气泡高度不能扩大上下视口，否则正文会滚进页眉/页脚。
+ * 字形保留阴影/斜体余量；气泡只放宽左右边缘，上下随正文一起在视口边界裁剪。
+ */
+fun ReaderPageWindow.contentClipRect(): ReaderRect? {
+    val viewport = current ?: return null
+    val pages = listOfNotNull(previous, viewport, next, nextPlus)
+    val pad = pages.maxOf { it.contentClipPadPx }
+    var left = viewport.contentLeftPx - pad
+    var right = viewport.contentRightPx + pad
+    pages.forEach { page ->
+        page.textBackgroundRuns().forEach { run ->
+            val drawn = run.drawnBounds()
+            left = min(left, drawn.left)
+            right = max(right, drawn.right)
+        }
+    }
+    return ReaderRect(
+        left = left,
+        top = viewport.contentTopPx - pad,
+        right = right,
+        bottom = viewport.contentBottomPx + pad,
+    )
+}
+
 private const val SHADOW_RADIUS_PADDING_PX = 2f
 private const val ITALIC_PAD_RATIO = 0.25f

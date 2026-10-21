@@ -37,7 +37,6 @@ import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.OpenInBrowser
-import androidx.compose.material.icons.filled.RecordVoiceOver
 import androidx.compose.material.icons.filled.Sell
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Source
@@ -55,9 +54,6 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.legado.app.R
 import io.legado.app.eink.EInkMainActivity
-import io.legado.app.ui.book.bookmark.AllBookmarkActivity
-import io.legado.app.ui.book.toc.rule.TxtTocRuleActivity
-import io.legado.app.ui.dict.rule.DictRuleActivity
 import io.legado.app.ui.file.FileManageActivity
 import io.legado.app.ui.theme.adaptiveContentPadding
 import io.legado.app.utils.startActivity
@@ -198,31 +194,17 @@ fun MyScreen(
                 ClickableSettingItem(
                     title = stringResource(R.string.txt_toc_rule),
                     imageVector = Icons.AutoMirrored.Filled.Rule,
-                    onClick = {
-                        onNavigate(
-                            PrefClickEvent.StartActivity(TxtTocRuleActivity::class.java)
-                        )
-                    }
+                    onClick = { onNavigate(PrefClickEvent.OpenTxtTocRule) }
                 )
                 ClickableSettingItem(
                     title = stringResource(R.string.dict_rule),
                     imageVector = Icons.AutoMirrored.Filled.LibraryBooks,
-                    onClick = {
-                        onNavigate(
-                            PrefClickEvent.StartActivity(DictRuleActivity::class.java)
-                        )
-                    }
+                    onClick = { onNavigate(PrefClickEvent.OpenDictRule) }
                 )
                 ClickableSettingItem(
                     title = stringResource(R.string.highlight_tag_config),
                     imageVector = Icons.Default.Sell,
                     onClick = { onNavigate(PrefClickEvent.OpenHighlightTagRule) }
-                )
-                ClickableSettingItem(
-                    title = stringResource(R.string.multi_role_rule),
-                    description = stringResource(R.string.multi_role_rule_summary),
-                    imageVector = Icons.Default.RecordVoiceOver,
-                    onClick = { onNavigate(PrefClickEvent.OpenMultiRoleRule) }
                 )
             }
 
@@ -244,9 +226,7 @@ fun MyScreen(
                 ClickableSettingItem(
                     title = stringResource(R.string.bookmark),
                     imageVector = Icons.Default.Bookmark,
-                    onClick = {
-                        onNavigate(PrefClickEvent.StartActivity(AllBookmarkActivity::class.java))
-                    }
+                    onClick = { onNavigate(PrefClickEvent.OpenAllBookmark) }
                 )
                 ClickableSettingItem(
                     title = stringResource(R.string.read_record),

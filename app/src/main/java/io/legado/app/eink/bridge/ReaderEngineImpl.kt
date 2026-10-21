@@ -37,7 +37,7 @@ import io.legado.app.help.book.isOnLineTxt
 import io.legado.app.help.book.isType
 import io.legado.app.help.book.removeType
 import io.legado.app.help.config.ReadBookConfig
-import io.legado.app.help.loadFontFiles
+import io.legado.app.help.scanFontFiles
 import io.legado.app.model.CacheBook
 import io.legado.app.model.ReadBook
 import io.legado.app.model.cache.CacheDownloadRequest
@@ -679,7 +679,8 @@ internal object ReaderEngineImpl : ReaderEngine, KoinComponent {
         val folder = readSettingsRepository.currentSettings.fontFolder
             .takeIf { it.isNotEmpty() }
             ?.toUri()
-        return loadFontFiles(appCtx, folder).map { ReaderFontOption(name = it.name, path = it.uri.toString()) }
+        return scanFontFiles(appCtx, folder).fontFiles
+            .map { ReaderFontOption(name = it.name, path = it.uri.toString()) }
     }
 
     override suspend fun setFontFolder(uri: String) {

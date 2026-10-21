@@ -26,7 +26,7 @@ import splitties.init.injectAsAppCtx
 @RunWith(RobolectricTestRunner::class)
 @Config(application = Application::class, sdk = [35])
 class ReadAloudStopServiceTest {
-    private lateinit var previousServiceClass: Class<*>
+    private var previousServiceClass: Class<*>? = null
 
     @Before
     fun setUp() {
@@ -37,10 +37,10 @@ class ReadAloudStopServiceTest {
                 single<ReadAloudSettingsGateway> { TestReadAloudSettingsGateway() }
             })
         }
-        val serviceClassField = ReadAloud::class.java.getDeclaredField("aloudClass").apply {
+        val serviceClassField = ReadAloud::class.java.getDeclaredField("selectedAloudClass").apply {
             isAccessible = true
         }
-        previousServiceClass = serviceClassField.get(ReadAloud) as Class<*>
+        previousServiceClass = serviceClassField.get(ReadAloud) as Class<*>?
         serviceClassField.set(ReadAloud, TTSReadAloudService::class.java)
         setServiceFlag("isRun", true)
         setServiceFlag("stopRequested", false)
@@ -48,7 +48,7 @@ class ReadAloudStopServiceTest {
 
     @After
     fun tearDown() {
-        ReadAloud::class.java.getDeclaredField("aloudClass").apply {
+        ReadAloud::class.java.getDeclaredField("selectedAloudClass").apply {
             isAccessible = true
             set(ReadAloud, previousServiceClass)
         }
@@ -72,6 +72,22 @@ class ReadAloudStopServiceTest {
         assertFalse(BaseReadAloudService.requestStop())
     }
 
+    @Test
+    fun controlCommandsWhileRunningDoNotStartForegroundService() {
+        val context = RecordingContext(RuntimeEnvironment.getApplication())
+
+        ReadAloud.pause(context)
+        ReadAloud.resume(context)
+        ReadAloud.prevParagraph(context)
+        ReadAloud.nextParagraph(context)
+        ReadAloud.upTtsSpeechRate(context)
+        ReadAloud.setTimer(context, 15)
+        ReadAloud.setTimerChapters(context, 3)
+
+        assertEquals(0, context.foregroundStartCount)
+        assertEquals(7, context.startedServices.size)
+    }
+
     private fun setServiceFlag(name: String, value: Boolean) {
         BaseReadAloudService::class.java.getDeclaredField(name).apply {
             isAccessible = true
@@ -82,10 +98,16 @@ class ReadAloudStopServiceTest {
     private class RecordingContext(base: Application) : ContextWrapper(base) {
         var stoppedService: Intent? = null
         var foregroundStartCount = 0
+        val startedServices = mutableListOf<Intent>()
 
         override fun stopService(name: Intent): Boolean {
             stoppedService = name
             return true
+        }
+
+        override fun startService(service: Intent): ComponentName? {
+            startedServices.add(service)
+            return service.component
         }
 
         override fun startForegroundService(service: Intent): ComponentName? {

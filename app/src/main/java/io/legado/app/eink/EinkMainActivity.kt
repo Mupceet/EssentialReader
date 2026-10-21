@@ -1,20 +1,30 @@
 package io.legado.app.eink
 
+import android.Manifest
 import android.content.Context
 import android.content.Intent
 import android.content.res.Configuration
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.text.font.FontFamily
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.lifecycleScope
+import io.legado.app.R
+import io.legado.app.constant.EventBus
 import io.legado.app.constant.PreferKey
 import io.legado.app.domain.gateway.AppUiConfigurationGateway
 import io.legado.app.eink.bridge.EInkBridge
 import io.legado.app.eink.bridge.PageTurnEffectEngineImpl
 import io.legado.app.eink.contract.EInkHostActivity
 import io.legado.app.help.config.AppConfigStore
+import io.legado.app.help.http.LocalNetworkBlockedNotifier
 import io.legado.app.ui.main.MainIntent
 import io.legado.app.ui.theme.rememberCustomFont
+import io.legado.app.utils.eventBus.FlowEventBus
+import io.legado.app.utils.toastOnUi
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.launch
 import org.koin.core.context.GlobalContext
 
 /**
@@ -35,6 +45,14 @@ class EInkMainActivity : EInkHostActivity() {
     private val appUiConfigurationGateway: AppUiConfigurationGateway =
         GlobalContext.get().get()
 
+    private val localNetworkRequestPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        // 未授权时提示授予方式（与完整模式 MainActivity 同文案同行为）
+        if (!granted) toastOnUi(R.string.local_network_permission_required)
+    }
+    private var localNetworkPermissionJob: Job? = null
+
     override fun onInstallEngines() = EInkBridge.install()
 
     /**
@@ -45,9 +63,22 @@ class EInkMainActivity : EInkHostActivity() {
     override fun onStart() {
         super.onStart()
         EInkBridge.attachHostActivity(this)
+        // Android 17 本地网络保护：书源/WebDAV 访问局域网被系统在网络栈拦截时，
+        // 网络层兜底（LocalNetworkBlockedNotifier）置标记并发事件，由前台
+        // Activity 领取后申请权限。完整模式在 MainActivity 领取；墨水屏模式
+        // 常驻本 Activity，必须同样接住，否则用户只看到超时与 Toast 提示、
+        // 永远等不到系统权限框（低版本隐式授予，不会触发申请）。
+        requestLocalNetworkPermissionIfBlocked()
+        localNetworkPermissionJob = lifecycleScope.launch {
+            FlowEventBus.with<Unit>(EventBus.LOCAL_NETWORK_PERMISSION_REQUIRED).collect {
+                requestLocalNetworkPermissionIfBlocked()
+            }
+        }
     }
 
     override fun onStop() {
+        localNetworkPermissionJob?.cancel()
+        localNetworkPermissionJob = null
         EInkBridge.detachHostActivity(this)
         super.onStop()
     }
@@ -60,6 +91,13 @@ class EInkMainActivity : EInkHostActivity() {
     override fun onResume() {
         super.onResume()
         PageTurnEffectEngineImpl.debugLogRotation("onResume")
+        // 后台期间失败置位的补授权标记，回到前台时领取（与 MainActivity.onResume 同位）
+        requestLocalNetworkPermissionIfBlocked()
+    }
+
+    private fun requestLocalNetworkPermissionIfBlocked() {
+        if (!LocalNetworkBlockedNotifier.consumePermissionRequest()) return
+        localNetworkRequestPermissionLauncher.launch(Manifest.permission.ACCESS_LOCAL_NETWORK)
     }
 
     override fun onConfigurationChanged(newConfig: Configuration) {

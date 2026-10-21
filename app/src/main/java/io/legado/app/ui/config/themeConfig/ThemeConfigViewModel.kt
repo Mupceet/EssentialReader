@@ -35,6 +35,7 @@ import splitties.init.appCtx
 import java.io.File
 import java.io.FileOutputStream
 import kotlin.coroutines.cancellation.CancellationException
+import kotlin.uuid.Uuid
 
 class ThemeConfigViewModel(
     private val appShellSettingsGateway: AppShellSettingsGateway,
@@ -105,6 +106,9 @@ class ThemeConfigViewModel(
             is ThemeConfigIntent.SetPredictiveBackEnabled -> updateAppShell {
                 it.copy(predictiveBackEnabled = intent.enabled)
             }
+            is ThemeConfigIntent.SetReaderSharedElementEnabled -> updateAppShell {
+                it.copy(readerSharedElementEnabled = intent.enabled)
+            }
             is ThemeConfigIntent.SetFontScale -> updateAppShell {
                 it.copy(fontScale = intent.value)
             }
@@ -126,6 +130,9 @@ class ThemeConfigViewModel(
             }
             is ThemeConfigIntent.SetTabletInterface -> updateAppShell {
                 it.copy(tabletInterface = intent.value)
+            }
+            is ThemeConfigIntent.SetMultiPaneMode -> updateAppShell {
+                it.copy(multiPaneMode = intent.value)
             }
             is ThemeConfigIntent.SetLabelVisibilityMode -> updateAppShell {
                 it.copy(labelVisibilityMode = intent.value)

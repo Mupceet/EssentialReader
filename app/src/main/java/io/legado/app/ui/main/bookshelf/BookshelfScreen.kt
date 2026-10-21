@@ -38,13 +38,15 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.compose.foundation.lazy.grid.itemsIndexed
@@ -69,10 +71,8 @@ import androidx.compose.material.icons.filled.SelectAll
 import androidx.compose.material.icons.filled.UploadFile
 import androidx.compose.material.icons.filled.Wifi
 import androidx.compose.material.icons.outlined.ViewCarousel
-import androidx.compose.material3.Checkbox
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
-import androidx.compose.material3.Icon
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
@@ -131,8 +131,10 @@ import io.legado.app.ui.widget.components.button.series.SmallToggleButton
 import io.legado.app.ui.widget.components.button.series.ToggleStyle
 import io.legado.app.ui.widget.components.card.NormalCard
 import io.legado.app.ui.widget.components.card.TextCard
+import io.legado.app.ui.widget.components.checkBox.AppCheckbox
 import io.legado.app.ui.widget.components.divider.PillHeaderDivider
 import io.legado.app.ui.widget.components.filePicker.FilePickerSheet
+import io.legado.app.ui.widget.components.icon.AppIcon
 import io.legado.app.ui.widget.components.icon.AppIcons
 import io.legado.app.ui.widget.components.image.cover.bookshelfSharedCoverSourceId
 import io.legado.app.ui.widget.components.importComponents.SourceInputDialog
@@ -556,15 +558,26 @@ fun BookshelfScreen(
 
     val scrollBehavior = GlassTopAppBarDefaults.defaultScrollBehavior()
     var showTopBarMenu by remember { mutableStateOf(false) }
+    val toggleShelfFilter = {
+        toggleBookshelfFilter(
+            isSearch = uiState.isSearch,
+            selectedGroupId = uiState.selectedGroupId,
+            currentTabGroupId = currentTabGroupId,
+            onIntent = onIntent,
+        )
+    }
     val onSearchClick = {
         if (uiState.settings.bookshelfSearchActionDirectToSearch) {
             onNavigateToSearch(uiState.searchKey.trim())
         } else {
-            val active = !uiState.isSearch
-            onIntent(BookshelfIntent.SetSearchMode(active))
-            if (!active && uiState.selectedGroupId != currentTabGroupId) {
-                onIntent(BookshelfIntent.ChangeGroup(currentTabGroupId))
-            }
+            toggleShelfFilter()
+        }
+    }
+    val onSearchLongClick = {
+        if (uiState.settings.bookshelfSearchActionDirectToSearch) {
+            toggleShelfFilter()
+        } else {
+            onNavigateToSearch(uiState.searchKey.trim())
         }
     }
 
@@ -575,11 +588,8 @@ fun BookshelfScreen(
             SnackbarHost(
                 hostState = snackbarHostState,
                 modifier = Modifier
-                    .padding(
-                        bottom = 72.dp + WindowInsets.navigationBars
-                            .asPaddingValues()
-                            .calculateBottomPadding()
-                    )
+                    .windowInsetsPadding(WindowInsets.navigationBars.only(WindowInsetsSides.Bottom))
+                    .padding(bottom = 72.dp)
             )
         },
         topBar = {
@@ -587,6 +597,7 @@ fun BookshelfScreen(
                 uiState = uiState,
                 scrollBehavior = scrollBehavior,
                 onSearchClick = onSearchClick,
+                onSearchLongClick = onSearchLongClick,
                 onSearchQueryChange = { onIntent(BookshelfIntent.SetSearchKey(it)) },
                 onSearchSubmit = { rawQuery ->
                     rawQuery.trim()
@@ -683,12 +694,12 @@ fun BookshelfScreen(
                                 RoundDropdownMenuItem(
                                     text = stringResource(R.string.add_remote_book),
                                     onClick = { onNavigateToRemoteImport(); dismiss() },
-                                    leadingIcon = { Icon(Icons.Default.Wifi, null) }
+                                    leadingIcon = { AppIcon(Icons.Default.Wifi, null) }
                                 )
                                 RoundDropdownMenuItem(
                                     text = stringResource(R.string.book_local),
                                     onClick = { onNavigateToLocalImport(); dismiss() },
-                                    leadingIcon = { Icon(Icons.Default.Save, null) }
+                                    leadingIcon = { AppIcon(Icons.Default.Save, null) }
                                 )
                                 RoundDropdownMenuItem(
                                     text = stringResource(R.string.update_toc),
@@ -696,7 +707,7 @@ fun BookshelfScreen(
                                         onIntent(BookshelfIntent.RefreshToc(uiState.items))
                                         dismiss()
                                     },
-                                    leadingIcon = { Icon(Icons.Default.Refresh, null) }
+                                    leadingIcon = { AppIcon(Icons.Default.Refresh, null) }
                                 )
                                 RoundDropdownMenuItem(
                                     text = stringResource(R.string.layout_setting),
@@ -704,7 +715,7 @@ fun BookshelfScreen(
                                         onIntent(BookshelfIntent.ShowOverlay(BookshelfOverlay.ConfigSheet))
                                         dismiss()
                                     },
-                                    leadingIcon = { Icon(Icons.Default.GridView, null) }
+                                    leadingIcon = { AppIcon(Icons.Default.GridView, null) }
                                 )
                                 RoundDropdownMenuItem(
                                     text = stringResource(R.string.group_manage),
@@ -712,7 +723,7 @@ fun BookshelfScreen(
                                         onIntent(BookshelfIntent.ShowOverlay(BookshelfOverlay.GroupManageSheet))
                                         dismiss()
                                     },
-                                    leadingIcon = { Icon(Icons.Outlined.ViewCarousel, null) }
+                                    leadingIcon = { AppIcon(Icons.Outlined.ViewCarousel, null) }
                                 )
                                 RoundDropdownMenuItem(
                                     text = stringResource(R.string.add_url),
@@ -720,7 +731,7 @@ fun BookshelfScreen(
                                         onIntent(BookshelfIntent.ShowOverlay(BookshelfOverlay.AddUrlDialog))
                                         dismiss()
                                     },
-                                    leadingIcon = { Icon(Icons.Default.Link, null) }
+                                    leadingIcon = { AppIcon(Icons.Default.Link, null) }
                                 )
                                 RoundDropdownMenuItem(
                                     text = stringResource(R.string.selection_mode),
@@ -728,7 +739,7 @@ fun BookshelfScreen(
                                         toggleEditMode()
                                         dismiss()
                                     },
-                                    leadingIcon = { Icon(Icons.Default.Edit, null) }
+                                    leadingIcon = { AppIcon(Icons.Default.Edit, null) }
                                 )
                                 RoundDropdownMenuItem(
                                     text = stringResource(R.string.bookshelf_management),
@@ -739,7 +750,7 @@ fun BookshelfScreen(
                                         onNavigateToCache(groupId)
                                         dismiss()
                                     },
-                                    leadingIcon = { Icon(Icons.Default.Bookmarks, null) }
+                                    leadingIcon = { AppIcon(Icons.Default.Bookmarks, null) }
                                 )
                                 RoundDropdownMenuItem(
                                     text = stringResource(R.string.export_bookshelf),
@@ -747,7 +758,7 @@ fun BookshelfScreen(
                                         onIntent(BookshelfIntent.ShowOverlay(BookshelfOverlay.ExportSheet))
                                         dismiss()
                                     },
-                                    leadingIcon = { Icon(Icons.Default.UploadFile, null) }
+                                    leadingIcon = { AppIcon(Icons.Default.UploadFile, null) }
                                 )
                                 RoundDropdownMenuItem(
                                     text = stringResource(R.string.import_bookshelf),
@@ -755,7 +766,7 @@ fun BookshelfScreen(
                                         onIntent(BookshelfIntent.ShowOverlay(BookshelfOverlay.ImportSheet))
                                         dismiss()
                                     },
-                                    leadingIcon = { Icon(Icons.Default.CloudDownload, null) }
+                                    leadingIcon = { AppIcon(Icons.Default.CloudDownload, null) }
                                 )
                                 RoundDropdownMenuItem(
                                     text = stringResource(R.string.log),
@@ -763,7 +774,7 @@ fun BookshelfScreen(
                                         onIntent(BookshelfIntent.ShowOverlay(BookshelfOverlay.LogSheet))
                                         dismiss()
                                     },
-                                    leadingIcon = { Icon(Icons.Default.History, null) }
+                                    leadingIcon = { AppIcon(Icons.Default.History, null) }
                                 )
                             }
                         }
@@ -833,7 +844,7 @@ fun BookshelfScreen(
                                                         selectedTabIndex == index
                                                     }
                                                     if (isSelected) {
-                                                        Icon(
+                                                        AppIcon(
                                                             Icons.Default.Check,
                                                             null,
                                                             modifier = Modifier.size(18.dp)
@@ -869,7 +880,7 @@ fun BookshelfScreen(
                                                         },
                                                         trailingIcon = {
                                                             if (uiState.selectedGroupId == group.groupId) {
-                                                                Icon(
+                                                                AppIcon(
                                                                     Icons.Default.Check,
                                                                     null,
                                                                     modifier = Modifier.size(18.dp)
@@ -888,7 +899,7 @@ fun BookshelfScreen(
                                                         },
                                                         trailingIcon = {
                                                             if (uiState.selectedGroupId == group.groupId) {
-                                                                Icon(
+                                                                AppIcon(
                                                                     Icons.Default.Check,
                                                                     null,
                                                                     modifier = Modifier.size(18.dp)
@@ -1272,7 +1283,7 @@ fun BookshelfScreen(
                                     },
                                     trailingIcon = {
                                         if (currentMenuGroupId == group.groupId) {
-                                            Icon(
+                                            AppIcon(
                                                 Icons.Default.Check,
                                                 null,
                                                 modifier = Modifier.size(18.dp)
@@ -1301,11 +1312,25 @@ fun BookshelfScreen(
     )
 }
 
+internal fun toggleBookshelfFilter(
+    isSearch: Boolean,
+    selectedGroupId: Long,
+    currentTabGroupId: Long,
+    onIntent: (BookshelfIntent) -> Unit,
+) {
+    val active = !isSearch
+    onIntent(BookshelfIntent.SetSearchMode(active))
+    if (!active && selectedGroupId != currentTabGroupId) {
+        onIntent(BookshelfIntent.ChangeGroup(currentTabGroupId))
+    }
+}
+
 @Composable
 private fun BookshelfTopBar(
     uiState: BookshelfUiState,
     scrollBehavior: GlassTopAppBarScrollBehavior,
     onSearchClick: () -> Unit,
+    onSearchLongClick: () -> Unit,
     onSearchQueryChange: (String) -> Unit,
     onSearchSubmit: (String) -> Unit,
     onClearSearch: () -> Unit,
@@ -1314,6 +1339,8 @@ private fun BookshelfTopBar(
     bottomContent: @Composable ColumnScope.() -> Unit = {}
 ) {
     val searchContentDescription = stringResource(R.string.search)
+    val filterContentDescription = stringResource(R.string.bookshelf_filter)
+    val searchFirst = uiState.settings.bookshelfSearchActionDirectToSearch
     val exitEditModeDescription = stringResource(R.string.cancel_select)
     GlassMediumFlexibleTopAppBar(
         modifier = Modifier.fillMaxWidth(),
@@ -1337,8 +1364,10 @@ private fun BookshelfTopBar(
         actions = {
             TopBarActionButton(
                 onClick = onSearchClick,
+                onLongClick = onSearchLongClick,
+                onLongClickLabel = if (searchFirst) filterContentDescription else searchContentDescription,
                 imageVector = AppIcons.Search,
-                contentDescription = searchContentDescription
+                contentDescription = if (searchFirst) searchContentDescription else filterContentDescription,
             )
             actions()
         },
@@ -1522,7 +1551,7 @@ private fun BookshelfOverlays(
             content = {
                 if (hasLocalBook) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Checkbox(
+                        AppCheckbox(
                             checked = deleteOriginal,
                             onCheckedChange = { deleteOriginal = it }
                         )

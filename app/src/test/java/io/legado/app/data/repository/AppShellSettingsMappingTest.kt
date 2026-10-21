@@ -8,13 +8,57 @@ import org.junit.Test
 class AppShellSettingsMappingTest {
 
     @Test
-    fun `AppShell 28 键写读映射逐字段对应`() {
+    fun `阅读共享元素旧配置默认开启且开关可独立持久化`() {
+        assertEquals(
+            true,
+            emptyMap<String, Any?>().toTestPreferences()
+                .toAppShellSettings().readerSharedElementEnabled,
+        )
+        listOf(false, true).forEach { enabled ->
+            val values = captureAtomicUpdateValues(
+                current = AppShellSettings(readerSharedElementEnabled = !enabled),
+                read = { it.toAppShellSettings() },
+                toPrefMap = AppShellSettings::toPrefMap,
+                transform = { it.copy(readerSharedElementEnabled = enabled) },
+            )
+            assertEquals(mapOf(PreferKey.readerSharedElementEnabled to enabled), values)
+            assertEquals(
+                enabled,
+                values.toTestPreferences().toAppShellSettings().readerSharedElementEnabled,
+            )
+        }
+    }
+
+    @Test
+    fun `AppShell 写读映射逐字段对应`() {
         appShellMappingSamples().forEach { expected ->
             assertEquals(expected.expectedPrefMap(), expected.toPrefMap())
             assertEquals(
                 expected,
                 expected.expectedPrefMap().toTestPreferences().toAppShellSettings(),
             )
+        }
+    }
+
+    @Test
+    fun `旧配置默认自动多栏且与平板导航设置独立`() {
+        val settings = mapOf<String, Any?>(PreferKey.tabletInterface to "off")
+            .toTestPreferences().toAppShellSettings()
+        assertEquals("auto", settings.multiPaneMode)
+        assertEquals("off", settings.tabletInterface)
+    }
+
+    @Test
+    fun `多栏模式单独原子写入并可以重新读取`() {
+        listOf("auto", "landscape", "always", "off").forEach { mode ->
+            val values = captureAtomicUpdateValues(
+                current = AppShellSettings(multiPaneMode = "old-mode", tabletInterface = "off"),
+                read = { it.toAppShellSettings() },
+                toPrefMap = AppShellSettings::toPrefMap,
+                transform = { it.copy(multiPaneMode = mode) },
+            )
+            assertEquals(mapOf(PreferKey.multiPaneMode to mode), values)
+            assertEquals(mode, values.toTestPreferences().toAppShellSettings().multiPaneMode)
         }
     }
 
@@ -48,6 +92,7 @@ private fun appShellMappingSamples(): List<AppShellSettings> {
         fontScale = 13,
         composeEngine = "compose-engine",
         tabletInterface = "tablet-interface",
+        multiPaneMode = "multi-pane-mode",
         labelVisibilityMode = "label-mode",
         defaultHomePage = "default-page",
         mainNavigationOrder = "navigation-order",
@@ -71,6 +116,7 @@ private fun appShellMappingSamples(): List<AppShellSettings> {
         base.copy(showStatusBar = false),
         base.copy(swipeAnimation = false),
         base.copy(predictiveBackEnabled = false),
+        base.copy(readerSharedElementEnabled = false),
         base.copy(showBottomView = false),
         base.copy(useFloatingBottomBar = true),
         base.copy(useFloatingBottomBarLiquidGlass = true),
@@ -88,10 +134,12 @@ private fun AppShellSettings.expectedPrefMap(): Map<String, Any?> = mapOf(
     PreferKey.showStatusBar to showStatusBar,
     PreferKey.swipeAnimation to swipeAnimation,
     PreferKey.isPredictiveBackEnabled to predictiveBackEnabled,
+    PreferKey.readerSharedElementEnabled to readerSharedElementEnabled,
     PreferKey.showBottomView to showBottomView,
     PreferKey.useFloatingBottomBar to useFloatingBottomBar,
     PreferKey.useFloatingBottomBarLiquidGlass to useFloatingBottomBarLiquidGlass,
     PreferKey.tabletInterface to tabletInterface,
+    PreferKey.multiPaneMode to multiPaneMode,
     PreferKey.labelVisibilityMode to labelVisibilityMode,
     PreferKey.defaultHomePage to defaultHomePage,
     PreferKey.mainNavigationOrder to mainNavigationOrder,

@@ -29,6 +29,7 @@ import io.legado.app.model.SourceCallBack
 import io.legado.app.model.localBook.LocalBook
 import io.legado.app.model.webBook.WebBook
 import io.legado.app.service.BaseReadAloudService
+import io.legado.app.model.ReadAloud
 import io.legado.app.utils.mapParallelSafe
 import io.legado.app.utils.postEvent
 import kotlinx.coroutines.CoroutineScope
@@ -154,7 +155,11 @@ class ReadBookLoadDelegate(
         if (isSameBook) {
             ReadBook.upData(book)
         } else {
-            ReadBook.resetData(book)
+            val playing = ReadAloud.bookSession.state.value
+            val readerBook = if (BaseReadAloudService.isRun && ReadAloud.bookSession.owns(book.bookUrl)) {
+                book.copy(durChapterIndex = playing.chapterIndex, durChapterPos = playing.chapterPosition)
+            } else book
+            ReadBook.resetData(readerBook)
         }
         host.setInitFinish()
         if (!book.isLocal && book.tocUrl.isEmpty() && !loadBookInfo(book)) {
@@ -170,7 +175,8 @@ class ReadBookLoadDelegate(
         host.checkReadRecordAlias(book)
 
         if (!isSameBook) {
-            ReadBook.loadInitialContent(resetPageOffset = true) {
+            ReadBook.loadInitialContent(resetPageOffset = true,
+                preserveReadAloudPosition = ReadBook.isCurrentBookReadAloud) {
                 ReadBook.bookSource?.let {
                     SourceCallBack.callBackBook(
                         SourceCallBack.START_READ,
@@ -194,7 +200,7 @@ class ReadBookLoadDelegate(
         }
         if (ReadBook.chapterChanged) {
             ReadBook.chapterChanged = false
-        } else if (!(isSameBook && BaseReadAloudService.isRun) && ReadBook.inBookshelf) {
+        } else if (!ReadBook.isCurrentBookReadAloud && ReadBook.inBookshelf) {
             if (backupSettingsGateway.currentSettings.syncBookProgressPlus) {
                 ReadBook.syncProgress({ progress -> host.sureNewProgress(progress) })
             } else {
@@ -252,6 +258,11 @@ class ReadBookLoadDelegate(
             }.onFailure {
                 when (it) {
                     is SecurityException, is FileNotFoundException -> {
+                        // 只弹目录选择时阅读页会一直停在占位页、看不出原因；把失败原因也写成
+                        // 消息，用户重选目录并重载成功后由 initBook 的 upMsg(null) 清掉。
+                        ReadBook.upMsg(
+                            context.getString(R.string.error_load_msg, it.localizedMessage)
+                        )
                         host.requestBooksDirPicker(reloadChapterList = true)
                     }
                     else -> {

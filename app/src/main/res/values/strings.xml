@@ -35,6 +35,8 @@
     <string name="manual_contrast_value_label">Manual value [-1, 1]</string>
     <string name="manual_contrast_invalid">Enter a valid number between -1 and 1</string>
     <string name="predictive_back">Predictive Back Gestures</string>
+    <string name="reader_shared_element">Reader shared element transition</string>
+    <string name="reader_shared_element_summary">Expand the cover when opening the reader. Use a fade transition when disabled.</string>
     <string name="predictive_back_summary">Enable system predictive back gestures</string>
     <string name="restart_to_apply">Restart to apply</string>
     <string name="custom_theme">Custom Theme</string>
@@ -95,6 +97,8 @@
     <string name="book_source">Book sources</string>
     <string name="book_source_manage">Sources Management</string>
     <string name="book_source_manage_desc">Create/Import/Edit/Manage Book Sources</string>
+    <string name="book_source_edit">Book source edit</string>
+    <string name="book_source_login">Book source login</string>
     <string name="setting">Settings</string>
     <string name="theme_setting">Theme Settings</string>
     <string name="theme_setting_s">Some settings related to interface or color</string>
@@ -256,6 +260,7 @@
     <string name="pause">Pause</string>
     <string name="resume">Resume</string>
     <string name="set_timer">Timer</string>
+    <string name="timer_preset_duration">Quick presets</string>
     <string name="read_aloud_pause">Speak Paused</string>
     <string name="read_aloud_timer">Speaking(%d min left)</string>
     <string name="playing_timer">Playing(%d min left)</string>
@@ -488,6 +493,12 @@
     <string name="nb_file_add_shelves">Add to Bookshelf(%1$d)</string>
     <string name="nb_file_add_succeed">%1$d books added successfully</string>
     <string name="fonts_folder">Please put the font files in the Fonts folder of the storage root directory and reselect</string>
+    <string name="font_import">Import font files</string>
+    <string name="font_import_done">Fonts imported. Pick one from the list below.</string>
+    <string name="font_import_none">No .ttf/.otf font file was imported</string>
+    <string name="font_folder_not_accessible">The selected font folder cannot be read (the system picker may have lost the grant). Fonts inside the app are shown instead; please select the folder again or import font files.</string>
+    <string name="font_folder_empty_hint">No file could be read from the selected font folder. If your fonts are already there, the system file picker of some ROMs cannot expose it; please use “Import font files”.</string>
+    <string name="font_folder_no_fonts">No .ttf/.otf font in the selected font folder</string>
     <string name="default_font">Default font</string>
     <string name="select_font">Select fonts</string>
     <string name="text_size">Text size</string>
@@ -870,6 +881,7 @@
     <string name="add_to_text_context_menu_t">Show Search in Text Actions</string>
     <string name="record_log">Record Log</string>
     <string name="log">Log</string>
+    <string name="read_log">Read log</string>
     <string name="chinese_converter">Simplified conversion</string>
     <string name="change_icon_error">The icon is a vector icon, which was not supported before Android 8.0</string>
     <string name="aloud_config">Speech settings</string>
@@ -1097,6 +1109,7 @@
     <string name="donate_summary">Your donation makes this app better</string>
     <string name="about_summary">WeChat official account [Open Source Reading]</string>
     <string name="read_record">Read Record</string>
+    <string name="book_disable_read_record">Disable record for this book</string>
     <string name="del_read_record">Delete Read record</string>
     <string name="read_record_summary">Read record summary</string>
     <string name="local_tts">Local TTS</string>
@@ -1156,9 +1169,11 @@
     <string name="single_url">Single URL</string>
     <string name="export_bookshelf">Export Book List</string>
     <string name="import_bookshelf">Import Book List</string>
-    <string name="pre_download">Download in Advance</string>
+    <string name="pre_download">Pre-download (following)</string>
     <string name="pre_download_m">Pre-download %s pages</string>
-    <string name="pre_download_s">Download %s chapters in advance</string>
+    <string name="pre_download_s">Pre-download %s following chapters</string>
+    <string name="pre_download_prev">Pre-download (previous)</string>
+    <string name="pre_download_prev_s">Pre-download %s previous chapters</string>
     <string name="is_enabled">Is enabled</string>
     <string name="background_image">Background Image</string>
     <string name="background_image_blurring">Background image blurring</string>
@@ -1194,6 +1209,9 @@
     <string name="content_src">Content source code</string>
     <string name="list_src">List source code</string>
     <string name="font_size">Font Size</string>
+    <string name="title_size_relative">Relative to body text size</string>
+    <string name="title_size_relative_desc">Compatible with other versions</string>
+    <string name="title_size_offset">Font size offset</string>
     <string name="color">Color</string>
     <string name="reset_to_body_color">Reset to body text color</string>
     <string name="title_margin_top">Margin Top</string>
@@ -1484,6 +1502,9 @@
     <string name="jump_to_another_app">Jump to another app</string>
     <string name="clear_webview_data">Clear WebView Data</string>
     <string name="clear_webview_data_summary">Clear all data in WebView</string>
+    <string name="block_source_browser">Block Sources from Opening the Built-in Browser</string>
+    <string name="block_source_browser_summary">When enabled, sources cannot open the built-in browser through java.startBrowser, and calls that wait for the page result will fail</string>
+    <string name="block_source_browser_error">Blocked: sources are not allowed to open the built-in browser</string>
     <string name="source_tab_list">List</string>
     <string name="source_tab_web_view">Web view</string>
     <string name="source_tab_start">Startup</string>
@@ -1820,7 +1841,7 @@
     <string name="system_media_control_compatibility_change_summary">Enable if system media controls are missing on lock screen (e.g. OneUI 7.0, OriginOS)</string>
     <string name="read_aloud_pause_resume">Pause/Resume Reading Aloud</string>
     <string name="play_mode">Play Mode</string>
-    <string name="tabletInterface">Tablet Interface</string>
+    <string name="tabletInterface">Navigation layout</string>
     <string name="progress">Progress</string>
     <string name="clear_all">Clear All</string>
     <string name="welcome_title">Welcome!</string>
@@ -2355,6 +2376,8 @@
     <string name="ai_test_success_no_models">AI connection test succeeded, but no models found</string>
     <string name="ai_test_success_with_models">AI connection test succeeded (%1$d models found)</string>
     <string name="ai_test_failed">AI connection test failed</string>
+    <string name="ai_local_network_permission_denied">Local network permission is required to reach this AI service</string>
+    <string name="local_network_permission_required">Can\'t reach the local network. Grant the \"Nearby devices\" permission to this app in system settings</string>
     <string name="ai_profile_counts">Providers: %1$d, models: %2$d, presets: %3$d</string>
     <string name="homepage_load_more_failed">Failed to load more: %1$s</string>
     <string name="homepage_module_duplicate_infinite">This group already has an infinite loading module</string>
@@ -2458,6 +2481,9 @@
     <string name="title_bar_layout">Title Bar Layout</string>
     <string name="show_title_bar_icons">Show floating icons</string>
     <string name="title_bar_compact">Compact top bar buttons</string>
+    <string name="title_bar_action_buttons">Configure Top Buttons</string>
+    <string name="only_online_books">Online books only</string>
+    <string name="only_local_books">Local books only</string>
     <string name="title_bar_icon_position">Floating icon position</string>
     <string name="position_top_start">Top left</string>
     <string name="position_top_end">Top right</string>
@@ -2589,9 +2615,15 @@
     <string name="show_all_synopsis">Show all synopsis</string>
     <string name="show_lines_synopsis">Show %1$d lines of synopsis</string>
     <string name="show_tags">Show Tags</string>
+    <string name="bookshelf_tag_content">Tag display content</string>
+    <string name="bookshelf_tag_custom">User tags</string>
+    <string name="bookshelf_tag_word_count">Word count</string>
+    <string name="bookshelf_tag_none">None selected</string>
     <string name="custom_tag_colors">Custom Tag Colors</string>
     <string name="manage_tag_colors">Manage Tag Colors</string>
     <string name="search_filter_first">Search button opens the search page directly</string>
+    <string name="bookshelf_filter">Filter bookshelf</string>
+    <string name="bookshelf_search_button_hint">On: tap to search, hold to filter. Off: tap to filter, hold to search.</string>
     <string name="import_from_network">Import from Network</string>
     <string name="input_url_or_json_hint">Enter URL or JSON</string>
     <string name="history_label">History:</string>
@@ -2621,6 +2653,8 @@
     <string name="no_logs">No logs</string>
     <string name="no_crash_logs">No crash logs</string>
     <string name="select_or_search_category">Select or search category</string>
+    <string name="explore_jump_page">Jump to page</string>
+    <string name="explore_jump_page_hint">Page number</string>
     <string name="multi_select_items">Multi-select Items</string>
     <string name="recently_read">Recently Read: </string>
     <string name="no_favorites_rss">No favorite subscriptions yet!</string>
@@ -2999,6 +3033,11 @@
     <string name="switch_to_classic_read_aloud">Classic controls</string>
     <string name="read_aloud_settings_general_tab">General</string>
     <string name="read_aloud_settings_voice_tab">Engine &amp; voices</string>
+    <string name="read_aloud_settings_casting_tab">Roles &amp; music</string>
+    <string name="read_aloud_section_engine">Engines</string>
+    <string name="read_aloud_section_analysis">Chapter analysis</string>
+    <string name="read_aloud_section_casting">Roles &amp; voices</string>
+    <string name="read_aloud_section_bgm">Background music</string>
     <string name="speech_analysis_mode">Chapter segmentation</string>
     <string name="speech_analysis_rule">Rule segmentation</string>
     <string name="speech_analysis_rule_ai">Rules with AI completion (recommended)</string>
@@ -3018,7 +3057,7 @@
     <string name="cast_bgm_track">Music track</string>
     <string name="cast_bgm_scene_follow">Random from pool</string>
     <string name="cast_bgm_scene_follow_hint">Pick a track to pin it, leave empty to choose randomly from the pool</string>
-    <string name="cast_bgm_scene_clear">Clear this paragraph</string>
+    <string name="cast_bgm_scene_clear">Clear this segment’s music</string>
     <string name="cast_bgm_scene_saved">Applied</string>
     <string name="cast_bgm_segment_volume">This paragraph</string>
     <string name="cast_bgm_segment_volume_hint">Multiplies the track’s own volume; only this paragraph is affected</string>
@@ -3030,7 +3069,7 @@
     <string name="cast_bgm_track_volume_hint">Applies to this imported track everywhere it is used</string>
     <string name="cast_bgm_scene_table">Chapter background music</string>
     <string name="cast_bgm_scene_overview">Overview</string>
-    <string name="cast_bgm_scene_table_summary">All paragraphs of this chapter with their pool, track and volume</string>
+    <string name="cast_bgm_scene_table_summary">Music and volume for each segment of this chapter, editable in place</string>
     <string name="cast_bgm_scene_table_empty">No background music assigned in this chapter yet</string>
     <string name="cast_bgm_scene_row">Paragraph %1$d</string>
     <string name="cast_bgm_scene_range">Paragraphs %1$d–%2$d</string>
@@ -3054,7 +3093,7 @@
     <string name="cast_bgm_pool_summary">Import music files to play as background audio while reading</string>
     <string name="cast_tts_engines_summary">Configure reading engines and import voices; long-press a voice to audition it</string>
     <string name="cast_bgm_import">Import audio</string>
-    <string name="cast_bgm_empty">No background music yet. Use Import audio in the top right.</string>
+    <string name="cast_bgm_empty">No background music yet. Imported audio files show up here.</string>
     <string name="cast_bgm_delete">Delete music</string>
     <string name="cast_bgm_delete_confirm">Delete \"%1$s\"? The copied audio file will be removed too.</string>
     <string name="cast_bgm_play">Play</string>
@@ -3088,13 +3127,12 @@
     <string name="cast_voice">Voice</string>
     <string name="cast_unassign">Unassign</string>
     <string name="cast_no_match">No match</string>
-    <string name="read_aloud_pagination_pending">Chapter layout is still in progress, please try again</string>
     <string name="ai_cast_roles">AI casting</string>
-    <string name="ai_cast_status">%1$d of %2$d dialogues assigned</string>
+    <string name="ai_cast_status">%2$d dialogue lines in this chapter, %1$d assigned</string>
     <string name="ai_cast_status_loading">Loading chapter status…</string>
     <string name="ai_cast_all_done">All dialogues in this chapter are assigned</string>
-    <string name="ai_cast_reassign">Reassign (clear existing first)</string>
-    <string name="ai_cast_chapter_count">Chapters to cast (from current)</string>
+    <string name="ai_cast_reassign">Reassign</string>
+    <string name="ai_cast_reassign_summary">Clear this chapter’s existing assignments, then identify again</string>
     <string name="ai_cast_progress">%1$d/%2$d chapters</string>
     <string name="ai_cast_start">Start</string>
     <string name="ai_cast_delete">Delete chapter assignments</string>
@@ -3106,6 +3144,7 @@
     <string name="ai_cast_memory">Book cast memory</string>
     <string name="ai_cast_memory_hint">Cross-chapter character dossier shared by AI (main name|aliases/roles|relations|pool). Editable.</string>
     <string name="ai_cast_memory_saved">Memory saved</string>
+    <string name="ai_cast_memory_rename_clash">Memory saved, %1$d name(s) not applied: another character in this book already uses that name</string>
     <string name="ai_cast_preset_name">Preset name</string>
     <string name="ai_cast_preset_instruction">Casting requirement</string>
     <string name="ai_cast_fixed_slots_title">Always-appended prompt rows</string>
@@ -3118,14 +3157,14 @@
     <string name="ai_cast_preset_default">Default</string>
     <string name="ai_cast_preset_default_done">Restored the built-in casting requirement</string>
     <string name="ai_cast_extra_chapters">Extra chapters</string>
-    <string name="ai_cast_extra_summary">%1$d more chapters after the current one (0 = only this chapter)</string>
+    <string name="ai_cast_extra_summary">Assign after this chapter (0 = this chapter only)</string>
     <string name="ai_cast_range_mode">Chapter range</string>
     <string name="ai_cast_chapter_failed">Chapter %1$d %2$s: %3$s</string>
     <string name="ai_cast_run_failed">%1$d chapter(s) failed</string>
     <string name="ai_cast_resume_from">Continue from chapter %1$d</string>
     <string name="ai_cast_retry">Retry %1$d chapter(s)</string>
     <string name="ai_cast_cancelled">Casting cancelled, stopped at chapter %1$d</string>
-    <string name="ai_cast_no_preset">No presets - using built-in default</string>
+    <string name="ai_cast_no_preset">No custom preset yet, using the built-in default</string>
     <string name="ai_cast_reasoning_level">Model reasoning depth</string>
     <string name="ai_cast_reasoning_level_hint">Model default = the app sends no reasoning parameter at all. Lower it when a chapter takes too long; forced-thinking models such as GLM-5.3 cannot be switched off.</string>
     <string name="ai_cast_reasoning_follow">Model default</string>
@@ -3134,8 +3173,6 @@
     <string name="ai_cast_request_hint">System prompt plus the user JSON of the last request, exactly as the model received it. Open this when the result looks wrong: it shows which dialogue lines and which character names the model actually saw.</string>
     <string name="ai_cast_transcript_folded">%1$d earlier characters folded, only the latest part is shown</string>
     <string name="ai_cast_thinking_pending">No reasoning text from the model yet. If the chapter finishes with nothing here, this model does not return its thinking; casting continues either way.</string>
-    <string name="cast_table_empty">No characters yet for this book.</string>
-    <string name="book_cast_roles">Book cast roles</string>
     <string name="cast_table_row_count">%1$d chapters · %2$d lines</string>
     <string name="cast_delete_character">Delete character</string>
     <string name="cast_delete_character_confirm">Delete "%1$s" and all its assignments?</string>
@@ -3169,14 +3206,15 @@
     <string name="cast_import_tts_server_empty">No character voices found in this file (sound effects are excluded on purpose)</string>
     <string name="cast_import_tts_server_counts">%1$d voices · %2$d sound effects skipped · %3$d disabled skipped</string>
     <string name="cast_import_tts_server_engine">Engine package</string>
+    <string name="cast_import_engine_pick">Select installed engine</string>
     <string name="cast_import_tts_server_engine_hint">Voices are matched by the "display name_id" name this engine exposes. If that package is not installed, the imported voices stay silent.</string>
     <string name="cast_import_tts_server_result">Imported %1$d pools, %2$d voices</string>
     <string name="cast_import_confirm">Import</string>
     <string name="cast_import_pools_invalid">This file was not exported by this app</string>
+    <string name="cast_import_pools_nothing_new">The file is valid, but its %1$d pool(s) already exist here — nothing was added</string>
     <string name="cast_export_pools_done">Pools exported</string>
     <string name="cast_export_pools_failed">Export failed</string>
     <string name="cast_list_separator">, </string>
-    <string name="multi_role_rule">Read-aloud rules</string>
     <string name="regex_cast_rule">Regex roles</string>
     <string name="regex_cast_rule_summary">When matched text appears, read it with another voice or replace it with a sound effect</string>
     <string name="regex_cast_create">New regex role</string>
@@ -3210,7 +3248,6 @@
     <string name="regex_cast_summary">Match %1$s -> %2$s</string>
     <string name="regex_cast_summary_voice">read with %1$s (%2$s)</string>
     <string name="regex_cast_summary_sound">play %1$s (%2$s) on a third track, text not read</string>
-    <string name="regex_cast_scope_hint">Scope takes book title or source URL, empty means all books.</string>
     <string name="regex_cast_search_hint">Filter rules and groups</string>
     <string name="regex_cast_new_group">New group</string>
     <string name="regex_cast_delete_group_title">Delete this group?</string>
@@ -3218,7 +3255,6 @@
     <string name="regex_cast_group_bad_name">Empty name</string>
     <string name="regex_cast_group_duplicate">Another group here already has this name</string>
     <string name="regex_cast_dialog_hint">The pool list is only a filter: disabled pools are still listed, and a voice can be picked without choosing a pool. Type a new group name to create one.</string>
-    <string name="regex_cast_sort_hint">Long press and drag to reorder; drop into another section to move the rule into that group.</string>
     <string name="regex_cast_pool_disabled"> (disabled)</string>
     <string name="multi_role_rule_summary">Manage voice pools, background music pools and role casting</string>
     <string name="cast_voice_pool_summary">Manage character voice pools and the voices enabled inside them</string>
@@ -3234,11 +3270,8 @@
     <string name="cast_symbol_duplicated">Symbols must differ from each other</string>
     <string name="cast_syntax_preview">Preview: %1$s</string>
     <string name="cast_syntax_applies_next_chapter">Name and pool may also be separated by . · 、 (e.g. 张三.男青年). Changes apply to chapters opened afterwards.</string>
-    <string name="voice_pool_tab">Voice pools</string>
-    <string name="cast_assign_tab">Assignments</string>
     <string name="cast_group">Group</string>
     <string name="cast_group_none">Ungrouped</string>
-    <string name="cast_group_hint">Pick a group from the list; groups are created and nested on the voice pool page</string>
     <string name="cast_create_pool">New voice pool</string>
     <string name="cast_edit_pool">Edit voice pool</string>
     <string name="cast_delete_pool">Delete voice pool</string>
@@ -3246,9 +3279,6 @@
     <string name="cast_pool_name_invalid">Empty or duplicate name</string>
     <string name="cast_search_pool_hint">Search pools or groups</string>
     <string name="cast_search_voice_hint">Search voices</string>
-    <string name="cast_pool_members">Pool voices</string>
-    <string name="cast_assign_empty">No characters yet. Assign one from a role capsule in the reader.</string>
-    <string name="cast_no_voice">No voice</string>
     <string name="cast_create">Create</string>
     <string name="cast_invalid_name">Invalid character name</string>
     <string name="cast_confirm_not_found">Character not found, tap Create to add one</string>
@@ -3349,6 +3379,7 @@
     <string name="cloud_tts_loading_voices">Loading voices…</string>
     <string name="cloud_tts_no_matching_voice">No matching voice</string>
     <string name="cloud_tts_selected">Selected</string>
+    <string name="cloud_tts_default_voice">Default voice of this engine</string>
     <string name="cloud_tts_current_voice">Current voice</string>
     <string name="cloud_tts_refresh_catalog">Refresh online voice catalog</string>
     <string name="cloud_tts_hide_manual_voice">Hide manual input</string>
@@ -3386,6 +3417,9 @@
     <string name="cloud_tts_no_available_engine">Install a system TTS, add a cloud TTS engine, or import an HTTP TTS first</string>
     <string name="cloud_tts_voice_engine_unavailable">The engine used by this voice is currently unavailable</string>
     <string name="cloud_tts_cannot_change_engine">The engine cannot be changed while editing. Create a new voice preset instead.</string>
+    <string name="cloud_tts_restore_excluded_voices">Restore excluded voices (%1$d)</string>
+    <string name="cloud_tts_no_excluded_voices">No excluded voices</string>
+    <string name="cloud_tts_restored_voices">Restored %1$d voices</string>
     <string name="cloud_tts_engine_default_voice">Engine default voice</string>
     <string name="cloud_tts_voice_count">Loaded %1$d voices</string>
     <string name="cloud_tts_cannot_change_native_voice">The native voice cannot be changed while editing. Create a new voice preset instead.</string>
@@ -3819,4 +3853,10 @@
     <string name="explore_main_content">Browse discovery content here</string>
     <string name="explore_source_list">Show discovery sources</string>
     <string name="explore_select_source">Select discovery source</string>
+    <string name="background_battery_optimization_title">Background Running &amp; Battery Optimization</string>
+    <string name="background_battery_optimization_summary">Configure unrestricted background activity and autostart to prevent reader services from being killed</string>
+    <string name="battery_optimization_dialog_title">Background Optimization Settings Guide</string>
+    <string name="battery_optimization_status_ignored">Unrestricted (Tap to check OEM background policy)</string>
+    <string name="battery_optimization_status_not_ignored">Restricted or not configured; service may be killed in background</string>
+    <string name="reader_paragraph_image_action_unsupported">This image uses a paragraph-rule action that this version does not support.</string>
 </resources>

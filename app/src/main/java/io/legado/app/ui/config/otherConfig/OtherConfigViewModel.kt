@@ -78,6 +78,9 @@ class OtherConfigViewModel(
 
     fun onIntent(intent: OtherConfigIntent) {
         when (intent) {
+            OtherConfigIntent.RefreshBatteryStatus -> _uiState.update {
+                it.copy(isBatteryIgnored = io.legado.app.utils.BatteryOptimizationUtils.isIgnoringBatteryOptimizations())
+            }
             is OtherConfigIntent.LanguageChanged -> appLocaleGateway.setLanguage(intent.value)
             is OtherConfigIntent.UpdateToVariantChanged ->
                 updateOtherSetting { it.copy(updateToVariant = intent.value) }
@@ -109,6 +112,8 @@ class OtherConfigViewModel(
                 updateOtherSetting { it.copy(showMangaUi = intent.value) }
             is OtherConfigIntent.WebServiceWakeLockChanged ->
                 updateOtherSetting { it.copy(webServiceWakeLock = intent.value) }
+            is OtherConfigIntent.BlockSourceBrowserChanged ->
+                updateOtherSetting { it.copy(blockSourceBrowser = intent.value) }
             is OtherConfigIntent.SourceEditMaxLineChanged ->
                 updateOtherSetting { it.copy(sourceEditMaxLine = intent.value) }
             is OtherConfigIntent.WebPortChanged -> {
@@ -351,9 +356,11 @@ private fun OtherSettings.toUiState(current: OtherConfigUiState): OtherConfigUiS
         showAddToShelfAlert = showAddToShelfAlert,
         showMangaUi = showMangaUi,
         webServiceWakeLock = webServiceWakeLock,
+        blockSourceBrowser = blockSourceBrowser,
         sourceEditMaxLine = sourceEditMaxLine,
         webPort = webPort,
         processText = processText,
         recordLog = recordLog,
         recordHeapDump = recordHeapDump,
+        isBatteryIgnored = io.legado.app.utils.BatteryOptimizationUtils.isIgnoringBatteryOptimizations(),
     )

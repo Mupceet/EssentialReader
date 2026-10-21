@@ -12,10 +12,13 @@ import io.legado.app.domain.model.PlaybackTimer
 import io.legado.app.domain.model.readaloud.ReadAloudEngineSelection
 import io.legado.app.domain.model.readaloud.ReadAloudVoice
 import io.legado.app.help.readaloud.effect.VoiceEffectStore
+import io.legado.app.help.readaloud.playback.ReadAloudAudioStore
 import io.legado.app.lib.dialogs.SelectItem
+import io.legado.app.model.ReadAloud.getReadAloudClass
 import io.legado.app.service.BaseReadAloudService
 import io.legado.app.service.HttpReadAloudService
 import io.legado.app.service.TTSReadAloudService
+import io.legado.app.service.readaloud.ReadAloudBookSession
 import io.legado.app.utils.GSON
 import io.legado.app.utils.LogUtils
 import io.legado.app.utils.StringUtils
@@ -23,13 +26,25 @@ import io.legado.app.utils.fromJsonObject
 import io.legado.app.utils.postEvent
 import io.legado.app.utils.startForegroundServiceCompat
 import io.legado.app.utils.toastOnUi
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeoutOrNull
 import splitties.init.appCtx
 
 object ReadAloud {
+    val bookSession = ReadAloudBookSession()
+    private val requests = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+    private var requestId = 0L
     private val aloudSettingsGateway get() = org.koin.core.context.GlobalContext.get().get<io.legado.app.domain.gateway.ReadAloudSettingsGateway>()
-    private var aloudClass: Class<*> = getReadAloudClass()
-    val ttsEngine get() = ReadBook.book?.getTtsEngine() ?: aloudSettingsGateway.currentSettings.ttsEngine
+    private var selectedAloudClass: Class<*>? = null
+    private var aloudClass: Class<*>
+        get() = selectedAloudClass ?: getReadAloudClass().also { selectedAloudClass = it }
+        set(value) { selectedAloudClass = value }
+    val ttsEngine get() = (bookSession.book ?: ReadBook.book)?.getTtsEngine() ?: aloudSettingsGateway.currentSettings.ttsEngine
     var httpTTS: HttpTTS? = null
     var coordinatorDefaultEngineType: String = ReadAloudVoice.ENGINE_SYSTEM
         private set
@@ -47,7 +62,7 @@ object ReadAloud {
      * 管理页拿它来标「当前引擎不生效」，免得用户以为预设坏了。
      */
     val supportsSessionAudioEffect: Boolean
-        get() = aloudClass != TTSReadAloudService::class.java
+        get() = (if (BaseReadAloudService.isRun) aloudClass else getReadAloudClass()) != TTSReadAloudService::class.java
 
     private fun getReadAloudClass(): Class<*> {        val ttsEngine = ttsEngine
         GSON.fromJsonObject<ReadAloudEngineSelection>(ttsEngine).getOrNull()
@@ -101,7 +116,7 @@ object ReadAloud {
         // 回到用户在朗读设置里选的默认引擎。
         if (!settings.useMultiSpeaker) return null
         return runCatching {
-            val bookUrl = ReadBook.book?.bookUrl ?: return@runCatching null
+            val bookUrl = (bookSession.book ?: ReadBook.book)?.bookUrl ?: return@runCatching null
             val (httpVoices, systemRoutes) = runBlocking {
                 val voiceIds = appDb.readAloudVoiceDao.getBindings(bookUrl)
                     .mapTo(hashSetOf()) { it.voiceId }
@@ -177,7 +192,37 @@ object ReadAloud {
         startPos: Int = 0,
         /** Absolute position in the processed chapter; preferred by the Canvas reader. */
         chapterPosition: Int? = null,
+        fromReader: Boolean = true,
     ) {
+        val request = if (fromReader) ReadAloudBookSession.captureReader() else bookSession.state.value
+        if (request?.book == null) return
+        playRequest(context, request, play, pageIndex, startPos, chapterPosition)
+    }
+
+    internal fun playRequest(context: Context, request: ReadAloudBookSession.Snapshot,
+        play: Boolean = true, pageIndex: Int = 0, startPos: Int = 0, chapterPosition: Int? = null) {
+        val requestedBook = request.book ?: return
+        val id = ++requestId
+        val application = context.applicationContext
+        requests.launch {
+            if (BaseReadAloudService.isAlive &&
+                (!BaseReadAloudService.isRun || !bookSession.owns(requestedBook.bookUrl))
+            ) {
+                stopRunning(application)
+                val stopped = withTimeoutOrNull(2_000L) {
+                    while (BaseReadAloudService.isAlive) delay(20)
+                    true
+                }
+                if (stopped == null || id != requestId) return@launch
+            }
+            if (id != requestId) return@launch
+            bookSession.adopt(request)
+            startPlayback(application, play, pageIndex, startPos, chapterPosition)
+        }
+    }
+
+    private fun startPlayback(context: Context, play: Boolean, pageIndex: Int, startPos: Int,
+        chapterPosition: Int?) {
         if (!BaseReadAloudService.isRun) {
             aloudClass = getReadAloudClass()
         }
@@ -194,10 +239,15 @@ object ReadAloud {
         intent.putExtra("play", play)
         intent.putExtra("pageIndex", pageIndex)
         intent.putExtra("startPos", startPos)
+        intent.putExtra("sessionGeneration", bookSession.state.value.generation)
         chapterPosition?.let { intent.putExtra("chapterPosition", it) }
         LogUtils.d("ReadAloud", intent.toString())
         try {
-            context.startForegroundServiceCompat(intent)
+            if (BaseReadAloudService.isRun) {
+                context.startService(intent)
+            } else {
+                context.startForegroundServiceCompat(intent)
+            }
         } catch (e: Exception) {
             val msg = "启动朗读服务出错\n${e.localizedMessage}"
             AppLog.put(msg, e)
@@ -224,7 +274,7 @@ object ReadAloud {
         if (BaseReadAloudService.isRun) {
             val intent = Intent(context, aloudClass)
             intent.action = IntentAction.pause
-            context.startForegroundServiceCompat(intent)
+            startServiceIntent(context, intent, "暂停朗读")
         }
     }
 
@@ -232,11 +282,16 @@ object ReadAloud {
         if (BaseReadAloudService.isRun) {
             val intent = Intent(context, aloudClass)
             intent.action = IntentAction.resume
-            context.startForegroundServiceCompat(intent)
+            startServiceIntent(context, intent, "恢复朗读")
         }
     }
 
     fun stop(context: Context) {
+        ++requestId
+        stopRunning(context)
+    }
+
+    private fun stopRunning(context: Context) {
         if (BaseReadAloudService.requestStop()) {
             // Stopping an already-running service must not issue a new foreground-start request.
             // If its last start is still pending, the stop action could otherwise finish the
@@ -249,7 +304,7 @@ object ReadAloud {
         if (BaseReadAloudService.isRun) {
             val intent = Intent(context, aloudClass)
             intent.action = IntentAction.prevParagraph
-            context.startForegroundServiceCompat(intent)
+            startServiceIntent(context, intent, "上一段")
         }
     }
 
@@ -257,7 +312,7 @@ object ReadAloud {
         if (BaseReadAloudService.isRun) {
             val intent = Intent(context, aloudClass)
             intent.action = IntentAction.nextParagraph
-            context.startForegroundServiceCompat(intent)
+            startServiceIntent(context, intent, "下一段")
         }
     }
 
@@ -265,15 +320,15 @@ object ReadAloud {
         if (BaseReadAloudService.isRun) {
             val intent = Intent(context, aloudClass)
             intent.action = IntentAction.upTtsSpeechRate
-            context.startForegroundServiceCompat(intent)
+            startServiceIntent(context, intent, "更新语速")
         }
     }
 
     fun syncLayout(context: Context = appCtx) {
-        if (BaseReadAloudService.isRun) {
+        if (ReadBook.isCurrentBookReadAloud) {
             val intent = Intent(context, aloudClass)
             intent.action = IntentAction.syncReadAloudLayout
-            context.startForegroundServiceCompat(intent)
+            startServiceIntent(context, intent, "同步朗读排版")
         }
     }
 
@@ -285,11 +340,25 @@ object ReadAloud {
      * stop 意图发给一个根本没在跑的类，朗读就永远停不下来（配乐清掉的正是这条链路）。
      */
     fun refreshCastQueue(context: Context = appCtx) {
-        if (!BaseReadAloudService.isRun) return
+        if (!ReadBook.isCurrentBookReadAloud) return
         val intent = Intent(context, aloudClass)
         intent.action = IntentAction.refreshReadAloudCast
-        context.startForegroundServiceCompat(intent)
+        startServiceIntent(context, intent, "刷新角色队列")
     }
+
+    fun selectChapter(context: Context, index: Int) {
+        if (!BaseReadAloudService.isRun) return
+        val intent = Intent(context, aloudClass).apply {
+            action = IntentAction.play
+            putExtra("chapterIndex", index)
+            putExtra("play", !BaseReadAloudService.pause)
+            putExtra("chapterPosition", 0)
+        }
+        startServiceIntent(context, intent, "切换朗读章节")
+    }
+
+    fun previousChapter(context: Context) = selectChapter(context, bookSession.chapterIndex - 1)
+    fun nextChapter(context: Context) = selectChapter(context, bookSession.chapterIndex + 1)
 
     /**
      * 听书音频下载：只走文件合成那条服务，因为只有它能把每句落成文件。
@@ -310,8 +379,26 @@ object ReadAloud {
         startServiceIntent(context, intent, "启动听书下载")
     }
 
+    /**
+     * 下载前解析当前设置对应的合成源。
+     *
+     * [httpTTS] 只是 [getReadAloudClass] 的副产物：进程刚起、还没进过朗读时它是 null，
+     * 直接读会把「第一次就点下载」判成没有可用引擎，于是下载既不开始、也不收尾。
+     * 解析里带数据库查询，必须在后台线程调用。
+     */
+    fun resolveHttpTts(): HttpTTS? {
+        httpTTS?.let { return it }
+        getReadAloudClass()
+        return httpTTS
+    }
+
     fun cancelDownloadAudio(context: Context) {
-        if (!BaseReadAloudService.isRun) return
+        // 服务已经不在（被杀、任务被划掉、下载协程随服务销毁）时意图发不出去，
+        // 但界面上的「下载中」必须收尾，否则按钮永远禁用、取消也没反应。
+        if (!BaseReadAloudService.isRun) {
+            ReadAloudAudioStore.finishProgress()
+            return
+        }
         val intent = Intent(context, HttpReadAloudService::class.java)
         intent.action = IntentAction.cancelDownloadReadAloudAudio
         startServiceIntent(context, intent, "取消听书下载")
@@ -319,7 +406,11 @@ object ReadAloud {
 
     private fun startServiceIntent(context: Context, intent: Intent, label: String) {
         try {
-            context.startForegroundServiceCompat(intent)
+            if (BaseReadAloudService.isRun) {
+                context.startService(intent)
+            } else {
+                context.startForegroundServiceCompat(intent)
+            }
         } catch (e: Exception) {
             val msg = "${label}出错\n${e.localizedMessage}"
             AppLog.put(msg, e)
@@ -332,7 +423,7 @@ object ReadAloud {
             val intent = Intent(context, aloudClass)
             intent.action = IntentAction.setTimer
             intent.putExtra("minute", PlaybackTimer.normalize(minute))
-            context.startForegroundServiceCompat(intent)
+            startServiceIntent(context, intent, "设置朗读定时")
         }
     }
 
@@ -342,7 +433,7 @@ object ReadAloud {
             val intent = Intent(context, aloudClass)
             intent.action = IntentAction.setTimerChapters
             intent.putExtra("chapters", PlaybackTimer.normalizeChapters(chapters))
-            context.startForegroundServiceCompat(intent)
+            startServiceIntent(context, intent, "设置章节定时")
         }
     }
 

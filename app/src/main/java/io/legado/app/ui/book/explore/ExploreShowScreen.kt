@@ -22,6 +22,11 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.GridView
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.input.KeyboardType
+import io.legado.app.ui.widget.components.AppTextField
+import io.legado.app.ui.widget.components.alert.AppAlertDialog
+import io.legado.app.ui.widget.components.text.AppText
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.runtime.Composable
@@ -37,7 +42,6 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.chrisbanes.haze.HazeState
-import dev.chrisbanes.haze.materials.ExperimentalHazeMaterialsApi
 import io.legado.app.R
 import io.legado.app.data.entities.SearchBook
 import io.legado.app.domain.model.BookShelfState
@@ -61,6 +65,7 @@ import io.legado.app.ui.widget.components.topbar.GlassTopAppBarDefaults
 import io.legado.app.ui.widget.components.topbar.GlassTopAppBarScrollBehavior
 import io.legado.app.ui.widget.components.topbar.TopBarActionButton
 import io.legado.app.ui.widget.components.topbar.TopBarNavigationButton
+import io.legado.app.ui.widget.components.topbar.TopBarTextActionButton
 import io.legado.app.utils.toastOnUi
 import org.koin.androidx.compose.koinViewModel
 import splitties.init.appCtx
@@ -78,7 +83,7 @@ private enum class BookFilterState(val id: Int) {
 
 @SuppressLint("LocalContextConfigurationRead", "ConfigurationScreenWidthHeight")
 @OptIn(
-    ExperimentalMaterial3Api::class, ExperimentalHazeMaterialsApi::class,
+    ExperimentalMaterial3Api::class,
     ExperimentalMaterial3ExpressiveApi::class, ExperimentalSharedTransitionApi::class
 )
 @Composable
@@ -130,7 +135,7 @@ fun ExploreShowRouteScreen(
 
 @SuppressLint("LocalContextConfigurationRead", "ConfigurationScreenWidthHeight")
 @OptIn(
-    ExperimentalMaterial3Api::class, ExperimentalHazeMaterialsApi::class,
+    ExperimentalMaterial3Api::class,
     ExperimentalMaterial3ExpressiveApi::class, ExperimentalSharedTransitionApi::class
 )
 @Composable
@@ -149,6 +154,8 @@ fun ExploreShowScreen(
 
     var previewBook by remember { mutableStateOf<SearchBook?>(null) }
     var previewSharedCoverKey by remember { mutableStateOf<String?>(null) }
+    var showJumpPageDialog by remember { mutableStateOf(false) }
+    var jumpPageInput by remember { mutableStateOf("") }
 
     val filterStateId = state.filterStateId
     val books = remember(state.books, filterStateId) {
@@ -429,11 +436,47 @@ fun ExploreShowScreen(
                             imageVector = AppIcons.Filter,
                             contentDescription = stringResource(R.string.select_or_search_category)
                         )
+                        if (state.canJumpPage) {
+                            TopBarTextActionButton(
+                                onClick = {
+                                    jumpPageInput = state.currentPage.toString()
+                                    showJumpPageDialog = true
+                                },
+                                text = state.currentPage.toString(),
+                                contentDescription = stringResource(R.string.explore_jump_page),
+                            )
+                        }
                     },
                     scrollBehavior = scrollBehavior
                 )
             }
         ) { paddingValues -> resultContent(paddingValues) }
+    }
+
+    if (showJumpPageDialog) {
+        val jumpPage = jumpPageInput.toIntOrNull()
+        AppAlertDialog(
+            show = true,
+            onDismissRequest = { showJumpPageDialog = false },
+            title = stringResource(R.string.explore_jump_page),
+            content = {
+                AppTextField(
+                    value = jumpPageInput,
+                    onValueChange = { input ->
+                        jumpPageInput = input.filter(Char::isDigit).take(4)
+                    },
+                    placeholder = { AppText(stringResource(R.string.explore_jump_page_hint)) },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                )
+            },
+            confirmEnabled = jumpPage != null && jumpPage >= 1,
+            onConfirm = {
+                if (jumpPage != null && jumpPage >= 1) {
+                    onIntent(ExploreShowIntent.JumpToPage(jumpPage))
+                }
+                showJumpPageDialog = false
+            },
+        )
     }
 
     val previewShelfState = previewBook?.let { book ->

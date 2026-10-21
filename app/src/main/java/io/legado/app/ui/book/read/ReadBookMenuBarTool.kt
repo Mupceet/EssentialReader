@@ -15,12 +15,13 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Icon
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -56,11 +57,11 @@ import com.kyant.backdrop.shadow.InnerShadow
 import com.kyant.backdrop.shadow.Shadow
 import com.kyant.capsule.ContinuousCapsule
 import io.legado.app.ui.animation.DampedDragAnimation
-import io.legado.app.ui.book.read.sheet.ReadMenuButtonInfo
-import io.legado.app.ui.book.read.sheet.readMenuButtonInfos
 import io.legado.app.ui.theme.LegadoTheme
-import io.legado.app.ui.widget.components.reader.ReaderMenuSlider as BaseReaderMenuSlider
+import io.legado.app.ui.widget.components.icon.AppIcon
+import io.legado.app.ui.widget.components.text.AppText
 import kotlin.math.roundToInt
+import io.legado.app.ui.widget.components.reader.ReaderMenuSlider as BaseReaderMenuSlider
 
 @Composable
 internal fun ReadMenuSlider(
@@ -329,36 +330,49 @@ internal fun ToolButtonItem(
     backdrop: Backdrop?,
     glassEnabled: Boolean,
     labelColor: Color,
+    onIntent: (ReadBookIntent) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val badgeCount = when (button.id) {
         "replace_badge" -> state.effectiveReplaceCount
         else -> 0
     }
+    var expandedMenu by remember { mutableStateOf(false) }
 
     Column(
         modifier = modifier,
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        ReadMenuGlassButtonSurface(
-            onClick = button.onClick,
-            colors = colors,
-            backdrop = backdrop,
-            menuConfig = state.menuConfig,
-            glassEnabled = glassEnabled,
-            selected = button.isActive,
-            onLongClick = button.onLongClick,
-            contentDescription = button.description,
-        ) { tint ->
-            ToolButtonContent(
-                button = button,
-                tint = tint,
-                badgeCount = badgeCount,
+        Box {
+            ReadMenuGlassButtonSurface(
+                onClick = button.onClick,
+                colors = colors,
+                backdrop = backdrop,
+                menuConfig = state.menuConfig,
+                glassEnabled = glassEnabled,
+                selected = button.isActive,
+                onLongClick = when {
+                    button.longPressMenu != null -> ({ expandedMenu = true })
+                    else -> button.onLongClick
+                },
+                contentDescription = button.description,
+            ) { tint ->
+                ToolButtonContent(
+                    button = button,
+                    tint = tint,
+                    badgeCount = badgeCount,
+                )
+            }
+            ReadMenuLongPressDropdown(
+                menu = button.longPressMenu,
+                expanded = expandedMenu,
+                onDismissRequest = { expandedMenu = false },
+                onIntent = onIntent,
             )
         }
         if (state.menuConfig.readMenuIconShowText) {
             Spacer(Modifier.height(2.dp))
-            Text(
+            AppText(
                 text = button.description,
                 style = LegadoTheme.typography.labelSmall.copy(
                     shadow = menuTextShadow
@@ -385,7 +399,7 @@ private fun ToolButtonContent(
         modifier = Modifier.fillMaxSize(),
     ) {
         if (button.customIconPath.isNullOrBlank()) {
-            Icon(
+            AppIcon(
                 imageVector = button.icon,
                 contentDescription = null,
                 modifier = Modifier.size(20.dp),
@@ -402,7 +416,7 @@ private fun ToolButtonContent(
             )
         }
         if (badgeCount > 0) {
-            Text(
+            AppText(
                 text = badgeCount.toString(),
                 modifier = Modifier
                     .align(Alignment.TopEnd)
@@ -426,6 +440,8 @@ internal data class ToolButtonDef(
     val isActive: Boolean = false,
     val onClick: () -> Unit,
     val onLongClick: (() -> Unit)? = null,
+    /** 与顶栏同一按钮保持一致的长按二级菜单。 */
+    val longPressMenu: ReadMenuLongPressMenu? = null,
 )
 
 internal fun loadToolButtons(
@@ -435,108 +451,28 @@ internal fun loadToolButtons(
     onIntent: (ReadBookIntent) -> Unit,
 ): List<ToolButtonDef> {
     val customIcons = state.menuConfig.readMenuCustomIcons
-    fun ReadMenuButtonInfo.toButton(
-        isActive: Boolean = false,
-        onLongClick: (() -> Unit)? = null,
-        onClick: () -> Unit,
-    ): ToolButtonDef {
-        return ToolButtonDef(id, icon, label, customIcons[id], isActive, onClick, onLongClick)
-    }
-
-    val infoMap = readMenuButtonInfos(context).associateBy { it.id }
-    val allButtons = listOf(
-        infoMap.getValue("search").toButton {
-            onIntent(ReadBookIntent.OpenSearch(null))
-        },
-        infoMap.getValue("catalog").toButton {
-            onIntent(ReadBookIntent.OpenChapterList)
-        },
-        infoMap.getValue("read_aloud").toButton(
-            isActive = state.isReadAloudRunning,
-            onLongClick = {
-                onIntent(ReadBookIntent.OpenReadMenuRoute(ReadBookMenuRoute.ReadAloud))
-            },
-        ) {
-            if (state.isReadAloudRunning) {
-                onIntent(ReadBookIntent.ReadAloudAction)
-            } else {
-                onIntent(ReadBookIntent.ToggleReadAloud)
-                onIntent(ReadBookIntent.HideMenu)
-            }
-        },
-        infoMap.getValue("setting").toButton {
-            onIntent(ReadBookIntent.OpenReadMenuRoute(ReadBookMenuRoute.ReadStyle))
-        },
-        infoMap.getValue("addBookmark").toButton {
-            onIntent(ReadBookIntent.AddBookmark)
-        },
-        infoMap.getValue("theme").toButton {
-            onIntent(ReadBookIntent.ToggleDayNight)
-        },
-        infoMap.getValue("eye_protection").toButton(
-            isActive = eyeProtectionEnabled,
-            onLongClick = { onIntent(ReadBookIntent.ShowSheet(ReadBookSheet.EyeProtection)) },
-        ) {
-            onIntent(ReadBookIntent.ToggleEyeProtection)
-        },
-        infoMap.getValue("prev_chapter").toButton {
-            onIntent(ReadBookIntent.PrevChapter)
-        },
-        infoMap.getValue("next_chapter").toButton {
-            onIntent(ReadBookIntent.NextChapter)
-        },
-        infoMap.getValue("replace").toButton(
-        ) {
-            onIntent(ReadBookIntent.ShowSheet(ReadBookSheet.TextProcessing))
-        },
-        infoMap.getValue("replace_badge").toButton {
-            onIntent(ReadBookIntent.ShowSheet(ReadBookSheet.TextProcessing))
-        },
-        infoMap.getValue("auto_page").toButton(isActive = state.isAutoPage) {
-            if (state.isAutoPage) {
-                onIntent(ReadBookIntent.OpenReadMenuRoute(ReadBookMenuRoute.AutoRead))
-            } else {
-                onIntent(ReadBookIntent.ToggleAutoPage)
-                onIntent(ReadBookIntent.HideMenu)
-            }
-        },
-        infoMap.getValue("translate").toButton(isActive = state.translationMode) {
-            onIntent(ReadBookIntent.ToggleTranslation)
-        },
-        infoMap.getValue("refresh_current").toButton {
-            onIntent(ReadBookIntent.RefreshCurrentChapter)
-        },
-        infoMap.getValue("ai_summary").toButton {
-            onIntent(ReadBookIntent.OpenChapterSummary)
-        },
-        infoMap.getValue("ai_rewrite").toButton {
-            onIntent(ReadBookIntent.OpenAiCurrentChapterRewrite)
-        },
-        infoMap.getValue("multi_role_read").toButton(
-            isActive = state.useMultiSpeaker,
-        ) {
-            onIntent(ReadBookIntent.SetUseMultiSpeaker(!state.useMultiSpeaker))
-        },
-        infoMap.getValue("multi_role_cast").toButton(
-            isActive = state.multiRoleCast,
-        ) {
-            onIntent(ReadBookIntent.SetMultiRoleCast(!state.multiRoleCast))
-        },
-        infoMap.getValue("cast_table").toButton {
-            onIntent(ReadBookIntent.OpenBookVoiceCasting)
-        },
-        infoMap.getValue("ai_cast").toButton {
-            onIntent(ReadBookIntent.OpenAiCastDialog)
-        },
-        infoMap.getValue("more_actions").toButton {
-            onIntent(ReadBookIntent.ShowSheet(ReadBookSheet.MoreActions))
-        },
+    val defs = buildAllReadMenuActionDefs(
+        context = context,
+        state = state,
+        eyeProtectionActive = eyeProtectionEnabled,
+        onIntent = onIntent,
     )
-
-    val allMap = allButtons.associateBy { it.id }
     return state.menuConfig.bottomBarButtons
         .asSequence()
         .filter { it.enabled }
-        .mapNotNull { allMap[it.id] }
+        .mapNotNull { defs[it.id] }
+        .filter { it.applicable }
+        .map { def ->
+            ToolButtonDef(
+                id = def.id,
+                icon = def.icon,
+                description = def.label,
+                customIconPath = customIcons[def.id],
+                isActive = def.isActive,
+                onClick = def.onClick,
+                onLongClick = def.onLongClick,
+                longPressMenu = def.longPressMenu,
+            )
+        }
         .toList()
 }

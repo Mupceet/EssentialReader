@@ -1,6 +1,7 @@
 package io.legado.app.ui.main
 
 import androidx.navigation3.runtime.NavKey
+import io.legado.app.ui.book.read.ReadAloudSubPage
 import io.legado.app.ui.login.SourceLoginType
 import io.legado.app.ui.replace.ReplaceEditRoute
 import kotlinx.serialization.Serializable
@@ -186,7 +187,6 @@ data class MainRouteBookInfo(
     val origin: String? = null,
     val coverPath: String? = null,
     val sharedCoverKey: String? = null,
-    val useCoverMorph: Boolean = true,
     val openRequestId: Long = 0L,
 ) : MainRoute
 
@@ -263,36 +263,68 @@ data class MainRouteSearchContent(
 @Serializable
 data object MainRouteHighlightTagRule : MainRoute
 
-/** 多角色规则 hub：声音池 / 多角色识别。 */
+@Serializable
+data object MainRouteDictRule : MainRoute
+
+/**
+ * TXT 目录规则列表。
+ *
+ * [pickForBookUrl] 非空表示**选择模式**：这是为 [MainRouteToc] 挑一条规则而打开的，
+ * 选中后把结果回传给那个目录页（见 `BookPageResult.TxtTocRuleChosen`），而不是切换选中态。
+ */
+@Serializable
+data class MainRouteTxtTocRule(
+    val initialRule: String? = null,
+    val pickForBookUrl: String? = null,
+) : MainRoute
+
+/** TXT 目录规则预览：把一条规则套到 [bookUrl] 这本书上，可应用，也可跳到规则列表。 */
+@Serializable
+data class MainRouteTxtTocRulePreview(
+    val bookUrl: String,
+    val currentTocRegex: String? = null,
+) : MainRoute
+
+@Serializable
+data object MainRouteAllBookmark : MainRoute
+
+/** 朗读设置 hub（设置 → 朗读设置）：变声器 / 引擎 / 识别 / 正则角色。 */
 @Serializable
 data object MainRouteMultiRoleRule : MainRoute
 
-/** 多角色规则 → 声音池：池与池内音色管理。 */
+/** 角色声音池：池与池内音色管理。 */
 @Serializable
 data object MainRouteVoicePool : MainRoute
 
-/** 多角色规则 → 背景音乐池：导入的配乐文件管理，朗读时可作背景音。 */
+/** 背景音乐池：导入的配乐文件管理，朗读时可作背景音。 */
 @Serializable
 data object MainRouteBgmPool : MainRoute
 
-/** 多角色规则 → 多角色识别：标记包裹符号与声音池分隔符号配置。 */
+/** 多角色识别：标记包裹符号与声音池分隔符号配置。 */
 @Serializable
 data object MainRouteMultiRoleRecognition : MainRoute
 
-/** 朗读规则 → 变声器：音高/混响预设管理，角色配音时可选。 */
+/** 变声器：音高/混响预设管理，角色配音时可选。 */
 @Serializable
 data object MainRouteVoiceEffect : MainRoute
 
-/** 朗读规则 → 朗读胶囊设置：三类胶囊的圆角、背景与头像形状位置。 */
+/** 朗读胶囊设置：三类胶囊的圆角、背景与头像形状位置。 */
 @Serializable
 data object MainRouteCastCapsuleStyle : MainRoute
 
-/** 朗读规则 → 正则角色管理：命中正文文字换音色 / 不念改放音效。 */
+/** 正则角色管理：命中正文文字换音色 / 不念改放音效。 */
 @Serializable
 data object MainRouteRegexCastRule : MainRoute
 
 @Serializable
 data object MainRouteAbout : MainRoute
+
+/** 朗读设置卡片里的子页跳转：把 [ReadAloudSubPage] 映射到对应整屏路由。 */
+fun ReadAloudSubPage.toMainRoute(): MainRoute = when (this) {
+    ReadAloudSubPage.VoicePool -> MainRouteVoicePool
+    ReadAloudSubPage.BgmPool -> MainRouteBgmPool
+    ReadAloudSubPage.CapsuleStyle -> MainRouteCastCapsuleStyle
+}
 
 object MainRouteConst {
     const val ROUTE_MAIN = "main"

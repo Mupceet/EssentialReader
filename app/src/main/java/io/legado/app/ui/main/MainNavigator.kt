@@ -326,6 +326,8 @@ object MainNavigator {
             }
 
             MainRouteHighlightTagRule,
+            MainRouteDictRule,
+            MainRouteAllBookmark,
             MainRouteMultiRoleRule,
             MainRouteReadRecord -> {
                 if (currentRoute == MainRouteHome) {
@@ -337,7 +339,8 @@ object MainNavigator {
                 }
             }
 
-            // 多角色规则的子页只由 hub 用 backStack.add 压栈；这里保底直推，不清栈
+            // 朗读设置的子页（设置 hub 与阅读界面朗读设置卡片两处入口）都只压栈、不清栈：
+            // 从阅读界面进来要能直接返回阅读界面。
             MainRouteVoicePool,
             MainRouteBgmPool,
             MainRouteVoiceEffect,
@@ -347,6 +350,26 @@ object MainNavigator {
 
             MainRouteAbout -> {
                 if (currentRoute == MainRouteHome) {
+                    backStack.add(route)
+                } else {
+                    backStack.clear()
+                    backStack.add(MainRouteHome)
+                    backStack.add(route)
+                }
+            }
+
+            // TXT 目录规则列表与它的预览页既可以从首页进（管理模式），也可以是压在目录页 /
+            // 阅读页之上的子页（选择 / 应用模式）。后者必须压栈，否则返回时下层页面被清掉，
+            // 选中的规则也就没有父页面可以回传。
+            is MainRouteTxtTocRule,
+            is MainRouteTxtTocRulePreview -> {
+                if (
+                    currentRoute == MainRouteHome ||
+                    currentRoute is MainRouteToc ||
+                    currentRoute is MainRouteTxtTocRulePreview ||
+                    currentRoute is MainRouteReadBook ||
+                    currentRoute is MainRouteReadManga
+                ) {
                     backStack.add(route)
                 } else {
                     backStack.clear()

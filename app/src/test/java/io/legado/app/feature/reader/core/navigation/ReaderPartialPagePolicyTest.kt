@@ -8,6 +8,14 @@ import org.junit.Test
 class ReaderPartialPagePolicyTest {
 
     @Test
+    fun streamedChapterPreviewsOnlyItsOwnPages() {
+        assertTrue(ReaderPartialPagePolicy.canPreviewPage(4, 4, true))
+        assertTrue(!ReaderPartialPagePolicy.canPreviewPage(4, 5, true))
+        assertTrue(!ReaderPartialPagePolicy.canPreviewPage(4, 3, true))
+        assertTrue(ReaderPartialPagePolicy.canPreviewPage(4, 5, false))
+    }
+
+    @Test
     fun nextChapterPublishesOnlyItsFirstTwoPagesLikeTheViewReader() {
         // offset = 1：旧 loadContent 在 `page.index > 1` 时停止提前重绘。
         assertTrue(ReaderPartialPagePolicy.shouldPublishPage(1, 0, 0, false, false))
@@ -24,7 +32,9 @@ class ReaderPartialPagePolicyTest {
     @Test
     fun currentChapterPublishesThePageThatHoldsTheReadingPosition() {
         assertTrue(ReaderPartialPagePolicy.shouldPublishPage(0, 7, 0, true, false))
-        // 分页模式没有别的触发条件：不是当前阅读页就不重绘。
+        // View 的页表可原地读取新页；Canvas 必须把刚成型的相邻页发布进窗口。
+        assertTrue(ReaderPartialPagePolicy.shouldPublishPage(0, 6, 5, false, false))
+        assertTrue(!ReaderPartialPagePolicy.shouldPublishPage(0, 7, 5, false, false))
         assertTrue(!ReaderPartialPagePolicy.shouldPublishPage(0, 1, 5, false, false))
     }
 
@@ -40,6 +50,115 @@ class ReaderPartialPagePolicyTest {
         // 当前第 1 页时，第 3 页成型仍在余量内（`max(0,0) < 1`）。
         assertTrue(ReaderPartialPagePolicy.shouldPublishPage(0, 3, 1, false, true))
         assertTrue(!ReaderPartialPagePolicy.shouldPublishPage(0, 4, 1, false, true))
+    }
+
+    @Test
+    fun loadingPlaceholderIsPublishedForAnotherChapterEvenWithUnchangedText() {
+        // 目标章正文没到位、窗口还停在别的章：照旧发占位页。
+        assertTrue(
+            ReaderPartialPagePolicy.shouldPublishLoadingPlaceholder(
+                targetChapterIndex = 4,
+                currentInputReady = false,
+                visibleChapterIndex = 3,
+                visibleIsPlaceholder = false,
+                visibleText = "上一章正文",
+                messageText = null,
+                placeholderText = "加载数据中…",
+            )
+        )
+    }
+
+    @Test
+    fun loadingPlaceholderIsNotRepublishedWhenTheVisibleOneIsUpToDate() {
+        assertTrue(
+            !ReaderPartialPagePolicy.shouldPublishLoadingPlaceholder(
+                targetChapterIndex = 4,
+                currentInputReady = false,
+                visibleChapterIndex = 4,
+                visibleIsPlaceholder = true,
+                visibleText = "加载数据中…",
+                messageText = null,
+                placeholderText = "加载数据中…",
+            )
+        )
+    }
+
+    @Test
+    fun changedFailureMessageIsRepublished() {
+        // ReadBook.msg 变成失败原因后必须重发，否则页面一直停在“加载中”，看不到原因。
+        assertTrue(
+            ReaderPartialPagePolicy.shouldPublishLoadingPlaceholder(
+                targetChapterIndex = 4,
+                currentInputReady = false,
+                visibleChapterIndex = 4,
+                visibleIsPlaceholder = true,
+                visibleText = "加载数据中…",
+                messageText = "加载失败\nFileNotFoundException: book.txt",
+                placeholderText = "加载数据中…",
+            )
+        )
+    }
+
+    @Test
+    fun messagePreemptsLoadedChapterLikeTheViewReader() {
+        // 旧 View `curPage` 先看 msg：正文已排好也要整页换成消息页（“目录更新中”“换源中”）。
+        assertTrue(
+            ReaderPartialPagePolicy.shouldPublishLoadingPlaceholder(
+                targetChapterIndex = 4,
+                currentInputReady = true,
+                visibleChapterIndex = 4,
+                visibleIsPlaceholder = false,
+                visibleText = "正文",
+                messageText = "目录更新中…",
+                placeholderText = "加载数据中…",
+            )
+        )
+    }
+
+    @Test
+    fun sameMessagePageIsNotRepublished() {
+        assertTrue(
+            !ReaderPartialPagePolicy.shouldPublishLoadingPlaceholder(
+                targetChapterIndex = 4,
+                currentInputReady = true,
+                visibleChapterIndex = 4,
+                visibleIsPlaceholder = true,
+                visibleText = "目录更新中…",
+                messageText = "目录更新中…",
+                placeholderText = "加载数据中…",
+            )
+        )
+    }
+
+    @Test
+    fun loadedChapterKeepsItsRealPageWhenNoMessageIsSet() {
+        assertTrue(
+            !ReaderPartialPagePolicy.shouldPublishLoadingPlaceholder(
+                targetChapterIndex = 4,
+                currentInputReady = true,
+                visibleChapterIndex = 4,
+                visibleIsPlaceholder = false,
+                visibleText = "正文",
+                messageText = null,
+                placeholderText = "加载数据中…",
+            )
+        )
+    }
+
+    @Test
+    fun realPageOfTheTargetChapterIsNotReplacedWithoutAMessage() {
+        // 没有消息时不把真实页换成占位页（Canvas 按批成型，避免误导性加载屏）。
+        assertTrue(
+            !ReaderPartialPagePolicy.shouldPublishLoadingPlaceholder(
+                targetChapterIndex = 4,
+                currentInputReady = false,
+                visibleChapterIndex = 4,
+                visibleIsPlaceholder = false,
+                visibleText = "正文",
+                messageText = null,
+                placeholderText = "加载数据中…",
+            )
+        )
     }
 
     @Test

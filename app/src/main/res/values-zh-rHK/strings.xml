@@ -174,6 +174,7 @@
     <string name="pause">暫停</string>
     <string name="resume">繼續</string>
     <string name="set_timer">定時</string>
+    <string name="timer_preset_duration">快捷預設</string>
     <string name="read_aloud_pause">朗讀暫停</string>
     <string name="read_aloud_timer">讀緊（剩餘 %d 分鐘）</string>
     <string name="playing_timer">播緊（剩餘 %d 分鐘）</string>
@@ -397,6 +398,12 @@
     <string name="nb_file_add_shelves">加入書架 (%1$d)</string>
     <string name="nb_file_add_succeed">成功添加 %1$d 本書</string>
     <string name="fonts_folder">請將字體文件放到 SD 根目錄 Fonts 文件夾下重新選擇</string>
+    <string name="font_import">匯入字體檔案</string>
+    <string name="font_import_done">已匯入字體，可在下方列表中選擇</string>
+    <string name="font_import_none">沒有匯入字體檔案（僅支援 .ttf/.otf）</string>
+    <string name="font_folder_not_accessible">無法讀取已選的字體文件夾（系統檔案選擇器可能已失效授權），已改為顯示應用內字體；請重新選擇文件夾或直接匯入字體檔案</string>
+    <string name="font_folder_empty_hint">已選的字體文件夾內讀不到任何檔案。若字體確實放在裏面仍未顯示，是部分國產 ROM 的系統檔案選擇器不支援，請改用「匯入字體檔案」</string>
+    <string name="font_folder_no_fonts">已選的字體文件夾內沒有 .ttf/.otf 字體</string>
     <string name="default_font">默認字體</string>
     <string name="select_font">選擇字體</string>
     <string name="text_size">字號</string>
@@ -952,9 +959,11 @@
     <string name="single_url">單URL</string>
     <string name="export_bookshelf">導出書單</string>
     <string name="import_bookshelf">導入書單</string>
-    <string name="pre_download">預下載</string>
+    <string name="pre_download">向後預下載</string>
     <string name="pre_download_m">預下載%s页</string>
-    <string name="pre_download_s">預先下載%s章正文</string>
+    <string name="pre_download_s">預先下載向後%s章正文</string>
+    <string name="pre_download_prev">向前預下載</string>
+    <string name="pre_download_prev_s">預先下載向前%s章正文</string>
     <string name="is_enabled">係咪啟用</string>
     <string name="background_image">背景圖片</string>
     <string name="background_image_blurring">背景圖片虛化</string>
@@ -985,6 +994,9 @@
     <string name="use_default_cover">總是使用默認封面</string>
     <string name="use_default_cover_s">總是使用默認封面,唔顯示網路封面</string>
     <string name="font_size">字號</string>
+    <string name="title_size_relative">相對正文字號</string>
+    <string name="title_size_relative_desc">兼容其他版本</string>
+    <string name="title_size_offset">字號偏移</string>
     <string name="title_margin_top">上邊距</string>
     <string name="title_margin_bottom">下邊距</string>
     <string name="show">顯示</string>
@@ -1242,6 +1254,9 @@
     <string name="jump_to_another_app">跳转其它应用</string>
     <string name="clear_webview_data">清除 WebView 数据</string>
     <string name="clear_webview_data_summary">清除内置浏览器所有数据</string>
+    <string name="block_source_browser">阻止书源打开内置浏览器</string>
+    <string name="block_source_browser_summary">开启后，书源无法通过 java.startBrowser 等接口弹出内置浏览器，等待网页结果的调用会直接报错</string>
+    <string name="block_source_browser_error">已阻止书源打开内置浏览器</string>
     <string name="source_tab_list">列表</string>
     <string name="source_tab_web_view">網頁</string>
     <string name="layout_type">布局</string>
@@ -1739,6 +1754,8 @@
     <string name="ai_test_success_no_models">AI 連線測試成功，但未找到任何模型</string>
     <string name="ai_test_success_with_models">AI 連線測試成功（共找到 %1$d 個模型）</string>
     <string name="ai_test_failed">AI 連線測試失敗</string>
+    <string name="ai_local_network_permission_denied">需要本機網路權限才能連線區域網路內的 AI 服務</string>
+    <string name="local_network_permission_required">無法存取區域網路位址，請在系統設定中授予「鄰近裝置」權限</string>
     <string name="ai_thinking_auto">自動</string>
     <string name="ai_thinking_collapse">收起</string>
     <string name="ai_thinking_deep">深度</string>
@@ -2279,6 +2296,8 @@
     <string name="search_empty_scope_disable_precision">%1$s 分組搜索無結果。是否關閉精準搜索？</string>
     <string name="search_empty_scope_switch_all">%1$s 分組搜索無結果。是否切換到全部分組？</string>
     <string name="search_filter_first">搜索按鈕優先打開搜索頁面</string>
+    <string name="bookshelf_filter">篩選書架</string>
+    <string name="bookshelf_search_button_hint">開啟：點擊搜索，長按篩選；關閉：點擊篩選，長按搜索。</string>
     <string name="search_has_more">上拉或點擊按鈕載入更多</string>
     <string name="search_layout_list">列表佈局</string>
     <string name="search_layout_source_grouped">按源分組</string>
@@ -2318,6 +2337,10 @@
     <string name="show_swipe_animation">滑動時啟用動畫</string>
     <string name="show_synopsis">顯示簡介</string>
     <string name="show_tags">顯示標籤</string>
+    <string name="bookshelf_tag_content">標籤顯示內容</string>
+    <string name="bookshelf_tag_custom">用戶標籤</string>
+    <string name="bookshelf_tag_word_count">字數</string>
+    <string name="bookshelf_tag_none">未選擇顯示內容</string>
     <string name="show_tip">顯示書籍類型</string>
     <string name="show_title_bar_icons">顯示浮動圖標</string>
     <string name="show_unread_new">顯示新章節標記</string>
@@ -2365,7 +2388,7 @@
     <string name="read_aloud_android_media_control_summary">啟用後，以 Android 系統媒體控制取代預設朗讀通知</string>
     <string name="system_media_control_compatibility_change">系統媒體控制相容性</string>
     <string name="system_media_control_compatibility_change_summary">若鎖定螢幕缺少系統媒體控制項時啟用（例如 OneUI 7.0、OriginOS）</string>
-    <string name="tabletInterface">平板介面</string>
+    <string name="tabletInterface">導覽佈局</string>
     <string name="tag">標籤</string>
     <string name="tag_group_add_rule">新建標籤分組</string>
     <string name="tag_group_edit_rule">編輯分組規則</string>
@@ -2472,6 +2495,9 @@
     <string name="tip_compose_set">這些選項僅影響以 Compose 重寫的介面。已停用的選項為佔位符，將在實作後啟用。</string>
     <string name="tip_custom_mode">主題引擎依賴 Monet。動態顏色和自訂主題在 Android 12 以下的裝置上不生效。</string>
     <string name="title_bar_icon_position">標題欄圖標位置</string>
+    <string name="title_bar_action_buttons">配置頂部按鈕</string>
+    <string name="only_online_books">僅線上書籍</string>
+    <string name="only_local_books">僅本機書籍</string>
     <string name="title_bar_icons">標題欄圖標</string>
     <string name="title_bar_layout">標題欄佈局</string>
     <string name="title_bar_mode">選單中的標題模式</string>
@@ -2759,6 +2785,11 @@
     <string name="switch_to_classic_read_aloud">經典控制</string>
     <string name="read_aloud_settings_general_tab">一般</string>
     <string name="read_aloud_settings_voice_tab">引擎與音色</string>
+    <string name="read_aloud_settings_casting_tab">角色與配樂</string>
+    <string name="read_aloud_section_engine">語音引擎</string>
+    <string name="read_aloud_section_analysis">章節分析</string>
+    <string name="read_aloud_section_casting">多角色與配音</string>
+    <string name="read_aloud_section_bgm">背景音樂</string>
     <string name="speech_analysis_mode">章節分片方式</string>
     <string name="speech_analysis_rule">規則分片</string>
     <string name="speech_analysis_rule_ai">規則分片與 AI 補全（建議）</string>
@@ -2857,6 +2888,7 @@
     <string name="cloud_tts_loading_voices">正在取得音色…</string>
     <string name="cloud_tts_no_matching_voice">沒有符合的音色</string>
     <string name="cloud_tts_selected">已選擇</string>
+    <string name="cloud_tts_default_voice">使用該引擎的預設音色</string>
     <string name="cloud_tts_current_voice">目前音色</string>
     <string name="cloud_tts_refresh_catalog">重新整理線上音色目錄</string>
     <string name="cloud_tts_hide_manual_voice">隱藏手動輸入</string>
@@ -3078,4 +3110,9 @@
     <string name="explore_select_source">選擇發現書源</string>
     <string name="cast_bubble_menu">設定氣泡</string>
     <string name="cast_bubble_clear">不設氣泡</string>
+    <string name="background_battery_optimization_title">背景保活與電池最佳化</string>
+    <string name="background_battery_optimization_summary">設定無限制背景執行與自啟動，避免切背景或鎖定螢幕時朗讀/服務被系統終止</string>
+    <string name="battery_optimization_dialog_title">背景保活與省電策略設定指引</string>
+    <string name="battery_optimization_status_ignored">已開啟無限制（點擊可檢查廠商背景策略）</string>
+    <string name="battery_optimization_status_not_ignored">未開啟無限制，背景可能被系統終止</string>
 </resources>

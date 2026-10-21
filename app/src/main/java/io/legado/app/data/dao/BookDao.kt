@@ -49,6 +49,9 @@ internal const val READING_PREDICATE =
 @Dao
 interface BookDao {
 
+    @Query("UPDATE books SET disableReadRecord = :disabled WHERE bookUrl = :bookUrl")
+    fun setReadRecordDisabled(bookUrl: String, disabled: Boolean)
+
     fun flowByGroup(groupId: Long): Flow<List<Book>> {
         return when (groupId) {
             BookGroup.IdRoot -> flowRoot()
@@ -864,6 +867,12 @@ interface BookDao {
         """update books set lastCheckCount = 0, durChapterIndex = :durChapterIndex, durChapterPos = :durChapterPos, durChapterTime = :durChapterTime where bookUrl = :bookUrl"""
     )
     fun upReadProgress(bookUrl: String, durChapterIndex: Int, durChapterPos: Int, durChapterTime: Long)
+
+    @Query("""UPDATE books SET lastCheckCount = 0, durChapterIndex = :chapterIndex,
+        durChapterPos = :chapterPosition, durChapterTitle = :chapterTitle, durChapterTime = :updatedAt
+        WHERE bookUrl = :bookUrl""")
+    fun upReadAloudProgress(bookUrl: String, chapterIndex: Int, chapterPosition: Int,
+        chapterTitle: String?, updatedAt: Long)
 
     @Query("UPDATE books SET syncTime = :syncTime WHERE bookUrl = :bookUrl AND syncTime < :syncTime")
     fun upSyncTime(bookUrl: String, syncTime: Long)

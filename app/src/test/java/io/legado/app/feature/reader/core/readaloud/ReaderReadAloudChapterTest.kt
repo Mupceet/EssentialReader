@@ -68,6 +68,68 @@ class ReaderReadAloudChapterTest {
     }
 
     @Test
+    fun blankUnitsAreNotCursorLandings() {
+        // 一个字符都没有的段（只剩缩进空格）念不出东西：不进朗读单元集合，
+        // 游标落在它上面时交给后面第一个可念单元
+        val chapter = ReaderReadAloudChapter.create(
+            chapterIndex = 0,
+            title = "",
+            semanticContent = "第一段。\n　　\n第二段。\n",
+            pageStarts = listOf(0),
+        )
+
+        assertEquals(
+            listOf("第一段。", "　　", "第二段。"),
+            chapter.paragraphs(splitByPage = false).map { it.text },
+        )
+        assertEquals(
+            listOf("第一段。", "第二段。"),
+            chapter.readAloudParagraphs(splitByPage = false).map { it.text },
+        )
+        assertEquals(0, chapter.paragraphIndexAtOrAfter(4, splitByPage = false))
+        // 落在空白段（章内位置 5..6）上时，定位交给它后面第一个可念单元
+        assertEquals(1, chapter.paragraphIndexAtOrAfter(6, splitByPage = false))
+        assertEquals(1, chapter.paragraphIndexAtOrAfter(8, splitByPage = false))
+    }
+
+    @Test
+    fun symbolOnlyUnitsStaySpeakable() {
+        // `——`、`……` 这类整段纯符号是正文的一部分：留在朗读单元里，也照样当游标落点，
+        // 念法由引擎决定：单元集合不按标点筛，只筛一个字符都没有的段
+        val chapter = ReaderReadAloudChapter.create(
+            chapterIndex = 0,
+            title = "",
+            semanticContent = "第一段。\n——\n第二段。\n",
+            pageStarts = listOf(0),
+        )
+
+        assertEquals(
+            listOf("第一段。", "——", "第二段。"),
+            chapter.readAloudParagraphs(splitByPage = false).map { it.text },
+        )
+        assertEquals(0, chapter.paragraphIndexAtOrAfter(4, splitByPage = false))
+        assertEquals(1, chapter.paragraphIndexAtOrAfter(6, splitByPage = false))
+        assertEquals(2, chapter.paragraphIndexAtOrAfter(8, splitByPage = false))
+    }
+
+    @Test
+    fun chapterWithoutSpeakableUnitFallsBackToRawUnits() {
+        // 整章都没有可念单元（空白页、图片页）时单元集合退回原始列表，
+        // 由朗读服务的「读完本章」那一套收尾，而不是定位不到段落就放弃
+        val chapter = ReaderReadAloudChapter.create(
+            chapterIndex = 0,
+            title = "",
+            semanticContent = "　　\n",
+            pageStarts = listOf(0),
+        )
+
+        assertEquals(
+            chapter.paragraphs(splitByPage = false).map { it.text },
+            chapter.readAloudParagraphs(splitByPage = false).map { it.text },
+        )
+    }
+
+    @Test
     fun explicitSymbolPolicyResplitsUnitsAtAbsolutePositions() {
         val chapter = ReaderReadAloudChapter.create(
             chapterIndex = 0,

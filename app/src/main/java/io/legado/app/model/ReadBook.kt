@@ -160,6 +160,11 @@ object ReadBook : CoroutineScope by MainScope(), KoinComponent {
     private var readerPaginationSnapshots = emptyMap<Int, ReaderChapterPaginationSnapshot>()
     @Volatile
     private var readerPaginationEnvironment: ReaderPaginationEnvironment? = null
+    val paginationEnvironment: ReaderPaginationEnvironment? get() = readerPaginationEnvironment
+
+    /** Only the playing book may drive/highlight this reader. */
+    val isCurrentBookReadAloud: Boolean
+        get() = BaseReadAloudService.isRun && ReadAloud.bookSession.owns(book?.bookUrl)
     var bookSource: BookSource? = null
     var msg: String? = null
     private val readRecordRepository: ReadRecordRepository by inject()
@@ -257,7 +262,7 @@ object ReadBook : CoroutineScope by MainScope(), KoinComponent {
      * 悬浮条随之消失；同时重绘朗读高亮（翻页时旧页高亮已被移除）。朗读服务自身驱动的页面移动不参与。
      */
     private fun restoreReadAloudFollowIfBackOnPosition() {
-        if (!BaseReadAloudService.isRun || BaseReadAloudService.speechDrivingNavigation) return
+        if (!isCurrentBookReadAloud || BaseReadAloudService.speechDrivingNavigation) return
         val speakingChapterIndex = BaseReadAloudService.currentChapterIndex
         if (speakingChapterIndex < 0 || speakingChapterIndex != durChapterIndex) return
         val speakingPage = readerPagination()?.pageIndex(
@@ -281,6 +286,14 @@ object ReadBook : CoroutineScope by MainScope(), KoinComponent {
     fun replaceCurrentBook(book: Book) {
         this.book = book
         publishSnapshot()
+    }
+
+    /** 记录开关属于书籍副本；同步字段时不能替换阅读器正在持有的进度/源实例。 */
+    fun setReadRecordDisabled(bookUrl: String, disabled: Boolean) {
+        book?.takeIf { it.bookUrl == bookUrl }?.let {
+            it.disableReadRecord = disabled
+            publishSnapshot()
+        }
     }
 
     /** 清空当前会话持有的 Book（仅置空引用，不动章节/进度状态）。 */
@@ -630,7 +643,7 @@ object ReadBook : CoroutineScope by MainScope(), KoinComponent {
      * 服务章节与当前章节一致的同章重排不受影响。
      */
     private fun resumeReadAloudWaitingForChapter(snapshots: List<ReaderChapterPaginationSnapshot>) {
-        if (!BaseReadAloudService.isRun) return
+        if (!isCurrentBookReadAloud) return
         // 脱离后朗读位置归用户：分页批次落地不代表朗读要跟到页面所在章节
         if (!readAloudSessionStore.state.value.followReadAloudPosition) return
         if (snapshots.none { it.chapterIndex == durChapterIndex }) return
@@ -1049,7 +1062,7 @@ object ReadBook : CoroutineScope by MainScope(), KoinComponent {
      * 朗读服务自身驱动的页面移动（[BaseReadAloudService.speechDrivingNavigation]）不参与。
      */
     private fun prepareManualNavigation() {
-        if (!BaseReadAloudService.isRun || BaseReadAloudService.speechDrivingNavigation) return
+        if (!isCurrentBookReadAloud || BaseReadAloudService.speechDrivingNavigation) return
         if (ReadBookConfig.readAloudDetachReminderEnabled) {
             readAloudSessionStore.detachReadAloudFollow()
         } else {
@@ -1062,7 +1075,7 @@ object ReadBook : CoroutineScope by MainScope(), KoinComponent {
      * 开启时保持脱离状态，不重启朗读，返回 false。
      */
     private fun followReadAloudAfterManualNavigation(): Boolean {
-        if (!BaseReadAloudService.isRun || BaseReadAloudService.speechDrivingNavigation) return false
+        if (!isCurrentBookReadAloud || BaseReadAloudService.speechDrivingNavigation) return false
         if (ReadBookConfig.readAloudDetachReminderEnabled) return false
         readAloud(play = !BaseReadAloudService.pause)
         return true
@@ -1132,7 +1145,7 @@ object ReadBook : CoroutineScope by MainScope(), KoinComponent {
                 AppLog.putDebug("moveToNextChapter-章节已加载,刷新视图")
                 renderCallBack?.upContent()
             }
-            loadContent(durChapterIndex.plus(1), upContent, false)
+            if (prefetchNextChapterEnabled) loadContent(durChapterIndex.plus(1), upContent, false)
             saveRead()
             callBack?.upMenuView()
             AppLog.putDebug("moveToNextChapter-curPageChanged()")
@@ -1162,7 +1175,7 @@ object ReadBook : CoroutineScope by MainScope(), KoinComponent {
                 AppLog.putDebug("moveToNextChapter-章节已加载,刷新视图")
                 renderCallBack?.upContentAwait()
             }
-            loadContent(durChapterIndex.plus(1), upContent, false)
+            if (prefetchNextChapterEnabled) loadContent(durChapterIndex.plus(1), upContent, false)
             saveRead()
             callBack?.upMenuView()
             AppLog.putDebug("moveToNextChapter-curPageChanged()")
@@ -1196,7 +1209,7 @@ object ReadBook : CoroutineScope by MainScope(), KoinComponent {
             } else if (upContent && upContentInPlace) {
                 renderCallBack?.upContent()
             }
-            loadContent(durChapterIndex.minus(1), upContent, false)
+            if (prefetchPrevChapterEnabled) loadContent(durChapterIndex.minus(1), upContent, false)
             saveRead()
             callBack?.upMenuView()
             curPageChanged()
@@ -1243,6 +1256,7 @@ object ReadBook : CoroutineScope by MainScope(), KoinComponent {
         index: Int,
         durChapterPos: Int = 0,
         upContent: Boolean = true,
+        preserveReadAloudPosition: Boolean = false,
         success: (() -> Unit)? = null
     ) {
         prepareManualNavigation()
@@ -1257,7 +1271,7 @@ object ReadBook : CoroutineScope by MainScope(), KoinComponent {
             ReadBook.durChapterPos = durChapterPos
             publishSnapshot()
             saveRead()
-            loadContent(resetPageOffset = true) {
+            loadContent(resetPageOffset = true, preserveReadAloudPosition = preserveReadAloudPosition) {
                 success?.invoke()
             }
         }
@@ -1272,7 +1286,7 @@ object ReadBook : CoroutineScope by MainScope(), KoinComponent {
     ) {
         renderCallBack?.pageChanged()
         readerChapterInputWindow.current?.let { input ->
-            if (BaseReadAloudService.isRun) {
+            if (isCurrentBookReadAloud) {
                 // 页面已脱离朗读位置（用户手动导航）：既不重启朗读到当前页，也不把页面拉回朗读位置
                 if (readAloudSessionStore.state.value.followReadAloudPosition) {
                     if (shouldRestartReadAloudAfterContentLoad(
@@ -1395,8 +1409,8 @@ object ReadBook : CoroutineScope by MainScope(), KoinComponent {
         ) {
             success?.invoke()
         }
-        loadContent(durChapterIndex + 1, resetPageOffset = resetPageOffset)
-        loadContent(durChapterIndex - 1, resetPageOffset = resetPageOffset)
+        if (prefetchNextChapterEnabled) loadContent(durChapterIndex + 1, resetPageOffset = resetPageOffset)
+        if (prefetchPrevChapterEnabled) loadContent(durChapterIndex - 1, resetPageOffset = resetPageOffset)
     }
 
     /**
@@ -1408,13 +1422,15 @@ object ReadBook : CoroutineScope by MainScope(), KoinComponent {
      */
     fun loadInitialContent(
         resetPageOffset: Boolean,
+        preserveReadAloudPosition: Boolean = false,
         success: (() -> Unit)? = null,
     ) {
         val currentIndex = durChapterIndex
-        loadContent(currentIndex, resetPageOffset = resetPageOffset) {
+        loadContent(currentIndex, resetPageOffset = resetPageOffset,
+            preserveReadAloudPosition = preserveReadAloudPosition) {
             success?.invoke()
-            loadContent(currentIndex + 1, resetPageOffset = resetPageOffset)
-            loadContent(currentIndex - 1, resetPageOffset = resetPageOffset)
+            if (prefetchNextChapterEnabled) loadContent(currentIndex + 1, resetPageOffset = resetPageOffset)
+            if (prefetchPrevChapterEnabled) loadContent(currentIndex - 1, resetPageOffset = resetPageOffset)
         }
     }
 
@@ -1427,7 +1443,7 @@ object ReadBook : CoroutineScope by MainScope(), KoinComponent {
 
     fun loadOrUpContent(success: (() -> Unit)? = null) {
         if (readerChapterInputWindow.current == null) {
-            val preserveReadAloudPosition = BaseReadAloudService.isRun &&
+            val preserveReadAloudPosition = isCurrentBookReadAloud &&
                     BaseReadAloudService.currentChapterIndex == durChapterIndex
             loadContent(
                 durChapterIndex,
@@ -1439,10 +1455,10 @@ object ReadBook : CoroutineScope by MainScope(), KoinComponent {
             renderCallBack?.upContent()
             publishSnapshot()
         }
-        if (readerChapterInputWindow.next == null) {
+        if (readerChapterInputWindow.next == null && prefetchNextChapterEnabled) {
             loadContent(durChapterIndex + 1)
         }
-        if (readerChapterInputWindow.previous == null) {
+        if (readerChapterInputWindow.previous == null && prefetchPrevChapterEnabled) {
             loadContent(durChapterIndex - 1)
         }
     }
@@ -1836,7 +1852,7 @@ object ReadBook : CoroutineScope by MainScope(), KoinComponent {
                 chapterSize = cList.size
                 simulatedChapterSize = book.simulatedTotalChapterNum()
                 publishSnapshot()
-                if (readerChapterInputWindow.next == null) loadContent(durChapterIndex + 1)
+                if (readerChapterInputWindow.next == null && prefetchNextChapterEnabled) loadContent(durChapterIndex + 1)
             }
         }
     }
@@ -1926,30 +1942,39 @@ object ReadBook : CoroutineScope by MainScope(), KoinComponent {
         }
     }
 
+    /** 相邻章预取跟随「向后 / 向前预下载」设置：该方向为 0 就不预取相邻章。 */
+    private val prefetchNextChapterEnabled
+        get() = readSettingsGateway.currentSettings.preDownloadNum > 0
+    private val prefetchPrevChapterEnabled
+        get() = readSettingsGateway.currentSettings.preDownloadNumPrev > 0
+
     /**
-     * 预下载
+     * 预下载：按设置分别向前/向后预取；0 视为关闭，N≥1 预取 N 章。
      */
     private fun preDownload() {
         if (book?.isLocal == true) return
         executor.execute {
-            if (readSettingsGateway.currentSettings.preDownloadNum < 2) {
+            val settings = readSettingsGateway.currentSettings
+            val forward = settings.preDownloadNumPrev
+            val backward = settings.preDownloadNum
+            if (forward <= 0 && backward <= 0) {
                 return@execute
             }
             preDownloadTask?.cancel()
             preDownloadTask = launch(IO) {
-                //预下载
-                launch {
-                    val maxChapterIndex =
-                        min(durChapterIndex + readSettingsGateway.currentSettings.preDownloadNum, chapterSize)
-                    for (i in durChapterIndex.plus(2)..maxChapterIndex) {
+                //向后预下载（当前章之后的章节）
+                if (backward > 0) launch {
+                    val maxChapterIndex = min(durChapterIndex + backward, chapterSize)
+                    for (i in durChapterIndex + 1..maxChapterIndex) {
                         if (downloadedChapters.contains(i)) continue
                         if ((downloadFailChapters[i] ?: 0) >= 3) continue
                         downloadIndex(i)
                     }
                 }
-                launch {
-                    val minChapterIndex = durChapterIndex - min(5, readSettingsGateway.currentSettings.preDownloadNum)
-                    for (i in durChapterIndex.minus(2) downTo minChapterIndex) {
+                //向前预下载（当前章之前的章节）
+                if (forward > 0) launch {
+                    val minChapterIndex = maxOf(durChapterIndex - forward, 0)
+                    for (i in durChapterIndex - 1 downTo minChapterIndex) {
                         if (downloadedChapters.contains(i)) continue
                         if ((downloadFailChapters[i] ?: 0) >= 3) continue
                         downloadIndex(i)

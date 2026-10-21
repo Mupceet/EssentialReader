@@ -34,6 +34,8 @@
     <string name="manual_contrast_value_label">手动值 [-1, 1]</string>
     <string name="manual_contrast_invalid">请输入 -1 到 1 之间的有效数字</string>
     <string name="predictive_back">预见性返回手势</string>
+    <string name="reader_shared_element">阅读界面共享元素动画</string>
+    <string name="reader_shared_element_summary">进入阅读界面时从封面展开，关闭后使用渐变过渡</string>
     <string name="predictive_back_summary">启用系统预见性返回手势</string>
     <string name="restart_to_apply">重启以应用</string>
     <string name="custom_theme">自定义主题</string>
@@ -94,6 +96,8 @@
     <string name="book_source">书源</string>
     <string name="book_source_manage">书源管理</string>
     <string name="book_source_manage_desc">新建 • 导入 • 编辑或管理书源</string>
+    <string name="book_source_edit">书源编辑</string>
+    <string name="book_source_login">书源登录</string>
     <string name="setting">设置</string>
     <string name="theme_setting">外观</string>
     <string name="theme_setting_s">主题 • 深色模式 • 界面设置</string>
@@ -226,6 +230,7 @@
     <string name="pause">暂停</string>
     <string name="resume">继续</string>
     <string name="set_timer">定时</string>
+    <string name="timer_preset_duration">快捷预设</string>
     <string name="read_aloud_pause">朗读暂停</string>
     <string name="read_aloud_timer">正在朗读（还剩 %d 分钟）</string>
     <string name="playing_timer">正在播放（还剩 %d 分钟）</string>
@@ -458,6 +463,12 @@
     <string name="nb_file_add_shelves">加入书架（%1$d）</string>
     <string name="nb_file_add_succeed">成功添加 %1$d 本书</string>
     <string name="fonts_folder">请将字体文件放到存储根目录 Fonts 文件夹下后重新选择</string>
+    <string name="font_import">导入字体文件</string>
+    <string name="font_import_done">已导入字体，可在下方列表中选择</string>
+    <string name="font_import_none">没有导入字体文件（仅支持 .ttf/.otf）</string>
+    <string name="font_folder_not_accessible">无法读取已选的字体文件夹（系统文件选择器可能已失效授权），已改为显示应用内字体；请重新选择文件夹或直接导入字体文件</string>
+    <string name="font_folder_empty_hint">已选的字体文件夹里读不到任何文件。若字体确实放在里面仍不显示，是部分国产 ROM 的系统文件选择器不支持，请改用「导入字体文件」</string>
+    <string name="font_folder_no_fonts">已选的字体文件夹里没有 .ttf/.otf 字体</string>
     <string name="default_font">默认字体</string>
     <string name="select_font">选择字体</string>
     <string name="text_size">字号</string>
@@ -839,6 +850,7 @@
     <string name="add_to_text_context_menu_t">文字操作显示搜索</string>
     <string name="record_log">记录日志</string>
     <string name="log">日志</string>
+    <string name="read_log">阅读日志</string>
     <string name="chinese_converter">中文简繁体转换</string>
     <string name="change_icon_error">图标为矢量图标，Android 8.0 以前不支持</string>
     <string name="aloud_config">朗读设置</string>
@@ -1066,6 +1078,7 @@
     <string name="donate_summary">您的支持是我更新的动力</string>
     <string name="about_summary">公众号【开源阅读软件】</string>
     <string name="read_record">阅读记录</string>
+    <string name="book_disable_read_record">独立关闭阅读记录</string>
     <string name="del_read_record">删除阅读记录</string>
     <string name="read_record_summary">阅读时间记录</string>
     <string name="local_tts">本地 TTS</string>
@@ -1121,9 +1134,11 @@
     <string name="single_url">单 URL</string>
     <string name="export_bookshelf">导出书单</string>
     <string name="import_bookshelf">导入书单</string>
-    <string name="pre_download">预下载</string>
+    <string name="pre_download">向后预下载</string>
     <string name="pre_download_m">预下载%s页</string>
-    <string name="pre_download_s">预先下载 %s 章正文</string>
+    <string name="pre_download_s">预先下载向后 %s 章正文</string>
+    <string name="pre_download_prev">向前预下载</string>
+    <string name="pre_download_prev_s">预先下载向前 %s 章正文</string>
     <string name="is_enabled">是否启用</string>
     <string name="background_image">背景图片</string>
     <string name="background_image_blurring">背景图片虚化</string>
@@ -1158,6 +1173,9 @@
     <string name="use_default_cover">总是使用默认封面</string>
     <string name="use_default_cover_s">总是显示默认封面（不显示网络封面）</string>
     <string name="font_size">字号</string>
+    <string name="title_size_relative">相对正文字号</string>
+    <string name="title_size_relative_desc">兼容其他版本</string>
+    <string name="title_size_offset">字号偏移</string>
     <string name="color">颜色</string>
     <string name="reset_to_body_color">重置为正文颜色</string>
     <string name="title_margin_top">上边距</string>
@@ -1427,6 +1445,9 @@
     <string name="jump_to_another_app">跳转其它应用</string>
     <string name="clear_webview_data">清除 WebView 数据</string>
     <string name="clear_webview_data_summary">清除内置浏览器所有数据</string>
+    <string name="block_source_browser">阻止书源打开内置浏览器</string>
+    <string name="block_source_browser_summary">开启后，书源无法通过 java.startBrowser 等接口弹出内置浏览器，等待网页结果的调用会直接报错</string>
+    <string name="block_source_browser_error">已阻止书源打开内置浏览器</string>
     <string name="source_tab_list">列表</string>
     <string name="source_tab_web_view">网页</string>
     <string name="layout_type">布局</string>
@@ -1765,7 +1786,7 @@
     <string name="system_media_control_compatibility_change_summary">使用OEM厂商提供的媒体通道，可能解决一些通知无法显示的问题</string>
     <string name="read_aloud_pause_resume">朗读暂停/继续</string>
     <string name="play_mode">播放模式</string>
-    <string name="tabletInterface">平板界面</string>
+    <string name="tabletInterface">导航布局</string>
     <string name="progress">进度</string>
     <string name="clear_all">清除所有</string>
     <string name="welcome_title">欢迎！</string>
@@ -2411,6 +2432,8 @@
     <string name="ai_test_success_no_models">AI 连接测试成功，但未找到任何模型</string>
     <string name="ai_test_success_with_models">AI 连接测试成功（共找到 %1$d 个模型）</string>
     <string name="ai_test_failed">AI 连接测试失败</string>
+    <string name="ai_local_network_permission_denied">需要本地网络权限才能访问局域网内的 AI 服务</string>
+    <string name="local_network_permission_required">无法访问局域网地址，请在系统设置中授予「附近的设备」权限</string>
     <string name="ai_profile_counts">供应商：%1$d，模型：%2$d，预设：%3$d</string>
     <string name="read_menu_bg_color_summary">阅读顶栏和底栏背景色</string>
     <string name="read_menu_text_color">菜单文字颜色</string>
@@ -2435,6 +2458,9 @@
     <string name="title_bar_layout">顶栏布局</string>
     <string name="show_title_bar_icons">显示浮动图标</string>
     <string name="title_bar_compact">精简顶部按钮</string>
+    <string name="title_bar_action_buttons">配置顶部按钮</string>
+    <string name="only_online_books">仅在线书籍</string>
+    <string name="only_local_books">仅本地书籍</string>
     <string name="title_bar_icon_position">浮动图标位置</string>
     <string name="position_top_start">左上</string>
     <string name="position_top_end">右上</string>
@@ -2566,9 +2592,15 @@
     <string name="show_all_synopsis">显示全部简介</string>
     <string name="show_lines_synopsis">显示 %1$d 行简介</string>
     <string name="show_tags">显示标签</string>
+    <string name="bookshelf_tag_content">标签显示内容</string>
+    <string name="bookshelf_tag_custom">用户标签</string>
+    <string name="bookshelf_tag_word_count">字数</string>
+    <string name="bookshelf_tag_none">未选择显示内容</string>
     <string name="custom_tag_colors">自定义标签颜色</string>
     <string name="manage_tag_colors">管理标签颜色</string>
     <string name="search_filter_first">搜索按钮优先打开搜索页面</string>
+    <string name="bookshelf_filter">筛选书架</string>
+    <string name="bookshelf_search_button_hint">开启：点击搜索，长按筛选；关闭：点击筛选，长按搜索。</string>
     <string name="import_from_network">网络导入</string>
     <string name="input_url_or_json_hint">请输入 URL 或 JSON</string>
     <string name="history_label">历史记录:</string>
@@ -2598,6 +2630,8 @@
     <string name="no_logs">暂无日志</string>
     <string name="no_crash_logs">暂无崩溃日志</string>
     <string name="select_or_search_category">选择或搜索分类</string>
+    <string name="explore_jump_page">跳转页码</string>
+    <string name="explore_jump_page_hint">页码</string>
     <string name="multi_select_items">多选项目</string>
     <string name="recently_read">最近阅读：</string>
     <string name="no_favorites_rss">还没有收藏订阅！</string>
@@ -2995,6 +3029,11 @@
     <string name="switch_to_classic_read_aloud">经典控制</string>
     <string name="read_aloud_settings_general_tab">常规</string>
     <string name="read_aloud_settings_voice_tab">引擎与音色</string>
+    <string name="read_aloud_settings_casting_tab">角色与配乐</string>
+    <string name="read_aloud_section_engine">语音引擎</string>
+    <string name="read_aloud_section_analysis">章节分析</string>
+    <string name="read_aloud_section_casting">多角色与配音</string>
+    <string name="read_aloud_section_bgm">背景音乐</string>
     <string name="speech_analysis_mode">章节分片方式</string>
     <string name="speech_analysis_rule">规则分片</string>
     <string name="speech_analysis_rule_ai">规则分片与 AI 补全（推荐）</string>
@@ -3016,11 +3055,11 @@
     <string name="cast_bgm_pool">背景音乐池</string>
     <string name="bgm_assign">背景音乐分配</string>
     <string name="bgm_assign_summary">在正文段首显示配乐胶囊，朗读时按场景播放背景音乐；胶囊只作视觉提示，朗读不会念出</string>
-    <string name="cast_bgm_track">背景音乐</string>
+    <string name="cast_bgm_track">曲目</string>
     <string name="cast_bgm_scene_title">场景配乐</string>
     <string name="cast_bgm_scene_follow">跟随池随机播放</string>
     <string name="cast_bgm_scene_follow_hint">选了就固定播这一首，留空则从池里随机取</string>
-    <string name="cast_bgm_scene_clear">清除本段分配</string>
+    <string name="cast_bgm_scene_clear">清除这段配乐</string>
     <string name="cast_bgm_scene_saved">已应用</string>
     <string name="cast_bgm_segment_volume">本段音量</string>
     <string name="cast_bgm_segment_volume_hint">与曲目自身音量相乘，只影响这一段</string>
@@ -3032,7 +3071,7 @@
     <string name="cast_bgm_track_volume_hint">对这条导入的音乐全局生效，用在哪个池都一样</string>
     <string name="cast_bgm_scene_table">本章背景音乐</string>
     <string name="cast_bgm_scene_overview">总览</string>
-    <string name="cast_bgm_scene_table_summary">本章每一段的池、曲目与音量，可直接改</string>
+    <string name="cast_bgm_scene_table_summary">本章每一段的配乐与音量，可直接修改</string>
     <string name="cast_bgm_scene_table_empty">本章还没有分配背景音乐</string>
     <string name="cast_bgm_scene_row">第 %1$d 段</string>
     <string name="cast_bgm_scene_range">第 %1$d–%2$d 段</string>
@@ -3046,7 +3085,7 @@
     <string name="cast_bgm_pool_summary">导入配乐文件，朗读时作为背景音乐播放</string>
     <string name="cast_tts_engines_summary">配置朗读引擎、导入音色，音色行可长按试听</string>
     <string name="cast_bgm_import">导入音频</string>
-    <string name="cast_bgm_empty">还没有背景音乐，点右上角导入音频文件</string>
+    <string name="cast_bgm_empty">还没有背景音乐，导入音频文件后会出现在这里</string>
     <string name="cast_bgm_delete">删除背景音乐</string>
     <string name="cast_bgm_delete_confirm">确定删除「%1$s」？应用内复制的音频文件会一并删除。</string>
     <string name="cast_bgm_play">播放</string>
@@ -3080,13 +3119,12 @@
     <string name="cast_voice">音色</string>
     <string name="cast_unassign">取消分配</string>
     <string name="cast_no_match">无匹配项</string>
-    <string name="read_aloud_pagination_pending">章节排版尚未完成，请稍候再试</string>
     <string name="ai_cast_roles">AI 分配角色</string>
-    <string name="ai_cast_status">本章 %2$d 句对话，已分配 %1$d 句</string>
+    <string name="ai_cast_status">本章共 %2$d 句对话，已分配 %1$d 句</string>
     <string name="ai_cast_status_loading">正在统计本章…</string>
     <string name="ai_cast_all_done">本章已全部分配</string>
-    <string name="ai_cast_reassign">重新分配（先清除既有）</string>
-    <string name="ai_cast_chapter_count">分配章节数（自本章起）</string>
+    <string name="ai_cast_reassign">重新分配</string>
+    <string name="ai_cast_reassign_summary">先清除本章已有分配，再重新识别一遍</string>
     <string name="ai_cast_progress">已处理 %1$d/%2$d 章</string>
     <string name="ai_cast_start">开始分配</string>
     <string name="ai_cast_delete">删除分配</string>
@@ -3095,13 +3133,14 @@
     <string name="ai_scene_assign_entry">AI 场景分配</string>
     <string name="ai_cast_assign_scene_hint">角色那趟跑完后再跑一遍：按段落场景从你启用的背景音乐池里挑配乐，只填池，具体曲目朗读时随机取。</string>
     <string name="ai_scene_finished">配乐场景已分配：%1$d 章</string>
-    <string name="ai_cast_presets">配音提示词</string>
-    <string name="ai_cast_presets_summary">管理 AI 分配角色使用的提示词预设，可自由新建、编辑、删除。每条都能就地展开查看全文。</string>
+    <string name="ai_cast_presets">分配提示词</string>
+    <string name="ai_cast_presets_summary">管理 AI 分配角色用的提示词预设：可新建、编辑、删除，每条都能展开看全文。</string>
     <string name="ai_cast_manage">管理</string>
     <string name="ai_cast_temporary">临时要求（仅本次）</string>
     <string name="ai_cast_memory">本书角色记忆</string>
     <string name="ai_cast_memory_hint">AI 跨章节共享的人物档案（主名｜别名/身份｜关系｜池），可手动编辑。</string>
     <string name="ai_cast_memory_saved">记忆已保存</string>
+    <string name="ai_cast_memory_rename_clash">记忆已保存，%1$d 个名字没改过去：本书已经有同名的角色，请先把它改名或删掉再来</string>
     <string name="ai_cast_preset_name">预设名称</string>
     <string name="ai_cast_preset_instruction">分配要求</string>
     <string name="ai_cast_preset_expand">展开全文</string>
@@ -3114,14 +3153,14 @@
     <string name="ai_cast_preset_default">默认</string>
     <string name="ai_cast_preset_default_done">已恢复内置默认分配要求</string>
     <string name="ai_cast_extra_chapters">追加章节数</string>
-    <string name="ai_cast_extra_summary">在当前章之后多分配 %1$d 章（0 = 仅本章）</string>
+    <string name="ai_cast_extra_summary">本章之后接着分配（0 = 仅本章）</string>
     <string name="ai_cast_range_mode">指定范围</string>
     <string name="ai_cast_chapter_failed">第 %1$d 章《%2$s》：%3$s</string>
     <string name="ai_cast_run_failed">%1$d 章分配失败</string>
     <string name="ai_cast_resume_from">从第 %1$d 章继续</string>
     <string name="ai_cast_retry">重试 %1$d 章</string>
     <string name="ai_cast_cancelled">已取消分配，停在第 %1$d 章</string>
-    <string name="ai_cast_no_preset">无提示词预设，使用内置默认</string>
+    <string name="ai_cast_no_preset">还没有自定义预设，将使用内置默认</string>
     <string name="ai_cast_reasoning_level">模型推理强度</string>
     <string name="ai_cast_reasoning_level_hint">「跟随模型」= 软件一个参数都不发。等得太久就往低调；智谱 GLM-5.3 这类强制思考的模型关不掉，调低也未必有变化。</string>
     <string name="ai_cast_reasoning_follow">跟随模型</string>
@@ -3130,8 +3169,6 @@
     <string name="ai_cast_request_hint">最近一次请求的系统提示词与用户 JSON，与模型收到的逐字一致。分配不准时展开这里，可以看到送给模型的正文与角色名。</string>
     <string name="ai_cast_transcript_folded">前面 %1$d 字已折叠，只显示最新部分</string>
     <string name="ai_cast_thinking_pending">模型还没有回传思考内容。若整章结束仍为空，说明这个模型不回思考过程（或只回思考不给正文），分配照常进行。</string>
-    <string name="cast_table_empty">本书还没有配音角色。</string>
-    <string name="book_cast_roles">本书配音角色</string>
     <string name="cast_table_row_count">%1$d 章 · %2$d 句</string>
     <string name="cast_delete_character">删除角色</string>
     <string name="cast_delete_character_confirm">删除「%1$s」及其全部分配？</string>
@@ -3165,14 +3202,15 @@
     <string name="cast_import_tts_server_empty">这个文件里没有可导入的角色音色（音效已按要求排除）</string>
     <string name="cast_import_tts_server_counts">角色音色 %1$d 个 · 排除音效 %2$d 个 · 跳过已停用 %3$d 个</string>
     <string name="cast_import_tts_server_engine">引擎包名</string>
+    <string name="cast_import_engine_pick">从已装引擎里选</string>
     <string name="cast_import_tts_server_engine_hint">音色按这个引擎暴露的「显示名_编号」去匹配；没装这个引擎，导进来的音色不会发声，只能在列表里当占位。</string>
     <string name="cast_import_tts_server_result">导入 %1$d 个声音池、%2$d 个音色</string>
     <string name="cast_import_confirm">导入</string>
     <string name="cast_import_pools_invalid">这个文件不是本软件导出的声音池</string>
+    <string name="cast_import_pools_nothing_new">文件没问题，但里面 %1$d 个声音池本机都已经有了，没有新增</string>
     <string name="cast_export_pools_done">声音池已导出</string>
     <string name="cast_export_pools_failed">导出失败</string>
     <string name="cast_list_separator">、</string>
-    <string name="multi_role_rule">朗读规则</string>
     <string name="regex_cast_rule">正则角色管理</string>
     <string name="regex_cast_rule_summary">正文命中指定文字时，换成别的音色念，或者不念改成放音效</string>
     <string name="regex_cast_create">新建正则角色</string>
@@ -3206,7 +3244,6 @@
     <string name="regex_cast_summary">命中「%1$s」→ %2$s</string>
     <string name="regex_cast_summary_voice">由「%1$s」念（%2$s）</string>
     <string name="regex_cast_summary_sound">播放「%1$s」（%2$s），这几个字不念，走第三条音轨</string>
-    <string name="regex_cast_scope_hint">特定范围与排除范围填书名或书源 URL，留空表示所有书。</string>
     <string name="regex_cast_search_hint">筛选规则与分组</string>
     <string name="regex_cast_new_group">新建分组</string>
     <string name="regex_cast_delete_group_title">删除这个分组？</string>
@@ -3214,7 +3251,6 @@
     <string name="regex_cast_group_bad_name">分组名不能为空</string>
     <string name="regex_cast_group_duplicate">同一层已经有这个名字的分组</string>
     <string name="regex_cast_dialog_hint">声音池只是筛选：停用的池照样列出来，不选池也能直接挑音色。分组那栏直接打字就是新建分组。</string>
-    <string name="regex_cast_sort_hint">长按拖动可排序；拖进别的小节就是把这条规则挪进那个分组。</string>
     <string name="regex_cast_pool_disabled">（已停用）</string>
     <string name="multi_role_rule_summary">管理角色声音池、背景音乐池与角色配音分配</string>
     <string name="cast_voice_pool_summary">管理角色声音池以及池内启用的音色</string>
@@ -3230,11 +3266,8 @@
     <string name="cast_symbol_duplicated">四个符号彼此不能重复</string>
     <string name="cast_syntax_preview">预览：%1$s</string>
     <string name="cast_syntax_applies_next_chapter">名字与声音池之间也接受 . · 、 等分隔（如 张三.男青年）。改动在此之后打开的章节生效。</string>
-    <string name="voice_pool_tab">声音池</string>
-    <string name="cast_assign_tab">分配表</string>
     <string name="cast_group">分组</string>
     <string name="cast_group_none">未分组</string>
-    <string name="cast_group_hint">分组在这里从列表里选；要新建或嵌套分组请到声音池页拖动/新建</string>
     <string name="cast_create_pool">新建声音池</string>
     <string name="cast_edit_pool">编辑声音池</string>
     <string name="cast_delete_pool">删除声音池</string>
@@ -3242,9 +3275,6 @@
     <string name="cast_pool_name_invalid">名称为空或重复</string>
     <string name="cast_search_pool_hint">搜索声音池或分组</string>
     <string name="cast_search_voice_hint">搜索音色</string>
-    <string name="cast_pool_members">池内音色</string>
-    <string name="cast_assign_empty">还没有配音角色。在阅读器里点击角色胶囊即可分配。</string>
-    <string name="cast_no_voice">未选音色</string>
     <string name="cast_create">创建</string>
     <string name="cast_invalid_name">角色名不合法</string>
     <string name="cast_confirm_not_found">角色不存在，请点击「创建」新建</string>
@@ -3345,6 +3375,7 @@
     <string name="cloud_tts_loading_voices">正在获取音色…</string>
     <string name="cloud_tts_no_matching_voice">没有匹配的音色</string>
     <string name="cloud_tts_selected">已选择</string>
+    <string name="cloud_tts_default_voice">使用该引擎的默认音色</string>
     <string name="cloud_tts_current_voice">当前音色</string>
     <string name="cloud_tts_refresh_catalog">刷新在线音色目录</string>
     <string name="cloud_tts_hide_manual_voice">隐藏手动输入</string>
@@ -3382,6 +3413,9 @@
     <string name="cloud_tts_no_available_engine">请先安装系统 TTS、添加云 TTS 引擎或导入 HTTP TTS</string>
     <string name="cloud_tts_voice_engine_unavailable">该音色使用的引擎当前不可用</string>
     <string name="cloud_tts_cannot_change_engine">编辑预设时不能更换引擎，请新建音色预设</string>
+    <string name="cloud_tts_restore_excluded_voices">恢复已排除的音色（%1$d）</string>
+    <string name="cloud_tts_no_excluded_voices">没有已排除的音色</string>
+    <string name="cloud_tts_restored_voices">已恢复 %1$d 个音色</string>
     <string name="cloud_tts_engine_default_voice">引擎默认音色</string>
     <string name="cloud_tts_voice_count">已获取 %1$d 个音色</string>
     <string name="cloud_tts_cannot_change_native_voice">编辑预设时不能更换原生音色，请新建音色预设</string>
@@ -3815,4 +3849,10 @@
     <string name="explore_main_content">直接浏览发现内容</string>
     <string name="explore_source_list">显示发现书源列表</string>
     <string name="explore_select_source">选择发现书源</string>
+    <string name="background_battery_optimization_title">后台保活与电池优化</string>
+    <string name="background_battery_optimization_summary">配置无限制后台运行与自启动，避免切后台或锁屏时朗读/服务被系统终止</string>
+    <string name="battery_optimization_dialog_title">后台保活与省电策略设置指引</string>
+    <string name="battery_optimization_status_ignored">已开启无限制（点击可检查厂商后台策略）</string>
+    <string name="battery_optimization_status_not_ignored">未开启无限制，后台可能被系统终止</string>
+    <string name="reader_paragraph_image_action_unsupported">此图片使用段落规则动作，当前版本尚不支持。</string>
 </resources>

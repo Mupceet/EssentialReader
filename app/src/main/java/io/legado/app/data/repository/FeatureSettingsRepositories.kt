@@ -153,6 +153,7 @@ internal fun Preferences.toDownloadCacheSettings(): DownloadCacheSettings =
         bitmapCacheSize = compatDsInt(PreferKey.bitmapCacheSize) ?: 50,
         imageRetainNum = compatDsInt(PreferKey.imageRetainNum) ?: 0,
         preDownloadNum = compatDsInt(PreferKey.preDownloadNum) ?: 10,
+        preDownloadNumPrev = compatDsInt(PreferKey.preDownloadNumPrev) ?: 0,
         threadCount = compatDsInt(PreferKey.threadCount) ?: 16,
         cacheBookThreadCount = compatDsInt(PreferKey.cacheBookThreadCount) ?: 16,
         userAgent = compatDsString(PreferKey.userAgent).orEmpty().ifBlank {
@@ -167,6 +168,7 @@ internal fun DownloadCacheSettings.toPrefMap(): Map<String, Any?> = mapOf(
     PreferKey.bitmapCacheSize to bitmapCacheSize,
     PreferKey.imageRetainNum to imageRetainNum,
     PreferKey.preDownloadNum to preDownloadNum,
+    PreferKey.preDownloadNumPrev to preDownloadNumPrev,
     PreferKey.threadCount to threadCount,
     PreferKey.cacheBookThreadCount to cacheBookThreadCount,
     PreferKey.userAgent to userAgent,
@@ -293,11 +295,13 @@ internal fun Preferences.toAppShellSettings(): AppShellSettings = AppShellSettin
     showStatusBar = compatDsBoolean(PreferKey.showStatusBar) ?: true,
     swipeAnimation = compatDsBoolean(PreferKey.swipeAnimation) ?: true,
     predictiveBackEnabled = compatDsBoolean(PreferKey.isPredictiveBackEnabled) ?: true,
+    readerSharedElementEnabled = compatDsBoolean(PreferKey.readerSharedElementEnabled) ?: true,
     showBottomView = compatDsBoolean(PreferKey.showBottomView) ?: true,
     useFloatingBottomBar = compatDsBoolean(PreferKey.useFloatingBottomBar) ?: false,
     useFloatingBottomBarLiquidGlass =
         compatDsBoolean(PreferKey.useFloatingBottomBarLiquidGlass) ?: false,
     tabletInterface = compatDsString(PreferKey.tabletInterface) ?: "auto",
+    multiPaneMode = compatDsString(PreferKey.multiPaneMode) ?: "auto",
     labelVisibilityMode = compatDsString(PreferKey.labelVisibilityMode) ?: "auto",
     defaultHomePage = compatDsString(PreferKey.defaultHomePage) ?: "bookshelf",
     mainNavigationOrder = compatDsString(PreferKey.mainNavigationOrder)
@@ -326,10 +330,12 @@ internal fun AppShellSettings.toPrefMap(): Map<String, Any?> = mapOf(
     PreferKey.showStatusBar to showStatusBar,
     PreferKey.swipeAnimation to swipeAnimation,
     PreferKey.isPredictiveBackEnabled to predictiveBackEnabled,
+    PreferKey.readerSharedElementEnabled to readerSharedElementEnabled,
     PreferKey.showBottomView to showBottomView,
     PreferKey.useFloatingBottomBar to useFloatingBottomBar,
     PreferKey.useFloatingBottomBarLiquidGlass to useFloatingBottomBarLiquidGlass,
     PreferKey.tabletInterface to tabletInterface,
+    PreferKey.multiPaneMode to multiPaneMode,
     PreferKey.labelVisibilityMode to labelVisibilityMode,
     PreferKey.defaultHomePage to defaultHomePage,
     PreferKey.mainNavigationOrder to mainNavigationOrder,
@@ -532,6 +538,7 @@ internal fun Preferences.toOtherSettings(): OtherSettings {
         importKeepGroup = compatDsBoolean(PreferKey.importKeepGroup) ?: false,
         importKeepEnable = compatDsBoolean(PreferKey.importKeepEnable) ?: false,
         fontSort = compatDsInt(PreferKey.fontSort) ?: 0,
+        blockSourceBrowser = compatDsBoolean(PreferKey.blockSourceBrowser) ?: false,
     )
 }
 
@@ -561,6 +568,7 @@ internal fun OtherSettings.toPrefMap(): Map<String, Any?> = mapOf(
     PreferKey.importKeepGroup to importKeepGroup,
     PreferKey.importKeepEnable to importKeepEnable,
     PreferKey.fontSort to fontSort,
+    PreferKey.blockSourceBrowser to blockSourceBrowser,
 )
 
 class OtherSettingsRepository : OtherSettingsGateway {

@@ -2,6 +2,7 @@
 package io.legado.app.service
 
 import android.app.PendingIntent
+import android.content.Intent
 import android.speech.tts.TextToSpeech
 import android.speech.tts.UtteranceProgressListener
 import android.speech.tts.Voice
@@ -9,7 +10,7 @@ import androidx.lifecycle.lifecycleScope
 import io.legado.app.R
 import io.legado.app.constant.AppConst
 import io.legado.app.constant.AppLog
-import io.legado.app.constant.AppPattern
+import io.legado.app.constant.IntentAction
 import io.legado.app.domain.gateway.ReadAloudSettingsGateway
 import io.legado.app.domain.model.readaloud.ReadAloudPlaybackCursor
 import io.legado.app.domain.model.readaloud.ReadAloudVoice
@@ -18,13 +19,13 @@ import io.legado.app.domain.model.readaloud.SpeechVoiceRouter
 import io.legado.app.domain.model.readaloud.SystemTtsVoiceConfig
 import io.legado.app.exception.NoStackTraceException
 import io.legado.app.feature.reader.core.cast.CastMarkers
-import io.legado.app.help.readaloud.effect.VoiceEffectAudio
-import io.legado.app.help.readaloud.effect.VoiceEffectStore
+import io.legado.app.feature.reader.core.readaloud.isBlankReadAloudUnit
 import io.legado.app.help.MediaHelp
 import io.legado.app.help.coroutine.Coroutine
+import io.legado.app.help.readaloud.effect.VoiceEffectAudio
+import io.legado.app.help.readaloud.effect.VoiceEffectStore
 import io.legado.app.lib.dialogs.SelectItem
 import io.legado.app.model.ReadAloud
-import io.legado.app.model.ReadBook
 import io.legado.app.ui.config.readConfig.ReadConfig
 import io.legado.app.utils.GSON
 import io.legado.app.utils.LogUtils
@@ -138,7 +139,6 @@ class TTSReadAloudService : BaseReadAloudService(), KoinComponent {
         } else {
             TextToSpeech(this, { status -> onTtsInitialized(status, generation) }, engine)
         }
-        upSpeechRate()
     }
 
     @Synchronized
@@ -171,6 +171,7 @@ class TTSReadAloudService : BaseReadAloudService(), KoinComponent {
                 appliedSpeechRate = -1f
                 appliedPitch = -1f
                 ttsInitFinish = true
+                upSpeechRate(reset = false)
                 // 先把音色表取回来：否则第一处「旁白→角色」的边界要现场等一次全量枚举
                 execute { voiceCatalog() }
                 play()
@@ -204,7 +205,7 @@ class TTSReadAloudService : BaseReadAloudService(), KoinComponent {
         if (!requestFocus()) return
         if (contentList.isEmpty()) {
             AppLog.putDebug("朗读列表为空")
-            ReadBook.readAloud()
+            preparePlayback()
             return
         }
         super.play()
@@ -240,7 +241,7 @@ class TTSReadAloudService : BaseReadAloudService(), KoinComponent {
                     awaitEngineIdle(tts, continuesCurrentSpeech)
                     voiceChanged = applyVoice(it.speakerId)
                     applyPreset(it)
-                }
+                } ?: applyDefaultPreset()
                 val storedStart = paragraphStartPos
                 val storedTail = if (storedStart > 0) {
                     contentList[nowSpeak].substring(storedStart)
@@ -250,7 +251,7 @@ class TTSReadAloudService : BaseReadAloudService(), KoinComponent {
                 // 偏移用完才去掉标记：这一句要么干净正文，要么带着 <<角色（池）>> 交给认标签的引擎
                 val utteranceId = ttsUtteranceId(AppConst.APP_TAG, session, nowSpeak)
                 val spoken = speakable(storedTail, utteranceId, storedStart)
-                if (spoken.text.isEmpty() || spoken.text.matches(AppPattern.notReadAloudRegex)) {
+                if (spoken.text.isBlank()) {
                     AppLog.putDebug("TTS段落全标点跳过: nowSpeak=$nowSpeak")
                     pendingUtterances.remove(utteranceId)
                     ttsUtteranceListener.onDone(utteranceId)
@@ -291,6 +292,7 @@ class TTSReadAloudService : BaseReadAloudService(), KoinComponent {
                 LogUtils.d(TAG, "朗读页数 ${readerReadAloudChapter?.pageCount}")
                 val session = ++speakSession
                 val tts = textToSpeech ?: throw NoStackTraceException("tts is null")
+                applyDefaultPreset()
                 val contentList = contentList
                 var isAddedText = false
                 for (i in nowSpeak until contentList.size) {
@@ -303,7 +305,7 @@ class TTSReadAloudService : BaseReadAloudService(), KoinComponent {
                     }
                     val utteranceId = ttsUtteranceId(AppConst.APP_TAG, session, i)
                     val text = speakable(storedTail, utteranceId, storedStart).text
-                    if (text.isEmpty() || text.matches(AppPattern.notReadAloudRegex)) {
+                    if (text.isBlank()) {
                         pendingUtterances.remove(utteranceId)
                         continue
                     }
@@ -469,7 +471,7 @@ class TTSReadAloudService : BaseReadAloudService(), KoinComponent {
         val globalRate = if (ReadConfig.ttsFollowSys) {
             1f
         } else {
-            (ReadConfig.ttsSpeechRate + 5) / 10f
+            (speechRateSetting + 5) / 10f
         }
         // 角色的变声器：直读路径没有自己的播放器，只能用引擎的音高/语速这一层
         val cue = playbackQueue.cues.getOrNull(nowSpeak)
@@ -496,6 +498,19 @@ class TTSReadAloudService : BaseReadAloudService(), KoinComponent {
         }
     }
 
+    private fun applyDefaultPreset() {
+        val tts = textToSpeech ?: return
+        val rate = if (ReadConfig.ttsFollowSys) 1f else (speechRateSetting + 5) / 10f
+        if (rate != appliedSpeechRate) {
+            appliedSpeechRate = rate
+            tts.setSpeechRate(rate)
+        }
+        if (appliedPitch != 1f) {
+            appliedPitch = 1f
+            tts.setPitch(1f)
+        }
+    }
+
     override fun playStop() {
         speakSession++
         speakJob?.cancel()
@@ -517,6 +532,7 @@ class TTSReadAloudService : BaseReadAloudService(), KoinComponent {
             }
         } else {
             val speechRate = (speechRateSetting + 5) / 10f
+            appliedSpeechRate = speechRate
             textToSpeech?.setSpeechRate(speechRate)
             upMediaMetadata()
             if (reset && !pause) {
@@ -573,7 +589,7 @@ class TTSReadAloudService : BaseReadAloudService(), KoinComponent {
                 val position = currentRangePosition(
                     utteranceStartReadAloudNumber, 0, utteranceStartPos
                 )
-                if (contentList[nowSpeak].matches(AppPattern.notReadAloudRegex)) {
+                if (contentList[nowSpeak].isBlankReadAloudUnit()) {
                     nextParagraph(naturalCompletion = true)
                     // 游标已经挪到下一句了，再拿这一句算页码和进度就是把两句的位置混在一起
                     return@let
@@ -584,7 +600,7 @@ class TTSReadAloudService : BaseReadAloudService(), KoinComponent {
                     pageIndex++
                     // 这是引擎自己越过页界续读，不是用户翻页：标记后 ReadBook 既不会脱离
                     // 会话，也不会把 TTS 在第二页重启
-                    withSpeechNavigation { ReadBook.moveToNextPage() }
+                    syncReaderToPlaybackPage()
                 }
                 upTtsProgress(position + 1)
                 upMediaMetadata(showContent = true)
@@ -722,7 +738,7 @@ class TTSReadAloudService : BaseReadAloudService(), KoinComponent {
                     if (naturalCompletion) completeCurrentChapter() else nextChapter()
                     return false
                 }
-            } while (contentList[nowSpeak].matches(AppPattern.notReadAloudRegex))
+            } while (contentList[nowSpeak].isBlankReadAloudUnit())
             // 页内切段不引入换行符，累加会漂移，用段落绝对位置重算
             readAloudNumber = paragraphChapterPositionAt(nowSpeak) ?: 0
             return true
@@ -739,6 +755,13 @@ class TTSReadAloudService : BaseReadAloudService(), KoinComponent {
             utteranceId != null &&
                 utteranceId == ttsUtteranceId(AppConst.APP_TAG, speakSession, nowSpeak)
 
+    }
+
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        if (intent?.action == IntentAction.play) {
+            speechRateSetting = readAloudSettingsGateway.currentSettings.ttsSpeechRate
+        }
+        return super.onStartCommand(intent, flags, startId)
     }
 
     override fun aloudServicePendingIntent(actionStr: String): PendingIntent? {

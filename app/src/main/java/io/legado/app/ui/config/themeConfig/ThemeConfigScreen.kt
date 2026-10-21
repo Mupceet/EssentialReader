@@ -298,6 +298,14 @@ fun ThemeConfigScreen(
                             )
                         }
                     )
+                    SwitchSettingItem(
+                        title = stringResource(R.string.reader_shared_element),
+                        description = stringResource(R.string.reader_shared_element_summary),
+                        checked = appShell.readerSharedElementEnabled,
+                        onCheckedChange = {
+                            onIntent(ThemeConfigIntent.SetReaderSharedElementEnabled(it))
+                        }
+                    )
                     SliderSettingItem(
                         title = stringResource(R.string.font_scale),
                         valueLabel = {
@@ -377,6 +385,13 @@ fun ThemeConfigScreen(
                                 ThemeConfigIntent.SetTabletInterface(it)
                             )
                         }
+                    )
+                    DropdownListSettingItem(
+                        title = stringResource(R.string.multi_pane_layout),
+                        selectedValue = appShell.multiPaneMode,
+                        displayEntries = stringArrayResource(R.array.multi_pane_layout_entries),
+                        entryValues = stringArrayResource(R.array.multi_pane_layout_values),
+                        onValueChange = { onIntent(ThemeConfigIntent.SetMultiPaneMode(it)) },
                     )
                 }
 

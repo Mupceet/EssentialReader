@@ -211,6 +211,7 @@ import io.legado.app.domain.usecase.SaveSearchBooksUseCase
 import io.legado.app.domain.usecase.SearchBooksUseCase
 import io.legado.app.domain.usecase.ShrinkDatabaseUseCase
 import io.legado.app.domain.usecase.StartBookSourceCheckUseCase
+import io.legado.app.domain.usecase.SyncHttpTtsCatalogUseCase
 import io.legado.app.domain.usecase.SyncReadAloudVoicesUseCase
 import io.legado.app.domain.usecase.TranslateChapterUseCase
 import io.legado.app.domain.usecase.UpdateBooksGroupUseCase
@@ -452,6 +453,7 @@ val appModule = module {
     singleOf(::PrepareChapterSpeechPlanUseCase)
     singleOf(::RefineSpeechWithAiUseCase)
     singleOf(::SyncReadAloudVoicesUseCase)
+    singleOf(::SyncHttpTtsCatalogUseCase)
     singleOf(::CacheBookChaptersUseCase)
     singleOf(::ChangeBookSourceUseCase)
     singleOf(::ClearBookCacheUseCase)
@@ -513,7 +515,7 @@ val appModule = module {
     single<BookContentProcessGateway> { BookContentProcessRepository(get()) }
     single<BookMarkingGateway> { BookMarkingRepository(get()) }
     single<BookKnowledgeGateway> { BookKnowledgeRepository(get()) }
-    single<ReadAloudVoiceGateway> { ReadAloudVoiceRepository(get()) }
+    single<ReadAloudVoiceGateway> { ReadAloudVoiceRepository(get(), get()) }
     singleOf(::CloudTtsCredentialCipher)
     single<CloudTtsEngineGateway> { CloudTtsEngineRepository(get(), get()) }
     single<ChapterSpeechGateway> { ChapterSpeechRepository(get()) }

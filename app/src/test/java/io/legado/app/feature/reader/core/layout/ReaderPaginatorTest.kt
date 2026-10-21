@@ -97,6 +97,36 @@ class ReaderPaginatorTest {
         assertTrue(lines.flatten().all { it.bounds.right <= 40f })
     }
 
+    /**
+     * 英文按词换行时行首不能出现空格：宽度恰好落在词间空格上时，空格必须留在上一行
+     * 行尾，下一行仍从词首开始（否则每换行一次，第一个词前就多出一个空格）。
+     */
+    @Test fun englishWordWrapNeverStartsWithAWordSpace() {
+        val text = "It is a truth universally acknowledged, that a single man in possession"
+        val page = ReaderPaginator.paginateBlocks(
+            listOf(ReaderMeasuredBlock.InlineParagraph(
+                items = text.mapIndexed { index, char ->
+                    ReaderMeasuredInlineItem.Text(char.toString(), 10f, style, index)
+                },
+                indentCharacters = 0,
+                alignment = ReaderTextAlignment.START,
+                lineHeightPx = 20f,
+                baselineOffsetPx = 15f,
+                baseTextSizePx = 10f,
+            )),
+            config.copy(viewportWidthPx = 200, viewportHeightPx = 400, paddingBottomPx = 0f),
+        ).single()
+        val lines = page.elements.filterIsInstance<ReaderElement.Text>()
+            .groupBy { it.bounds.top }
+            .toSortedMap()
+            .values
+            .map { row -> row.minBy { it.bounds.left } }
+
+        assertTrue(lines.size >= 4)
+        lines.forEach { line -> assertFalse("行首多出空格：${line.value}", line.value.isBlank()) }
+        assertEquals(text, page.text)
+    }
+
     @Test fun htmlQuoteContinuesAcrossVisualLinesWhileBulletOnlyMarksTheFirstLine() {
         val items = List(7) { index ->
             ReaderMeasuredInlineItem.Text("字", 10f, style, index)
@@ -894,6 +924,42 @@ class ReaderPaginatorTest {
         val glyphs = page.elements.filterIsInstance<ReaderElement.Text>()
 
         assertEquals(listOf(6f, 16f, 26f, 42f), glyphs.map { it.bounds.left })
+    }
+
+    /**
+     * 角色胶囊是行内项，正文整段可能被它顶到下一行。这时这一行只剩「一个字 + 胶囊」两个项、
+     * 唯一一道缝，两端对齐不许把整行剩余空隙砸在这道缝上——否则字贴行首、胶囊贴行尾。
+     * 字与字之间的缝照常拉伸，那一行的观感不变。
+     */
+    @Test
+    fun justifyNeverStretchesTheGapBesideACapsule() {
+        val page = ReaderPaginator.paginateBlocks(
+            listOf(ReaderMeasuredBlock.InlineParagraph(
+                items = listOf(
+                    ReaderMeasuredInlineItem.Text("甲", 10f, style, 0),
+                    ReaderMeasuredInlineItem.RoleCast(
+                        widthPx = 20f,
+                        heightPx = 20f,
+                        chapterPosition = 1,
+                        raw = "<<福>>",
+                        name = "福",
+                        voicePoolLabel = "",
+                        quoteOrdinal = 0,
+                    ),
+                    // 这一字宽到放不下，整项掉到下一行，第一行因此只剩两项
+                    ReaderMeasuredInlineItem.Text("乙", 80f, style, 2),
+                ),
+                indentCharacters = 0,
+                alignment = ReaderTextAlignment.JUSTIFY,
+                lineHeightPx = 20f,
+                baselineOffsetPx = 15f,
+                baseTextSizePx = 10f,
+            )),
+            config.copy(viewportWidthPx = 100, viewportHeightPx = 100, letterSpacingPx = 0f),
+        ).single()
+
+        val capsule = page.elements.filterIsInstance<ReaderElement.RoleCast>().single()
+        assertEquals(10f, capsule.bounds.left, 0.01f)
     }
 
     /**

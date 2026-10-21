@@ -46,7 +46,6 @@ import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.Share
 import androidx.compose.material.icons.outlined.SmartToy
 import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
 import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -79,6 +78,7 @@ import io.legado.app.R
 import io.legado.app.ui.theme.LegadoTheme
 import io.legado.app.ui.theme.ProvideAppDensity
 import io.legado.app.ui.widget.components.card.NormalCard
+import io.legado.app.ui.widget.components.icon.AppIcon
 import io.legado.app.ui.widget.components.text.AppText
 import kotlin.math.roundToInt
 
@@ -336,7 +336,7 @@ private fun MultiLineMenuView(
                 .padding(horizontal = 16.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Icon(
+            AppIcon(
                 imageVector = Icons.Default.Settings,
                 contentDescription = stringResource(R.string.edit_menu_items),
                 tint = LegadoTheme.colorScheme.onSurface,
@@ -407,7 +407,7 @@ private fun QuickMenuView(
                 .padding(start = 12.dp, end = 16.dp, top = 12.dp, bottom = 12.dp),
             contentAlignment = Alignment.Center
         ) {
-            Icon(
+            AppIcon(
                 imageVector = if (hasMore) Icons.Default.MoreVert else Icons.Default.Settings,
                 contentDescription = stringResource(if (hasMore) R.string.more_menu else R.string.setting),
                 tint = LegadoTheme.colorScheme.onSurface,
@@ -440,7 +440,7 @@ private fun QuickMenuItem(
     ) {
         val builtInIcon = if (showIcon) item.builtInIcon() else null
         if (builtInIcon != null) {
-            Icon(
+            AppIcon(
                 imageVector = builtInIcon,
                 contentDescription = item.title,
                 tint = LegadoTheme.colorScheme.onSurface,
@@ -486,7 +486,7 @@ private fun MoreMenuView(
                 .padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 8.dp),
             contentAlignment = Alignment.CenterStart
         ) {
-            Icon(
+            AppIcon(
                 imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                 contentDescription = stringResource(R.string.back),
                 tint = LegadoTheme.colorScheme.onSurface,
@@ -528,7 +528,7 @@ private fun MoreMenuView(
                 .padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Icon(
+            AppIcon(
                 imageVector = Icons.Default.Settings,
                 contentDescription = stringResource(R.string.edit_menu_items),
                 tint = LegadoTheme.colorScheme.onSurface,
@@ -559,7 +559,7 @@ private fun MoreMenuItem(
     ) {
         val builtInIcon = if (showIcon) item.builtInIcon() else null
         if (builtInIcon != null) {
-            Icon(
+            AppIcon(
                 imageVector = builtInIcon,
                 contentDescription = item.title,
                 tint = LegadoTheme.colorScheme.onSurface,
@@ -651,8 +651,8 @@ private class MoreMenuPositionProvider(
  * 只有选区贴近窗口底部、下方放不下卡片时才上翻，此时末行压在选区上沿；上下都放不下时
  * 仍贴选区下沿，由末尾的 clamp 兜底。
  *
- * [TextActionSelectionMenu] 与 [MarkingSelectionMenu] 共用该规则：两者在同一次选区里互相
- * 切换，落位必须一致，否则切换时浮层会跳。
+ * 笔记卡片可固定 [preferBelow]，避免输入增长或 IME 动画触发上下翻转；[availableBounds]
+ * 用宿主窗口坐标提供扣除系统栏和输入法后的区域，与卡片的测量约束共用。
  */
 internal class TextMenuPositionProvider(
     private val density: Float,
@@ -662,6 +662,8 @@ internal class TextMenuPositionProvider(
     private val endX: Int,
     private val endBottomY: Int,
     private val shadowPadding: Int,
+    private val preferBelow: Boolean? = null,
+    private val availableBounds: (() -> IntRect)? = null,
 ) : PopupPositionProvider {
     override fun calculatePosition(
         anchorBounds: IntRect,
@@ -677,17 +679,19 @@ internal class TextMenuPositionProvider(
         val textMargin = (4 * density).toInt()
         // ReaderCanvasSurface 的选择柄圆心挂在行底下 7dp，直径再占 14dp。
         val cursorHandleClearance = (14 * density).toInt()
+        val bounds = availableBounds?.invoke() ?: IntRect(IntOffset.Zero, windowSize)
+        val right = minOf(bounds.right, windowSize.width)
 
         val cardHeight = popupContentSize.height - shadowPadding * 2
         val isSpaceEnoughBelowSelection = windowSize.height - endBottomY >
                 cardHeight + textMargin + cursorHandleClearance + marginVertical
         val isSpaceEnoughAtTop = startTopY > cardHeight + textMargin + marginVertical
 
-        if (isSpaceEnoughBelowSelection) {
+        if (preferBelow == true || (preferBelow == null && isSpaceEnoughBelowSelection)) {
             x = startX - shadowPadding
             // 贴选区下沿展开，避开整个选区及末端把手，不能只从首行下方弹出。
             y = endBottomY + cursorHandleClearance + textMargin - shadowPadding
-        } else if (isSpaceEnoughAtTop) {
+        } else if (preferBelow == false || isSpaceEnoughAtTop) {
             x = startX - shadowPadding
             y = startTopY - popupContentSize.height + shadowPadding - textMargin
         } else {
@@ -695,19 +699,27 @@ internal class TextMenuPositionProvider(
             y = endBottomY + cursorHandleClearance + textMargin - shadowPadding
         }
 
-        val minX = marginHorizontal - shadowPadding
-        val minY = marginVertical - shadowPadding
+        val minX = bounds.left + marginHorizontal - shadowPadding
         val finalX = x.coerceIn(
             minX,
-            (windowSize.width - popupContentSize.width - marginHorizontal + shadowPadding)
+            (right - popupContentSize.width - marginHorizontal + shadowPadding)
                 .coerceAtLeast(minX),
         )
-        val finalY = y.coerceIn(
-            minY,
-            (windowSize.height - popupContentSize.height - marginVertical + shadowPadding)
-                .coerceAtLeast(minY),
-        )
+        val finalY = constrainPositionY(y, windowSize, popupContentSize)
 
         return IntOffset(finalX, finalY)
+    }
+
+    /** 最终目标限制在可见区域内，动画期间的位置由调用方控制。 */
+    private fun constrainPositionY(y: Int, windowSize: IntSize, popupContentSize: IntSize): Int {
+        val bounds = availableBounds?.invoke() ?: IntRect(IntOffset.Zero, windowSize)
+        val margin = (12 * density).toInt()
+        val minY = bounds.top + margin - shadowPadding
+        val maxY = (minOf(
+            bounds.bottom,
+            windowSize.height
+        ) - popupContentSize.height - margin + shadowPadding)
+            .coerceAtLeast(minY)
+        return y.coerceIn(minY, maxY)
     }
 }
