@@ -41,6 +41,13 @@ android {
         }
     }
 
+    testOptions {
+        // VM 级单测（ReaderViewModelStyleBaseTest）需实例化 android.app
+        // Application stub 作 AndroidViewModel 构造参数——stub 方法返回
+        // 默认值而非抛异常；既有纯 JVM 测试不触碰 android API，不受影响
+        unitTests.isReturnDefaultValues = true
+    }
+
     publishing {
         // 宿主经 Maven Local / 远程仓库消费预构建产物（发布 release 单变体）
         singleVariant("release") { withSourcesJar() }

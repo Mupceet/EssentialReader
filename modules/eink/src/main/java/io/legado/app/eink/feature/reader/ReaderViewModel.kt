@@ -1097,12 +1097,16 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application),
     }
 
     /**
-     * 应用排版参数变更：写回配置并读回快照，按目录 diff 判定是否需要
-     * 重新分页（affectsLayout 参数变更 → 200ms 防抖重排；仅纯绘制参数
-     * 变更即时生效不重排）。
+     * 应用排版参数变更。写回 base 必须取写时引擎真值（[engine.currentStyle]）
+     * 而非 UiState 缓存：独立字体设置页（FontSettingsScreen）等外部写径直接
+     * 改引擎样式不经本 VM，缓存不回流——以缓存为 base 会把陈旧字段（如外部
+     * 刚换掉的正文字体）整套写回宿主，静默回滚外部修改（选字体 B 后调任意
+     * 排版参数正文回退 A、字体弹框高亮失配即此路径）。写入后读回引擎快照，
+     * 按目录 diff 判定是否需要重新分页（affectsLayout 参数变更 → 200ms
+     * 防抖重排；仅纯绘制参数变更即时生效不重排）。
      */
     private fun applyStyleChange(change: (ReaderTextStyle) -> ReaderTextStyle) {
-        val old = _uiState.value.style
+        val old = engine.currentStyle()
         val new = change(old)
         engine.applyStyle(new)
         _uiState.update { it.copy(style = engine.currentStyle()) }
