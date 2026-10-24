@@ -26,6 +26,11 @@ internal class ReaderScreensaverSystem(context: Context) {
     private val resolver: ContentResolver = appContext.contentResolver
 
     fun isTargetPlatform(): Boolean {
+        // 临时停用掌阅(iReader)屏保生成（2026-10-24）。发布管线以本方法为
+        // 总闸：Publisher.start() 缓存结果后，为 false 时不注册 settings
+        // 观察者、不调度渲染、不写 .rmb、不发广播，整条管线休眠。
+        // 恢复时把 TEMPORARILY_DISABLED 改回 false 即可，无其它接线改动。
+        if (TEMPORARILY_DISABLED) return false
         if (!isIReaderBrand(Build.MANUFACTURER, Build.BRAND)) return false
         return systemUiInstalled()
     }
@@ -143,6 +148,12 @@ internal class ReaderScreensaverSystem(context: Context) {
 
     companion object {
         private const val TAG = "ReaderScreensaver"
+
+        /**
+         * 临时总闸：true 时整体停用掌阅屏保生成，见 [isTargetPlatform]。
+         * 待真机问题复核后改回 false 恢复。
+         */
+        internal const val TEMPORARILY_DISABLED = true
         internal const val KEY_SCREENSAVER_ENABLED = "screensaver_enabled"
         internal const val KEY_BOOK_SCREEN_SAVER_STYLE = "book_screen_saver_style"
         internal const val KEY_ENABLE_ILLUSTRATION =
