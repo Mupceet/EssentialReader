@@ -13,6 +13,7 @@ class ReaderScreensaverCapabilityTest {
         bookScreenSaverStyle = ReaderScreensaverSettings.BOOK_READING_STYLE,
         illustrationEnabled = false,
         illustrationValue = null,
+        activeLockScreenTypeValue = IREADER_LOCK_SCREEN_TYPE_READING_PROGRESS,
     )
 
     @Test
@@ -59,6 +60,7 @@ class ReaderScreensaverCapabilityTest {
                     systemUiInstalled = true,
                     settings = activeSettings.copy(
                         bookScreenSaverStyle = ReaderScreensaverSettings.BOOK_COVER_STYLE,
+                        activeLockScreenTypeValue = IREADER_LOCK_SCREEN_TYPE_BOOK,
                     ),
                 ),
             ),
@@ -96,5 +98,75 @@ class ReaderScreensaverCapabilityTest {
             ReaderScreensaverMode.fromStyle(ReaderScreensaverSettings.BOOK_READING_STYLE),
         )
         assertNull(ReaderScreensaverMode.fromStyle(4))
+    }
+
+    @Test
+    fun requiresActiveLockScreenTypeToMatchMode() {
+        // 用户选了实时屏保(DYNAMIC=25)等非图书类型时必须完全静默：
+        // SystemUI 收到刷新广播会无条件切到广播声明的显示模型，任何
+        // 写入/广播都会劫持用户所选屏保
+        assertFalse(
+            resolveReaderScreensaverCapability(
+                ReaderScreensaverCapabilityInput(
+                    manufacturer = "iReader",
+                    brand = "iReader",
+                    systemUiInstalled = true,
+                    settings = activeSettings.copy(
+                        activeLockScreenTypeValue = IREADER_LOCK_SCREEN_TYPE_DYNAMIC,
+                    ),
+                ),
+            ),
+        )
+        // 未设置(null)：固件把活动类型回落到 COMPAT_*/SYSTEM 兜底链（非
+        // 图书类），官方阅读应用同语义——不发布
+        assertFalse(
+            resolveReaderScreensaverCapability(
+                ReaderScreensaverCapabilityInput(
+                    manufacturer = "iReader",
+                    brand = "iReader",
+                    systemUiInstalled = true,
+                    settings = activeSettings.copy(activeLockScreenTypeValue = null),
+                ),
+            ),
+        )
+        // 活动类型是另一图书样式（选封面但活动的是阅读进度）同样不发布
+        assertFalse(
+            resolveReaderScreensaverCapability(
+                ReaderScreensaverCapabilityInput(
+                    manufacturer = "iReader",
+                    brand = "iReader",
+                    systemUiInstalled = true,
+                    settings = activeSettings.copy(
+                        bookScreenSaverStyle = ReaderScreensaverSettings.BOOK_COVER_STYLE,
+                    ),
+                ),
+            ),
+        )
+        // 活动类型与所选样式一致 → 允许发布
+        assertTrue(
+            resolveReaderScreensaverCapability(
+                ReaderScreensaverCapabilityInput(
+                    manufacturer = "iReader",
+                    brand = "iReader",
+                    systemUiInstalled = true,
+                    settings = activeSettings,
+                ),
+            ),
+        )
+    }
+
+    @Test
+    fun firmwareTypeValuesMatchWallpaperLockScreenTypeContract() {
+        assertEquals(2, IREADER_LOCK_SCREEN_TYPE_BOOK)
+        assertEquals(16, IREADER_LOCK_SCREEN_TYPE_READING_PROGRESS)
+        assertEquals(25, IREADER_LOCK_SCREEN_TYPE_DYNAMIC)
+        assertEquals(
+            IREADER_LOCK_SCREEN_TYPE_BOOK,
+            ReaderScreensaverMode.COVER.typeValue,
+        )
+        assertEquals(
+            IREADER_LOCK_SCREEN_TYPE_READING_PROGRESS,
+            ReaderScreensaverMode.READING_PROGRESS.typeValue,
+        )
     }
 }

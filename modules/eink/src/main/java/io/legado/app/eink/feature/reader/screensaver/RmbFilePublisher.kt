@@ -31,6 +31,12 @@ internal class RmbFilePublisher {
         require(targetDirectory.exists() || targetDirectory.mkdirs()) {
             "Cannot create ${targetDirectory.absolutePath}"
         }
+        // mkdirs() 落地的目录是 0700（属主为本应用 uid），设置应用(uid 1000)
+        // 预览写入会 EACCES 闪退、SystemUI(uid 10039) 列不出目录回落内置
+        // 默认图。固件约定目录与文件全 0777（设置/官方阅读每次写入后都会
+        // chmod 777），此处幂等对齐；失败只记日志不中断发布
+        runCatching { Os.chmod(targetDirectory.absolutePath, IREADER_LOGO_MODE_0777) }
+            .onFailure { Log.w(TAG, "target dir chmod failed: ${it.javaClass.simpleName}") }
         deleteStaleTempFiles(targetDirectory)
 
         val target = uniqueTarget(encoded, targetDirectory)
@@ -45,7 +51,7 @@ internal class RmbFilePublisher {
                 stream.flush()
                 stream.fd.sync()
             }
-            Os.chmod(temp.absolutePath, 0x1FF)
+            Os.chmod(temp.absolutePath, IREADER_LOGO_MODE_0777)
             validateFile(temp, encoded)
 
             Os.rename(temp.absolutePath, target.absolutePath)

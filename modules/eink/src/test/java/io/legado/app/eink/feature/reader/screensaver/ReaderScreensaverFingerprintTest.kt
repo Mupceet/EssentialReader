@@ -17,6 +17,7 @@ class ReaderScreensaverFingerprintTest {
         bookScreenSaverStyle = 5,
         illustrationEnabled = true,
         illustrationValue = "overlay2.png",
+        activeLockScreenTypeValue = IREADER_LOCK_SCREEN_TYPE_READING_PROGRESS,
     )
 
     @Test

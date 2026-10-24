@@ -52,8 +52,22 @@ internal class ReaderScreensaverSystem(context: Context) {
             bookScreenSaverStyle = style,
             illustrationEnabled = illustrationEnabled,
             illustrationValue = illustrationValue,
+            activeLockScreenTypeValue = readActiveLockScreenTypeValue(),
         )
     }
+
+    /**
+     * 活动锁屏类型：`wallpaper_lock_screen_info`（格式 "type,order"）的首段。
+     * 固件按它决定息屏显示哪个目录的壁纸；未设置时固件回落
+     * COMPAT_x/SYSTEM 兜底链（非图书类），这里同样返回 null。
+     */
+    fun readActiveLockScreenTypeValue(): Int? = runCatching {
+        Settings.System.getString(resolver, KEY_ACTIVE_LOCK_SCREEN_INFO)
+            ?.split(",")
+            ?.firstOrNull()
+            ?.trim()
+            ?.toIntOrNull()
+    }.getOrNull()
 
     fun registerObserver(observer: ContentObserver) {
         runCatching {
@@ -159,6 +173,7 @@ internal class ReaderScreensaverSystem(context: Context) {
         internal const val KEY_ENABLE_ILLUSTRATION =
             "book_wallpaper_enable_illustration"
         internal const val KEY_ILLUSTRATION_INFO = "Book_Wallpaper_Illustration_info"
+        internal const val KEY_ACTIVE_LOCK_SCREEN_INFO = "wallpaper_lock_screen_info"
         internal const val BUILTIN_ILLUSTRATION_URI_PREFIX =
             "content://com.szzy.ireader.ink.wallpaper.fileprovider/wallpaper"
 
@@ -166,6 +181,10 @@ internal class ReaderScreensaverSystem(context: Context) {
             KEY_BOOK_SCREEN_SAVER_STYLE,
             KEY_ENABLE_ILLUSTRATION,
             KEY_ILLUSTRATION_INFO,
+            // 活动类型切换（如实时屏保 ⇄ 图书）必须即时反映到发布门禁：
+            // 切走即静默、切回即恢复发布；仍走 settingsObserver 的
+            // FORCE_RECLAIM_INTERVAL_MS 限频，防固件回写观察键形成自激环
+            KEY_ACTIVE_LOCK_SCREEN_INFO,
         )
     }
 }
