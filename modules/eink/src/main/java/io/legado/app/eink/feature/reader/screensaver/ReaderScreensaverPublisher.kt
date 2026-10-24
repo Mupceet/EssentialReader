@@ -6,7 +6,6 @@ import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
-import android.system.Os
 import android.util.Log
 import java.io.File
 import kotlinx.coroutines.CoroutineScope
@@ -104,7 +103,8 @@ internal class ReaderScreensaverPublisher(
      * 自愈历史遗留的 0700 目录：缺陷版本 `mkdirs()` 后未 chmod，两台图书
      * 目录以 0700 落地（属主为本应用 uid），导致设置应用预览写入 EACCES
      * 闪退、SystemUI 列不出目录回落内置默认图。目录属主是本应用，有权限
-     * 直接 chmod；缺失则按固件 0777 约定补建。失败只记日志不中断——
+     * 直接 chmod；缺失则按固件 0777 约定补建。已是 0777 时跳过 chmod；
+     * 非属主（如正式/debug 双包共存）chmod 会 EPERM——只记日志不中断，
      * 不删目录内非本进程写入的 rmb，系统写入方自带写新删旧清理。
      */
     private fun selfHealLogoDirectories() {
@@ -115,12 +115,18 @@ internal class ReaderScreensaverPublisher(
                     Log.w(TAG, "self-heal mkdirs failed: ${mode.targetDirectory}")
                     return@runCatching
                 }
-                Os.chmod(directory.absolutePath, IREADER_LOGO_MODE_0777)
+                if (!writer.ensureIReaderLogoDirectoryMode(directory)) {
+                    Log.w(
+                        TAG,
+                        "self-heal left ${mode.targetDirectory} non-0777 " +
+                            "(not owner or chmod denied); publish continues",
+                    )
+                }
             }.onFailure {
                 Log.w(
                     TAG,
-                    "self-heal chmod failed for ${mode.targetDirectory}: " +
-                        "${it.javaClass.simpleName}",
+                    "self-heal failed for ${mode.targetDirectory}: " +
+                        "${it.javaClass.simpleName}: ${it.message}",
                 )
             }
         }

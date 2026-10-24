@@ -16,6 +16,28 @@ internal data class PublishedRmbFile(
  */
 internal class RmbFilePublisher {
 
+    /**
+     * 确保目录处于固件约定的 0777：先 stat 比对权限位，已符合即跳过——
+     * 非属主场景（如正式/debug 双包共存，目录属另一 uid）对已是 0777
+     * 的目录再 chmod 只会每次刷 EPERM 噪音。chmod 仅属主可行，失败带
+     * errno 记日志并返回 false，由调用方决定后果提示。
+     */
+    internal fun ensureIReaderLogoDirectoryMode(directory: File): Boolean {
+        val currentMode = runCatching {
+            Os.stat(directory.absolutePath).st_mode and 0x1FF
+        }.getOrNull() ?: return false
+        if (currentMode == IREADER_LOGO_MODE_0777) return true
+        return runCatching {
+            Os.chmod(directory.absolutePath, IREADER_LOGO_MODE_0777)
+        }.onFailure {
+            Log.w(
+                TAG,
+                "chmod 0777 failed for ${directory.absolutePath}: " +
+                    "${it.javaClass.simpleName}: ${it.message}",
+            )
+        }.isSuccess
+    }
+
     fun write(
         encoded: EncodedRmb,
         targetDirectory: File = TARGET_DIRECTORY,
@@ -33,10 +55,11 @@ internal class RmbFilePublisher {
         }
         // mkdirs() 落地的目录是 0700（属主为本应用 uid），设置应用(uid 1000)
         // 预览写入会 EACCES 闪退、SystemUI(uid 10039) 列不出目录回落内置
-        // 默认图。固件约定目录与文件全 0777（设置/官方阅读每次写入后都会
-        // chmod 777），此处幂等对齐；失败只记日志不中断发布
-        runCatching { Os.chmod(targetDirectory.absolutePath, IREADER_LOGO_MODE_0777) }
-            .onFailure { Log.w(TAG, "target dir chmod failed: ${it.javaClass.simpleName}") }
+        // 默认图。固件约定目录与文件全 0777；已是 0777 则跳过（非属主
+        // 场景免每次发布刷 EPERM 噪音），chmod 失败只记日志不中断发布
+        if (!ensureIReaderLogoDirectoryMode(targetDirectory)) {
+            Log.w(TAG, "target dir not 0777: ${targetDirectory.absolutePath}")
+        }
         deleteStaleTempFiles(targetDirectory)
 
         val target = uniqueTarget(encoded, targetDirectory)
