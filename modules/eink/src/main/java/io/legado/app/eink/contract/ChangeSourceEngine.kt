@@ -43,6 +43,12 @@ interface ChangeSourceEngine {
     /**
      * 读取换源页的当前书籍：正在阅读的会话书优先，否则按 bookUrl
      * 从存储读取。返回「句柄 + 展示模型」序对，找不到返回 null。
+     *
+     * 展示字段回填义务（默认值 ≠ 可省略）：[ChangeSourceBookUiModel.originName]
+     * 须回填书籍记录的源显示名、[ChangeSourceBookUiModel.latestChapterTitle]
+     * 须回填已缓存最新章节——二者供「当前源」常驻首项行展示，留默认值
+     * 会使该行回落显示 origin URL 与「无最新章节」（编译期无感的能力
+     * 退化；LegadoTeam 适配 2026-10-25 实录）。
      */
     suspend fun currentReadingBook(bookUrl: String): Pair<BookHandle, ChangeSourceBookUiModel>?
 
