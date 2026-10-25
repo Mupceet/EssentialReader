@@ -81,6 +81,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import io.legado.app.eink.app.hubVolumePagingEvent
 import io.legado.app.eink.contract.EInkEngineRegistry
+import io.legado.app.eink.contract.EInkHostActivity
 import io.legado.app.eink.contract.ReaderPageSnapshot
 import io.legado.app.eink.designsystem.content.EInkText
 import io.legado.app.eink.designsystem.control.EInkDialog
@@ -1052,7 +1053,16 @@ fun ReaderRoute(
                 onSetTitleWeight = viewModel::setTitleWeight,
                 onSetChineseConverterType = viewModel::setChineseConverterType,
                 onOpenFontSettings = onOpenFontSettings,
-                onPickFolder = { fontFolderLauncher.launch(null) },
+                // 首次选文件夹与字体设置页同链（FontSettingsRoute.onPickFolder）：
+                // 宿主钩子优先——无系统 DocumentsUI 的墨水屏固件由宿主应用内
+                // 文件浏览器接管（HandleFileContract，完整模式同链）；未接管
+                // 回落模块自带 SAF 选择器
+                onPickFolder = {
+                    val hostHandled = (context as? EInkHostActivity)?.onPickFontFolder { uriString ->
+                        if (uriString != null) viewModel.setFontFolder(uriString)
+                    } ?: false
+                    if (!hostHandled) fontFolderLauncher.launch(null)
+                },
                 onClose = { styleDialog = null },
                 onBackdropClick = dismissToCleanReading,
             )
