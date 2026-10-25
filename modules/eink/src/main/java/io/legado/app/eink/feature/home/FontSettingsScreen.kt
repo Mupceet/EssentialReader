@@ -38,6 +38,7 @@ import androidx.compose.ui.unit.dp
 import io.legado.app.eink.R
 import io.legado.app.eink.app.EInkPagerInput
 import io.legado.app.eink.contract.EInkEngineRegistry
+import io.legado.app.eink.contract.EInkHostActivity
 import io.legado.app.eink.contract.GlobalSettings
 import io.legado.app.eink.contract.ReaderFontOption
 import io.legado.app.eink.contract.ReaderFontSelection
@@ -252,7 +253,22 @@ fun FontSettingsRoute(
         onScaleStep = onScaleStep,
         onSelect = onSelect,
         onSelectPreset = onSelectPreset,
-        onPickFolder = { fontFolderLauncher.launch(null) },
+        // 宿主钩子优先（无 DocumentsUI 设备的宿主自研选择 UI 接管）；
+        // 回落模块自带 SAF 选择器（OpenDocumentTree）。两条路径的结果
+        // 处理一致：持久化文件夹 + 重拉字体列表
+        onPickFolder = {
+            val hostHandled = (context as? EInkHostActivity)?.onPickFontFolder { uriString ->
+                if (uriString != null) {
+                    scope.launch(Dispatchers.IO) {
+                        engine.setFontFolder(uriString)
+                        fontOptions = withContext(Dispatchers.IO) {
+                            sortFontOptions(engine.availableFonts())
+                        }
+                    }
+                }
+            } ?: false
+            if (!hostHandled) fontFolderLauncher.launch(null)
+        },
         onBack = onBack,
     )
 }

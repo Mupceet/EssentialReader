@@ -146,6 +146,21 @@ abstract class EInkHostActivity : AppCompatActivity() {
     protected open fun uiFontFamily(): FontFamily? = null
 
     /**
+     * 字体文件夹选择钩子（可选，非 Composable）：模块「切换字体文件夹」
+     * 入口先经本钩子询问——宿主返回 **true** 表示接管本次选择（以自有
+     * 文件选择 UI 实现，适用于无系统 DocumentsUI 的设备/固件：部分低版
+     * 本及国产墨水屏 ROM 裁剪了 SAF 选择器，模块自带的 OpenDocumentTree
+     * 无法弹出）。选择结果经 [onResult] 回传（主线程）：文件夹字符串
+     * （content uri 或文件路径，取值域同 [io.legado.app.eink.contract.ReaderEngine.setFontFolder]，
+     * 模块原样落库）；用户取消回传 null。返回 **false** = 不接管，模块
+     * 回落自带 SAF 选择器（默认行为，md3 等宿主不受影响）。
+     *
+     * 接管方注意：回调引用跨 Activity 重建不保证存活（进程回收场景
+     * 结果丢弃即可，用户重点一次）；重复进入时以最后一次回调为准。
+     */
+    open fun onPickFontFolder(onResult: (uriString: String?) -> Unit): Boolean = false
+
+    /**
      * attach 期编排：先装配端口（必须早于下方 fontScale 的端口读取），
      * 再按 GlobalSettings.fontScaleSetting 包装字体缩放 Context。
      */
