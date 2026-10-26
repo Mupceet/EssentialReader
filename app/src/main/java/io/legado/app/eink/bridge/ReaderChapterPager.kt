@@ -1,6 +1,7 @@
 package io.legado.app.eink.bridge
 
 import io.legado.app.data.entities.Book
+import io.legado.app.data.entities.HighlightRule
 import io.legado.app.data.repository.HighlightRuleRepository
 import io.legado.app.eink.contract.ReaderPageSnapshot
 import io.legado.app.feature.reader.core.model.ReaderPage
@@ -275,13 +276,18 @@ internal class ReaderChapterPager(
             return
         }
         val style = LegacyReaderPaginationStyleFactory.create()
-        val key = cacheKey(input, style)
+        // 规则哈希必须取 DB 活规则（loadEnabled）：durConfig.highlightRules 内嵌
+        // 副本仅在排版配置导出时刷新，编辑规则后键不变会命中旧页缓存、样式不更新。
+        // 主线程查库与完整模式 ReadBook.loadContent 同口径（Room allowMainThreadQueries）。
+        val highlightRules = HighlightRuleRepository()
+            .loadEnabled(ReadBookConfig.durConfig.name)
+        val key = cacheKey(input, style, highlightRules)
         val entry = chapters[input.chapter.index]
         if (entry != null && entry.key == key && entry.pages.isNotEmpty()) {
             // 命中也要补发布：ReadBook 侧快照可能被外部清空（清窗/重置）；
             // 相邻章输入晚于当前章到达时，这里也是预排的补触发点
             republishCachedSnapshots()
-            scheduleAdjacentPagination(style)
+            scheduleAdjacentPagination(style, highlightRules)
             return
         }
         // 同键在途去重：一次装载的三个章节输入先后到达会重复触发本方法，
@@ -292,8 +298,6 @@ internal class ReaderChapterPager(
         val generation = ReadBook.readerPaginationGeneration
         inFlightKey = key
         paginateJob = scope.launch {
-            val highlightRules = HighlightRuleRepository()
-                .loadEnabled(ReadBookConfig.durConfig.name)
             val result = paginateLegacyReaderChapterSafely {
                 LegacyReaderChapterPaginator.paginate(
                     book = input.book,
@@ -316,7 +320,7 @@ internal class ReaderChapterPager(
                         // 分页期间可能已换书：旧章节产物不得落进新会话
                         if (ReadBook.book?.bookUrl != input.book.bookUrl) return@withContext
                         commit(input, style, result.pages, key, generation, notify = true)
-                        scheduleAdjacentPagination(style)
+                        scheduleAdjacentPagination(style, highlightRules)
                     }
 
                     is LegacyReaderChapterPaginationResult.Unsupported ->
@@ -332,23 +336,24 @@ internal class ReaderChapterPager(
      * 到来时整体让路。产物同样发布分页快照（页内导航需要），但不通知
      * 模块重绘——模块只消费当前章页面，多余通知在墨水屏上就是一次闪屏。
      */
-    private fun scheduleAdjacentPagination(style: ReaderAndroidPaginationStyle) {
+    private fun scheduleAdjacentPagination(
+        style: ReaderAndroidPaginationStyle,
+        highlightRules: List<HighlightRule>,
+    ) {
         if (adjacentJob?.isActive == true) return
         val bookUrl = ReadBook.book?.bookUrl ?: return
         val window = ReadBook.readerChapterInputWindow
         val candidates = listOfNotNull(window.next, window.previous).filter { input ->
             val entry = chapters[input.chapter.index]
             if (entry == null || entry.pages.isEmpty()) return@filter true
-            entry.key != cacheKey(input, style)
+            entry.key != cacheKey(input, style, highlightRules)
         }
         if (candidates.isEmpty()) return
         val generation = ReadBook.readerPaginationGeneration
         adjacentJob = scope.launch {
-            val highlightRules = HighlightRuleRepository()
-                .loadEnabled(ReadBookConfig.durConfig.name)
             for (input in candidates) {
                 ensureActive()
-                val key = cacheKey(input, style)
+                val key = cacheKey(input, style, highlightRules)
                 val entry = chapters[input.chapter.index]
                 if (entry != null && entry.key == key && entry.pages.isNotEmpty()) continue
                 val result = paginateLegacyReaderChapterSafely {
@@ -450,59 +455,20 @@ internal class ReaderChapterPager(
         }
     }
 
-    /** 缓存键：章节身份 + 视口 + 影响排版的全部样式标量（对照直排层 key）。 */
-    private fun cacheKey(input: ReaderChapterInput, style: ReaderAndroidPaginationStyle): String =
-        buildString {
-            append(input.chapter.index).append('|')
-            append(input.chapter.url).append('|')
-            append(input.chapter.baseUrl).append('|')
-            append(input.displayTitle).append('|')
-            append(input.chapter.isVolume).append('|')
-            append(input.contentHash).append('|')
-            append(input.contentProcessesHash).append('|')
-            append(input.sourceHash).append('|')
-            append(input.book.bookUrl).append('|')
-            append(input.book.origin).append('|')
-            append(input.bookSourceHash).append('|')
-            append(input.book.getImageStyle()).append('|')
-            append(viewportWidth).append('x').append(viewportHeight).append('|')
-            append(style.columnMode).append('|')
-            append(style.isScroll).append('|')
-            append(style.excludeActionImages).append('|')
-            append(style.textBottomJustify).append('|')
-            append(style.pageUnderline).append('|')
-            append(style.emphasisUnderlineStyle).append('|')
-            append(style.bodyPaint.textSize).append('|')
-            append(style.titlePaint.textSize).append('|')
-            append(style.bodyPaint.letterSpacing).append('|')
-            append(style.bodyStyle.fontWeight).append('|')
-            append(style.titleStyle.fontWeight).append('|')
-            append(style.bodyStyle.fontPath).append('|')
-            append(style.titleStyle.fontPath).append('|')
-            append(style.bodyStyle.italic).append('|')
-            append(style.bodyStyle.fontFamily).append('|')
-            append(style.bodyStyle.linearText).append('|')
-            append(ReadBookConfig.paragraphIndent).append('|')
-            append(ReadBookConfig.textFullJustify).append('|')
-            append(ReadBookConfig.titleMode).append('|')
-            append(style.paddingLeftPx).append(',').append(style.paddingTopPx)
-                .append(',').append(style.paddingRightPx)
-                .append(',').append(style.paddingBottomPx).append('|')
-            append(style.lineSpacingExtra).append('|')
-            append(style.titleLineSpacingExtra).append('|')
-            append(style.titleLineSpacingSub).append('|')
-            append(style.titleSegmentation).append('|')
-            append(style.titleTopSpacingPx).append('|')
-            append(style.titleBottomSpacingPx).append('|')
-            append(style.paragraphSpacing).append('|')
-            append(decorationCacheKeyFragment(ReadBookConfig.config)).append('|')
-            // 直接钉住派生 extent 值（同完整模式键）：任何现在/未来的 extent 输入
-            // （含 headerMode=0 档的 hideStatusBar 门控）变化都反映到这两个值，
-            // 结构性闭合装饰参数错位
-            append(LegacyReaderPageDecorationFactory.headerExtentPx()).append(',')
-                .append(LegacyReaderPageDecorationFactory.footerExtentPx()).append('|')
-            append(ReadBookConfig.durConfig.highlightRules.hashCode())
-        }
+    /** 缓存键：章节身份 + 视口 + 影响排版的全部样式标量 + 高亮规则活哈希。 */
+    private fun cacheKey(
+        input: ReaderChapterInput,
+        style: ReaderAndroidPaginationStyle,
+        highlightRules: List<HighlightRule>,
+    ): String = readerPaginationCacheKey(
+        input = input,
+        style = style,
+        viewportWidth = viewportWidth,
+        viewportHeight = viewportHeight,
+        highlightRules = highlightRules,
+        headerExtentPx = LegacyReaderPageDecorationFactory.headerExtentPx(),
+        footerExtentPx = LegacyReaderPageDecorationFactory.footerExtentPx(),
+    )
 
     /** 单章分页产物缓存项。 */
     private class ChapterPages(
@@ -514,6 +480,74 @@ internal class ReaderChapterPager(
         val chapterIndex: Int,
         val generation: Long,
     )
+}
+
+/**
+ * 分页缓存键（提取为顶层纯函数供单测锚定）：章节身份 + 视口 + 影响排版
+ * 的全部样式标量（对照直排层 key）+ **高亮规则活哈希**。
+ *
+ * 规则项必须来自 DB `loadEnabled` 的实时结果——`ReadBookConfig.durConfig.
+ * highlightRules` 内嵌副本仅在排版配置导出/导入时刷新，编辑规则后哈希
+ * 不变，旧页缓存被错误复用（规则样式不更新）。
+ */
+internal fun readerPaginationCacheKey(
+    input: ReaderChapterInput,
+    style: ReaderAndroidPaginationStyle,
+    viewportWidth: Int,
+    viewportHeight: Int,
+    highlightRules: List<HighlightRule>,
+    headerExtentPx: Float,
+    footerExtentPx: Float,
+): String = buildString {
+    append(input.chapter.index).append('|')
+    append(input.chapter.url).append('|')
+    append(input.chapter.baseUrl).append('|')
+    append(input.displayTitle).append('|')
+    append(input.chapter.isVolume).append('|')
+    append(input.contentHash).append('|')
+    append(input.contentProcessesHash).append('|')
+    append(input.sourceHash).append('|')
+    append(input.book.bookUrl).append('|')
+    append(input.book.origin).append('|')
+    append(input.bookSourceHash).append('|')
+    append(input.book.getImageStyle()).append('|')
+    append(viewportWidth).append('x').append(viewportHeight).append('|')
+    append(style.columnMode).append('|')
+    append(style.isScroll).append('|')
+    append(style.excludeActionImages).append('|')
+    append(style.textBottomJustify).append('|')
+    append(style.pageUnderline).append('|')
+    append(style.emphasisUnderlineStyle).append('|')
+    append(style.bodyPaint.textSize).append('|')
+    append(style.titlePaint.textSize).append('|')
+    append(style.bodyPaint.letterSpacing).append('|')
+    append(style.bodyStyle.fontWeight).append('|')
+    append(style.titleStyle.fontWeight).append('|')
+    append(style.bodyStyle.fontPath).append('|')
+    append(style.titleStyle.fontPath).append('|')
+    append(style.bodyStyle.italic).append('|')
+    append(style.bodyStyle.fontFamily).append('|')
+    append(style.bodyStyle.linearText).append('|')
+    append(ReadBookConfig.paragraphIndent).append('|')
+    append(ReadBookConfig.textFullJustify).append('|')
+    append(ReadBookConfig.titleMode).append('|')
+    append(style.paddingLeftPx).append(',').append(style.paddingTopPx)
+        .append(',').append(style.paddingRightPx)
+        .append(',').append(style.paddingBottomPx).append('|')
+    append(style.lineSpacingExtra).append('|')
+    append(style.titleLineSpacingExtra).append('|')
+    append(style.titleLineSpacingSub).append('|')
+    append(style.titleSegmentation).append('|')
+    append(style.titleTopSpacingPx).append('|')
+    append(style.titleBottomSpacingPx).append('|')
+    append(style.paragraphSpacing).append('|')
+    append(decorationCacheKeyFragment(ReadBookConfig.config)).append('|')
+    // 直接钉住派生 extent 值（同完整模式键）：任何现在/未来的 extent 输入
+    // （含 headerMode=0 档的 hideStatusBar 门控）变化都反映到这两个值，
+    // 结构性闭合装饰参数错位。extent 由调用方传入（工厂经 Koin 取阅读
+    // 设置，纯函数键保持无 Koin 依赖、可单测）
+    append(headerExtentPx).append(',').append(footerExtentPx).append('|')
+    append(highlightRules.hashCode())
 }
 
 /**

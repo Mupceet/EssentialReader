@@ -17,10 +17,12 @@ import io.legado.app.feature.reader.core.model.ReaderPageId
 import io.legado.app.feature.reader.core.model.ReaderRect
 import io.legado.app.feature.reader.core.model.ReaderTextStyle
 import io.legado.app.feature.reader.core.model.ReaderUnderline
+import io.legado.app.feature.reader.platform.ReaderAndroidPaintFactory
 import io.legado.app.feature.reader.platform.ReaderAndroidPaginationStyle
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -132,6 +134,7 @@ class ReaderPageSnapshotMapperTest {
         vararg elements: ReaderElement,
         sdkInt: Int = 30,
         sessionBook: Book? = null,
+        contentBaseline: ReaderChunkBaseline = ReaderChunkBaseline(),
     ) = ReaderPageSnapshotMapper.mapWithSpecs(
         page = readerPage(elements.toList()),
         titleSpec = titleSpec,
@@ -140,6 +143,26 @@ class ReaderPageSnapshotMapperTest {
         sessionBook = sessionBook,
         readProgress = "12.3%",
         imageLoader = { _, _ -> { _, _ -> null } },
+        contentBaseline = contentBaseline,
+    )
+
+    /** 直接喂元素样式（高亮规则字体覆盖/自定义颜色的元素构造用）。 */
+    private fun styledTextElement(
+        x: Float,
+        value: String,
+        style: ReaderTextStyle,
+        top: Float = 0f,
+        emphasized: Boolean = false,
+        chapterPosition: Int = 0,
+    ) = ReaderElement.Text(
+        bounds = ReaderRect(x, top, x + 20f, top + 50f),
+        baselinePx = top + 40f,
+        value = value,
+        style = style,
+        selected = false,
+        emphasized = emphasized,
+        markingId = null,
+        chapterPosition = chapterPosition,
     )
 
     /** ReaderDecorationRun 非 data class（引用相等），按字段断言。 */
@@ -156,6 +179,128 @@ class ReaderPageSnapshotMapperTest {
         assertEquals(underlineMode, run.underlineMode)
         assertEquals(highlight, run.highlight)
         assertEquals(markingId, run.markingId)
+    }
+
+    // ==================== 高亮规则渲染支持（灰度跨桥 + 逐段画笔覆盖） ====================
+
+    @Test
+    fun `toEInkGrayArgb 按亮度公式换算并保留alpha`() {
+        // BT.709：0xFFFF8C00 → 0.2126*255+0.7152*140+0.0722*0 ≈ 154.3 → 154
+        assertEquals(0xFF9A9A9A.toInt(), 0xFFFF8C00.toInt().toEInkGrayArgb())
+        assertEquals(0xFF000000.toInt(), 0xFF000000.toInt().toEInkGrayArgb())
+        assertEquals(0xFFFFFFFF.toInt(), 0xFFFFFFFF.toInt().toEInkGrayArgb())
+        // alpha 原样保留（半透明高亮带）
+        assertEquals(0x80363636.toInt(), 0x80FF0000.toInt().toEInkGrayArgb())
+    }
+
+    @Test
+    fun `字号覆盖折为逐段画笔覆盖无覆盖行省略`() {
+        val snapshot = mapElements(
+            styledTextElement(0f, "常", bodyStyle),
+            styledTextElement(20f, "大", bodyStyle.copy(fontSizePx = 48f)),
+        )
+        val line = snapshot.lines.single()
+        assertEquals(2, line.chunkOverrides.size)
+        assertNull(line.chunkOverrides[0])
+        assertEquals(48f, line.chunkOverrides[1]!!.textSizePx)
+        assertNull(line.chunkOverrides[1]!!.typeface)
+
+        // 全行无覆盖：chunkOverrides 保持缺省空列表（兼容旧快照形态）
+        val plain = mapElements(styledTextElement(0f, "常", bodyStyle))
+        assertTrue(plain.lines.single().chunkOverrides.isEmpty())
+    }
+
+    @Test
+    fun `字重覆盖发射字体与可变字重`() {
+        val snapshot = mapElements(
+            styledTextElement(0f, "粗", bodyStyle.copy(fontWeight = 700)),
+        )
+        val override = snapshot.lines.single().chunkOverrides.single()
+        assertNotNull(override)
+        assertNotNull(override!!.typeface)
+        assertEquals("'wght' 700", override.fontVariationSettings)
+    }
+
+    @Test
+    fun `斜体发射合成倾斜非斜体不发射`() {
+        val snapshot = mapElements(
+            styledTextElement(0f, "斜", bodyStyle.copy(italic = true)),
+            styledTextElement(20f, "正", bodyStyle),
+        )
+        val overrides = snapshot.lines.single().chunkOverrides
+        assertEquals(ReaderAndroidPaintFactory.SYNTHETIC_ITALIC_SKEW_X, overrides[0]!!.skewX)
+        assertNull(overrides[1])
+    }
+
+    @Test
+    fun `可变字重在API28以下不发射`() {
+        // 低版本工厂把字重折进 typeface 的 BOLD 档，variation 不跨桥（镜像同口径）
+        val snapshot = mapElements(
+            sdkInt = 27,
+            elements = arrayOf(styledTextElement(0f, "粗", bodyStyle.copy(fontWeight = 700))),
+        )
+        val override = snapshot.lines.single().chunkOverrides.single()
+        assertNotNull(override)
+        assertNotNull(override!!.typeface)
+        assertNull(override.fontVariationSettings)
+    }
+
+    @Test
+    fun `字色异基线灰度跨桥基线同色不发射`() {
+        // 基线色取 bodyStyle 同值 0：同色段不发射覆盖，异色段换算灰度跨桥
+        val snapshot = mapElements(
+            styledTextElement(0f, "彩", bodyStyle.copy(colorArgb = 0xFFFF8C00.toInt())),
+            styledTextElement(20f, "黑", bodyStyle),
+            contentBaseline = ReaderChunkBaseline(colorArgb = 0),
+        )
+        val overrides = snapshot.lines.single().chunkOverrides
+        assertEquals(0xFF9A9A9A.toInt(), overrides[0]!!.colorArgb)
+        assertNull(overrides[1])
+    }
+
+    @Test
+    fun `不同灰度高亮不并入同一run`() {
+        val snapshot = mapElements(
+            styledTextElement(0f, "甲", bodyStyle.copy(backgroundArgb = 0x80FF0000.toInt())),
+            styledTextElement(20f, "乙", bodyStyle.copy(backgroundArgb = 0x8000FF00.toInt())),
+        )
+        val runs = snapshot.lines.single().decorations
+        assertEquals(2, runs.size)
+        assertEquals(0x80363636.toInt(), runs[0].highlightColorArgb)
+        assertEquals(0x80B6B6B6.toInt(), runs[1].highlightColorArgb)
+    }
+
+    @Test
+    fun `删除线与荧光模式携带灰度下划线色透传`() {
+        val snapshot = mapElements(
+            styledTextElement(
+                0f, "删",
+                bodyStyle.copy(
+                    underline = ReaderUnderline(
+                        mode = 6,
+                        colorArgb = 0xFF3366CC.toInt(),
+                        widthPx = 1f,
+                        offsetPx = 2f,
+                    ),
+                ),
+            ),
+            styledTextElement(
+                20f, "荧",
+                bodyStyle.copy(
+                    underline = ReaderUnderline(
+                        mode = 7,
+                        colorArgb = 0xFFFF8C00.toInt(),
+                        widthPx = 1f,
+                        offsetPx = 2f,
+                    ),
+                ),
+            ),
+        )
+        val runs = snapshot.lines.single().decorations
+        assertEquals(6, runs[0].underlineMode)
+        assertEquals(0xFF636363.toInt(), runs[0].underlineColorArgb)
+        assertEquals(7, runs[1].underlineMode)
+        assertEquals(0xFF9A9A9A.toInt(), runs[1].underlineColorArgb)
     }
 
     @Test

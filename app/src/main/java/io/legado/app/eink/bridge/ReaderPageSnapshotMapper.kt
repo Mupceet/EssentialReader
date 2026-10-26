@@ -2,8 +2,10 @@ package io.legado.app.eink.bridge
 
 import android.graphics.Bitmap
 import android.graphics.Paint
+import android.graphics.Typeface
 import android.os.Build
 import io.legado.app.data.entities.Book
+import io.legado.app.eink.contract.ReaderChunkPaintOverride
 import io.legado.app.eink.contract.ReaderDecorationRun
 import io.legado.app.eink.contract.ReaderImageSlot
 import io.legado.app.eink.contract.ReaderPageLine
@@ -13,9 +15,11 @@ import io.legado.app.eink.contract.ReaderUnderlineGeometry
 import io.legado.app.feature.reader.core.model.ReaderElement
 import io.legado.app.feature.reader.core.model.ReaderPage
 import io.legado.app.feature.reader.core.model.ReaderUnderline
+import io.legado.app.feature.reader.platform.ReaderAndroidPaintFactory
 import io.legado.app.feature.reader.platform.ReaderAndroidPaginationStyle
 import io.legado.app.model.ImageProvider
 import java.text.DecimalFormat
+import kotlin.math.roundToInt
 
 /**
  * ReaderPage → 模块快照映射器（宿主唯一新增渲染职责）。
@@ -31,16 +35,22 @@ import java.text.DecimalFormat
  *    透传，模块按 fullLine 铺满即与引擎布局一致；
  *  - 划线/高亮样式（ReaderTextStyle.underline/backgroundArgb）折叠为行内
  *    装饰 run（相邻且样式签名 + markingId 全等的段合并——run.markingId 是
- *    模块点按命中的定位键，不同标记不并入同一 run）；字体色标记不产生
- *    装饰，颜色一律不跨桥；
+ *    模块点按命中的定位键，不同标记不并入同一 run）；颜色以**灰度**跨桥
+ *    （亮度公式换算、保留 alpha，见 [toEInkGrayArgb]）——墨水屏无彩色，
+ *    灰度是规则彩色的等价表达，模块按值绘制；
+ *  - 高亮规则的字体覆盖（字号差/字重/自定义字体/字色）折为逐段画笔覆盖
+ *    [ReaderChunkPaintOverride]——引擎按覆盖参数测宽，模块按同值绘制才
+ *    不会画不满/溢出测宽槽；覆盖判定与基线（排版样式工厂的 body/title
+ *    style）比对，无差异不发射；
  *  - 段落边界（paragraphBreaksAfter）从排版块结构推导：元素携带块序号
  *    （paragraphIndex），同一文本块的折行续行间 0、块末行 1、其后每个
  *    空行/占位块（Spacer 等，不产生行）累加 1——与分页器拼 pageText 的
  *    `append('\n')` 口径（段末/空行各一个）同构。
  *
  * 画笔规格只拷贝测量耦合参数（字号/字距/字体/可变字重）——快照坐标
- * 是引擎按这些参数测量的，模块必须按同值绘制才不错位；阴影/斜体等纯
- * 视觉效果不跨桥（E-Ink 阅读不渲染，既定产品取舍）。
+ * 是引擎按这些参数测量的，模块必须按同值绘制才不错位；阴影等纯视觉
+ * 效果不跨桥（E-Ink 阅读不渲染，既定产品取舍），斜体例外：高亮规则的
+ * 合成斜体（skew，不改步进宽、无对齐风险）经逐段覆盖跨桥。
  *
  * 在引擎回调线程调用，产物不可变、跨线程安全。
  */
@@ -62,6 +72,18 @@ internal object ReaderPageSnapshotMapper {
             sessionBook = sessionBook,
             readProgress = readProgress,
             bookmarkBadge = bookmarkBadge,
+            titleBaseline = ReaderChunkBaseline(
+                fontPath = paginationStyle.titleStyle.fontPath,
+                fontWeight = paginationStyle.titleStyle.fontWeight,
+                fontFamily = paginationStyle.titleStyle.fontFamily,
+                colorArgb = paginationStyle.titlePaint.color,
+            ),
+            contentBaseline = ReaderChunkBaseline(
+                fontPath = paginationStyle.bodyStyle.fontPath,
+                fontWeight = paginationStyle.bodyStyle.fontWeight,
+                fontFamily = paginationStyle.bodyStyle.fontFamily,
+                colorArgb = paginationStyle.bodyPaint.color,
+            ),
             contentFillRatio = contentFillRatio(
                 page = page,
                 bodyLineAdvancePx =
@@ -81,10 +103,16 @@ internal object ReaderPageSnapshotMapper {
         bookmarkBadge: Boolean = false,
         contentFillRatio: Float = 1f,
         imageLoader: (Book, String) -> (Int, Int) -> Bitmap?,
+        /** 标题行覆盖判定基线（缺省 = 无基准可比：不发射字体与字色覆盖）。 */
+        titleBaseline: ReaderChunkBaseline = ReaderChunkBaseline(),
+        /** 正文行覆盖判定基线（缺省同上）。 */
+        contentBaseline: ReaderChunkBaseline = ReaderChunkBaseline(),
     ): ReaderPageSnapshot {
         val staged = ArrayList<LineBuffer>()
         val images = ArrayList<ReaderImageSlot>()
         var buffer: LineBuffer? = null
+        // 覆盖签名 → 共享实例（页内等值段复用同一覆盖对象，模块画笔缓存按值命中）
+        val overrideInterned = HashMap<ChunkOverrideSignature, ReaderChunkPaintOverride>()
         // 段落边界推导状态（见类 KDoc）：元素 paragraphIndex 是分页器写入的块序号
         var lastTextBlockIndex: Int? = null
         var pendingBlankLines = 0
@@ -135,9 +163,19 @@ internal object ReaderPageSnapshotMapper {
                     line.chapterPositions.add(element.chapterPosition)
                     line.underlineModes.add(element.style.underline?.mode ?: 0)
                     line.highlights.add(element.style.backgroundArgb != null)
+                    line.highlightGrays.add(element.style.backgroundArgb?.toEInkGrayArgb())
+                    line.underlineGrays.add(element.style.underline?.colorArgb?.toEInkGrayArgb())
                     line.markingIds.add(element.markingId.orEmpty())
                     // 下划线几何透传给模块（宿主样式即唯一真源，见 ReaderUnderlineGeometry）
                     line.underlines.add(element.style.underline?.toGeometry())
+                    line.chunkOverrideCandidates.add(
+                        element.chunkOverride(
+                            spec = spec,
+                            baseline = if (element.emphasized) titleBaseline else contentBaseline,
+                            sdkInt = sdkInt,
+                            interned = overrideInterned,
+                        )
+                    )
                 }
 
                 is ReaderElement.Image -> {
@@ -205,12 +243,16 @@ internal object ReaderPageSnapshotMapper {
         val xs = ArrayList<Float>()
         val chapterPositions = ArrayList<Int>()
         // 与 chunks 平行的逐段装饰签名（underline.mode；backgroundArgb 是否非空；
-        // markingId 归一后的标记身份——null 表示非用户标记来源，归一为空串）
+        // 两者的灰度色；markingId 归一后的标记身份——null 表示非用户标记来源，归一为空串）
         val underlineModes = ArrayList<Int>()
         val highlights = ArrayList<Boolean>()
+        val highlightGrays = ArrayList<Int?>()
+        val underlineGrays = ArrayList<Int?>()
         val markingIds = ArrayList<String>()
         // 与 chunks 平行的宿主下划线几何（ReaderUnderline → 契约 ReaderUnderlineGeometry）
         val underlines = ArrayList<ReaderUnderlineGeometry?>()
+        // 与 chunks 平行的逐段画笔覆盖（null = 沿用行规格；页内已按签名共享实例）
+        val chunkOverrideCandidates = ArrayList<ReaderChunkPaintOverride?>()
         var top = 0f
         var bottom = 0f
         var baseY = 0f
@@ -223,22 +265,28 @@ internal object ReaderPageSnapshotMapper {
         private var decorations: List<ReaderDecorationRun> = emptyList()
 
         /** flush 时把相邻同签名段合并为行内装饰 run（行内拼接文本 UTF-16 索引）。
-         *  合并键 = (underlineMode, highlight, markingId) 三元组全等：
-         *  不同标记不并入同一 run（run.markingId 是点按命中的定位键）。 */
+         *  合并键 = (underlineMode, highlight, highlightGray, underlineGray, markingId,
+         *  underlineGeometry) 全等：不同标记/不同灰度不并入同一 run
+         *  （run.markingId 是点按命中的定位键，灰度是 run 自带绘制色）。 */
         private fun buildDecorations(): List<ReaderDecorationRun> {
             val runs = ArrayList<ReaderDecorationRun>()
             var runStart = -1
             var runMode = 0
             var runHighlight = false
+            var runHighlightGray: Int? = null
+            var runUnderlineGray: Int? = null
             var runMarkingId = ""
             var runUnderline: ReaderUnderlineGeometry? = null
             var offset = 0
             for (i in chunks.indices) {
                 val mode = underlineModes[i]
                 val highlight = highlights[i]
+                val highlightGray = highlightGrays[i]
+                val underlineGray = underlineGrays[i]
                 val markingId = markingIds[i]
                 val underline = underlines[i]
                 val same = runStart >= 0 && mode == runMode && highlight == runHighlight &&
+                    highlightGray == runHighlightGray && underlineGray == runUnderlineGray &&
                     markingId == runMarkingId && underline == runUnderline
                 if (!same) {
                     // 无签名段（0, false）只负责截断前序 run，自身不成 run
@@ -246,12 +294,16 @@ internal object ReaderPageSnapshotMapper {
                         runs.add(
                             ReaderDecorationRun(
                                 runStart, offset, runMode, runHighlight, runMarkingId, runUnderline,
+                                highlightColorArgb = runHighlightGray,
+                                underlineColorArgb = runUnderlineGray,
                             )
                         )
                     }
                     runStart = offset
                     runMode = mode
                     runHighlight = highlight
+                    runHighlightGray = highlightGray
+                    runUnderlineGray = underlineGray
                     runMarkingId = markingId
                     runUnderline = underline
                 }
@@ -261,6 +313,8 @@ internal object ReaderPageSnapshotMapper {
                 runs.add(
                     ReaderDecorationRun(
                         runStart, offset, runMode, runHighlight, runMarkingId, runUnderline,
+                        highlightColorArgb = runHighlightGray,
+                        underlineColorArgb = runUnderlineGray,
                     )
                 )
             }
@@ -284,6 +338,11 @@ internal object ReaderPageSnapshotMapper {
             bottom = bottom,
             paragraphBreaksAfter = breaksAfter,
             decorations = decorations,
+            chunkOverrides = if (chunkOverrideCandidates.all { it == null }) {
+                emptyList()
+            } else {
+                chunkOverrideCandidates
+            },
         )
     }
 
@@ -366,6 +425,89 @@ internal fun Paint.copyPaintSpec(): ReaderPaintSpec = ReaderPaintSpec(
     typeface = typeface, // API 1
     fontVariationSettings = fontVariationSettings, // API 26 = minSdk
 )
+
+/** 覆盖判定基线：排版样式工厂的 body/title style 参数（元素无差异时不发射覆盖）。 */
+internal data class ReaderChunkBaseline(
+    val fontPath: String = "",
+    val fontWeight: Int = 400,
+    val fontFamily: String = "sans-serif",
+    /** 基线字色（null = 无基准可比，跳过字色覆盖判定——单测缺省路径）。 */
+    val colorArgb: Int? = null,
+)
+
+/** 覆盖签名（typeface 恒为工厂缓存实例，按引用等值即参数等值）。 */
+private data class ChunkOverrideSignature(
+    val textSizePx: Float?,
+    val typeface: Typeface?,
+    val fontVariationSettings: String?,
+    val colorArgb: Int?,
+    val skewX: Float?,
+)
+
+/**
+ * 元素样式 → 逐段画笔覆盖（与基线无差异返回 null，模块沿用行规格）。
+ *
+ * 与引擎测量同源：typeface 经 [ReaderAndroidPaintFactory.loadTypeface]
+ * （斜体恒 false——工厂口径，斜体只经 skewX 不改字宽）；可变字重仅在
+ * API 28+ 发射（低版本工厂把字重折进 typeface 的 BOLD 档，镜像同口径）；
+ * 字色做灰度换算（墨水屏等价表达，基线色跳过）；斜体发射
+ * [ReaderAndroidPaintFactory.SYNTHETIC_ITALIC_SKEW_X] 同款合成倾斜。
+ */
+private fun ReaderElement.Text.chunkOverride(
+    spec: ReaderPaintSpec,
+    baseline: ReaderChunkBaseline,
+    sdkInt: Int,
+    interned: MutableMap<ChunkOverrideSignature, ReaderChunkPaintOverride>,
+): ReaderChunkPaintOverride? {
+    val style = style
+    val textSize = style.fontSizePx.takeIf { it != spec.textSizePx }
+    val typeface = if (style.fontPath != baseline.fontPath ||
+        style.fontWeight != baseline.fontWeight ||
+        style.fontFamily != baseline.fontFamily
+    ) {
+        ReaderAndroidPaintFactory.loadTypeface(style.fontPath, style.fontWeight, false, style.fontFamily)
+    } else {
+        null
+    }
+    val variation = if (sdkInt >= 28) {
+        style.fontWeight.takeIf { it != 400 }
+            ?.let { "'wght' $it" }
+            ?.takeIf { it != spec.fontVariationSettings }
+    } else {
+        null
+    }
+    val color = baseline.colorArgb
+        ?.let { base -> style.colorArgb.takeIf { it != base }?.toEInkGrayArgb() }
+    // 合成斜体：skew 只剪切成字形轮廓、不改步进宽，跨桥无对齐风险
+    // （完整模式引擎同为 skew 合成，不走字体 italic 面）
+    val skewX = ReaderAndroidPaintFactory.SYNTHETIC_ITALIC_SKEW_X.takeIf { style.italic }
+    if (textSize == null && typeface == null && variation == null && color == null && skewX == null) {
+        return null
+    }
+    val signature = ChunkOverrideSignature(textSize, typeface, variation, color, skewX)
+    return interned.getOrPut(signature) {
+        ReaderChunkPaintOverride(
+            textSizePx = textSize,
+            typeface = typeface,
+            fontVariationSettings = variation,
+            colorArgb = color,
+            skewX = skewX,
+        )
+    }
+}
+
+/**
+ * 彩色 → 墨水屏灰度（BT.709 亮度，保留 alpha）：彩色规则色在灰阶屏上的
+ * 等价表达。宿主完成换算，模块不做色彩推断。
+ */
+internal fun Int.toEInkGrayArgb(): Int {
+    val alpha = this ushr 24
+    val r = (this shr 16) and 0xFF
+    val g = (this shr 8) and 0xFF
+    val b = this and 0xFF
+    val y = (0.2126f * r + 0.7152f * g + 0.0722f * b).roundToInt().coerceIn(0, 255)
+    return (alpha shl 24) or (y shl 16) or (y shl 8) or y
+}
 
 /**
  * 宿主下划线样式 → 模块绘制几何（px）：字段一一对应，模块不再自拟公式。
