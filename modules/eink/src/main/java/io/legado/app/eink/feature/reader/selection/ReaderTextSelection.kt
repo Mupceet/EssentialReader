@@ -393,25 +393,52 @@ fun selectionRuns(
         val from = if (index == start.lineIndex) start.charIndex else 0
         val to = if (index == end.lineIndex) end.charIndex else text.length
         // 段首缩进不是可见墨迹：铺灰底从句首可见字符起笔（整行区间都是空白
-        // 时兜底按原区间，避免选区失去视觉反馈与操作条锚点）
+        // 时兜底按原区间，避免选区失去视觉反馈与操作条锚定）
         val (inkFrom, inkTo) = inkRange(text, from, to) ?: (from to to)
-        val left = charX(line, inkFrom, measure)
-        val right = charX(line, inkTo, measure)
+        // 左缘用段起点真值（命中字距段间空白不圈进首字）、右缘到字形末端
+        val left = charStartX(line, inkFrom) { _, text -> measure(text) }
+        val right = charEndX(line, inkTo) { _, text -> measure(text) }
         runs += SelectionRun(index, left, right, line.top, line.bottom)
     }
     return runs
 }
 
-/** 行内字符偏移的 x 坐标（逐段累加前缀宽）。 */
+/** 行内字符偏移的 x 坐标（旧口径，等价 [charEndX]；兼容既有调用）。 */
 internal fun charX(line: ReaderPageLine, charIndex: Int, measure: (String) -> Float): Float =
-    charX(line, charIndex) { _, text -> measure(text) }
+    charEndX(line, charIndex) { _, text -> measure(text) }
 
 /**
- * [charX] 的逐段测量版：measure 回调携带段下标——行内段带画笔覆盖
- * （高亮规则的字号/字体覆盖）时，前缀宽必须按各段自己的画笔测量，
- * 否则装饰 span 与字形错位。无覆盖行的调用方传恒定测量即退化为上者。
+ * 字符 k 的**左缘** x：段内按前缀宽累加、段首从 [ReaderPageLine.x] 起算；
+ * k 落在段边界（= 前段右端）时取**下一段的 x**。
+ *
+ * 引擎把段间间隙（letterSpacing、命中字距 matchSpacing 等）计入前一项的
+ * advance、不进任何字形的 bounds——完整模式的装饰与选区直接用元素
+ * bounds，命中段的左缘永远从字形起笔。模块快照只携带各段起点 x，段间
+ * 间隙只有「下一段的 x」这一处真值可读；若按前段前缀宽测量会差出整段
+ * 间隙，命中字距（可达 40dp）时选区/高亮带把空白圈进首字（真机反馈）。
  */
-internal fun charX(
+internal fun charStartX(
+    line: ReaderPageLine,
+    charIndex: Int,
+    measureChunk: (chunkIndex: Int, text: String) -> Float,
+): Float {
+    val (chunk, offsetInChunk) = locateChunk(line, charIndex)
+    if (offsetInChunk == line.chunks[chunk].length && chunk < line.chunks.lastIndex) {
+        return line.x[chunk + 1]
+    }
+    var x = line.x[chunk]
+    val text = line.chunks[chunk]
+    for (i in 0 until offsetInChunk) x += measureChunk(chunk, text[i].toString())
+    return x
+}
+
+/**
+ * end-exclusive 索引 k 的**右缘** x（= 字符 k−1 的字形末端）：按所在段
+ * 前缀宽测量。段尾间隙（letterSpacing、命中字距 after）不计入——完整
+ * 模式 bounds.right 同口径，选区/装饰到末字字形为止、不吞段尾空白。
+ * 行末（无下一段）同样按前缀测量。
+ */
+internal fun charEndX(
     line: ReaderPageLine,
     charIndex: Int,
     measureChunk: (chunkIndex: Int, text: String) -> Float,

@@ -68,14 +68,35 @@ class ReaderDecorationSpanTest {
         )
         assertEquals(100f + 20f, span!!.first)
         assertEquals(100f + 40f, span.second)
+    }
 
-        // 段边界索引（= 段 0 的右缘）按段 0 前缀宽测量（locateChunk 约定：
-        // remaining <= length 落前段）——几何上正是段 0 的末端 x
-        val boundary = decorationSpanX(
+    @Test
+    fun `段边界起笔不圈进段间空白`() {
+        // 引擎把段间间隙（letterSpacing、命中字距）计入前项 advance、不进
+        // 字形 bounds——完整模式装饰从元素 bounds.left 起笔。模块快照的
+        // 段间真值只有「下一段的 x」：起笔落段边界时必须取 x[1]（100f），
+        // 按前段前缀宽测量会差出整段间隙（30f），命中字距大时空白被圈进
+        // 首字（真机反馈）
+        val l = line("abc", "de", positions = intArrayOf(0, 3))
+        val measureChunk: (Int, String) -> Float = { chunk, text ->
+            text.length * if (chunk == 0) 10f else 20f
+        }
+        val span = decorationSpanX(
             l,
             ReaderDecorationRun(3, 5, underlineMode = 1, highlight = false, markingId = "m1"),
             measureChunk,
         )
-        assertEquals(30f, boundary!!.first)
+        assertEquals(100f, span!!.first)
+        assertEquals(100f + 40f, span.second)
+
+        // 右缘到字形末端为止：区间止于段边界（= 段 0 末字之后）时按段 0
+        // 前缀宽收笔（30f），不吞段尾空白
+        val endAtBoundary = decorationSpanX(
+            l,
+            ReaderDecorationRun(0, 3, underlineMode = 1, highlight = false, markingId = "m1"),
+            measureChunk,
+        )
+        assertEquals(0f, endAtBoundary!!.first)
+        assertEquals(30f, endAtBoundary.second)
     }
 }

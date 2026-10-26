@@ -202,6 +202,20 @@ class ReaderTextSelectionTest {
     }
 
     @Test
+    fun `段边界起笔的选区不圈进段间空白`() {
+        // 两段行（x[0]=0、x[1]=100）：引擎把段间间隙（letterSpacing、命中
+        // 字距）计入前项 advance、不进字形 bounds。选区从段边界字符（索引
+        // 3，即段 1 首字）起笔时，左缘必须取下一段起点 x[1]，按前段前缀宽
+        // 测量（30f）会把整段空白圈进首字（真机反馈：命中字距的空白被合并
+        // 进首字、长按选区含空白）
+        val snap = snapshot(line("abc", "de", positions = intArrayOf(0, 3)))
+        val sel = buildSelection(snap, ReaderTextHit(0, 3), ReaderTextHit(0, 4))!!
+        val runs = selectionRuns(snap, sel, measure, measure)
+        assertEquals(100f, runs.single().left)
+        assertEquals(100f + 10f, runs.single().right)
+    }
+
+    @Test
     fun `拖动末端把手越过起始端时固定端不跟随`() {
         val snap = snapshot(line("abcdefghij", positions = intArrayOf(0)))
         var sel = buildSelection(snap, ReaderTextHit(0, 2), ReaderTextHit(0, 8))!!

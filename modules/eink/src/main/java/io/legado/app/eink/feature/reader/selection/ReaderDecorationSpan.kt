@@ -24,8 +24,9 @@ fun decorationSpanX(
 
 /**
  * [decorationSpanX] 的逐段测量版：行内段带画笔覆盖（高亮规则的字号/字体
- * 覆盖）时按各段自己的画笔测宽，span 与字形才不错位。段首缩进剔除后
- * 起笔可能落在段中，前缀宽必须逐段测量；无覆盖行传恒定测量即退化。
+ * 覆盖）时按各段自己的画笔测宽，span 与字形才不错位。左缘取段起点真值
+ * （[charStartX]——命中字距的段间空白不圈进首字，与完整模式元素
+ * bounds.left 同口径），右缘到字形末端（[charEndX]，不吞段尾空白）。
  */
 fun decorationSpanX(
     line: ReaderPageLine,
@@ -35,5 +36,5 @@ fun decorationSpanX(
     val text = lineText(line)
     if (run.start < 0 || run.end > text.length || run.start >= run.end) return null
     val (from, to) = inkRange(text, run.start, run.end) ?: return null
-    return charX(line, from, measureChunk) to charX(line, to, measureChunk)
+    return charStartX(line, from, measureChunk) to charEndX(line, to, measureChunk)
 }
