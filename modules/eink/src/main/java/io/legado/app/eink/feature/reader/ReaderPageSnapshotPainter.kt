@@ -8,6 +8,7 @@ import android.graphics.RectF
 import android.graphics.Typeface
 import android.os.Build
 import io.legado.app.eink.contract.ReaderImageSlot
+import io.legado.app.eink.contract.ReaderPageLine
 import io.legado.app.eink.contract.ReaderPageSnapshot
 import io.legado.app.eink.contract.ReaderPaintSpec
 import io.legado.app.eink.feature.reader.selection.decorationSpanX
@@ -30,6 +31,26 @@ internal data class ReaderPageRenderStyle(
 )
 
 /**
+ * 下划线 mode → 绘制形态。完整模式（ReaderPageDecorationDrawCache）的
+ * 语义映射在模块侧的等价物：6 删除线（行盒 52% 高度横线压过字形）、
+ * 7 荧光（行盒下半高亮带）此前误入「行底实线」分支，本枚举锚定语义，
+ * 模块单测锁定 mode→形态映射。
+ */
+internal enum class ReaderUnderlineVisual {
+    SOLID, DASHED, WAVE, DOUBLE, STRIKE_THROUGH, HALF_BAND,
+}
+
+internal fun underlineVisualOf(mode: Int): ReaderUnderlineVisual = when (mode) {
+    2 -> ReaderUnderlineVisual.DASHED
+    3 -> ReaderUnderlineVisual.WAVE
+    4 -> ReaderUnderlineVisual.DOUBLE
+    6 -> ReaderUnderlineVisual.STRIKE_THROUGH
+    7 -> ReaderUnderlineVisual.HALF_BAND
+    // 1 实线；5 SVG 花色及未知值降级实线（明示不支持花色）
+    else -> ReaderUnderlineVisual.SOLID
+}
+
+/**
  * Android-canvas implementation shared by the live Compose reader canvas and
  * the lock-screen renderer.
  *
@@ -46,6 +67,18 @@ internal class ReaderPageSnapshotPainter {
     private val imagePaint = Paint()
     private val linePaint = Paint().apply { isAntiAlias = true }
 
+    /** 覆盖段派生画笔缓存（键含行规格身份与覆盖字段；防页内样式膨胀）。 */
+    private val overridePaints = HashMap<OverridePaintKey, Paint>()
+
+    private data class OverridePaintKey(
+        val isTitle: Boolean,
+        val textSizePx: Float,
+        val typeface: Typeface?,
+        val fontVariationSettings: String?,
+        val colorArgb: Int,
+        val skewX: Float,
+    )
+
     fun draw(
         canvas: Canvas,
         snapshot: ReaderPageSnapshot,
@@ -54,19 +87,59 @@ internal class ReaderPageSnapshotPainter {
         titlePaint.applySpec(snapshot.titleSpec, style.textColorArgb)
         contentPaint.applySpec(snapshot.contentSpec, style.textColorArgb)
 
-        // Highlight bands stay below glyphs.
-        highlightPaint.color = style.highlightColorArgb
+        fun basePaintOf(line: ReaderPageLine): Paint =
+            if (line.isTitle) titlePaint else contentPaint
+
+        /** 段级画笔：无覆盖 = 行画笔；有覆盖 = 规格合并后的派生画笔（缓存）。 */
+        fun chunkPaint(line: ReaderPageLine, index: Int): Paint {
+            val override = line.chunkOverrides.getOrNull(index) ?: return basePaintOf(line)
+            val base = if (line.isTitle) snapshot.titleSpec else snapshot.contentSpec
+            val merged = ReaderPaintSpec(
+                textSizePx = override.textSizePx ?: base.textSizePx,
+                letterSpacing = base.letterSpacing,
+                typeface = override.typeface ?: base.typeface,
+                fontVariationSettings = override.fontVariationSettings ?: base.fontVariationSettings,
+            )
+            val color = override.colorArgb ?: style.textColorArgb
+            val key = OverridePaintKey(
+                isTitle = line.isTitle,
+                textSizePx = merged.textSizePx,
+                typeface = merged.typeface,
+                fontVariationSettings = merged.fontVariationSettings,
+                colorArgb = color,
+                skewX = override.skewX ?: 0f,
+            )
+            return overridePaints.getOrPut(key) {
+                Paint().apply {
+                    applySpec(merged, color)
+                    textSkewX = override.skewX ?: 0f
+                }
+            }.also {
+                if (overridePaints.size > 64) overridePaints.clear()
+            }
+        }
+
+        fun measureChunk(line: ReaderPageLine): (Int, String) -> Float =
+            { index, text -> chunkPaint(line, index).measureText(text) }
+
+        // Highlight bands stay below glyphs. 荧光（mode 7）是行盒下半的
+        // 高亮带，与背景高亮同画在字形之下；色取 run 灰度，缺省主题高亮色。
         for (line in snapshot.lines) {
+            val measure = measureChunk(line)
             for (run in line.decorations) {
-                if (!run.highlight) continue
-                val span = decorationSpanX(line, run) { contentPaint.measureText(it) } ?: continue
-                canvas.drawRect(
-                    span.first,
-                    line.top,
-                    span.second,
-                    line.bottom,
-                    highlightPaint,
-                )
+                val visual = underlineVisualOf(run.underlineMode)
+                if (!run.highlight && visual != ReaderUnderlineVisual.HALF_BAND) continue
+                val span = decorationSpanX(line, run, measure) ?: continue
+                // 两者并存（bgColor + 荧光）时与完整模式一致：整行带与下半带叠画
+                if (run.highlight) {
+                    highlightPaint.color = run.highlightColorArgb ?: style.highlightColorArgb
+                    canvas.drawRect(span.first, line.top, span.second, line.bottom, highlightPaint)
+                }
+                if (visual == ReaderUnderlineVisual.HALF_BAND) {
+                    highlightPaint.color = run.underlineColorArgb ?: style.highlightColorArgb
+                    val half = line.top + (line.bottom - line.top) * 0.5f
+                    canvas.drawRect(span.first, half, span.second, line.bottom, highlightPaint)
+                }
             }
         }
 
@@ -89,9 +162,8 @@ internal class ReaderPageSnapshotPainter {
         }
 
         for (line in snapshot.lines) {
-            val paint = if (line.isTitle) titlePaint else contentPaint
             for (index in line.chunks.indices) {
-                canvas.drawText(line.chunks[index], line.x[index], line.baseY, paint)
+                canvas.drawText(line.chunks[index], line.x[index], line.baseY, chunkPaint(line, index))
             }
         }
 
@@ -100,51 +172,51 @@ internal class ReaderPageSnapshotPainter {
             drawImageSlot(canvas, slot, imagePaint)
         }
 
+        // 下划线画在字形之上（删除线必须压过字形；其余线在行盒下沿之下，
+        // 与字形无重叠，先后仅影响同色叠加，保持既有顺序）。荧光带已在
+        // 字形之下处理，这里跳过。
         for (line in snapshot.lines) {
+            val measure = measureChunk(line)
             for (run in line.decorations) {
                 if (run.underlineMode == 0) continue
-                val span = decorationSpanX(line, run) { contentPaint.measureText(it) } ?: continue
+                val visual = underlineVisualOf(run.underlineMode)
+                if (visual == ReaderUnderlineVisual.HALF_BAND) continue
+                val span = decorationSpanX(line, run, measure) ?: continue
                 val geometry = run.underline
                 val strokeWidth =
                     geometry?.widthPx ?: EInkUnderlineDefaults.widthPx(style.density)
+                val colorArgb = run.underlineColorArgb ?: style.textColorArgb
                 val y = line.bottom +
                     (geometry?.offsetPx ?: EInkUnderlineDefaults.offsetPx(style.density))
-                when (run.underlineMode) {
-                    2 -> drawDashedLine(
+                when (visual) {
+                    ReaderUnderlineVisual.DASHED -> drawDashedLine(
                         canvas = canvas,
                         left = span.first,
                         right = span.second,
                         y = y,
                         strokeWidth = strokeWidth,
-                        colorArgb = style.textColorArgb,
+                        colorArgb = colorArgb,
                         dashOnPx = geometry?.dashOnPx
                             ?: EInkUnderlineDefaults.dashOnPx(style.density),
                         dashOffPx = geometry?.dashOffPx
                             ?: EInkUnderlineDefaults.dashOffPx(style.density),
                     )
 
-                    3 -> drawWaveLine(
+                    ReaderUnderlineVisual.WAVE -> drawWaveLine(
                         canvas = canvas,
                         left = span.first,
                         right = span.second,
                         y = y,
                         strokeWidth = strokeWidth,
-                        colorArgb = style.textColorArgb,
+                        colorArgb = colorArgb,
                         waveLengthPx = geometry?.waveLengthPx
                             ?: EInkUnderlineDefaults.waveLengthPx(style.density),
                         waveAmplitudePx = geometry?.waveAmplitudePx
                             ?: EInkUnderlineDefaults.waveAmplitudePx(style.density),
                     )
 
-                    4 -> {
-                        drawSolidLine(
-                            canvas,
-                            span.first,
-                            span.second,
-                            y,
-                            strokeWidth,
-                            style.textColorArgb,
-                        )
+                    ReaderUnderlineVisual.DOUBLE -> {
+                        drawSolidLine(canvas, span.first, span.second, y, strokeWidth, colorArgb)
                         drawSolidLine(
                             canvas,
                             span.first,
@@ -153,18 +225,30 @@ internal class ReaderPageSnapshotPainter {
                                 ?: EInkUnderlineDefaults.doubleLineGapPx(style.density)) +
                                 strokeWidth,
                             strokeWidth,
-                            style.textColorArgb,
+                            colorArgb,
                         )
                     }
 
-                    else -> drawSolidLine(
+                    // 完整模式 ReaderUnderlineDrawCommand mode 6：行盒 52% 高度
+                    ReaderUnderlineVisual.STRIKE_THROUGH -> drawSolidLine(
+                        canvas,
+                        span.first,
+                        span.second,
+                        line.top + (line.bottom - line.top) * 0.52f,
+                        strokeWidth,
+                        colorArgb,
+                    )
+
+                    ReaderUnderlineVisual.SOLID -> drawSolidLine(
                         canvas,
                         span.first,
                         span.second,
                         y,
                         strokeWidth,
-                        style.textColorArgb,
+                        colorArgb,
                     )
+
+                    ReaderUnderlineVisual.HALF_BAND -> Unit // 已在字形之下处理
                 }
             }
         }

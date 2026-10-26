@@ -114,6 +114,17 @@ class ReaderPageLine(
      * 合并（不同标记不并入同一 run）。
      */
     val decorations: List<ReaderDecorationRun> = emptyList(),
+
+    /**
+     * 行内逐段画笔覆盖（与 [chunks] 平行；元素为 null 或列表短于 chunks
+     * = 该段沿用行规格 [ReaderPageSnapshot.titleSpec]/[contentSpec]）。
+     *
+     * 来源是宿主高亮规则的字体覆盖（字号差/字重/自定义字体/字色）——
+     * 引擎按这些参数**测量段宽**，模块若按行规格绘制，字形画不满或溢出
+     * 引擎量出的槽位（段间出现多余空隙）。覆盖项由宿主映射器计算，模块
+     * 只按值建画笔，不做字体加载与差值推断。
+     */
+    val chunkOverrides: List<ReaderChunkPaintOverride?> = emptyList(),
 )
 
 /**
@@ -188,7 +199,44 @@ class ReaderPaintSpec(
 )
 
 /**
- * 行内一段用户标记装饰。颜色不跨桥：模块按主题自涂（线=黑，高亮=灰底）。
+ * 行内一段的画笔覆盖：全部字段 nullable，null = 沿用行规格对应项
+ * （[ReaderPaintSpec] 的 textSizePx/typeface/fontVariationSettings 与模块
+ * 主题文字色）。缺省实例（全 null）等价于无覆盖。
+ *
+ * 取值均为**引擎测量同源**参数——宿主映射器用引擎侧同一字体工厂解析
+ * typeface（含字重映射）、同一字号值；模块按值绘制才能与段宽测量逐像素
+ * 对齐。字色 [colorArgb] 是宿主灰度换算后的绝对灰（保留 alpha）——彩色
+ * 规则色在墨水屏上的等价表达，宿主完成换算、模块不做色彩推断；null =
+ * 模块主题文字色（既有口径）。
+ */
+@Stable
+class ReaderChunkPaintOverride(
+    /** 覆盖字号（px，绝对值非增量）。null = 行规格字号。 */
+    val textSizePx: Float? = null,
+
+    /** 覆盖字体（null = 行规格字体）。字形宽度测量耦合。 */
+    val typeface: Typeface? = null,
+
+    /** 覆盖可变字重设置（如 "'wght' 700"）。null = 行规格设置。 */
+    val fontVariationSettings: String? = null,
+
+    /** 覆盖字色（宿主灰度换算后的 ARGB 灰）。null = 模块主题文字色。 */
+    val colorArgb: Int? = null,
+
+    /**
+     * 合成斜体倾斜（宿主引擎 `textSkewX` 同值，如 -0.25f）。null = 不倾斜。
+     *
+     * 例外说明：行规格层面斜体仍不跨桥（基线样式无斜体），但高亮规则的
+     * isItalic 需要在墨水屏上表达——skew 只剪切成字形轮廓、不改步进宽
+     * （引擎测量与模块测量都不受影响），故作为覆盖项无对齐风险地跨桥。
+     */
+    val skewX: Float? = null,
+)
+
+/**
+ * 行内一段用户标记装饰。颜色**灰度跨桥**：宿主把规则/标记的彩色换算为
+ * 灰（亮度公式、保留 alpha）后随 run 透传，模块按值绘制；null = 模块按
+ * 主题自涂（线=主题文字色，高亮=主题高亮色，兼容旧宿主）。
  */
 @Stable
 class ReaderDecorationRun(
@@ -198,8 +246,11 @@ class ReaderDecorationRun(
 
     /**
      * 宿主 TextProcessStyle.underlineMode 原样透传
-     * （1 实线 / 2 虚线 / 3 波浪 / 4 双线 / 5 SVG 花色；0 = 无下划线）。
-     * 模块渲染：1/2/3/4 原生绘制，5 及未知值降级为实线（明示不支持花色）。
+     * （1 实线 / 2 虚线 / 3 波浪 / 4 双线 / 5 SVG 花色 / 6 删除线 /
+     * 7 荧光半高带；0 = 无下划线）。
+     * 模块渲染：1/2/3/4/6/7 按语义绘制（6 = 行盒 52% 高度横线压过字形，
+     * 7 = 行盒下半高亮带、色取 [underlineColorArgb]），5 及未知值降级为
+     * 实线（明示不支持花色）。
      */
     val underlineMode: Int,
 
@@ -225,6 +276,12 @@ class ReaderDecorationRun(
      * 常量或高亮规则自带线宽也能如实呈现。
      */
     val underline: ReaderUnderlineGeometry? = null,
+
+    /** 高亮带颜色（宿主灰度换算后；null = 模块主题高亮色）。 */
+    val highlightColorArgb: Int? = null,
+
+    /** 下划线/删除线/荧光带颜色（宿主灰度换算后；null = 模块主题文字色）。 */
+    val underlineColorArgb: Int? = null,
 )
 
 /**

@@ -403,11 +403,23 @@ fun selectionRuns(
 }
 
 /** 行内字符偏移的 x 坐标（逐段累加前缀宽）。 */
-internal fun charX(line: ReaderPageLine, charIndex: Int, measure: (String) -> Float): Float {
+internal fun charX(line: ReaderPageLine, charIndex: Int, measure: (String) -> Float): Float =
+    charX(line, charIndex) { _, text -> measure(text) }
+
+/**
+ * [charX] 的逐段测量版：measure 回调携带段下标——行内段带画笔覆盖
+ * （高亮规则的字号/字体覆盖）时，前缀宽必须按各段自己的画笔测量，
+ * 否则装饰 span 与字形错位。无覆盖行的调用方传恒定测量即退化为上者。
+ */
+internal fun charX(
+    line: ReaderPageLine,
+    charIndex: Int,
+    measureChunk: (chunkIndex: Int, text: String) -> Float,
+): Float {
     val (chunk, offsetInChunk) = locateChunk(line, charIndex)
     var x = line.x[chunk]
     val text = line.chunks[chunk]
-    for (i in 0 until offsetInChunk) x += measure(text[i].toString())
+    for (i in 0 until offsetInChunk) x += measureChunk(chunk, text[i].toString())
     return x
 }
 

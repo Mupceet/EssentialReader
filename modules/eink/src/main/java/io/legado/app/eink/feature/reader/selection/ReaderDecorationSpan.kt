@@ -20,9 +20,20 @@ fun decorationSpanX(
     line: ReaderPageLine,
     run: ReaderDecorationRun,
     measure: (String) -> Float,
+): Pair<Float, Float>? = decorationSpanX(line, run) { _, text -> measure(text) }
+
+/**
+ * [decorationSpanX] 的逐段测量版：行内段带画笔覆盖（高亮规则的字号/字体
+ * 覆盖）时按各段自己的画笔测宽，span 与字形才不错位。段首缩进剔除后
+ * 起笔可能落在段中，前缀宽必须逐段测量；无覆盖行传恒定测量即退化。
+ */
+fun decorationSpanX(
+    line: ReaderPageLine,
+    run: ReaderDecorationRun,
+    measureChunk: (chunkIndex: Int, text: String) -> Float,
 ): Pair<Float, Float>? {
     val text = lineText(line)
     if (run.start < 0 || run.end > text.length || run.start >= run.end) return null
     val (from, to) = inkRange(text, run.start, run.end) ?: return null
-    return charX(line, from, measure) to charX(line, to, measure)
+    return charX(line, from, measureChunk) to charX(line, to, measureChunk)
 }
