@@ -19,19 +19,13 @@ object ReaderAndroidPaintFactory {
     /** 进程级字体缓存：同一 path/weight/italic/family 只做一次磁盘读取与解析。 */
     private val typefaceCache = java.util.concurrent.ConcurrentHashMap<String, Typeface>()
 
-    /**
-     * 合成斜体倾斜量：阅读器斜体一律走 skew（不换字体的 italic 面），
-     * 完整模式画布、排版测量与 E-Ink 快照映射共用同一常量。
-     */
-    const val SYNTHETIC_ITALIC_SKEW_X = -0.25f
-
     fun create(style: ReaderTextStyle): Paint =
         Paint(Paint.ANTI_ALIAS_FLAG or Paint.SUBPIXEL_TEXT_FLAG).apply {
             color = style.colorArgb
             textSize = style.fontSizePx
             typeface = loadTypeface(style.fontPath, style.fontWeight, false, style.fontFamily)
             // Match the reader's synthetic italic; don't substitute another font's italic face.
-            textSkewX = if (style.italic) SYNTHETIC_ITALIC_SKEW_X else 0f
+            textSkewX = if (style.italic) -0.25f else 0f
             isLinearText = style.linearText
             isStrikeThruText = style.strikeThrough
             isUnderlineText = style.nativeUnderline

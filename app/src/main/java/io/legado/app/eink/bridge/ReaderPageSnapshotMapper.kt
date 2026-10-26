@@ -451,7 +451,7 @@ private data class ChunkOverrideSignature(
  * （斜体恒 false——工厂口径，斜体只经 skewX 不改字宽）；可变字重仅在
  * API 28+ 发射（低版本工厂把字重折进 typeface 的 BOLD 档，镜像同口径）；
  * 字色做灰度换算（墨水屏等价表达，基线色跳过）；斜体发射
- * [ReaderAndroidPaintFactory.SYNTHETIC_ITALIC_SKEW_X] 同款合成倾斜。
+ * [SYNTHETIC_ITALIC_SKEW_X]（bridge 镜像常量）同款合成倾斜。
  */
 private fun ReaderElement.Text.chunkOverride(
     spec: ReaderPaintSpec,
@@ -479,8 +479,8 @@ private fun ReaderElement.Text.chunkOverride(
     val color = baseline.colorArgb
         ?.let { base -> style.colorArgb.takeIf { it != base }?.toEInkGrayArgb() }
     // 合成斜体：skew 只剪切成字形轮廓、不改步进宽，跨桥无对齐风险
-    // （完整模式引擎同为 skew 合成，不走字体 italic 面）
-    val skewX = ReaderAndroidPaintFactory.SYNTHETIC_ITALIC_SKEW_X.takeIf { style.italic }
+    // （倾斜量见 SYNTHETIC_ITALIC_SKEW_X，镜像引擎 textSkewX 口径）
+    val skewX = SYNTHETIC_ITALIC_SKEW_X.takeIf { style.italic }
     if (textSize == null && typeface == null && variation == null && color == null && skewX == null) {
         return null
     }
@@ -508,6 +508,14 @@ internal fun Int.toEInkGrayArgb(): Int {
     val y = (0.2126f * r + 0.7152f * g + 0.0722f * b).roundToInt().coerceIn(0, 255)
     return (alpha shl 24) or (y shl 16) or (y shl 8) or y
 }
+
+/**
+ * 合成斜体倾斜量：镜像 `ReaderAndroidPaintFactory.create` 的
+ * `textSkewX = -0.25f`（引擎口径——阅读器斜体一律 skew 合成，不换字体
+ * italic 面）。刻意不改引擎文件抽公共常量：bridge 只读引擎行为，不为
+ * bridge 需求动引擎平台层；引擎侧若调整该值，这里须同步。
+ */
+internal const val SYNTHETIC_ITALIC_SKEW_X = -0.25f
 
 /**
  * 宿主下划线样式 → 模块绘制几何（px）：字段一一对应，模块不再自拟公式。

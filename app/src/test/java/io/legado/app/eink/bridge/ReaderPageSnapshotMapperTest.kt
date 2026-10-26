@@ -17,7 +17,6 @@ import io.legado.app.feature.reader.core.model.ReaderPageId
 import io.legado.app.feature.reader.core.model.ReaderRect
 import io.legado.app.feature.reader.core.model.ReaderTextStyle
 import io.legado.app.feature.reader.core.model.ReaderUnderline
-import io.legado.app.feature.reader.platform.ReaderAndroidPaintFactory
 import io.legado.app.feature.reader.platform.ReaderAndroidPaginationStyle
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
@@ -228,7 +227,7 @@ class ReaderPageSnapshotMapperTest {
             styledTextElement(20f, "正", bodyStyle),
         )
         val overrides = snapshot.lines.single().chunkOverrides
-        assertEquals(ReaderAndroidPaintFactory.SYNTHETIC_ITALIC_SKEW_X, overrides[0]!!.skewX)
+        assertEquals(SYNTHETIC_ITALIC_SKEW_X, overrides[0]!!.skewX)
         assertNull(overrides[1])
     }
 
