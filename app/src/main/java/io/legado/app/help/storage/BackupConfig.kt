@@ -59,8 +59,9 @@ internal val deviceLocalPreferenceKeys = setOf(
     PreferKey.webServiceWakeLock,
     PreferKey.readAloudWakeLock,
     PreferKey.audioPlayWakeLock,
-    // 本机路径/URI/设备盘点：字体私有副本路径（字体文件不随备份走，必悬空）、
-    // SAF 文件夹 URI、导入路径历史、系统字体盘点、物理翻页键码
+    // 本机路径/URI/设备盘点：字体私有副本路径与 SAF 文件夹 URI（字体文件不随备份
+    // 走，跨设备必悬空；readConfig/highlightRule 内嵌字体引用的同类清洗见
+    // FontReferenceSanitizer）、导入路径历史、系统字体盘点、物理翻页键码
     PreferKey.appFontPath,
     PreferKey.fontFolder,
     PreferKey.importBookPath,

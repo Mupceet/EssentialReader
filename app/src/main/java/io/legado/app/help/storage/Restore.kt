@@ -152,6 +152,19 @@ object Restore : KoinComponent {
 
     private suspend fun restore(path: String) {
         val aes = BackupAES()
+        // 恢复配置文件 (手动解析 XML，替代反射逻辑)。解析与同机判定前移到恢复最前：
+        // 备份 JSON 的字体引用清洗要按来源设备分流，须在任何 JSON 落库/落盘之前完成。
+        val configFile = File(path, "config.xml")
+        val configMap = configFile.takeIf { it.exists() }?.let { file ->
+            runCatching { readXmlToMap(file) }.onFailure { e ->
+                AppLog.put("恢复配置 XML 出错\n${e.localizedMessage}", e)
+            }.getOrNull()
+        }
+        // 来源设备名 ≠ 本机（含标记缺失/为空的旧备份）按跨设备处理：设备相关键保留本机值
+        val restoreFromSameDevice = configMap?.let { isBackupFromSameDevice(it) } ?: false
+        if (!restoreFromSameDevice) {
+            sanitizeFontReferences(path)
+        }
         fileToListT<Book>(path, "bookshelf.json")?.let {
             it.forEach { book ->
                 book.upType()
@@ -398,15 +411,8 @@ object Restore : KoinComponent {
                 )
             )
         }
-        // 恢复配置文件 (手动解析 XML，替代反射逻辑)
-        val configFile = File(path, "config.xml")
-        val configMap = configFile.takeIf { it.exists() }?.let { file ->
-            runCatching { readXmlToMap(file) }.onFailure { e ->
-                AppLog.put("恢复配置 XML 出错\n${e.localizedMessage}", e)
-            }.getOrNull()
-        }
-        // 来源设备名 ≠ 本机（含标记缺失/为空的旧备份）按跨设备处理：设备相关键保留本机值
-        val restoreFromSameDevice = configMap?.let { isBackupFromSameDevice(it) } ?: false
+        // 应用配置键值。configMap 与 restoreFromSameDevice 已在恢复入口解析
+        // （字体引用清洗要先于任何落盘/落库完成），此处只负责批量写入。
         if (!configMap.isNullOrEmpty()) {
             try {
                 applyConfigMap(configMap, aes, restoreFromSameDevice)
@@ -550,6 +556,41 @@ object Restore : KoinComponent {
             left <= 0L -> right
             right <= 0L -> left
             else -> minOf(left, right)
+        }
+    }
+
+    /**
+     * 跨设备恢复时清洗备份 JSON 中的字体文件引用（字段级「忽略清单」，纯逻辑见
+     * [FontReferenceSanitizer]）：字体文件不随备份走，异机引用必悬空，置空后阅读器
+     * 回落系统预设字体。只处理本次恢复会实际消费的文件（readConfig 受忽略开关、
+     * highlightRule 受数据库忽略项控制）；无可清洗引用时文件字节不变。
+     */
+    private fun sanitizeFontReferences(path: String) {
+        val targetFileNames = buildList {
+            if (!BackupConfig.ignoreReadConfig) {
+                add(ReadBookConfig.configFileName)
+                add(ReadBookConfig.shareConfigFileName)
+            }
+            if (BackupConfig.dbIsNotIgnored("highlightRule")) {
+                add("highlightRule.json")
+            }
+        }
+        var sanitizedFiles = 0
+        targetFileNames.forEach { fileName ->
+            val file = File(path, fileName)
+            if (!file.exists()) return@forEach
+            runCatching {
+                val sanitized = FontReferenceSanitizer.sanitizeForCrossDeviceRestore(file.readText())
+                if (sanitized != null) {
+                    file.writeText(sanitized)
+                    sanitizedFiles++
+                }
+            }.onFailure {
+                AppLog.put("清洗字体引用出错 $fileName\n${it.localizedMessage}", it)
+            }
+        }
+        if (sanitizedFiles > 0) {
+            AppLog.put("跨设备恢复：已忽略 $sanitizedFiles 个备份文件中的字体文件引用（字体文件不随备份迁移，恢复后回落系统默认字体）")
         }
     }
 
