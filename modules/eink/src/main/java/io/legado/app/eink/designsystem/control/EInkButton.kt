@@ -2,8 +2,10 @@ package io.legado.app.eink.designsystem.control
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
@@ -22,6 +24,7 @@ import io.legado.app.eink.designsystem.interaction.eInkActionColors
 import io.legado.app.eink.designsystem.interaction.einkClickable
 import io.legado.app.eink.designsystem.interaction.rememberImmediatePressState
 import io.legado.app.eink.designsystem.theme.EInkShapes
+import io.legado.app.eink.designsystem.theme.EInkSpacing
 import io.legado.app.eink.designsystem.theme.EInkTheme
 
 /**
@@ -55,6 +58,9 @@ import io.legado.app.eink.designsystem.theme.EInkTheme
  * @param contentPadding 文案内边距（在按压背景之内；如顶栏标题的
  *   start 边距、章节按钮的水平边距）
  * @param contentAlignment 文案对齐（默认居中；顶栏标题起始对齐）
+ * @param trailing 文案尾部内容槽（现消费者：顶栏可点击标题的筛选图标/
+ *   筛选名），接收与文案同源的内容色（随按压反色）；null 时仅渲染文案，
+ *   既有调用方布局不变
  */
 @Composable
 fun EInkButton(
@@ -71,6 +77,7 @@ fun EInkButton(
     onClickLabel: String? = null,
     contentPadding: PaddingValues = PaddingValues(0.dp),
     contentAlignment: Alignment = Alignment.Center,
+    trailing: (@Composable (contentColor: Color) -> Unit)? = null,
 ) {
     val scheme = EInkTheme.colorScheme
     val press = rememberImmediatePressState()
@@ -123,17 +130,35 @@ fun EInkButton(
                     ),
             )
         }
-        EInkText(
-            text = text,
-            // 选中且非按压：文案反色（实心块上）；其余随按压/常态色
-            color = if (bordered && selected && !press.isPressed && enabled) {
-                scheme.background
-            } else {
-                colors.contentColor
-            },
-            style = style,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
+        // 选中且非按压：文案反色（实心块上）；其余随按压/常态色
+        //（trailing 槽与文案同色，整块按压反色时保持一致）
+        val contentColor = if (bordered && selected && !press.isPressed && enabled) {
+            scheme.background
+        } else {
+            colors.contentColor
+        }
+        if (trailing == null) {
+            EInkText(
+                text = text,
+                color = contentColor,
+                style = style,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        } else {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(EInkSpacing.s),
+            ) {
+                EInkText(
+                    text = text,
+                    color = contentColor,
+                    style = style,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                trailing(contentColor)
+            }
+        }
     }
 }

@@ -8,7 +8,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -20,6 +19,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
@@ -38,49 +38,42 @@ import io.legado.app.eink.designsystem.theme.EInkSpacing
 import io.legado.app.eink.designsystem.theme.EInkTheme
 
 /**
- * 顶栏右侧筛选入口（spec D4 2026-10-17 修订）：无筛选时仅筛选图标，
- * 筛选激活时图标 + 筛选名。点击打开 [ShelfFilterMenu] 下拉。
+ * 标题旁筛选内容片（spec D4 2026-10-17 修订；2026-10-28 起「书架 +
+ * 图标 + 筛选名」整块即筛选按钮）：本片仅展示（图标 + 激活筛选名），
+ * 不自带点击/按压——随可点击标题（[EInkButton] trailing 槽）整块按压
+ * 反色，点击行为在标题上、由宿主打开 [ShelfFilterMenu] 下拉。
  */
 @Composable
-fun FilterMenuAction(
+fun FilterMenuTitleChip(
     activeFilterName: String?,
-    onClick: () -> Unit,
+    contentColor: Color,
 ) {
-    // 定高 56dp、宽度包裹内容（不可 fillMax：会把顶栏标题与其余动作图标
-    // 挤出主轴）；按压瞬时反色对齐 EInkOperationBarIcon 分层（规范 §35）
-    val press = rememberImmediatePressState()
-    val colors = eInkActionColors(pressed = press.isPressed)
     Row(
-        modifier = Modifier
-            .height(56.dp)
-            .then(press.modifier)
-            .background(colors.containerColor)
-            .einkClickable(role = Role.Button, onClickLabel = "筛选", onClick = onClick)
-            .padding(horizontal = EInkSpacing.m),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(EInkSpacing.xs),
     ) {
-        if (activeFilterName != null) {
-            EInkText(
-                text = activeFilterName,
-                style = EInkTheme.typography.titleSmall,
-                color = colors.contentColor,
-                maxLines = 1,
-            )
-        }
         androidx.compose.foundation.Image(
             painter = painterResource(R.drawable.eink_ic_filter),
             contentDescription = null,
             modifier = Modifier.width(22.dp),
-            colorFilter = androidx.compose.ui.graphics.ColorFilter.tint(colors.contentColor),
+            colorFilter = androidx.compose.ui.graphics.ColorFilter.tint(contentColor),
         )
+        if (activeFilterName != null) {
+            EInkText(
+                text = activeFilterName,
+                style = EInkTheme.typography.titleSmall,
+                color = contentColor,
+                maxLines = 1,
+            )
+        }
     }
 }
 
 /**
- * 筛选下拉菜单（spec D4 2026-10-17 修订）：顶栏右侧锚定（TopEnd）、
- * 透明点击层收起；顶部一行简略筛选描述，其后筛选选项（选中项 = 左竖线 +
- * 加粗 + 末尾 ✓，静态单帧），最底「调整筛选器」项（上通栏分隔线）。
+ * 筛选下拉菜单（spec D4 2026-10-17 修订）：锚定筛选入口下方（触发钮在
+ * 书架标题旁，菜单自内容区左上 TopStart 展开）、透明点击层收起；顶部
+ * 一行简略筛选描述，其后筛选选项（选中项 = 左竖线 + 加粗 + 末尾 ✓，
+ * 静态单帧），最底「调整筛选器」项（上通栏分隔线）。
  * E-Ink：零动画零阴影，1dp 边框 + surface 底。
  */
 @Composable
@@ -110,8 +103,10 @@ fun ShelfFilterMenu(
     ) {
         Column(
             modifier = Modifier
-                .align(Alignment.TopEnd)
-                .padding(end = 4.dp)  // 不紧贴屏幕右缘（小留距）
+                // 锚定筛选入口下方：触发钮在书架标题旁（左上），菜单从
+                // 内容区左上展开，不再贴右缘
+                .align(Alignment.TopStart)
+                .padding(start = EInkSpacing.m)  // 不紧贴屏幕左缘（小留距）
                 .width(240.dp)
                 .background(colors.surface)
                 .border(1.dp, colors.outline, EInkShapes.medium)

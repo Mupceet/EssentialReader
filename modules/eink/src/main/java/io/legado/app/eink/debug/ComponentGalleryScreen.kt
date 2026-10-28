@@ -37,7 +37,6 @@ import io.legado.app.eink.designsystem.content.EInkLoading
 import io.legado.app.eink.designsystem.content.EInkText
 import io.legado.app.eink.designsystem.control.EInkButton
 import io.legado.app.eink.designsystem.control.EInkDialog
-import io.legado.app.eink.designsystem.control.EInkSearchHintBar
 import io.legado.app.eink.designsystem.control.EInkSearchInputBar
 import io.legado.app.eink.designsystem.control.EInkSteppedSlider
 import io.legado.app.eink.designsystem.interaction.eInkActionColors
@@ -535,7 +534,6 @@ private fun ButtonSamples() {
 private fun SearchSamples() {
     var query by rememberSaveable { mutableStateOf("") }
     Column(modifier = Modifier.fillMaxWidth()) {
-        EInkSearchHintBar(onClick = {})
         EInkSearchInputBar(
             value = query,
             onValueChange = { query = it },

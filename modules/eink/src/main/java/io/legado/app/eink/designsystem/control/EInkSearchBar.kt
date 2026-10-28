@@ -2,7 +2,6 @@ package io.legado.app.eink.designsystem.control
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -39,35 +38,12 @@ import io.legado.app.eink.designsystem.theme.EInkSpacing
 import io.legado.app.eink.designsystem.theme.EInkTheme
 
 /**
- * 搜索条（首页提示样式与搜索页输入样式共用同一外壳）。
+ * 搜索条（搜索页输入样式）。
  *
  * 几何规格固定：外层高 64dp + 水平 16dp 内边距，输入框高 44dp、
  * 1dp 描边两端圆角（胶囊形，EInkShapes.capsule），右侧可选动作槽。
- * 首页点击提示条进入搜索页后，
- * 输入条落在完全相同的位置，视觉上是"同一个框"从未移动。
+ * 首页搜索入口已收敛为顶栏搜索图标，提示条样式已下线。
  */
-
-/**
- * 搜索提示条（首页）：不可输入，整条可点击，点击进入搜索页。
- */
-@Composable
-fun EInkSearchHintBar(
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-    hint: String = "搜索书名 / 作者",
-) {
-    SearchBarShell(
-        modifier = modifier.clickable(onClick = onClick),
-        input = {
-            EInkText(
-                text = hint,
-                style = EInkTheme.typography.bodyMedium,
-                color = EInkTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(horizontal = EInkSpacing.m)
-            )
-        }
-    )
-}
 
 /**
  * 搜索输入条（搜索页）：聚焦时拉起输入法，右侧为动作槽（搜索/停止按钮）。

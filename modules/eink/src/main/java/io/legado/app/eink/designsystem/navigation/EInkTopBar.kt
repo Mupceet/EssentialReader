@@ -16,6 +16,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.Role
@@ -57,9 +58,10 @@ import io.legado.app.eink.designsystem.theme.EInkTheme
  * @param onTitleClick 标题点击回调；非 null 时标题整体可点击（按压反色、贴边背景）
  * @param titleEnabled 标题可点击性；false 时中灰置灰（仅 [onTitleClick] 非 null 时有意义）
  * @param titleClickLabel 标题点击的无障碍语义标签（如"书籍详情"）
- * @param titleStyle 标题样式；null 时用默认 titleLarge（首页等传 titleLarge 放大）
- * @param titleTrailing 标题尾部内容槽（如首页书架的分组 chip）；仅普通
- *   标题分支渲染（可点击标题分支暂无消费方，需要时再扩展）
+ * @param titleStyle 标题样式；null 时用默认 titleLarge（首页传 headlineMedium 大标题档放大）
+ * @param titleTrailing 标题尾部内容槽（现消费者：首页书架的筛选图标/
+ *   筛选名，随标题内容整块可点），接收与标题同源的内容色——可点击标题
+ *   分支经 [EInkButton] trailing 槽随按压反色，普通分支为静态 onSurface
  * @param actionsFillMax true 时动作区贴右撑满高度（图标动作模式），
  *   动作内直接使用 [EInkOperationBarIcon]；false 时动作区随顶栏内边距（文本动作模式）
  * @param actions 右侧动作区内容
@@ -73,7 +75,7 @@ fun EInkTopBar(
     titleEnabled: Boolean = true,
     titleClickLabel: String? = null,
     titleStyle: TextStyle? = null,
-    titleTrailing: (@Composable () -> Unit)? = null,
+    titleTrailing: (@Composable (contentColor: Color) -> Unit)? = null,
     actionsFillMax: Boolean = false,
     actions: @Composable () -> Unit = {},
 ) {
@@ -110,6 +112,7 @@ fun EInkTopBar(
                     onClickLabel = titleClickLabel,
                     contentPadding = PaddingValues(start = EInkSpacing.m),
                     contentAlignment = Alignment.CenterStart,
+                    trailing = titleTrailing,
                 )
             } else {
                 // Box 换 Row：trailing 内容在标题文本右侧、动作区之前；
@@ -128,7 +131,8 @@ fun EInkTopBar(
                         overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.padding(start = EInkSpacing.m)
                     )
-                    titleTrailing?.invoke()
+                    // 普通分支无按压态，内容色与标题文字同源（静态 onSurface）
+                    titleTrailing?.invoke(colors.onSurface)
                 }
             }
             if (actionsFillMax) {

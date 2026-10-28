@@ -17,6 +17,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
@@ -31,7 +32,6 @@ import io.legado.app.eink.app.EInkAppUpdateViewModel
 import io.legado.app.eink.contract.BookshelfGroupIds
 import io.legado.app.eink.contract.BookshelfItemUiModel
 import io.legado.app.eink.contract.BookshelfShelfEntryUiModel
-import io.legado.app.eink.designsystem.control.EInkSearchHintBar
 import io.legado.app.eink.designsystem.navigation.EInkOperationBar
 import io.legado.app.eink.designsystem.navigation.EInkOperationBarIcon
 import io.legado.app.eink.designsystem.navigation.EInkOperationTab
@@ -50,7 +50,7 @@ import io.legado.app.eink.feature.bookshelf.BookshelfScreen
 import io.legado.app.eink.feature.bookshelf.BookshelfStylePanel
 import io.legado.app.eink.feature.bookshelf.BookshelfViewModel
 import io.legado.app.eink.feature.bookshelf.ADJUST_PAGE_SIZE_FALLBACK
-import io.legado.app.eink.feature.bookshelf.FilterMenuAction
+import io.legado.app.eink.feature.bookshelf.FilterMenuTitleChip
 import io.legado.app.eink.feature.bookshelf.FilterAdjustPanel
 import io.legado.app.eink.feature.bookshelf.ShelfFilterMenu
 import io.legado.app.eink.feature.bookshelf.GroupAdjustPanel
@@ -82,11 +82,14 @@ private val HomeTabIcons = listOf(
 /**
  * 首页 Route — ViewModel 感知层。
  *
- * 结构参考微信读书墨水屏版：
- *  - 顶部固定搜索框（点击进入搜索页）；
- *  - 搜索框下方一行头部（放大标题 + 右侧动作）：书架 Tab 显示刷新按钮
- *    与书架样式入口（打开个性化配置面板 [BookshelfStylePanel]，六项
- *    样式即改即提交、书架实时预览），"我的" Tab 无动作；
+ * 结构参考微信读书墨水屏版，搜索入口收敛为顶栏图标（不再占内容区
+ * 纵向空间）：
+ *  - 顶栏（大标题 headlineMedium + 右侧动作）：搜索图标常驻最右（点击进入搜索页，
+ *    两 Tab 同一角位可达）；筛选按钮 = 顶层书架标题内容整块（书架 +
+ *    图标 + 筛选名一并可点，打开筛选下拉）；
+ *    书架 Tab 另显示刷新按钮与书架样式入口（打开个性化配置面板
+ *    [BookshelfStylePanel]，六项样式即改即提交、书架实时预览），
+ *    "我的" Tab 仅搜索图标；
  *  - 中间内容区：书架 / 我的 两个 Tab；
  *  - 底部通用操作栏（[EInkOperationBar]）：左侧 Tab 切换，
  *    右侧上/下箭头按当前 Tab 整页翻页（书架条目 /「我的」条目，
@@ -357,15 +360,32 @@ internal fun HomeRoute(
             } else {
                 HomeTabLabels[selectedTab]
             },
-            // 组视图：点击顶栏分组名退到顶层（会话级，所选分组记录保留）
-            onTitleClick = if (
-                selectedTab == HomeTabs.BOOKSHELF &&
-                uiState.selectedScopeId != BookshelfGroupIds.ALL
-            ) {
-                { viewModel.exitGroup() }
+            // 标题点击（2026-10-28：顶层书架的筛选按钮 = 标题内容整块
+            // 「书架 + 图标 + 筛选名」）：组视图退到顶层（会话级，所选分组
+            // 记录保留）；顶层书架打开筛选下拉；其余（我的 Tab / 无可用
+            // 筛选器）标题不可点
+            onTitleClick = if (selectedTab == HomeTabs.BOOKSHELF) {
+                if (uiState.selectedScopeId != BookshelfGroupIds.ALL) {
+                    { viewModel.exitGroup() }
+                } else if (uiState.filterSelectorAvailable) {
+                    {
+                        // 与其余顶栏面板入口同款互斥收起
+                        showStylePanel = false
+                        showFilterManage = false
+                        sortPanel = null
+                        showFilterMenu = !showFilterMenu
+                    }
+                } else {
+                    null
+                }
             } else {
                 null
             },
+            titleClickLabel = if (
+                selectedTab == HomeTabs.BOOKSHELF &&
+                uiState.selectedScopeId == BookshelfGroupIds.ALL &&
+                uiState.filterSelectorAvailable
+            ) "筛选" else null,
             contentOverlay = {
                 // 底部调整面板挂内容区（不盖底部操作栏——▲▼ 承担面板翻页）；
                 // 顶栏侧不共存由各入口的全量互斥状态保证（点其他入口即关面板）
@@ -424,19 +444,14 @@ internal fun HomeRoute(
             filterAction = if (
                 selectedTab == HomeTabs.BOOKSHELF &&
                 uiState.filterSelectorAvailable &&
-                uiState.selectedScopeId == BookshelfGroupIds.ALL   // 组视图无筛选入口（spec D7）
+                uiState.selectedScopeId == BookshelfGroupIds.ALL   // 组视图无筛选入口（spec D7）；与组视图可点击标题（退出分组）由 scopeId 互斥
             ) {
-                {
-                    FilterMenuAction(
+                { contentColor: Color ->
+                    FilterMenuTitleChip(
                         activeFilterName = if (uiState.selectedFilterId == BookshelfGroupIds.NONE) null
                         else uiState.filters
                             .firstOrNull { it.groupId == uiState.selectedFilterId }?.name,
-                        onClick = {
-                            showStylePanel = false
-                            showFilterManage = false
-                            sortPanel = null
-                            showFilterMenu = !showFilterMenu
-                        },
+                        contentColor = contentColor,
                     )
                 }
             } else {
@@ -583,7 +598,7 @@ internal fun HomeRoute(
 }
 
 /**
- * 无状态首页外壳 — 顶部搜索框 + 头部标题行 + 内容区 + 底部操作栏。
+ * 无状态首页外壳 — 顶栏（标题 + 搜索等动作）+ 内容区 + 底部操作栏。
  *
  * 内容通过 [bookshelf] / [mine] 槽位注入，外壳只负责布局。
  *
@@ -600,9 +615,9 @@ internal fun HomeScreen(
     onRefresh: () -> Unit,
     onShowStylePanel: () -> Unit,
     onSearchClick: () -> Unit,
-    filterAction: (@Composable () -> Unit)? = null,
+    filterAction: (@Composable (Color) -> Unit)? = null,
     onTitleClick: (() -> Unit)? = null,
-    titleTrailing: (@Composable () -> Unit)? = null,
+    titleClickLabel: String? = null,
     contentOverlay: @Composable () -> Unit = {},
     pageArrows: @Composable () -> Unit,
     bookshelf: @Composable () -> Unit,
@@ -613,23 +628,28 @@ internal fun HomeScreen(
             .fillMaxSize()
             .background(EInkTheme.colorScheme.background)
     ) {
-        EInkSearchHintBar(onClick = onSearchClick)
-        // 搜索栏与内容区之间的一行头部：左侧放大标题，右侧动作区
-        //（动作按钮新规格：撑满顶栏高、贴右屏，自带底部分隔线）
+        // 顶栏：左侧大标题（headlineMedium 28sp，比默认 titleLarge 22sp
+        // 再大一档）；顶层书架的筛选按钮 = 标题内容整块（书架 + 图标 +
+        // 筛选名，titleTrailing 槽随可点击标题渲染、整块按压反色）；右侧
+        // 动作区（动作按钮新规格：撑满顶栏高、贴右屏、自带底部分隔线）；
+        // 搜索图标常驻最右，两 Tab 同一角位
         EInkTopBar(
             title = headerTitle,
             onTitleClick = onTitleClick,
-            titleTrailing = titleTrailing,
+            titleClickLabel = titleClickLabel,
+            titleStyle = EInkTheme.typography.headlineMedium,
+            titleTrailing = filterAction,
             actionsFillMax = true,
             actions = {
                 if (showRefresh) {
-                    filterAction?.invoke()
                     StyleConfigAction(onShowStylePanel)
                     RefreshAction(
                         isRefreshing = isRefreshing,
                         onClick = onRefresh
                     )
                 }
+                // 搜索入口常驻最右（两 Tab 同一角位；原顶部搜索条收敛为图标）
+                SearchAction(onSearchClick)
             }
         )
         Box(modifier = Modifier.weight(1f)) {
@@ -718,6 +738,19 @@ private fun StyleConfigAction(onClick: () -> Unit) {
     EInkOperationBarIcon(
         icon = painterResource(R.drawable.eink_ic_style_edit),
         contentDescription = "书架个性化配置",
+        onClick = onClick,
+    )
+}
+
+/**
+ * 顶栏搜索入口：点击进入搜索页。常驻两 Tab 动作区最右（同一角位），
+ * 替代原 64dp 顶部搜索提示条，不再占内容区纵向空间。
+ */
+@Composable
+private fun SearchAction(onClick: () -> Unit) {
+    EInkOperationBarIcon(
+        icon = painterResource(R.drawable.eink_ic_search),
+        contentDescription = "搜索",
         onClick = onClick,
     )
 }
