@@ -63,6 +63,7 @@ import io.legado.app.eink.contract.MarkingUiModel
 import io.legado.app.eink.designsystem.content.EInkLoading
 import io.legado.app.eink.designsystem.content.EInkText
 import io.legado.app.eink.designsystem.control.EInkDialog
+import io.legado.app.eink.designsystem.interaction.EInkPressBlock
 import io.legado.app.eink.designsystem.interaction.eInkActionColors
 import io.legado.app.eink.designsystem.interaction.einkClickable
 import io.legado.app.eink.designsystem.interaction.ImmediatePressState
@@ -708,56 +709,56 @@ private fun ChapterItem(
     onClick: () -> Unit
 ) {
     val scheme = EInkTheme.colorScheme
-    val press = rememberImmediatePressState()
-    val colors = eInkActionColors(pressed = press.isPressed)
-    // 标记/标签随按压反色；标题：当前章加深，其余为次级色
-    val markColor = if (press.isPressed) scheme.surface else scheme.onSurface
-    val titleColor = when {
-        press.isPressed -> colors.contentColor
-        isCurrent -> scheme.onSurface
-        else -> scheme.onSurfaceVariant
-    }
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .then(press.modifier)
-            .background(colors.containerColor)
-            .einkClickable(role = Role.Button, onClick = onClick)
-            .padding(horizontal = EInkSpacing.m, vertical = EInkSpacing.s),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(EInkSpacing.s),
-    ) {
-        if (isCurrent) {
-            Box(
-                modifier = Modifier
-                    .size(width = CurrentMarkWidth, height = CurrentMarkHeight)
-                    .background(markColor)
-            )
+    EInkPressBlock(
+        onClick = onClick,
+        modifier = Modifier.fillMaxWidth(),
+    ) { colors, pressed ->
+        // 标记/标签随按压反色；标题：当前章加深，其余为次级色
+        val markColor = if (pressed) scheme.surface else scheme.onSurface
+        val titleColor = when {
+            pressed -> colors.contentColor
+            isCurrent -> scheme.onSurface
+            else -> scheme.onSurfaceVariant
         }
-        EInkText(
-            text = chapter.title,
-            modifier = Modifier.weight(1f),
-            style = EInkTheme.typography.bodyLarge,
-            fontWeight = if (isCurrent) FontWeight.Bold else null,
-            color = titleColor,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis
-        )
-        if (!cached) {
-            // 未下载缓存标记（云图标，与 View 版一致），颜色随按压反色
-            Image(
-                painter = painterResource(id = R.drawable.eink_ic_outline_cloud_24),
-                contentDescription = "未缓存",
-                modifier = Modifier.size(IconSize),
-                colorFilter = ColorFilter.tint(titleColor),
-            )
-        }
-        if (isCurrent) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = EInkSpacing.m, vertical = EInkSpacing.s),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(EInkSpacing.s),
+        ) {
+            if (isCurrent) {
+                Box(
+                    modifier = Modifier
+                        .size(width = CurrentMarkWidth, height = CurrentMarkHeight)
+                        .background(markColor)
+                )
+            }
             EInkText(
-                text = "在读",
-                style = EInkTheme.typography.labelMedium,
-                color = markColor,
+                text = chapter.title,
+                modifier = Modifier.weight(1f),
+                style = EInkTheme.typography.bodyLarge,
+                fontWeight = if (isCurrent) FontWeight.Bold else null,
+                color = titleColor,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
             )
+            if (!cached) {
+                // 未下载缓存标记（云图标，与 View 版一致），颜色随按压反色
+                Image(
+                    painter = painterResource(id = R.drawable.eink_ic_outline_cloud_24),
+                    contentDescription = "未缓存",
+                    modifier = Modifier.size(IconSize),
+                    colorFilter = ColorFilter.tint(titleColor),
+                )
+            }
+            if (isCurrent) {
+                EInkText(
+                    text = "在读",
+                    style = EInkTheme.typography.labelMedium,
+                    color = markColor,
+                )
+            }
         }
     }
 }
@@ -1008,6 +1009,10 @@ private fun MarkChapterHeader(
  * 卡与钮的按压反馈按落点分层：按在**钮**上时整卡不反色、只有钮自身反色
  * （钮不触发跳转由子节点消费抬起事件保证，这里收敛视觉）；按在**卡面
  * 其余位置**时整卡反色，钮文字（[content] 收到的 primary）随之翻转。
+ *
+ * 刻意不用 [EInkPressBlock]：配色解析含跨节点抑制（cardPressed = 卡按压
+ * ∧ ¬删除钮按压），原语的配色是自身按压态内部解析，接管需开联动口，
+ * 特例留手写（共享 ImmediatePressState，120ms 最短保持不自制）。
  */
 @Composable
 private fun MarkCard(

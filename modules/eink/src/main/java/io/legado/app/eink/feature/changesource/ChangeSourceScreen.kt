@@ -36,9 +36,7 @@ import io.legado.app.eink.designsystem.content.EInkHorizontalDivider
 import io.legado.app.eink.designsystem.content.EInkInfoRow
 import io.legado.app.eink.designsystem.content.EInkLoading
 import io.legado.app.eink.designsystem.content.EInkText
-import io.legado.app.eink.designsystem.interaction.eInkActionColors
-import io.legado.app.eink.designsystem.interaction.einkClickable
-import io.legado.app.eink.designsystem.interaction.rememberImmediatePressState
+import io.legado.app.eink.designsystem.interaction.EInkPressBlock
 import io.legado.app.eink.designsystem.navigation.EInkOperationBar
 import io.legado.app.eink.designsystem.navigation.EInkOperationBarIcon
 import io.legado.app.eink.designsystem.navigation.EInkPageArrows
@@ -345,64 +343,64 @@ private fun SourceRow(
     onClick: () -> Unit,
 ) {
     val scheme = EInkTheme.colorScheme
-    val press = rememberImmediatePressState()
-    val colors = eInkActionColors(pressed = press.isPressed)
-    // 标记/标签随按压反色；名称：当前源加深，其余为次级色；
-    // 信息行（最新章节/作者）同步反色，避免深色底上仍是深灰字
-    val markColor = if (press.isPressed) scheme.surface else scheme.onSurface
-    val titleColor = if (press.isPressed) colors.contentColor else scheme.onSurface
-    val infoColor = if (press.isPressed) colors.contentColor else scheme.onSurfaceVariant
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .then(press.modifier)
-            .background(colors.containerColor)
-            .einkClickable(role = Role.Button, onClick = onClick)
-            .padding(horizontal = EInkSpacing.m, vertical = EInkSpacing.s),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(EInkSpacing.s),
-    ) {
-        if (isCurrent) {
-            Box(
-                modifier = Modifier
-                    .size(width = CurrentMarkWidth, height = CurrentMarkHeight)
-                    .background(markColor)
-            )
-        }
-        Column(modifier = Modifier.weight(1f)) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(EInkSpacing.s),
-            ) {
-                EInkText(
-                    text = title,
-                    modifier = Modifier.weight(1f),
-                    style = EInkTheme.typography.bodyLarge,
-                    fontWeight = if (isCurrent) FontWeight.Bold else null,
-                    color = titleColor,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
+    EInkPressBlock(
+        onClick = onClick,
+        modifier = Modifier.fillMaxWidth(),
+    ) { colors, pressed ->
+        // 标记/标签随按压反色；名称：当前源加深，其余为次级色；
+        // 信息行（最新章节/作者）同步反色，避免深色底上仍是深灰字
+        val markColor = if (pressed) scheme.surface else scheme.onSurface
+        val titleColor = if (pressed) colors.contentColor else scheme.onSurface
+        val infoColor = if (pressed) colors.contentColor else scheme.onSurfaceVariant
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = EInkSpacing.m, vertical = EInkSpacing.s),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(EInkSpacing.s),
+        ) {
+            if (isCurrent) {
+                Box(
+                    modifier = Modifier
+                        .size(width = CurrentMarkWidth, height = CurrentMarkHeight)
+                        .background(markColor)
                 )
-                if (isCurrent) {
-                    EInkText(
-                        text = "当前源",
-                        style = EInkTheme.typography.labelMedium,
-                        color = markColor,
-                    )
-                }
             }
-            EInkInfoRow(
-                iconRes = R.drawable.eink_ic_book_last,
-                text = latestChapter?.takeIf { it.isNotBlank() } ?: "无最新章节",
-                style = EInkTheme.typography.bodySmall,
-                contentColor = infoColor,
-            )
-            EInkInfoRow(
-                iconRes = R.drawable.eink_ic_author,
-                text = author.ifBlank { "佚名" },
-                style = EInkTheme.typography.bodySmall,
-                contentColor = infoColor,
-            )
+            Column(modifier = Modifier.weight(1f)) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(EInkSpacing.s),
+                ) {
+                    EInkText(
+                        text = title,
+                        modifier = Modifier.weight(1f),
+                        style = EInkTheme.typography.bodyLarge,
+                        fontWeight = if (isCurrent) FontWeight.Bold else null,
+                        color = titleColor,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    if (isCurrent) {
+                        EInkText(
+                            text = "当前源",
+                            style = EInkTheme.typography.labelMedium,
+                            color = markColor,
+                        )
+                    }
+                }
+                EInkInfoRow(
+                    iconRes = R.drawable.eink_ic_book_last,
+                    text = latestChapter?.takeIf { it.isNotBlank() } ?: "无最新章节",
+                    style = EInkTheme.typography.bodySmall,
+                    contentColor = infoColor,
+                )
+                EInkInfoRow(
+                    iconRes = R.drawable.eink_ic_author,
+                    text = author.ifBlank { "佚名" },
+                    style = EInkTheme.typography.bodySmall,
+                    contentColor = infoColor,
+                )
+            }
         }
     }
 }

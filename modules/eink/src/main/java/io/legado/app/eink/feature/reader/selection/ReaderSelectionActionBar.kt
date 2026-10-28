@@ -28,9 +28,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import io.legado.app.eink.R
 import io.legado.app.eink.designsystem.content.EInkText
-import io.legado.app.eink.designsystem.interaction.eInkActionColors
+import io.legado.app.eink.designsystem.interaction.EInkPressBlock
 import io.legado.app.eink.designsystem.interaction.einkClickable
-import io.legado.app.eink.designsystem.interaction.rememberImmediatePressState
 import io.legado.app.eink.designsystem.theme.EInkShapes
 import io.legado.app.eink.designsystem.theme.EInkTheme
 import kotlin.math.roundToInt
@@ -108,7 +107,7 @@ private val ActionBarPadding = 4.dp
  * （放不下取下方），x 跟随选区中心并钳制在画布内。
  *
  * 形态取舍：卡片不透明（正文不透过按键，与正文视觉打架）；按钮常态透明 +
- * onSurface 内容、按压瞬时反色（[eInkActionColors]，规范 §35 唯一按压语言），
+ * onSurface 内容、按压瞬时反色（[EInkPressBlock] 原语，规范 §35 唯一按压语言），
  * 零动画直切。整卡消费点击：点卡片内空白不穿透成「收操作条」。
  *
  * 置于 zIndex(2f)：压过把手独占层（zIndex(1f)），下方放置时按钮落在把手
@@ -175,39 +174,36 @@ internal fun ReaderSelectionActionBar(
     }
 }
 
-/** 操作条按钮：图标在上、文案在下；按压反色（含 120ms 最短保持）。 */
+/** 操作条按钮：图标在上、文案在下；按压反色（原语内聚 120ms 最短保持）。 */
 @Composable
 private fun ReaderActionButton(
     action: ReaderMarkingAction,
     onClick: () -> Unit,
 ) {
-    val press = rememberImmediatePressState()
-    val colors = eInkActionColors(pressed = press.isPressed)
-    Column(
+    EInkPressBlock(
+        onClick = onClick,
+        onClickLabel = action.label,
+        shape = EInkShapes.small,
         modifier = Modifier
             .width(ActionItemWidth)
-            .height(ActionItemHeight)
-            .then(press.modifier)
-            .background(colors.containerColor, shape = EInkShapes.small)
-            .einkClickable(
-                role = Role.Button,
-                onClickLabel = action.label,
-                onClick = onClick,
-            ),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center,
-    ) {
-        Image(
-            painter = painterResource(action.iconRes),
-            contentDescription = action.label,
-            modifier = Modifier.size(24.dp),
-            colorFilter = ColorFilter.tint(colors.contentColor),
-        )
-        EInkText(
-            text = action.label,
-            style = EInkTheme.typography.labelMedium,
-            color = colors.contentColor,
-            modifier = Modifier.padding(top = 6.dp),
-        )
+            .height(ActionItemHeight),
+    ) { colors, _ ->
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center,
+        ) {
+            Image(
+                painter = painterResource(action.iconRes),
+                contentDescription = action.label,
+                modifier = Modifier.size(24.dp),
+                colorFilter = ColorFilter.tint(colors.contentColor),
+            )
+            EInkText(
+                text = action.label,
+                style = EInkTheme.typography.labelMedium,
+                color = colors.contentColor,
+                modifier = Modifier.padding(top = 6.dp),
+            )
+        }
     }
 }

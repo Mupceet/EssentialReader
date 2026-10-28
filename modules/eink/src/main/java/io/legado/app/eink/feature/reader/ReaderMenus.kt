@@ -48,9 +48,8 @@ import io.legado.app.eink.designsystem.control.EInkDialog
 import io.legado.app.eink.designsystem.control.EInkSegmentedButton
 import io.legado.app.eink.designsystem.control.EInkSliderRow
 import io.legado.app.eink.designsystem.control.EInkSteppedSlider
-import io.legado.app.eink.designsystem.interaction.eInkActionColors
+import io.legado.app.eink.designsystem.interaction.EInkPressBlock
 import io.legado.app.eink.designsystem.interaction.einkClickable
-import io.legado.app.eink.designsystem.interaction.rememberImmediatePressState
 import io.legado.app.eink.designsystem.navigation.EInkOperationBarIcon
 import io.legado.app.eink.designsystem.navigation.EInkTopBar
 import io.legado.app.eink.designsystem.theme.EInkShapes
@@ -901,29 +900,30 @@ internal fun ToggleRow(label: String, checked: Boolean, onToggle: () -> Unit) {
  */
 @Composable
 private fun OptionRow(label: String, onClick: () -> Unit) {
-    val press = rememberImmediatePressState()
-    val colors = eInkActionColors(pressed = press.isPressed)
-    Row(
+    EInkPressBlock(
+        onClick = onClick,
         modifier = Modifier
             .fillMaxWidth()
-            .height(48.dp)
-            .then(press.modifier)
-            .background(colors.containerColor)
-            .einkClickable(role = Role.Button, onClick = onClick)
-            .padding(start = EInkSpacing.m, end = EInkSpacing.m + EInkSpacing.s),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        EInkText(
-            text = label,
-            style = EInkTheme.typography.bodyMedium,
-            color = colors.contentColor,
-        )
-        Spacer(modifier = Modifier.weight(1f))
-        Image(
-            painter = painterResource(R.drawable.eink_ic_keyboard_arrow_right),
-            contentDescription = null,
-            modifier = Modifier.size(24.dp),
-            colorFilter = ColorFilter.tint(colors.secondaryContentColor),
-        )
+            .height(48.dp),
+    ) { colors, _ ->
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(start = EInkSpacing.m, end = EInkSpacing.m + EInkSpacing.s),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            EInkText(
+                text = label,
+                style = EInkTheme.typography.bodyMedium,
+                color = colors.contentColor,
+            )
+            Spacer(modifier = Modifier.weight(1f))
+            Image(
+                painter = painterResource(R.drawable.eink_ic_keyboard_arrow_right),
+                contentDescription = null,
+                modifier = Modifier.size(24.dp),
+                colorFilter = ColorFilter.tint(colors.secondaryContentColor),
+            )
+        }
     }
 }

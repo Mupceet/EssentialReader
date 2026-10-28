@@ -1,14 +1,11 @@
 package io.legado.app.eink.designsystem.navigation
 
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.staticCompositionLocalOf
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.painter.Painter
@@ -16,9 +13,7 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import io.legado.app.eink.designsystem.interaction.eInkActionColors
-import io.legado.app.eink.designsystem.interaction.einkClickable
-import io.legado.app.eink.designsystem.interaction.rememberImmediatePressState
+import io.legado.app.eink.designsystem.interaction.EInkPressBlock
 
 /**
  * 操作栏图标按钮（公共组件，规范 §35/§42 操作条图标按钮层）。
@@ -54,14 +49,6 @@ fun EInkOperationBarIcon(
     height: Dp = DefaultHeight,
     iconSize: Dp = DefaultIconSize,
 ) {
-    val press = rememberImmediatePressState()
-    // 有素材对时选中只切换素材，配色保持白底；
-    // 无素材对时选中回落实心色块（共享配色解析，规范 §35）
-    val colors = eInkActionColors(
-        pressed = press.isPressed,
-        enabled = enabled,
-        selected = selected && selectedIcon == null
-    )
     // 宽度自适应：min(屏幕宽 / 5, 收敛倍数 × 高度)。手机类窄屏均分
     // 屏宽（触控目标仍 ≥48dp），宽屏收敛为固定规格；收敛倍数由所属
     // 操作条经 [LocalOperationBarWidthRatio] 覆写（顶栏 1.0 方形、底栏
@@ -75,20 +62,18 @@ fun EInkOperationBarIcon(
         screenWidth / AdaptiveButtonCount,
         height * LocalOperationBarWidthRatio.current
     )
-    Box(
+    // 有素材对时选中只切换素材，配色保持白底（selected 不入配色解析）；
+    // 无素材对时选中回落实心色块（按压反色块原语共享配色，规范 §35）
+    EInkPressBlock(
+        onClick = onClick,
         modifier = modifier
             .width(resolvedWidth)
-            .height(height)
-            .then(press.modifier)
-            .background(colors.containerColor)
-            .einkClickable(
-                enabled = enabled,
-                role = role,
-                onClickLabel = contentDescription,
-                onClick = onClick
-            ),
-        contentAlignment = Alignment.Center
-    ) {
+            .height(height),
+        enabled = enabled,
+        selected = selected && selectedIcon == null,
+        role = role,
+        onClickLabel = contentDescription,
+    ) { colors, _ ->
         Image(
             painter = if (selected && selectedIcon != null) selectedIcon else icon,
             contentDescription = contentDescription,

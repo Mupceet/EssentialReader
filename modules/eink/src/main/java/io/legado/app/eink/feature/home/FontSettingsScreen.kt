@@ -45,9 +45,7 @@ import io.legado.app.eink.contract.ReaderFontSelection
 import io.legado.app.eink.designsystem.content.EInkHorizontalDivider
 import io.legado.app.eink.designsystem.content.EInkText
 import io.legado.app.eink.designsystem.control.EInkSteppedSlider
-import io.legado.app.eink.designsystem.interaction.eInkActionColors
-import io.legado.app.eink.designsystem.interaction.einkClickable
-import io.legado.app.eink.designsystem.interaction.rememberImmediatePressState
+import io.legado.app.eink.designsystem.interaction.EInkPressBlock
 import io.legado.app.eink.designsystem.navigation.EInkOperationBar
 import io.legado.app.eink.designsystem.navigation.EInkOperationBarIcon
 import io.legado.app.eink.designsystem.navigation.EInkPageArrows
@@ -528,23 +526,18 @@ private fun applyScaleStep(
     return true
 }
 
-/** 步进按钮（−/＋）：按压反色（共享配色解析 + 120ms 最短保持，规范 §35）。 */
+/** 步进按钮（−/＋）：按压反色（按压反色块原语内聚 120ms 最短保持，规范 §35）。 */
 @Composable
 private fun StepGlyphButton(
     glyph: String,
     onClickLabel: String,
     onClick: () -> Unit
 ) {
-    val press = rememberImmediatePressState()
-    val colors = eInkActionColors(pressed = press.isPressed)
-    Box(
-        modifier = Modifier
-            .size(48.dp)
-            .then(press.modifier)
-            .background(colors.containerColor)
-            .einkClickable(role = Role.Button, onClickLabel = onClickLabel, onClick = onClick),
-        contentAlignment = Alignment.Center
-    ) {
+    EInkPressBlock(
+        onClick = onClick,
+        onClickLabel = onClickLabel,
+        modifier = Modifier.size(48.dp),
+    ) { colors, _ ->
         EInkText(
             text = glyph,
             style = EInkTheme.typography.titleLarge,
@@ -641,59 +634,61 @@ private fun FontListRow(
     onClick: () -> Unit,
 ) {
     val scheme = EInkTheme.colorScheme
-    val press = rememberImmediatePressState()
-    val colors = eInkActionColors(pressed = press.isPressed)
-    Row(
+    EInkPressBlock(
+        onClick = onClick,
+        onClickLabel = label,
         modifier = Modifier
             .fillMaxWidth()
-            .height(FontRowHeight)
-            .then(press.modifier)
-            .background(colors.containerColor)
-            .einkClickable(role = Role.Button, onClickLabel = label, onClick = onClick)
+            .height(FontRowHeight),
+    ) { colors, pressed ->
+        Row(
             // 与目录界面行同口径 16dp（亦与顶栏标题左边距同列对齐）
-            .padding(horizontal = EInkSpacing.m),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(EInkSpacing.s),
-    ) {
-        if (selected) {
-            Box(
-                modifier = Modifier
-                    .size(width = FontRowMarkWidth, height = FontRowMarkHeight)
-                    .background(if (press.isPressed) scheme.surface else scheme.onSurface),
-            )
-        }
-        Column(verticalArrangement = Arrangement.spacedBy(EInkSpacing.xs)) {
-            EInkText(
-                text = label,
-                fontFamily = fonts?.let { if (selected) it.bold else it.normal },
-                style = EInkTheme.typography.bodyLarge,
-                fontWeight = if (selected) FontWeight.Bold else null,
-                color = when {
-                    press.isPressed -> colors.contentColor
-                    selected -> scheme.onSurface
-                    else -> scheme.onSurfaceVariant
-                },
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            // 示例两行（中/英）用 tertiaryContent 与名称行拉开一档实灰
-            // （灰阶做减法，不用字重/字号层级）；按压跟随整行反色
-            EInkText(
-                text = FontSampleTextCn,
-                fontFamily = fonts?.normal,
-                style = EInkTheme.typography.bodySmall,
-                color = if (press.isPressed) colors.contentColor else scheme.tertiaryContent,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            EInkText(
-                text = FontSampleTextEn,
-                fontFamily = fonts?.normal,
-                style = EInkTheme.typography.bodySmall,
-                color = if (press.isPressed) colors.contentColor else scheme.tertiaryContent,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = EInkSpacing.m),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(EInkSpacing.s),
+        ) {
+            if (selected) {
+                Box(
+                    modifier = Modifier
+                        .size(width = FontRowMarkWidth, height = FontRowMarkHeight)
+                        .background(if (pressed) scheme.surface else scheme.onSurface),
+                )
+            }
+            Column(verticalArrangement = Arrangement.spacedBy(EInkSpacing.xs)) {
+                EInkText(
+                    text = label,
+                    fontFamily = fonts?.let { if (selected) it.bold else it.normal },
+                    style = EInkTheme.typography.bodyLarge,
+                    fontWeight = if (selected) FontWeight.Bold else null,
+                    color = when {
+                        pressed -> colors.contentColor
+                        selected -> scheme.onSurface
+                        else -> scheme.onSurfaceVariant
+                    },
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                // 示例两行（中/英）用 tertiaryContent 与名称行拉开一档实灰
+                // （灰阶做减法，不用字重/字号层级）；按压跟随整行反色
+                EInkText(
+                    text = FontSampleTextCn,
+                    fontFamily = fonts?.normal,
+                    style = EInkTheme.typography.bodySmall,
+                    color = if (pressed) colors.contentColor else scheme.tertiaryContent,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                EInkText(
+                    text = FontSampleTextEn,
+                    fontFamily = fonts?.normal,
+                    style = EInkTheme.typography.bodySmall,
+                    color = if (pressed) colors.contentColor else scheme.tertiaryContent,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
         }
     }
 }

@@ -39,6 +39,7 @@ import io.legado.app.eink.designsystem.control.EInkButton
 import io.legado.app.eink.designsystem.control.EInkDialog
 import io.legado.app.eink.designsystem.control.EInkSearchInputBar
 import io.legado.app.eink.designsystem.control.EInkSteppedSlider
+import io.legado.app.eink.designsystem.interaction.EInkPressBlock
 import io.legado.app.eink.designsystem.interaction.eInkActionColors
 import io.legado.app.eink.designsystem.interaction.einkClickable
 import io.legado.app.eink.designsystem.interaction.rememberImmediatePressState
@@ -589,20 +590,19 @@ private fun DialogSample(onOpen: (GalleryDialog) -> Unit) {
     }
 }
 
-/** 预览触发按钮：44dp、描边、按压反色。 */
+/** 预览触发按钮：44dp、描边、按压反色（EInkPressBlock 原语）。 */
 @Composable
 private fun SampleTriggerButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifier) {
-    val press = rememberImmediatePressState()
-    val colors = eInkActionColors(pressed = press.isPressed)
-    Box(
-        modifier = modifier
-            .height(44.dp)
-            .then(press.modifier)
-            .background(colors.containerColor, EInkShapes.small)
-            .border(1.dp, EInkTheme.colorScheme.outline, EInkShapes.small)
-            .einkClickable(role = Role.Button, onClick = onClick),
-        contentAlignment = Alignment.Center
-    ) {
+    EInkPressBlock(
+        onClick = onClick,
+        shape = EInkShapes.small,
+        modifier = modifier.height(44.dp),
+    ) { colors, _ ->
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .border(1.dp, EInkTheme.colorScheme.outline, EInkShapes.small)
+        )
         EInkText(text = text, color = colors.contentColor)
     }
 }

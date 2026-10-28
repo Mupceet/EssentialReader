@@ -30,9 +30,8 @@ import io.legado.app.eink.contract.BookshelfGroupIds
 import io.legado.app.eink.contract.BookshelfGroupUiModel
 import io.legado.app.eink.designsystem.content.EInkHorizontalDivider
 import io.legado.app.eink.designsystem.content.EInkText
-import io.legado.app.eink.designsystem.interaction.eInkActionColors
+import io.legado.app.eink.designsystem.interaction.EInkPressBlock
 import io.legado.app.eink.designsystem.interaction.einkClickable
-import io.legado.app.eink.designsystem.interaction.rememberImmediatePressState
 import io.legado.app.eink.designsystem.theme.EInkShapes
 import io.legado.app.eink.designsystem.theme.EInkSpacing
 import io.legado.app.eink.designsystem.theme.EInkTheme
@@ -151,42 +150,43 @@ private fun FilterMenuRow(
     onClick: () -> Unit,
 ) {
     val scheme = EInkTheme.colorScheme
-    val press = rememberImmediatePressState()
-    val colors = eInkActionColors(pressed = press.isPressed)
-    val markColor = if (press.isPressed) scheme.surface else scheme.onSurface
-    val textColor = when {
-        press.isPressed -> colors.contentColor
-        selected -> scheme.onSurface
-        else -> scheme.onSurfaceVariant
-    }
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .then(press.modifier)
-            .background(colors.containerColor)
-            .einkClickable(role = Role.Button, onClickLabel = text, onClick = onClick)
-            .padding(horizontal = EInkSpacing.m, vertical = EInkSpacing.s),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(EInkSpacing.s),
-    ) {
-        if (selected) {
-            // 选中实心标记（目录页同款 4×16dp）：出现即把文字自然后推
-            Box(modifier = Modifier.size(width = 4.dp, height = 16.dp).background(markColor))
+    EInkPressBlock(
+        onClick = onClick,
+        onClickLabel = text,
+        modifier = Modifier.fillMaxWidth(),
+    ) { colors, pressed ->
+        val markColor = if (pressed) scheme.surface else scheme.onSurface
+        val textColor = when {
+            pressed -> colors.contentColor
+            selected -> scheme.onSurface
+            else -> scheme.onSurfaceVariant
         }
-        EInkText(
-            text = if (bookCount != null) "$text($bookCount)" else text,
-            style = EInkTheme.typography.bodyLarge,
-            fontWeight = if (selected) FontWeight.Bold else null,
-            color = textColor,
-            modifier = Modifier.weight(1f),
-            maxLines = 1,
-        )
-        if (selected) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = EInkSpacing.m, vertical = EInkSpacing.s),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(EInkSpacing.s),
+        ) {
+            if (selected) {
+                // 选中实心标记（目录页同款 4×16dp）：出现即把文字自然后推
+                Box(modifier = Modifier.size(width = 4.dp, height = 16.dp).background(markColor))
+            }
             EInkText(
-                text = "✓",
-                style = EInkTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Bold),
-                color = markColor,
+                text = if (bookCount != null) "$text($bookCount)" else text,
+                style = EInkTheme.typography.bodyLarge,
+                fontWeight = if (selected) FontWeight.Bold else null,
+                color = textColor,
+                modifier = Modifier.weight(1f),
+                maxLines = 1,
             )
+            if (selected) {
+                EInkText(
+                    text = "✓",
+                    style = EInkTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Bold),
+                    color = markColor,
+                )
+            }
         }
     }
 }

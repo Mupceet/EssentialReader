@@ -48,9 +48,7 @@ import io.legado.app.eink.designsystem.content.EInkHorizontalDivider
 import io.legado.app.eink.designsystem.content.EInkText
 import io.legado.app.eink.designsystem.control.EInkButton
 import io.legado.app.eink.designsystem.control.EInkDialog
-import io.legado.app.eink.designsystem.interaction.eInkActionColors
-import io.legado.app.eink.designsystem.interaction.einkClickable
-import io.legado.app.eink.designsystem.interaction.rememberImmediatePressState
+import io.legado.app.eink.designsystem.interaction.EInkPressBlock
 import io.legado.app.eink.designsystem.navigation.EInkOperationBar
 import io.legado.app.eink.designsystem.navigation.EInkOperationBarIcon
 import io.legado.app.eink.designsystem.theme.EInkShapes
@@ -368,37 +366,37 @@ private fun WebDavConfigRow(
     value: String,
     onClick: () -> Unit,
 ) {
-    val press = rememberImmediatePressState()
-    val colors = eInkActionColors(pressed = press.isPressed)
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .then(press.modifier)
-            .background(colors.containerColor)
-            .einkClickable(role = Role.Button, onClick = onClick)
-            .padding(horizontal = EInkSpacing.m, vertical = EInkSpacing.m),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Column(modifier = Modifier.weight(1f)) {
-            EInkText(
-                text = label,
-                style = EInkTheme.typography.titleMedium,
-                color = colors.contentColor,
-            )
-            EInkText(
-                text = value,
-                style = EInkTheme.typography.bodyMedium,
-                color = colors.secondaryContentColor,
-                modifier = Modifier.padding(top = EInkSpacing.xxs),
+    EInkPressBlock(
+        onClick = onClick,
+        modifier = Modifier.fillMaxWidth(),
+    ) { colors, _ ->
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = EInkSpacing.m, vertical = EInkSpacing.m),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                EInkText(
+                    text = label,
+                    style = EInkTheme.typography.titleMedium,
+                    color = colors.contentColor,
+                )
+                EInkText(
+                    text = value,
+                    style = EInkTheme.typography.bodyMedium,
+                    color = colors.secondaryContentColor,
+                    modifier = Modifier.padding(top = EInkSpacing.xxs),
+                )
+            }
+            Spacer(modifier = Modifier.padding(start = EInkSpacing.s))
+            Image(
+                painter = painterResource(R.drawable.eink_ic_keyboard_arrow_right),
+                contentDescription = null,
+                modifier = Modifier.size(24.dp),
+                colorFilter = ColorFilter.tint(colors.secondaryContentColor),
             )
         }
-        Spacer(modifier = Modifier.padding(start = EInkSpacing.s))
-        Image(
-            painter = painterResource(R.drawable.eink_ic_keyboard_arrow_right),
-            contentDescription = null,
-            modifier = Modifier.size(24.dp),
-            colorFilter = ColorFilter.tint(colors.secondaryContentColor),
-        )
     }
 }
 

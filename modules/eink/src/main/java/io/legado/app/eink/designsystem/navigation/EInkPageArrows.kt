@@ -16,13 +16,10 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import io.legado.app.eink.R
-import io.legado.app.eink.designsystem.interaction.eInkActionColors
-import io.legado.app.eink.designsystem.interaction.einkClickable
-import io.legado.app.eink.designsystem.interaction.rememberImmediatePressState
+import io.legado.app.eink.designsystem.interaction.EInkPressBlock
 import io.legado.app.eink.designsystem.theme.EInkTheme
 
 /**
@@ -77,23 +74,15 @@ private fun PageArrowIcon(
     contentDescription: String,
     onClick: () -> Unit,
 ) {
-    // 按压反色：共享 ImmediatePress（含 120ms 最短保持）+ 配色解析，规范 §35
-    val press = rememberImmediatePressState()
-    val colors = eInkActionColors(pressed = press.isPressed, enabled = enabled)
-    Box(
+    // 按压反色块原语（120ms 最短保持 + 配色解析内聚，规范 §35）
+    EInkPressBlock(
+        onClick = onClick,
+        enabled = enabled,
+        onClickLabel = contentDescription,
         modifier = Modifier
             .width(ArrowButtonWidth)
-            .height(ArrowTouchTarget)
-            .then(press.modifier)
-            .background(colors.containerColor)
-            .einkClickable(
-                enabled = enabled,
-                role = Role.Button,
-                onClickLabel = contentDescription,
-                onClick = onClick,
-            ),
-        contentAlignment = Alignment.Center
-    ) {
+            .height(ArrowTouchTarget),
+    ) { colors, _ ->
         Image(
             painter = painterResource(iconRes),
             contentDescription = contentDescription,

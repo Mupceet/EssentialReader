@@ -53,9 +53,8 @@ import io.legado.app.eink.designsystem.content.EInkInfoRow
 import io.legado.app.eink.designsystem.content.EInkLoading
 import io.legado.app.eink.designsystem.content.EInkText
 import io.legado.app.eink.designsystem.control.EInkDialog
-import io.legado.app.eink.designsystem.interaction.eInkActionColors
+import io.legado.app.eink.designsystem.interaction.EInkPressBlock
 import io.legado.app.eink.designsystem.interaction.einkClickable
-import io.legado.app.eink.designsystem.interaction.rememberImmediatePressState
 import io.legado.app.eink.designsystem.navigation.EInkOperationBar
 import io.legado.app.eink.designsystem.navigation.EInkOperationBarIcon
 import io.legado.app.eink.designsystem.navigation.EInkPageArrowsWidth
@@ -647,43 +646,46 @@ private fun DetailActionButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val press = rememberImmediatePressState()
-    val colors = eInkActionColors(pressed = press.isPressed)
-    // 描边取舍与 EInkButton 同源：常态轮廓线，按压（实心反色）时边框取
-    // 容器色与色块融合
-    val borderColor = if (colors.containerColor != Color.Transparent) {
-        colors.containerColor
-    } else {
-        EInkTheme.colorScheme.outline
-    }
-    Row(
-        modifier = modifier
-            .height(DetailActionButtonHeight)
-            .then(press.modifier)
-            .background(colors.containerColor, EInkShapes.small)
-            .border(1.dp, borderColor, EInkShapes.small)
-            .einkClickable(
-                role = Role.Button,
-                onClickLabel = label,
-                onClick = onClick,
-            )
+    EInkPressBlock(
+        onClick = onClick,
+        onClickLabel = label,
+        shape = EInkShapes.small,
+        modifier = modifier.height(DetailActionButtonHeight),
+    ) { colors, _ ->
+        // 描边取舍与 EInkButton 同源：常态轮廓线，按压（实心反色）时边框取
+        // 容器色与色块融合（内层首子绘制，与节点级 border 同界同形）
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .border(
+                    1.dp,
+                    if (colors.containerColor != Color.Transparent) {
+                        colors.containerColor
+                    } else {
+                        EInkTheme.colorScheme.outline
+                    },
+                    EInkShapes.small
+                )
+        )
+        Row(
             // 宽度随内容收缩后需要内边距，避免图标/文字贴描边
-            .padding(horizontal = EInkSpacing.m),
-        horizontalArrangement = Arrangement.spacedBy(EInkSpacing.xs, Alignment.CenterHorizontally),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Image(
-            painter = painterResource(iconRes),
-            contentDescription = null,
-            modifier = Modifier.size(DetailActionButtonIconSize),
-            colorFilter = ColorFilter.tint(colors.contentColor)
-        )
-        EInkText(
-            text = label,
-            style = EInkTheme.typography.labelSmall,
-            color = colors.contentColor,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis
-        )
+            modifier = Modifier.padding(horizontal = EInkSpacing.m),
+            horizontalArrangement = Arrangement.spacedBy(EInkSpacing.xs),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Image(
+                painter = painterResource(iconRes),
+                contentDescription = null,
+                modifier = Modifier.size(DetailActionButtonIconSize),
+                colorFilter = ColorFilter.tint(colors.contentColor)
+            )
+            EInkText(
+                text = label,
+                style = EInkTheme.typography.labelSmall,
+                color = colors.contentColor,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
     }
 }

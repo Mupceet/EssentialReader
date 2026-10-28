@@ -35,9 +35,7 @@ import io.legado.app.eink.contract.EInkEngineRegistry
 import io.legado.app.eink.designsystem.content.EInkHorizontalDivider
 import io.legado.app.eink.designsystem.content.EInkText
 import io.legado.app.eink.designsystem.control.EInkButton
-import io.legado.app.eink.designsystem.interaction.eInkActionColors
-import io.legado.app.eink.designsystem.interaction.einkClickable
-import io.legado.app.eink.designsystem.interaction.rememberImmediatePressState
+import io.legado.app.eink.designsystem.interaction.EInkPressBlock
 import io.legado.app.eink.designsystem.pager.EInkListPagerState
 import io.legado.app.eink.designsystem.theme.EInkSpacing
 import io.legado.app.eink.designsystem.theme.EInkTheme
@@ -256,41 +254,41 @@ private fun MineEntry(
     onClick: () -> Unit,
     sublabel: String? = null
 ) {
-    // 按压瞬时反色（规范 §35）：共享配色解析 + 120ms 最短保持——裸
+    // 按压瞬时反色（规范 §35，按压反色块原语内聚 120ms 最短保持）——裸
     // clickable 在全局禁涟漪下按压零反馈
-    val press = rememberImmediatePressState()
-    val colors = eInkActionColors(pressed = press.isPressed)
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .then(press.modifier)
-            .background(colors.containerColor)
-            .einkClickable(role = Role.Button, onClick = onClick)
-            .padding(horizontal = EInkSpacing.m, vertical = EInkSpacing.m),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Column(modifier = Modifier.weight(1f)) {
-            EInkText(
-                text = label,
-                style = EInkTheme.typography.titleMedium,
-                color = colors.contentColor
-            )
-            if (sublabel != null) {
+    EInkPressBlock(
+        onClick = onClick,
+        modifier = Modifier.fillMaxWidth(),
+    ) { colors, _ ->
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = EInkSpacing.m, vertical = EInkSpacing.m),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
                 EInkText(
-                    text = sublabel,
-                    style = EInkTheme.typography.bodyMedium,
-                    color = colors.secondaryContentColor,
-                    modifier = Modifier.padding(top = EInkSpacing.xxs)
+                    text = label,
+                    style = EInkTheme.typography.titleMedium,
+                    color = colors.contentColor
                 )
+                if (sublabel != null) {
+                    EInkText(
+                        text = sublabel,
+                        style = EInkTheme.typography.bodyMedium,
+                        color = colors.secondaryContentColor,
+                        modifier = Modifier.padding(top = EInkSpacing.xxs)
+                    )
+                }
             }
+            Spacer(modifier = Modifier.padding(start = EInkSpacing.s))
+            Image(
+                painter = painterResource(R.drawable.eink_ic_keyboard_arrow_right),
+                contentDescription = null,
+                modifier = Modifier.size(24.dp),
+                colorFilter = ColorFilter.tint(colors.secondaryContentColor)
+            )
         }
-        Spacer(modifier = Modifier.padding(start = EInkSpacing.s))
-        Image(
-            painter = painterResource(R.drawable.eink_ic_keyboard_arrow_right),
-            contentDescription = null,
-            modifier = Modifier.size(24.dp),
-            colorFilter = ColorFilter.tint(colors.secondaryContentColor)
-        )
     }
 }
 

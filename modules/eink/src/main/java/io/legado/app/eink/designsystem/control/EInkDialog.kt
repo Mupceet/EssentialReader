@@ -27,9 +27,8 @@ import androidx.compose.ui.unit.dp
 import io.legado.app.eink.designsystem.content.EInkHorizontalDivider
 import io.legado.app.eink.designsystem.content.EInkText
 import io.legado.app.eink.designsystem.content.EInkVerticalDivider
-import io.legado.app.eink.designsystem.interaction.eInkActionColors
+import io.legado.app.eink.designsystem.interaction.EInkPressBlock
 import io.legado.app.eink.designsystem.interaction.einkClickable
-import io.legado.app.eink.designsystem.interaction.rememberImmediatePressState
 import io.legado.app.eink.designsystem.theme.EInkShapes
 import io.legado.app.eink.designsystem.theme.EInkSpacing
 import io.legado.app.eink.designsystem.theme.EInkTheme
@@ -230,16 +229,10 @@ object EInkModalPresence {
  */
 @Composable
 internal fun EInkCloseButton(onClose: () -> Unit) {
-    val press = rememberImmediatePressState()
-    val colors = eInkActionColors(pressed = press.isPressed)
-    Box(
-        modifier = Modifier
-            .size(36.dp)
-            .then(press.modifier)
-            .background(colors.containerColor)
-            .einkClickable(role = Role.Button, onClick = onClose),
-        contentAlignment = Alignment.Center,
-    ) {
+    EInkPressBlock(
+        onClick = onClose,
+        modifier = Modifier.size(36.dp),
+    ) { colors, _ ->
         EInkText(
             text = "×",
             style = EInkTheme.typography.titleLarge,
