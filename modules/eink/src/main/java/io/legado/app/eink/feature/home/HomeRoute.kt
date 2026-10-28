@@ -86,7 +86,8 @@ private val HomeTabIcons = listOf(
  * 纵向空间）：
  *  - 顶栏（大标题 headlineMedium + 右侧动作）：搜索图标常驻最右（点击进入搜索页，
  *    两 Tab 同一角位可达）；筛选按钮 = 顶层书架标题内容整块（书架 +
- *    图标 + 筛选名一并可点，打开筛选下拉）；
+ *    图标 + 筛选名一并可点，打开筛选下拉）；组视图标题为面包屑
+ *    「书架/分组名」（前缀提示点击退回顶层书架）；
  *    书架 Tab 另显示刷新按钮与书架样式入口（打开个性化配置面板
  *    [BookshelfStylePanel]，六项样式即改即提交、书架实时预览），
  *    "我的" Tab 仅搜索图标；
@@ -360,6 +361,12 @@ internal fun HomeRoute(
             } else {
                 HomeTabLabels[selectedTab]
             },
+            // 组视图面包屑前缀（方案 C）：分组名标题带「书架/」前缀
+            // （bodyLarge、紧贴标题密排），提示点击标题退回顶层书架
+            titlePrefix = if (
+                selectedTab == HomeTabs.BOOKSHELF &&
+                uiState.selectedScopeId != BookshelfGroupIds.ALL
+            ) "${HomeTabLabels[HomeTabs.BOOKSHELF]}/" else null,
             // 标题点击（2026-10-28：顶层书架的筛选按钮 = 标题内容整块
             // 「书架 + 图标 + 筛选名」）：组视图退到顶层（会话级，所选分组
             // 记录保留）；顶层书架打开筛选下拉；其余（我的 Tab / 无可用
@@ -381,11 +388,14 @@ internal fun HomeRoute(
             } else {
                 null
             },
-            titleClickLabel = if (
+            titleClickLabel = when {
                 selectedTab == HomeTabs.BOOKSHELF &&
-                uiState.selectedScopeId == BookshelfGroupIds.ALL &&
-                uiState.filterSelectorAvailable
-            ) "筛选" else null,
+                    uiState.selectedScopeId != BookshelfGroupIds.ALL -> "返回书架"
+                selectedTab == HomeTabs.BOOKSHELF &&
+                    uiState.selectedScopeId == BookshelfGroupIds.ALL &&
+                    uiState.filterSelectorAvailable -> "筛选"
+                else -> null
+            },
             contentOverlay = {
                 // 底部调整面板挂内容区（不盖底部操作栏——▲▼ 承担面板翻页）；
                 // 顶栏侧不共存由各入口的全量互斥状态保证（点其他入口即关面板）
@@ -610,6 +620,7 @@ internal fun HomeScreen(
     selectedTab: Int,
     onSelectTab: (Int) -> Unit,
     headerTitle: String,
+    titlePrefix: String? = null,
     showRefresh: Boolean,
     isRefreshing: Boolean,
     onRefresh: () -> Unit,
@@ -630,13 +641,15 @@ internal fun HomeScreen(
     ) {
         // 顶栏：左侧大标题（headlineMedium 28sp，比默认 titleLarge 22sp
         // 再大一档）；顶层书架的筛选按钮 = 标题内容整块（书架 + 图标 +
-        // 筛选名，titleTrailing 槽随可点击标题渲染、整块按压反色）；右侧
-        // 动作区（动作按钮新规格：撑满顶栏高、贴右屏、自带底部分隔线）；
-        // 搜索图标常驻最右，两 Tab 同一角位
+        // 筛选名，titleTrailing 槽随可点击标题渲染、整块按压反色）；组
+        // 视图标题带「书架 /」面包屑前缀（titlePrefix，经 leading 槽整块
+        // 按压反色）；右侧动作区（动作按钮新规格：撑满顶栏高、贴右屏、
+        // 自带底部分隔线）；搜索图标常驻最右，两 Tab 同一角位
         EInkTopBar(
             title = headerTitle,
             onTitleClick = onTitleClick,
             titleClickLabel = titleClickLabel,
+            titlePrefix = titlePrefix,
             titleStyle = EInkTheme.typography.headlineMedium,
             titleTrailing = filterAction,
             actionsFillMax = true,

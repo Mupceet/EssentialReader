@@ -25,6 +25,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import io.legado.app.eink.R
 import io.legado.app.eink.designsystem.content.EInkHorizontalDivider
+import io.legado.app.eink.designsystem.content.EInkText
 import io.legado.app.eink.designsystem.control.EInkButton
 import io.legado.app.eink.designsystem.interaction.eInkActionColors
 import io.legado.app.eink.designsystem.interaction.einkClickable
@@ -58,6 +59,9 @@ import io.legado.app.eink.designsystem.theme.EInkTheme
  * @param onTitleClick 标题点击回调；非 null 时标题整体可点击（按压反色、贴边背景）
  * @param titleEnabled 标题可点击性；false 时中灰置灰（仅 [onTitleClick] 非 null 时有意义）
  * @param titleClickLabel 标题点击的无障碍语义标签（如"书籍详情"）
+ * @param titlePrefix 标题前缀文本（次级字号 bodyLarge 18sp、与标题同色；
+ *   现消费者：组视图面包屑「书架 /」前缀，提示可点击标题退回顶层书架）；
+ *   两种标题分支均渲染，可点击分支经 [EInkButton] leading 槽随按压整块反色
  * @param titleStyle 标题样式；null 时用默认 titleLarge（首页传 headlineMedium 大标题档放大）
  * @param titleTrailing 标题尾部内容槽（现消费者：首页书架的筛选图标/
  *   筛选名，随标题内容整块可点），接收与标题同源的内容色——可点击标题
@@ -74,6 +78,7 @@ fun EInkTopBar(
     onTitleClick: (() -> Unit)? = null,
     titleEnabled: Boolean = true,
     titleClickLabel: String? = null,
+    titlePrefix: String? = null,
     titleStyle: TextStyle? = null,
     titleTrailing: (@Composable (contentColor: Color) -> Unit)? = null,
     actionsFillMax: Boolean = false,
@@ -112,6 +117,15 @@ fun EInkTopBar(
                     onClickLabel = titleClickLabel,
                     contentPadding = PaddingValues(start = EInkSpacing.m),
                     contentAlignment = Alignment.CenterStart,
+                    leading = titlePrefix?.let { prefix ->
+                        { contentColor: Color ->
+                            EInkText(
+                                text = prefix,
+                                style = EInkTheme.typography.bodyLarge,
+                                color = contentColor,
+                            )
+                        }
+                    },
                     trailing = titleTrailing,
                 )
             } else {
@@ -123,13 +137,22 @@ fun EInkTopBar(
                         .then(if (actionsFillMax) Modifier.fillMaxHeight() else Modifier),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
+                    if (titlePrefix != null) {
+                        EInkText(
+                            text = titlePrefix,
+                            style = EInkTheme.typography.bodyLarge,
+                            color = colors.onSurface,
+                            // 前缀紧贴标题（零间距密排），仅保留行首边距
+                            modifier = Modifier.padding(start = EInkSpacing.m)
+                        )
+                    }
                     BasicText(
                         text = title,
                         style = (titleStyle ?: EInkTheme.typography.titleLarge)
                             .copy(color = colors.onSurface),
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.padding(start = EInkSpacing.m)
+                        modifier = Modifier.padding(start = if (titlePrefix == null) EInkSpacing.m else 0.dp)
                     )
                     // 普通分支无按压态，内容色与标题文字同源（静态 onSurface）
                     titleTrailing?.invoke(colors.onSurface)

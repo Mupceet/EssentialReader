@@ -2,12 +2,13 @@ package io.legado.app.eink.designsystem.control
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -58,6 +59,8 @@ import io.legado.app.eink.designsystem.theme.EInkTheme
  * @param contentPadding 文案内边距（在按压背景之内；如顶栏标题的
  *   start 边距、章节按钮的水平边距）
  * @param contentAlignment 文案对齐（默认居中；顶栏标题起始对齐）
+ * @param leading 文案前部内容槽（现消费者：顶栏可点击标题的面包屑前缀），
+ *   接收与文案同源的内容色（随按压反色）；null 时不渲染
  * @param trailing 文案尾部内容槽（现消费者：顶栏可点击标题的筛选图标/
  *   筛选名），接收与文案同源的内容色（随按压反色）；null 时仅渲染文案，
  *   既有调用方布局不变
@@ -77,6 +80,7 @@ fun EInkButton(
     onClickLabel: String? = null,
     contentPadding: PaddingValues = PaddingValues(0.dp),
     contentAlignment: Alignment = Alignment.Center,
+    leading: (@Composable (contentColor: Color) -> Unit)? = null,
     trailing: (@Composable (contentColor: Color) -> Unit)? = null,
 ) {
     val scheme = EInkTheme.colorScheme
@@ -137,7 +141,7 @@ fun EInkButton(
         } else {
             colors.contentColor
         }
-        if (trailing == null) {
+        if (leading == null && trailing == null) {
             EInkText(
                 text = text,
                 color = contentColor,
@@ -148,8 +152,9 @@ fun EInkButton(
         } else {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(EInkSpacing.s),
+                // 前缀与文案零间距（面包屑密排），尾部槽前显式留距
             ) {
+                leading?.invoke(contentColor)
                 EInkText(
                     text = text,
                     color = contentColor,
@@ -157,7 +162,10 @@ fun EInkButton(
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
-                trailing(contentColor)
+                if (trailing != null) {
+                    Spacer(modifier = Modifier.width(EInkSpacing.s))
+                    trailing(contentColor)
+                }
             }
         }
     }
