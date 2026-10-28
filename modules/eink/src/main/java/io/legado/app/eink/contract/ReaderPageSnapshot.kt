@@ -199,9 +199,10 @@ class ReaderPaintSpec(
 )
 
 /**
- * 行内一段的画笔覆盖：全部字段 nullable，null = 沿用行规格对应项
- * （[ReaderPaintSpec] 的 textSizePx/typeface/fontVariationSettings 与模块
- * 主题文字色）。缺省实例（全 null）等价于无覆盖。
+ * 行内一段的画笔覆盖：字段 nullable（[fakeBold] 为 Boolean，false 即
+ * 沿用），null/false = 沿用行规格对应项（[ReaderPaintSpec] 的
+ * textSizePx/typeface/fontVariationSettings 与模块主题文字色）。
+ * 缺省实例等价于无覆盖。
  *
  * 取值均为**引擎测量同源**参数——宿主映射器用引擎侧同一字体工厂解析
  * typeface（含字重映射）、同一字号值；模块按值绘制才能与段宽测量逐像素
@@ -231,6 +232,16 @@ class ReaderChunkPaintOverride(
      * （引擎测量与模块测量都不受影响），故作为覆盖项无对齐风险地跨桥。
      */
     val skewX: Float? = null,
+
+    /**
+     * 合成加粗（宿主引擎 `isFakeBoldText` 同源）。false = 不加粗。
+     *
+     * 与斜体同理跨桥的合成效果：fake bold 只在绘制期对字形描边加宽、
+     * 不改步进宽（引擎测量与模块测量都不受影响），无对齐风险。经典
+     * 架构宿主的规则加粗即此口径（完整模式同为 fake bold，非 BOLD 字
+     * 体面）；字重经 typeface/可变字重表达的宿主（MD3）不发射本字段。
+     */
+    val fakeBold: Boolean = false,
 )
 
 /**

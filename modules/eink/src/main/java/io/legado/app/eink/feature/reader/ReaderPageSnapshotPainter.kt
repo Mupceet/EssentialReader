@@ -77,6 +77,7 @@ internal class ReaderPageSnapshotPainter {
         val fontVariationSettings: String?,
         val colorArgb: Int,
         val skewX: Float,
+        val fakeBold: Boolean,
     )
 
     fun draw(
@@ -108,11 +109,14 @@ internal class ReaderPageSnapshotPainter {
                 fontVariationSettings = merged.fontVariationSettings,
                 colorArgb = color,
                 skewX = override.skewX ?: 0f,
+                fakeBold = override.fakeBold,
             )
             return overridePaints.getOrPut(key) {
                 Paint().apply {
                     applySpec(merged, color)
                     textSkewX = override.skewX ?: 0f
+                    // 合成加粗：绘制期描边加宽、不改步进宽，选区/装饰测量不受影响
+                    isFakeBoldText = override.fakeBold
                 }
             }.also {
                 if (overridePaints.size > 64) overridePaints.clear()
