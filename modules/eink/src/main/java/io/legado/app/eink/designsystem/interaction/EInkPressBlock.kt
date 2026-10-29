@@ -2,6 +2,7 @@ package io.legado.app.eink.designsystem.interaction
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -22,6 +23,11 @@ import androidx.compose.ui.semantics.Role
  * 色）与按压位——整块反色时子内容颜色随容器一致翻转，调用方无需自行
  * 传播按压态；选中标记等按压相关派生色用 [content] 的 pressed 位
  * 自行计算。
+ *
+ * 内容槽带 [BoxScope] 接收者：随尺寸传播的装饰层（描边轨道/选中块）
+ * 用 [BoxScope.matchParentSize] 绘制——匹配父最终尺寸且**不参与尺寸
+ * 决策**；fillMaxSize 会把块宽度顶到传入约束的 maxWidth，令不定宽
+ * 按钮在有界行内被撑满（搜索历史 chip 回归的根因）。
  *
  * 尺寸、边距、形状裁剪等布局属性由调用方经 [modifier] 与 [shape] 决定；
  * 原语只在修饰链上追加按压状态、背景与点击（顺序：
@@ -49,7 +55,7 @@ fun EInkPressBlock(
     role: Role = Role.Button,
     onClickLabel: String? = null,
     contentAlignment: Alignment = Alignment.Center,
-    content: @Composable (colors: EInkActionColors, pressed: Boolean) -> Unit,
+    content: @Composable BoxScope.(colors: EInkActionColors, pressed: Boolean) -> Unit,
 ) {
     val press = rememberImmediatePressState()
     val colors = eInkActionColors(

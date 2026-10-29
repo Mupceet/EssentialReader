@@ -37,6 +37,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -47,6 +48,7 @@ import io.legado.app.eink.contract.SearchHistoryUiModel
 import io.legado.app.eink.designsystem.content.EInkHorizontalDivider
 import io.legado.app.eink.designsystem.content.EInkInfoRow
 import io.legado.app.eink.designsystem.content.EInkText
+import io.legado.app.eink.designsystem.content.MIN_FONT_SIZE
 import io.legado.app.eink.designsystem.control.EInkButton
 import io.legado.app.eink.designsystem.control.EInkSearchInputBar
 import io.legado.app.eink.designsystem.navigation.EInkOperationBar
@@ -122,7 +124,10 @@ fun SearchRoute(
         val viewWidth = maxWidth
         val density = LocalDensity.current
         val textMeasurer = rememberTextMeasurer()
-        val chipStyle = EInkTheme.typography.labelMedium
+        // 历史 chip 测量与渲染（HistoryList 内 EInkButton 的 style）必须同
+        // style：估宽口径与渲染宽同源，分行才不漂移。渲染走 EInkText 有
+        // MIN_FONT_SIZE 下限，测量侧在下方 remember 块同步复刻
+        val chipStyle = EInkTheme.typography.bodyMedium
         val showHistoryDeleteMode = isDeletingHistory && uiState.history.isNotEmpty()
         // 历史 chip 贪心分行（一行 chip = LazyColumn 一项），固定页分页与
         // 手势整页翻页语义和结果列表一致；实测宽含删除态 ✕ 后缀，切换即重排
@@ -138,6 +143,14 @@ fun SearchRoute(
             val maxChipWidthPx = (rowWidthPx * HistoryMaxChipWidthFraction).toInt()
             val chipChromePx =
                 with(density) { (HistoryChipContentPadding * 2 + HistoryChipChromeAllowance).toPx() }.toInt()
+            // EInkText 渲染的下限复刻：style 字号低于 MIN_FONT_SIZE 时渲染
+            // 被抬升，而 textMeasurer 不会——不复刻则估宽偏窄、行溢出
+            val measureStyle =
+                if (chipStyle.fontSize != TextUnit.Unspecified && chipStyle.fontSize < MIN_FONT_SIZE) {
+                    chipStyle.copy(fontSize = MIN_FONT_SIZE)
+                } else {
+                    chipStyle
+                }
             chunkHistoryRows(
                 history = uiState.history,
                 rowWidth = rowWidthPx.toInt(),
@@ -145,7 +158,7 @@ fun SearchRoute(
                 labelWidth = { keyword ->
                     val label = keyword.word +
                             if (showHistoryDeleteMode) HistoryDeleteMarkSuffix else ""
-                    (textMeasurer.measure(label, chipStyle).size.width + chipChromePx)
+                    (textMeasurer.measure(label, measureStyle).size.width + chipChromePx)
                         .coerceAtMost(maxChipWidthPx)
                 },
             )
@@ -530,6 +543,7 @@ private fun HistoryList(
                                 else onSearch(keyword.word)
                             },
                             height = HistoryChipHeight,
+                            // 与 Route 内 chipStyle（估宽测量口径）必须同源，改一处须同步另一处
                             style = EInkTheme.typography.bodyMedium,
                             contentPadding = PaddingValues(horizontal = HistoryChipContentPadding),
                             onClickLabel = if (isDeleting) "删除此搜索记录" else null,

@@ -4,7 +4,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
@@ -89,10 +88,12 @@ fun EInkButton(
         contentAlignment = contentAlignment,
     ) { colors, pressed ->
         if (bordered) {
-            // 轨道描边：内层首子绘制，与原节点级 modifier.border 同界同形
+            // 轨道描边：内层首子绘制，与原节点级 modifier.border 同界同形；
+            // matchParentSize 不参与尺寸决策（fillMaxSize 会顶满传入约束
+            // 的 maxWidth，不定宽按钮会被撑到 max——搜索历史 chip 回归）
             Box(
                 modifier = Modifier
-                    .fillMaxSize()
+                    .matchParentSize()
                     .border(
                         width = 1.dp,
                         color = if (!enabled) scheme.disabledContent else scheme.outline,
@@ -103,7 +104,7 @@ fun EInkButton(
             // onSurface 底；按压反色期间由整轨反色覆盖，不叠加
             Box(
                 modifier = Modifier
-                    .fillMaxSize()
+                    .matchParentSize()
                     .padding(2.dp)
                     .then(
                         if (selected && !pressed && enabled) {
