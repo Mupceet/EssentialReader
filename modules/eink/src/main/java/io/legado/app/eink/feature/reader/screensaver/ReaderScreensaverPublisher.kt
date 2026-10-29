@@ -22,6 +22,8 @@ import kotlinx.coroutines.sync.withLock
  *
  * Invariants:
  * - all system gates are checked before allocating the target bitmap;
+ * - the wallpaper canvas is sized to the device's real display size, resolved
+ *   once per publish (never a hardcoded resolution);
  * - page/settings bursts are debounced, then serialized with a process-wide
  *   mutex shared by every surface ([publishEpoch] supersedes a slow flush from
  *   a surface that was already closed);
@@ -185,6 +187,13 @@ internal class ReaderScreensaverPublisher(
                 gate.reset()
                 return@withLock
             }
+            // 目标画布 = 设备真实显示尺寸，随发布解析（旋转/折叠后随之变化）；
+            // 读取失败时跳过本次发布，而不是退回某个猜测尺寸
+            val target = system.readDisplaySize()
+            if (target == null) {
+                Log.w(TAG, "display size unavailable; publish skipped")
+                return@withLock
+            }
 
             var coverSource: ReaderScreensaverCoverSource? = null
             var cover: ReaderScreensaverCover? = null
@@ -209,13 +218,19 @@ internal class ReaderScreensaverPublisher(
                 var fingerprint = ReaderScreensaverFingerprint.of(
                     request = request,
                     settings = settings,
+                    targetWidthPx = target.width,
+                    targetHeightPx = target.height,
                     coverDigest = coverSource?.digest,
                 )
                 if (!gate.shouldPublish(fingerprint, force)) return@withLock
 
                 if (mode == ReaderScreensaverMode.COVER) {
                     val source = requireNotNull(coverSource)
-                    val decoded = coverLoader.decodeAndUpgrade(source)
+                    val decoded = coverLoader.decodeAndUpgrade(
+                        source = source,
+                        targetWidthPx = target.width,
+                        targetHeightPx = target.height,
+                    )
                     if (decoded == null) {
                         Log.i(TAG, "cover decode failed book_url=${request.bookUrl.take(24)}")
                         return@withLock
@@ -227,6 +242,8 @@ internal class ReaderScreensaverPublisher(
                         fingerprint = ReaderScreensaverFingerprint.of(
                             request = request,
                             settings = settings,
+                            targetWidthPx = target.width,
+                            targetHeightPx = target.height,
                             coverDigest = decoded.digest,
                         )
                         if (!gate.shouldPublish(fingerprint, false)) return@withLock
@@ -243,11 +260,15 @@ internal class ReaderScreensaverPublisher(
                     ReaderScreensaverMode.COVER -> renderer.renderCover(
                         cover = requireNotNull(cover).bitmap,
                         illustration = illustration,
+                        targetWidthPx = target.width,
+                        targetHeightPx = target.height,
                     )
 
                     ReaderScreensaverMode.READING_PROGRESS -> renderer.render(
                         request = request,
                         illustration = illustration,
+                        targetWidthPx = target.width,
+                        targetHeightPx = target.height,
                     )
                 }
                 currentCoroutineContext().ensureActive()

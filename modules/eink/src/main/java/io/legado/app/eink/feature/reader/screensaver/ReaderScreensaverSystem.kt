@@ -6,10 +6,13 @@ import android.content.pm.PackageManager
 import android.database.ContentObserver
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.graphics.Point
 import android.net.Uri
 import android.os.Build
 import android.provider.Settings
 import android.util.Log
+import android.util.Size
+import android.view.WindowManager
 import java.io.File
 import java.io.FileInputStream
 
@@ -50,6 +53,29 @@ internal class ReaderScreensaverSystem(context: Context) {
             activeLockScreenTypeValue = readActiveLockScreenTypeValue(),
         )
     }
+
+    /**
+     * 屏保目标画布 = 设备真实显示尺寸（当前旋转，含系统栏，不受应用窗口
+     * 裁剪/兼容缩放影响）。30+ 用 maximumWindowMetrics，旧平台
+     * defaultDisplay.getRealSize。发布时按需读取（随旋转/折叠变化）；
+     * 读取失败或返回非正值时返回 null，由发布方跳过本次发布。
+     */
+    fun readDisplaySize(): Size? = runCatching {
+        val windowManager =
+            appContext.getSystemService(Context.WINDOW_SERVICE) as WindowManager
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            val bounds = windowManager.maximumWindowMetrics.bounds
+            Size(bounds.width(), bounds.height())
+        } else {
+            @Suppress("DEPRECATION")
+            val display = windowManager.defaultDisplay
+                ?: return@runCatching null
+            val point = Point()
+            @Suppress("DEPRECATION")
+            display.getRealSize(point)
+            Size(point.x, point.y)
+        }
+    }.getOrNull()?.takeIf { it.width > 0 && it.height > 0 }
 
     /**
      * 活动锁屏类型：`wallpaper_lock_screen_info`（格式 "type,order"）的首段。

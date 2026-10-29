@@ -100,13 +100,20 @@ internal class ReaderScreensaverCoverLoader(
     }
 
     /** 解码阶段：采样解码 + 必要时网络大图重载升级（摘要随之变化）。 */
-    suspend fun decodeAndUpgrade(source: ReaderScreensaverCoverSource): ReaderScreensaverCover? {
-        var cover = decodeCover(source.bytes, source.digest) ?: return null
+    suspend fun decodeAndUpgrade(
+        source: ReaderScreensaverCoverSource,
+        targetWidthPx: Int,
+        targetHeightPx: Int,
+    ): ReaderScreensaverCover? {
+        var cover = decodeCover(source.bytes, source.digest, targetWidthPx, targetHeightPx)
+            ?: return null
         if (
             source.coverUrl.startsWith("http", ignoreCase = true) &&
             coverNeedsHighResolutionReload(
                 width = cover.bitmap.width,
                 height = cover.bitmap.height,
+                targetWidth = targetWidthPx,
+                targetHeight = targetHeightPx,
             )
         ) {
             val attemptKey = "${source.coverUrl}|${source.digest}"
@@ -121,7 +128,12 @@ internal class ReaderScreensaverCoverLoader(
                         attemptedReloads.markAttempt("${source.coverUrl}|$reloadedDigest")
                     }
                     if (reloadedDigest != source.digest) {
-                        val reloaded = decodeCover(reloadedBytes, reloadedDigest)
+                        val reloaded = decodeCover(
+                            reloadedBytes,
+                            reloadedDigest,
+                            targetWidthPx,
+                            targetHeightPx,
+                        )
                         if (reloaded != null) {
                             if (reloaded.pixelCount > cover.pixelCount) {
                                 Log.i(
@@ -148,6 +160,8 @@ internal class ReaderScreensaverCoverLoader(
                 "needs_reload=${coverNeedsHighResolutionReload(
                     cover.bitmap.width,
                     cover.bitmap.height,
+                    targetWidthPx,
+                    targetHeightPx,
                 )}",
         )
         return cover
@@ -201,12 +215,22 @@ internal class ReaderScreensaverCoverLoader(
         return bounds.outWidth to bounds.outHeight
     }
 
-    private fun decodeCover(bytes: ByteArray, digest: String): ReaderScreensaverCover? {
+    private fun decodeCover(
+        bytes: ByteArray,
+        digest: String,
+        targetWidthPx: Int,
+        targetHeightPx: Int,
+    ): ReaderScreensaverCover? {
         val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
         BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
         if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null
 
-        val sampleSize = calculateCoverSampleSize(bounds.outWidth, bounds.outHeight)
+        val sampleSize = calculateCoverSampleSize(
+            bounds.outWidth,
+            bounds.outHeight,
+            targetWidthPx,
+            targetHeightPx,
+        )
         val options = BitmapFactory.Options().apply {
             inSampleSize = sampleSize
             inPreferredConfig = Bitmap.Config.ARGB_8888
@@ -236,14 +260,14 @@ internal class ReaderScreensaverCoverLoader(
 
 /**
  * Samples only while both decoded dimensions stay at least as large as the
- * lock-screen target. Decoding below the target would force an avoidable
- * second upscale.
+ * device's lock-screen target. Decoding below the target would force an
+ * avoidable second upscale.
  */
 internal fun calculateCoverSampleSize(
     sourceWidth: Int,
     sourceHeight: Int,
-    targetWidth: Int = ReaderScreensaverRenderer.TARGET_WIDTH,
-    targetHeight: Int = ReaderScreensaverRenderer.TARGET_HEIGHT,
+    targetWidth: Int,
+    targetHeight: Int,
 ): Int {
     var sampleSize = 1
     while (
@@ -258,6 +282,6 @@ internal fun calculateCoverSampleSize(
 internal fun coverNeedsHighResolutionReload(
     width: Int,
     height: Int,
-    targetWidth: Int = ReaderScreensaverRenderer.TARGET_WIDTH,
-    targetHeight: Int = ReaderScreensaverRenderer.TARGET_HEIGHT,
+    targetWidth: Int,
+    targetHeight: Int,
 ): Boolean = width < targetWidth || height < targetHeight

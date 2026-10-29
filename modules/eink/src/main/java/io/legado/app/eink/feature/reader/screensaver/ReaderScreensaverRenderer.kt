@@ -13,12 +13,13 @@ import io.legado.app.eink.feature.reader.clampTipFontSizeToAvailablePx
 import io.legado.app.eink.feature.reader.fontLineRequirementRatio
 
 /**
- * Renders the current reader page at the fixed iReader wallpaper size.
+ * Renders the current reader page at the device's real display size.
  *
- * The live Compose page is drawn through the same [ReaderPageSnapshotPainter].
- * Header/footer rendering mirrors the reader's configured pixel-anchored font
- * sizing and is drawn in the host-reserved extents before the canvas scale is
- * restored. The system illustration is applied last at full target size.
+ * The live Compose page is drawn through the same [ReaderPageSnapshotPainter]
+ * and scaled from the reader viewport into the wallpaper canvas. Header/footer
+ * rendering mirrors the reader's configured pixel-anchored font sizing and is
+ * drawn in the host-reserved extents before the canvas scale is restored. The
+ * system illustration is applied last at full target size.
  */
 internal class ReaderScreensaverRenderer {
 
@@ -30,11 +31,13 @@ internal class ReaderScreensaverRenderer {
     fun renderCover(
         cover: Bitmap,
         illustration: Bitmap?,
+        targetWidthPx: Int,
+        targetHeightPx: Int,
     ): Bitmap {
-        val bitmap = Bitmap.createBitmap(TARGET_WIDTH, TARGET_HEIGHT, Bitmap.Config.RGB_565)
+        val bitmap = Bitmap.createBitmap(targetWidthPx, targetHeightPx, Bitmap.Config.RGB_565)
         val canvas = Canvas(bitmap)
         val paint = illustrationPaint()
-        val destination = RectF(0f, 0f, TARGET_WIDTH.toFloat(), TARGET_HEIGHT.toFloat())
+        val destination = RectF(0f, 0f, targetWidthPx.toFloat(), targetHeightPx.toFloat())
         canvas.drawBitmap(cover, null, destination, paint)
         if (illustration != null && !illustration.isRecycled) {
             canvas.drawBitmap(illustration, null, destination, paint)
@@ -45,15 +48,17 @@ internal class ReaderScreensaverRenderer {
     fun render(
         request: ReaderScreensaverRequest,
         illustration: Bitmap?,
+        targetWidthPx: Int,
+        targetHeightPx: Int,
     ): Bitmap {
-        val bitmap = Bitmap.createBitmap(TARGET_WIDTH, TARGET_HEIGHT, Bitmap.Config.RGB_565)
+        val bitmap = Bitmap.createBitmap(targetWidthPx, targetHeightPx, Bitmap.Config.RGB_565)
         val canvas = Canvas(bitmap)
         val backgroundPaint = Paint().apply { color = request.colors.backgroundArgb }
         canvas.drawRect(
             0f,
             0f,
-            TARGET_WIDTH.toFloat(),
-            TARGET_HEIGHT.toFloat(),
+            targetWidthPx.toFloat(),
+            targetHeightPx.toFloat(),
             backgroundPaint,
         )
 
@@ -64,8 +69,8 @@ internal class ReaderScreensaverRenderer {
             contentHeightPx = sourceHeight,
             systemBarTopInsetPx = request.systemBarTopInsetPx,
             systemBarBottomInsetPx = request.systemBarBottomInsetPx,
-            targetWidthPx = TARGET_WIDTH,
-            targetHeightPx = TARGET_HEIGHT,
+            targetWidthPx = targetWidthPx,
+            targetHeightPx = targetHeightPx,
         )
 
         canvas.save()
@@ -123,7 +128,7 @@ internal class ReaderScreensaverRenderer {
             canvas.drawBitmap(
                 illustration,
                 null,
-                RectF(0f, 0f, TARGET_WIDTH.toFloat(), TARGET_HEIGHT.toFloat()),
+                RectF(0f, 0f, targetWidthPx.toFloat(), targetHeightPx.toFloat()),
                 illustrationPaint(),
             )
         }
@@ -244,10 +249,5 @@ internal class ReaderScreensaverRenderer {
         val metrics = paint.fontMetrics
         return top + (availableHeight - (metrics.descent - metrics.ascent)) / 2f -
             metrics.ascent
-    }
-
-    companion object {
-        const val TARGET_WIDTH = 1860
-        const val TARGET_HEIGHT = 2480
     }
 }

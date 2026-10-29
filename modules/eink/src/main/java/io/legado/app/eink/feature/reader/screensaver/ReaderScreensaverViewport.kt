@@ -7,8 +7,8 @@ internal data class ReaderScreensaverViewport(
 )
 
 /**
- * Maps the reader content viewport into the fixed wallpaper canvas while
- * preserving the system-bar bands outside that viewport.
+ * Maps the reader content viewport into the device-sized wallpaper canvas
+ * while preserving the system-bar bands outside that viewport.
  *
  * When the status bar is visible the reader viewport starts below it, so the
  * generated image leaves the same scaled band blank above the page. Hidden

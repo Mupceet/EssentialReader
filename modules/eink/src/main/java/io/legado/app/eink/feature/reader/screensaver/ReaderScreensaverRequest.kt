@@ -18,7 +18,8 @@ internal data class ReaderScreensaverColors(
  * Immutable snapshot of everything needed to render one lock-screen image.
  *
  * The reader viewport can exclude system bars while the `.rmb` target is a
- * fixed full-screen bitmap, so both source dimensions and density are kept.
+ * device-sized full-screen bitmap, so both source dimensions and density are
+ * kept.
  */
 internal data class ReaderScreensaverRequest(
     val page: ReaderPageSnapshot,
@@ -97,6 +98,8 @@ internal object ReaderScreensaverFingerprint {
     fun of(
         request: ReaderScreensaverRequest,
         settings: ReaderScreensaverSettings,
+        targetWidthPx: Int,
+        targetHeightPx: Int,
         coverDigest: String? = null,
     ): String {
         val digest = MessageDigest.getInstance("SHA-256")
@@ -110,6 +113,8 @@ internal object ReaderScreensaverFingerprint {
             digest.int(settings.bookScreenSaverStyle)
             digest.int(if (settings.illustrationEnabled) 1 else 0)
             digest.text(settings.illustrationValue ?: "")
+            digest.int(targetWidthPx)
+            digest.int(targetHeightPx)
             return digest.hex()
         }
 
@@ -173,6 +178,8 @@ internal object ReaderScreensaverFingerprint {
         digest.text(request.style.toString())
         digest.int(request.viewportWidthPx)
         digest.int(request.viewportHeightPx)
+        digest.int(targetWidthPx)
+        digest.int(targetHeightPx)
         digest.float(request.density)
         digest.int(request.colors.backgroundArgb)
         digest.int(request.colors.textArgb)

@@ -26,23 +26,23 @@ class ReaderScreensaverFingerprintTest {
         val same = request(text = "same page")
 
         assertEquals(
-            ReaderScreensaverFingerprint.of(request, settings),
-            ReaderScreensaverFingerprint.of(same, settings),
+            fingerprint(request, settings),
+            fingerprint(same, settings),
         )
         assertNotEquals(
-            ReaderScreensaverFingerprint.of(request, settings),
-            ReaderScreensaverFingerprint.of(request(text = "next page"), settings),
+            fingerprint(request, settings),
+            fingerprint(request(text = "next page"), settings),
         )
         assertNotEquals(
-            ReaderScreensaverFingerprint.of(request, settings),
-            ReaderScreensaverFingerprint.of(
+            fingerprint(request, settings),
+            fingerprint(
                 request,
                 settings.copy(illustrationValue = "custom.png"),
             ),
         )
         assertNotEquals(
-            ReaderScreensaverFingerprint.of(request, settings),
-            ReaderScreensaverFingerprint.of(request.copyWithBookName("another book"), settings),
+            fingerprint(request, settings),
+            fingerprint(request.copyWithBookName("another book"), settings),
         )
     }
 
@@ -65,34 +65,81 @@ class ReaderScreensaverFingerprintTest {
         val request = request(text = "same page")
 
         assertEquals(
-            ReaderScreensaverFingerprint.of(request, coverSettings, coverDigest = "cover-a"),
-            ReaderScreensaverFingerprint.of(
+            fingerprint(request, coverSettings, coverDigest = "cover-a"),
+            fingerprint(
                 request(text = "different page"),
                 coverSettings,
                 coverDigest = "cover-a",
             ),
         )
         assertNotEquals(
-            ReaderScreensaverFingerprint.of(request, coverSettings, coverDigest = "cover-a"),
-            ReaderScreensaverFingerprint.of(request, coverSettings, coverDigest = "cover-b"),
+            fingerprint(request, coverSettings, coverDigest = "cover-a"),
+            fingerprint(request, coverSettings, coverDigest = "cover-b"),
         )
         assertNotEquals(
-            ReaderScreensaverFingerprint.of(request, coverSettings, coverDigest = "cover-a"),
-            ReaderScreensaverFingerprint.of(
+            fingerprint(request, coverSettings, coverDigest = "cover-a"),
+            fingerprint(
                 request.copyWithBookAuthor("another author"),
                 coverSettings,
                 coverDigest = "cover-a",
             ),
         )
         assertNotEquals(
-            ReaderScreensaverFingerprint.of(request, coverSettings, coverDigest = "cover-a"),
-            ReaderScreensaverFingerprint.of(
+            fingerprint(request, coverSettings, coverDigest = "cover-a"),
+            fingerprint(
                 request.copyWithBookUrl("another url"),
                 coverSettings,
                 coverDigest = "cover-a",
             ),
         )
     }
+
+    @Test
+    fun reflectsTheWallpaperTargetSizeInBothModes() {
+        val request = request(text = "same page")
+        val coverSettings = settings.copy(bookScreenSaverStyle = 2)
+
+        // 阅读页模式：目标画布尺寸变化（换设备/旋转）必须重发
+        assertNotEquals(
+            fingerprint(request, settings, targetWidthPx = 1860, targetHeightPx = 2480),
+            fingerprint(request, settings, targetWidthPx = 1200, targetHeightPx = 1600),
+        )
+        assertEquals(
+            fingerprint(request, settings, targetWidthPx = 1860, targetHeightPx = 2480),
+            fingerprint(request, settings, targetWidthPx = 1860, targetHeightPx = 2480),
+        )
+        // 封面模式同样随目标尺寸缩放，尺寸变化必须重发
+        assertNotEquals(
+            fingerprint(
+                request,
+                coverSettings,
+                coverDigest = "cover-a",
+                targetWidthPx = 1860,
+                targetHeightPx = 2480,
+            ),
+            fingerprint(
+                request,
+                coverSettings,
+                coverDigest = "cover-a",
+                targetWidthPx = 1200,
+                targetHeightPx = 1600,
+            ),
+        )
+    }
+
+    private fun fingerprint(
+        request: ReaderScreensaverRequest,
+        settings: ReaderScreensaverSettings,
+        targetWidthPx: Int = 1860,
+        targetHeightPx: Int = 2480,
+        coverDigest: String? = null,
+    ): String = ReaderScreensaverFingerprint.of(
+        request = request,
+        settings = settings,
+        targetWidthPx = targetWidthPx,
+        targetHeightPx = targetHeightPx,
+        coverDigest = coverDigest,
+    )
 
     private fun request(text: String): ReaderScreensaverRequest {
         val spec = ReaderPaintSpec(
