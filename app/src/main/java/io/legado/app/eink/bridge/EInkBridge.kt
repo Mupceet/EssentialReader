@@ -372,6 +372,11 @@ private object GlobalSettingsImpl : GlobalSettings, KoinComponent {
             }
         }
 
+    /** 只读（同键同源完整模式「隐藏导航栏」；在宿主阅读配置界面修改）。 */
+    override val hideNavigationBar: Boolean
+        get() = readSettingsGateway.currentSettings.hideNavigationBar
+
+
     override var showReviewBubbles: Boolean
         get() = readSettingsGateway.currentSettings.showReviewBubbles
         set(value) {

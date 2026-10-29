@@ -147,4 +147,32 @@ class ReaderPaginationCacheKeyTest {
         )
         assertNotEquals(enabled, disabled)
     }
+
+    @Test
+    fun `排版内容边距变化反映到缓存键`() {
+        // 系统栏避让（同源宿主策略）变化 ⇒ 正文区域变化 ⇒ 必须重排
+        val noAvoidance = readerPaginationCacheKey(
+            input(), style, 1000, 1400, emptyList(), 40f, 40f,
+            io.legado.app.eink.contract.ReaderEngine.ReaderContentPadding(),
+        )
+        val statusBarAvoided = readerPaginationCacheKey(
+            input(), style, 1000, 1400, emptyList(), 40f, 40f,
+            io.legado.app.eink.contract.ReaderEngine.ReaderContentPadding(top = 80),
+        )
+        val navBarAvoided = readerPaginationCacheKey(
+            input(), style, 1000, 1400, emptyList(), 40f, 40f,
+            io.legado.app.eink.contract.ReaderEngine.ReaderContentPadding(bottom = 48),
+        )
+        // 边距归零可复现（切换两套阅读界面同避让值 ⇒ 缓存键一致）
+        assertEquals(
+            noAvoidance,
+            readerPaginationCacheKey(
+                input(), style, 1000, 1400, emptyList(), 40f, 40f,
+                io.legado.app.eink.contract.ReaderEngine.ReaderContentPadding(),
+            ),
+        )
+        assertNotEquals(noAvoidance, statusBarAvoided)
+        assertNotEquals(noAvoidance, navBarAvoided)
+        assertNotEquals(statusBarAvoided, navBarAvoided)
+    }
 }

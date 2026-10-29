@@ -3,6 +3,7 @@ package io.legado.app.eink.bridge
 import io.legado.app.data.entities.Book
 import io.legado.app.data.entities.HighlightRule
 import io.legado.app.data.repository.HighlightRuleRepository
+import io.legado.app.eink.contract.ReaderEngine
 import io.legado.app.eink.contract.ReaderPageSnapshot
 import io.legado.app.feature.reader.core.model.ReaderPage
 import io.legado.app.feature.reader.core.navigation.ReaderChapterPaginationSnapshot
@@ -51,11 +52,13 @@ internal data class ReaderPageMeta(
  * ChapterProvider 体系已整体删除），而是新核心 ReaderPaginator 的设置
  * 适配层，完整模式自己的分页也走它（ReadBookController#directReaderLayoutJob）。
  * 章节输入、样式工厂、高亮规则、revision 公式、装饰预留均与完整模式
- * 同源同参（宿主分页器代码与上游零差异）。仅 contentPadding 传 0：
- * 完整模式画布全屏、经 ReaderContentAvoidancePolicy 向分页器避让系统栏；
- * E-Ink 模块画布已在布局层（insets）避让系统栏，语义一致。页眉/页脚
- * 由模块按宿主预留高度（headerDecorationExtentPx）叠加绘制在画布上，
- * 对齐完整模式「装饰画在预留区内」的几何。
+ * 同源同参（宿主分页器代码与上游零差异）。contentPadding 同为宿主策略
+ * （ReaderContentAvoidancePolicy，配置同源）解析的系统栏避让值——完整
+ * 模式画布全屏、经 contentPadding 向分页器避让；E-Ink 模块画布同样全屏
+ * （系统栏 overlay 其上），排版输入与完整模式完全一致，切换两套阅读
+ * 界面不再因视口差异跳页。页眉/页脚由模块按宿主预留高度
+ * （headerDecorationExtentPx）以同源几何叠加绘制在画布上，对齐完整模式
+ * 「装饰画在预留区内」的几何。
  *
  * 上游排版核心重写后，带元素的页对象（ReaderPage）不再存于 ReadBook 全局
  * 状态：ReadBook 只保留章节输入窗口（处理完的正文/标题/解析结果）与字符
@@ -96,6 +99,13 @@ internal class ReaderChapterPager(
     private var viewportHeight = 0
 
     /**
+     * 排版内容边距（系统栏/刘海避让，宿主策略同源解析）：画布全屏、
+     * 避让并入分页 contentPadding——与完整模式 ReadBookController 的
+     * 传参同构，两套界面排版输入一致。
+     */
+    private var contentPadding = ReaderEngine.ReaderContentPadding()
+
+    /**
      * 三章窗口缓存（键 = 章节下标）。copy-on-write：主线程写、任意线程读
      * （快照映射可能在 VM 的 IO 协程中被读），引用替换保证可见性。
      */
@@ -120,18 +130,28 @@ internal class ReaderChapterPager(
     val currentChapterPageSize: Int
         get() = chapters[ReadBook.durChapterIndex]?.pages?.size ?: 0
 
-    /** E-Ink 画布视口就绪/变化（等价旧 ChapterProvider.upViewSize）。 */
-    fun updateViewport(width: Int, height: Int) {
+    /** E-Ink 画布视口就绪/变化（等价旧 ChapterProvider.upViewSize；画布全屏 + 内容边距）。 */
+    fun updateViewport(
+        width: Int,
+        height: Int,
+        contentPadding: ReaderEngine.ReaderContentPadding = ReaderEngine.ReaderContentPadding(),
+    ) {
         if (width <= 0 || height <= 0) return
-        // 页眉/页脚内容（时间/电量文本）在首次渲染后才填充，会让画布高度
-        // 漂移几个像素。小于一行正文的视口漂移直接忽略（存储值也不更新，
-        // 否则下一次任何触发都会带着新视口全量重排）：快照自顶部绘制，
-        // 几像素差异只是页脚方向多留空白，而一次重排+换页在墨水屏上就是
-        // 一次肉眼可见的抖动
-        if (width == viewportWidth && abs(height - viewportHeight) < VIEWPORT_EPSILON_PX) return
-        if (width == viewportWidth && height == viewportHeight) return
+        val paddingChanged = contentPadding != this.contentPadding
+        if (!paddingChanged) {
+            // 页眉/页脚内容（时间/电量文本）在首次渲染后才填充，可能引起
+            // 视口漂移。小于一行正文的视口漂移直接忽略（存储值也不更新，
+            // 否则下一次任何触发都会带着新视口全量重排）：快照自顶部绘制，
+            // 几像素差异只是页脚方向多留空白，而一次重排+换页在墨水屏上
+            // 就是一次肉眼可见的抖动
+            if (width == viewportWidth && abs(height - viewportHeight) < VIEWPORT_EPSILON_PX) {
+                return
+            }
+            if (width == viewportWidth && height == viewportHeight) return
+        }
         viewportWidth = width
         viewportHeight = height
+        this.contentPadding = contentPadding
         requestPagination()
     }
 
@@ -309,6 +329,10 @@ internal class ReaderChapterPager(
                     revision = 31L * key.hashCode() + input.chapter.index,
                     viewportWidthPx = viewportWidth,
                     viewportHeightPx = viewportHeight,
+                    contentPaddingLeftPx = contentPadding.left,
+                    contentPaddingTopPx = contentPadding.top,
+                    contentPaddingRightPx = contentPadding.right,
+                    contentPaddingBottomPx = contentPadding.bottom,
                     paginationStyle = style,
                     highlightRules = highlightRules,
                 )
@@ -367,6 +391,10 @@ internal class ReaderChapterPager(
                         revision = 31L * key.hashCode() + input.chapter.index,
                         viewportWidthPx = viewportWidth,
                         viewportHeightPx = viewportHeight,
+                        contentPaddingLeftPx = contentPadding.left,
+                        contentPaddingTopPx = contentPadding.top,
+                        contentPaddingRightPx = contentPadding.right,
+                        contentPaddingBottomPx = contentPadding.bottom,
                         paginationStyle = style,
                         highlightRules = highlightRules,
                     )
@@ -455,7 +483,7 @@ internal class ReaderChapterPager(
         }
     }
 
-    /** 缓存键：章节身份 + 视口 + 影响排版的全部样式标量 + 高亮规则活哈希。 */
+    /** 缓存键：章节身份 + 视口（含内容边距）+ 影响排版的全部样式标量 + 高亮规则活哈希。 */
     private fun cacheKey(
         input: ReaderChapterInput,
         style: ReaderAndroidPaginationStyle,
@@ -468,6 +496,7 @@ internal class ReaderChapterPager(
         highlightRules = highlightRules,
         headerExtentPx = LegacyReaderPageDecorationFactory.headerExtentPx(),
         footerExtentPx = LegacyReaderPageDecorationFactory.footerExtentPx(),
+        contentPadding = contentPadding,
     )
 
     /** 单章分页产物缓存项。 */
@@ -498,6 +527,7 @@ internal fun readerPaginationCacheKey(
     highlightRules: List<HighlightRule>,
     headerExtentPx: Float,
     footerExtentPx: Float,
+    contentPadding: ReaderEngine.ReaderContentPadding = ReaderEngine.ReaderContentPadding(),
 ): String = buildString {
     append(input.chapter.index).append('|')
     append(input.chapter.url).append('|')
@@ -547,6 +577,11 @@ internal fun readerPaginationCacheKey(
     // 结构性闭合装饰参数错位。extent 由调用方传入（工厂经 Koin 取阅读
     // 设置，纯函数键保持无 Koin 依赖、可单测）
     append(headerExtentPx).append(',').append(footerExtentPx).append('|')
+    // 排版内容边距（系统栏避让，宿主策略同源）：避让变化必须重排——
+    // 与完整模式 directReaderLayoutKey 的 contentPadding 段对齐
+    append(contentPadding.left).append(',').append(contentPadding.top)
+        .append(',').append(contentPadding.right)
+        .append(',').append(contentPadding.bottom).append('|')
     append(highlightRules.hashCode())
 }
 

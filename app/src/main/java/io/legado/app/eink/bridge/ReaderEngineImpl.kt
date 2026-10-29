@@ -45,6 +45,7 @@ import io.legado.app.model.cache.ChapterSelection
 import io.legado.app.model.localBook.LocalBook
 import io.legado.app.model.webBook.WebBook
 import io.legado.app.feature.reader.legacy.LegacyReaderPageDecorationFactory
+import io.legado.app.ui.book.read.ReaderContentAvoidancePolicy
 import io.legado.app.ui.config.readConfig.ReadConfig
 import io.legado.app.ui.login.SourceLoginJsExtensions
 import org.koin.core.component.KoinComponent
@@ -469,8 +470,44 @@ internal object ReaderEngineImpl : ReaderEngine, KoinComponent {
 
     // ---- 排版 ----
 
-    override fun updateViewSize(width: Int, height: Int) {
-        chapterPager.updateViewport(width, height)
+    /**
+     * 排版内容边距解析：与完整模式 ReadBookRouteScreen 同一策略同一配置
+     * （[ReaderContentAvoidancePolicy]：hideStatusBar / hideNavigationBar /
+     * paddingDisplayCutouts / 多窗），模块只交忽略可见性 insets 采样。
+     * 策略单一事实源在宿主侧，配置键演进模块零改动。
+     */
+    override fun resolveContentPadding(
+        insets: ReaderEngine.ReaderSystemBarInsets,
+        hideStatusBar: Boolean,
+    ): ReaderEngine.ReaderContentPadding {
+        val padding = ReaderContentAvoidancePolicy.padding(
+            insets = ReaderContentAvoidancePolicy.SystemBarInsets(
+                statusBarTopPx = insets.statusBarTopPx,
+                navigationBarBottomPx = insets.navigationBarBottomPx,
+                cutoutLeftPx = insets.cutoutLeftPx,
+                cutoutTopPx = insets.cutoutTopPx,
+                cutoutRightPx = insets.cutoutRightPx,
+                cutoutBottomPx = insets.cutoutBottomPx,
+            ),
+            hideStatusBar = hideStatusBar,
+            hideNavigationBar = readSettingsRepository.currentSettings.hideNavigationBar,
+            paddingDisplayCutouts = readSettingsRepository.currentSettings.paddingDisplayCutouts,
+            inMultiWindow = EInkBridge.hostActivity()?.isInMultiWindowMode ?: false,
+        )
+        return ReaderEngine.ReaderContentPadding(
+            left = padding.left,
+            top = padding.top,
+            right = padding.right,
+            bottom = padding.bottom,
+        )
+    }
+
+    override fun updateViewSize(
+        width: Int,
+        height: Int,
+        contentPadding: ReaderEngine.ReaderContentPadding,
+    ) {
+        chapterPager.updateViewport(width, height, contentPadding)
     }
 
     override val isViewportReady: Boolean
@@ -530,7 +567,14 @@ internal object ReaderEngineImpl : ReaderEngine, KoinComponent {
         titleFont = followBodyIfSame(durConfig.titleFont, durConfig.textFont),
         headerFont = followBodyIfSame(durConfig.headerFont, durConfig.textFont),
         headerSize = durConfig.headerFontSize,
-        footerSize = durConfig.footerFontSize,
+        // 页脚字号与完整模式装饰工厂同源解析：applyHeaderStyle 开启时跟随
+        // 页眉字号（字体侧经 headerFooterTypefaces 的 resolveFooterTipFont
+        // 同样处理，两侧口径一致）
+        footerSize = if (durConfig.applyHeaderStyle) {
+            durConfig.headerFontSize
+        } else {
+            durConfig.footerFontSize
+        },
         headerDivider = durConfig.showHeaderLine,
         footerDivider = durConfig.showFooterLine,
         headerMode = when (durConfig.headerMode) {
