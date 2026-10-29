@@ -1,8 +1,6 @@
 package io.legado.app.eink.feature.common
 
 import android.content.Context
-import android.graphics.Paint
-import android.graphics.Typeface
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
@@ -13,11 +11,18 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithCache
-import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
-import androidx.compose.ui.graphics.nativeCanvas
-import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.drawText
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.rememberTextMeasurer
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -26,6 +31,8 @@ import io.legado.app.eink.contract.EInkEngineRegistry
 import io.legado.app.eink.designsystem.theme.EInkShapes
 import io.legado.app.eink.designsystem.theme.EInkTheme
 import io.legado.app.eink.designsystem.widget.EInkAsyncImage
+import kotlin.math.ceil
+import kotlin.math.roundToInt
 
 /** 封面尺寸（与 View 版 item_bookshelf_list.xml 一致：66dp × 90dp）。 */
 val EInkCoverWidth = 66.dp
@@ -139,17 +146,36 @@ fun EInkBookCover(
 }
 
 /**
- * 文字占位封面：无封面时保证封面区域正常显示。
+ * 文字占位封面（方案 A「题签」式）：无封面时保证封面区域正常显示。
  *
- * 竖排信息方向：书名加粗逐字下排居左（起点 0.16W/0.16H，步进一个字高，
- * 超过 0.8H 换列——右移 1.2 倍字宽、列首回落 0.2H），落在左上区域；
- * 作者逐字下排贴右缘（0.84W），列尾锚定 0.8H——署名落右下角，过长时
- * 列首不高于 0.2H、溢出底部裁剪。
- * 字号取封面宽比例（书名 1/7、作者 1/9），随封面尺寸等比缩放；较宿主
- * 比例（1/8、1/12）放大——本版本封面中部没有 Book 图标填充，原比例
- * 留白偏空，作者尤其需要加大。
+ * 版式取自中式线装书题签：封面整体为纸面（surface），左上角一枚竖排
+ * 题签只承载书名文字——书名逐字下排、列满左移换列（最多两列，超长
+ * 截断补「…」），【…】标签以小字落在书名列左侧（引题位）；右下角
+ * 落款行——作者横排右对齐、末尾钤书名首字藏书印
+ * （onSurface 印底、surface 印文），仿落款钤印收笔。左上题签、右下
+ * 落款对角占位；文字量被题签与截断天然封顶，不会重现旧版“逐字换列
+ * 塞满整框”。
  *
- * 不引入宿主的阴影/描边/自定义字色设置（E-Ink 零阴影，颜色由主题下发）。
+ * 题签高 0.72H、上边距 0.07H、左缘对齐 0.085W 边距并向右扩展，宽度
+ * 由实际列数决定；每列 7 字（题签内容高 / 1.12 倍书名字号，66:90 恒定
+ * 宽高比下与封面尺寸无关），列表 88×120dp 与网格 120×163dp 同为两列
+ * 14 字上限，搜索 66×90dp 同比例缩放。字号全部取封面宽比例（书名
+ * 0.11W、标签 0.06W、作者 0.09W、印文 0.10W）；竖排字距 1.12 倍字号、
+ * 列距 1.55 倍字号（CJK 字面 ≈0.86 字号，视觉留隙与效果图一致）。
+ *
+ * 字体与界面排版同源：直绘文本经 [rememberTextMeasurer] 走 Compose 文本
+ * 排版，消费 [EInkTheme.typography] 挂载的宿主全局 UI 字体
+ * （[io.legado.app.eink.contract.EInkHostActivity.uiFontFamily] 注入，
+ * 默认平台字体），与界面 Text 同一套字体解析，天然跟随字体切换；字重
+ * 按排版系统角色——书名/印文 Bold（title 角色）、标签/作者 Normal
+ * （body 角色）。颜色全部由主题下发（纸面 surface、墨字 onSurface、
+ * 辅助 onSurfaceVariant、界线 outline），灰阶对比靠“近黑字 + 近白纸 +
+ * 发丝界线”，不用中灰小字（E-Ink 低对比发虚）。不引入宿主的阴影/
+ * 描边/自定义字色设置（E-Ink 零阴影，主题单一下发）。
+ *
+ * 文本解析与截断在 [parseEInkCoverText] / [truncateEInkCoverTitle]
+ * （纯函数，单测锚定 AO3 真实书目）；本函数只按上述比例绘制。
+ *
  * 形状与外层 clip（EInkBookCover 的 coverModifier，medium）一致：内层
  * 半径小于外层掩模时，1dp 边框的四角弧线会被掩模切掉，视觉上四角缺损。
  */
@@ -160,9 +186,13 @@ private fun EInkDefaultCover(
     modifier: Modifier = Modifier,
 ) {
     val colors = EInkTheme.colorScheme
+    // 与界面排版同源的字体族：排版系统全部样式挂载宿主 uiFontFamily
+    //（默认平台字体），封面直绘消费同一族，保证界面字体统一
+    val coverFontFamily = EInkTheme.typography.bodyMedium.fontFamily
+    val textMeasurer = rememberTextMeasurer()
     Box(
         modifier = modifier
-            .background(color = colors.surfaceVariant, shape = EInkShapes.medium)
+            .background(color = colors.surface, shape = EInkShapes.medium)
             .border(width = 1.dp, color = colors.outline, shape = EInkShapes.medium)
     ) {
         Spacer(
@@ -175,54 +205,159 @@ private fun EInkDefaultCover(
                         return@drawWithCache onDrawBehind { }
                     }
 
-                    // 书名竖排逐字下排（几何与宿主逐条对齐）
-                    val namePaint = Paint().apply {
-                        isAntiAlias = true
-                        textAlign = Paint.Align.CENTER
-                        typeface = Typeface.DEFAULT_BOLD
-                        textSize = viewWidth / 7f
-                        color = colors.onSurface.toArgb()
-                    }
-                    val nameCharHeight = namePaint.fontMetrics.let { it.bottom - it.top }
-                    var nameX = viewWidth * 0.16f
-                    var nameY = viewHeight * 0.16f
-                    val nameDraws = name.map { char ->
-                        val draw = Triple(char.toString(), nameX, nameY)
-                        nameY += nameCharHeight
-                        if (nameY > viewHeight * 0.8f) {
-                            nameX += namePaint.textSize * 1.2f
-                            nameY = viewHeight * 0.2f
-                        }
-                        draw
+                    val parsed = parseEInkCoverText(name)
+
+                    // 题签字号与字距/列距：全部随封面宽等比缩放；字号经
+                    // 本作用域 Density 转 sp，与 textMeasurer 密度同源
+                    val titleTextSize = viewWidth * 0.11f
+                    val tagTextSize = viewWidth * 0.06f
+                    val authorTextSize = viewWidth * 0.09f
+                    val sealTextSize = viewWidth * 0.10f
+                    val titleStyle = TextStyle(
+                        color = colors.onSurface,
+                        fontFamily = coverFontFamily,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = titleTextSize.toSp(),
+                    )
+                    val tagStyle = TextStyle(
+                        color = colors.onSurfaceVariant,
+                        fontFamily = coverFontFamily,
+                        fontSize = tagTextSize.toSp(),
+                    )
+                    val authorStyle = TextStyle(
+                        color = colors.onSurfaceVariant,
+                        fontFamily = coverFontFamily,
+                        fontSize = authorTextSize.toSp(),
+                    )
+                    val sealStyle = TextStyle(
+                        color = colors.surface,
+                        fontFamily = coverFontFamily,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = sealTextSize.toSp(),
+                    )
+                    val titlePitchY = titleTextSize * 1.12f
+                    val tagPitchY = tagTextSize * 1.12f
+                    val titleColPitch = titleTextSize * 1.55f
+                    val tagColPitch = tagTextSize * 1.6f
+
+                    // 题签几何：高 0.72H、上边距 0.07H、左缘对齐 0.085W
+                    // 边距，内边距 0.026W/0.035H
+                    val slipTop = viewHeight * 0.07f
+                    val slipHeight = viewHeight * 0.72f
+                    val slipPadX = viewWidth * 0.026f
+                    val slipPadY = viewHeight * 0.035f
+                    val contentTop = slipTop + slipPadY
+                    val contentHeight = slipHeight - slipPadY * 2f
+                    val charsPerColumn = (contentHeight / titlePitchY).toInt().coerceAtLeast(1)
+
+                    // 书名最多两列，超长截断补「…」；标签单列小字殿后
+                    val titleText = truncateEInkCoverTitle(parsed.title, 2 * charsPerColumn)
+                    val titleColumns = ceil(titleText.length / charsPerColumn.toFloat())
+                        .toInt().coerceIn(1, 2)
+                    val tagText = parsed.tag?.let { tag ->
+                        truncateEInkCoverTitle(
+                            tag,
+                            (contentHeight / tagPitchY).toInt().coerceAtLeast(1),
+                        )
                     }
 
-                    // 作者竖排贴右缘一列，列尾锚定 0.8H（署名落右下角）：
-                    // 过长时列首不高于 0.2H，底部溢出由封面裁剪
-                    val authorPaint = Paint().apply {
-                        isAntiAlias = true
-                        textAlign = Paint.Align.CENTER
-                        textSize = viewWidth / 9f
-                        color = colors.onSurfaceVariant.toArgb()
+                    // 题签贴左上角，宽度由实际列数决定（上限 0.7W 兜底）
+                    // 并向右扩展；书名列自最右向左起排，标签列紧贴书名
+                    // 列左侧（引题位）
+                    val contentWidth = titleColumns * titleColPitch +
+                            (if (tagText != null) tagColPitch else 0f)
+                    val slipWidth = (contentWidth + slipPadX * 2f)
+                        .coerceAtMost(viewWidth * 0.7f)
+                    val slipLeft = viewWidth * 0.085f
+                    val contentRight = slipLeft + slipWidth - slipPadX
+                    val titleBaseX = contentRight - titleColPitch / 2f
+
+                    // 逐字测量（书名/标签竖排逐字定位，印文居中定位）
+                    val titleLayouts = titleText.map { char ->
+                        textMeasurer.measure(char.toString(), titleStyle)
                     }
-                    val authorCharHeight = authorPaint.fontMetrics.let { it.bottom - it.top }
-                    val authorText = author.orEmpty()
-                    var authorY = viewHeight * 0.8f -
-                            (authorText.length - 1).coerceAtLeast(0) * authorCharHeight
-                    authorY = authorY.coerceAtLeast(viewHeight * 0.2f)
-                    val authorDraws = authorText.map { char ->
-                        val draw = Triple(char.toString(), viewWidth * 0.84f, authorY)
-                        authorY += authorCharHeight
-                        draw
+                    val tagLayouts = tagText?.map { char ->
+                        textMeasurer.measure(char.toString(), tagStyle)
+                    }
+                    val sealLayout = textMeasurer.measure(
+                        parsed.title.firstOrNull()?.toString() ?: "书",
+                        sealStyle,
+                    )
+
+                    // 藏书印：右下角落款行末尾（贴 0.085W 右边距线），
+                    // 书名首字；印底 onSurface、印文 surface；下边距
+                    // 0.05H——题签加高后与落款行保持间距
+                    val sealSize = viewWidth * 0.17f
+                    val sealLeft = viewWidth - viewWidth * 0.085f - sealSize
+                    val sealTop = viewHeight - viewHeight * 0.05f - sealSize
+                    val sealCenterX = sealLeft + sealSize / 2f
+                    val sealCenterY = sealTop + sealSize / 2f
+
+                    // 作者：横排落款与印章同行，右对齐印章左侧、随印贴
+                    // 0.085W 右边距线，超长向左扩展省略号收尾
+                    val authorText = author?.trim().orEmpty()
+                    val authorRight = sealLeft - viewWidth * 0.03f
+                    val authorLayout = authorText.takeIf { it.isNotEmpty() }?.let {
+                        textMeasurer.measure(
+                            it,
+                            authorStyle,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            constraints = Constraints(
+                                maxWidth = (authorRight - slipLeft).roundToInt(),
+                            ),
+                        )
                     }
 
                     onDrawBehind {
-                        drawIntoCanvas { canvas ->
-                            nameDraws.forEach { (text, x, y) ->
-                                canvas.nativeCanvas.drawText(text, x, y, namePaint)
-                            }
-                            authorDraws.forEach { (text, x, y) ->
-                                canvas.nativeCanvas.drawText(text, x, y, authorPaint)
-                            }
+                        // 题签只描界线不铺底：纸面本就同色，发丝线即题签轮廓
+                        drawRect(
+                            color = colors.outline,
+                            topLeft = Offset(slipLeft, slipTop),
+                            size = Size(slipWidth, slipHeight),
+                            style = Stroke(width = 1.dp.toPx()),
+                        )
+                        titleLayouts.forEachIndexed { index, layout ->
+                            drawText(
+                                layout,
+                                topLeft = Offset(
+                                    titleBaseX - (index / charsPerColumn) * titleColPitch -
+                                            layout.size.width / 2f,
+                                    contentTop + (index % charsPerColumn) * titlePitchY,
+                                ),
+                            )
+                        }
+                        tagLayouts?.forEachIndexed { index, layout ->
+                            drawText(
+                                layout,
+                                topLeft = Offset(
+                                    contentRight - titleColumns * titleColPitch -
+                                            tagColPitch / 2f - layout.size.width / 2f,
+                                    contentTop + index * tagPitchY,
+                                ),
+                            )
+                        }
+                        drawRoundRect(
+                            color = colors.onSurface,
+                            topLeft = Offset(sealLeft, sealTop),
+                            size = Size(sealSize, sealSize),
+                            cornerRadius = CornerRadius(viewWidth * 0.017f),
+                        )
+                        drawText(
+                            sealLayout,
+                            topLeft = Offset(
+                                sealCenterX - sealLayout.size.width / 2f,
+                                sealCenterY - sealLayout.size.height / 2f,
+                            ),
+                        )
+                        authorLayout?.let { layout ->
+                            drawText(
+                                layout,
+                                topLeft = Offset(
+                                    authorRight - layout.size.width,
+                                    sealCenterY - layout.size.height / 2f,
+                                ),
+                            )
                         }
                     }
                 }

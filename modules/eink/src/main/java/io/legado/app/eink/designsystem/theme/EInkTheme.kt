@@ -223,7 +223,8 @@ object EInkTheme {
  * @param darkTheme Whether to use dark theme colors
  * @param fontFamily 宿主提供的全局 UI 字体（如完整模式「外观 → 字体」的自定义
  *   字体族）；null = 平台默认字体（跟随系统字体替换）。挂载到排版系统全部
- *   样式上；Canvas 直绘文本（文字占位封面、阅读页快照）不在此消费范围。
+ *   样式上；Canvas 直绘文本中，文字占位封面经排版系统消费同一字体族，
+ *   阅读页快照仍不在此消费范围。
  * @param content The content to theme
  */
 @Composable
