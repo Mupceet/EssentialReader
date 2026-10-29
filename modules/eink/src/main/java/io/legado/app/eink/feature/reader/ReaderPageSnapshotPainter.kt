@@ -16,8 +16,10 @@ import io.legado.app.eink.feature.reader.selection.decorationSpanX
 /**
  * Snapshot geometry and colors needed to draw a reader page.
  *
- * Coordinates remain in the reader viewport pixel space. The off-screen
- * screensaver renderer scales the canvas before invoking the painter.
+ * Coordinates are window pixel space (the canvas is full-screen; system bars
+ * overlay it and the snapshot already contains the content-padding offsets).
+ * The off-screen screensaver renderer scales the canvas before invoking the
+ * painter when the window differs from the device display.
  */
 internal data class ReaderPageRenderStyle(
     val widthPx: Int,
@@ -27,7 +29,8 @@ internal data class ReaderPageRenderStyle(
     val highlightColorArgb: Int,
     val badgeColorArgb: Int,
     val imageAntiAlias: Boolean,
-    val headerExtentPx: Float,
+    /** 正文首行顶（窗口坐标）：书签角标锚定点。 */
+    val contentTopPx: Float,
 )
 
 /**
@@ -151,7 +154,7 @@ internal class ReaderPageSnapshotPainter {
             val badgeWidth = 16f * style.density
             val badgeHeight = 64f * style.density
             val right = style.widthPx - 6f * style.density
-            val top = style.headerExtentPx
+            val top = style.contentTopPx
             val notch = badgeHeight * 0.25f
             val ribbon = Path().apply {
                 moveTo(right - badgeWidth, top)

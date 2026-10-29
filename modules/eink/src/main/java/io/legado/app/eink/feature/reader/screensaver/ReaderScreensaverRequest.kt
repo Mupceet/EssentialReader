@@ -17,9 +17,11 @@ internal data class ReaderScreensaverColors(
 /**
  * Immutable snapshot of everything needed to render one lock-screen image.
  *
- * The reader viewport can exclude system bars while the `.rmb` target is a
- * device-sized full-screen bitmap, so both source dimensions and density are
- * kept.
+ * Coordinates are **window space**：the reader canvas is full-screen (system
+ * bars overlay it) and the `.rmb` target is a device-sized full-screen bitmap.
+ * The viewport dimensions are the window size; the system-bar inset fields
+ * carry the reader's content padding (same-source host avoidance policy), so
+ * the bands [0, systemBarTopInsetPx) / bottom are blank system-bar bands.
  */
 internal data class ReaderScreensaverRequest(
     val page: ReaderPageSnapshot,
@@ -44,6 +46,8 @@ internal data class ReaderScreensaverRequest(
     val footerExtentPx: Float,
     val systemBarTopInsetPx: Float,
     val systemBarBottomInsetPx: Float,
+    val contentPaddingLeftPx: Float,
+    val contentPaddingRightPx: Float,
 )
 
 internal fun ReaderUiState.toScreensaverRequest(
@@ -58,6 +62,8 @@ internal fun ReaderUiState.toScreensaverRequest(
     footerExtentPx: Float,
     systemBarTopInsetPx: Float,
     systemBarBottomInsetPx: Float,
+    contentPaddingLeftPx: Float,
+    contentPaddingRightPx: Float,
 ): ReaderScreensaverRequest? {
     val currentPage = page ?: return null
     if (viewportWidthPx <= 0 || viewportHeightPx <= 0) return null
@@ -84,6 +90,8 @@ internal fun ReaderUiState.toScreensaverRequest(
         footerExtentPx = footerExtentPx,
         systemBarTopInsetPx = systemBarTopInsetPx.coerceAtLeast(0f),
         systemBarBottomInsetPx = systemBarBottomInsetPx.coerceAtLeast(0f),
+        contentPaddingLeftPx = contentPaddingLeftPx.coerceAtLeast(0f),
+        contentPaddingRightPx = contentPaddingRightPx.coerceAtLeast(0f),
     )
 }
 
@@ -193,6 +201,8 @@ internal object ReaderScreensaverFingerprint {
         digest.float(request.footerExtentPx)
         digest.float(request.systemBarTopInsetPx)
         digest.float(request.systemBarBottomInsetPx)
+        digest.float(request.contentPaddingLeftPx)
+        digest.float(request.contentPaddingRightPx)
 
         digest.int(if (settings.screensaverEnabled) 1 else 0)
         digest.int(settings.bookScreenSaverStyle)

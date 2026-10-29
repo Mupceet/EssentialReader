@@ -14,15 +14,16 @@ import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.text.BasicText
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
@@ -34,11 +35,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.statusBars
-import androidx.compose.foundation.layout.systemBars
-import androidx.compose.foundation.layout.union
-import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -54,6 +51,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
@@ -66,9 +64,6 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.TextUnit
@@ -82,6 +77,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import io.legado.app.eink.app.hubVolumePagingEvent
 import io.legado.app.eink.contract.EInkEngineRegistry
 import io.legado.app.eink.contract.EInkHostActivity
+import io.legado.app.eink.contract.ReaderEngine
 import io.legado.app.eink.contract.ReaderPageSnapshot
 import io.legado.app.eink.designsystem.content.EInkText
 import io.legado.app.eink.designsystem.control.EInkDialog
@@ -200,25 +196,44 @@ fun ReaderRoute(
     val screensaverPublisher = remember(context.applicationContext) {
         ReaderScreensaverPublisher(context.applicationContext)
     }
-    var contentWidthPx by remember { mutableIntStateOf(0) }
-    var contentHeightPx by remember { mutableIntStateOf(0) }
+    var viewportWidthPx by remember { mutableIntStateOf(0) }
+    var viewportHeightPx by remember { mutableIntStateOf(0) }
     val colorScheme = EInkTheme.colorScheme
     val tipTypefaces = EInkEngineRegistry.readerEngine.headerFooterTypefaces()
+    // 系统栏/刘海「忽略可见性」采样（与宿主完整模式 ReadBookRouteScreen
+    // 同口径）：显隐动画期间恒定。画布保持全屏（系统栏 overlay 其上），
+    // 避让值经宿主策略解析（配置同源：hideNavigationBar/
+    // paddingDisplayCutouts/多窗），并入分页 contentPadding——两套阅读
+    // 界面排版输入一致，切换不再跳。
     val rootWindowInsets = ViewCompat.getRootWindowInsets(view)
-    val systemBarInsets = rootWindowInsets?.getInsets(WindowInsetsCompat.Type.systemBars())
+    val systemBarsIgnoringVisibility = rootWindowInsets
+        ?.getInsetsIgnoringVisibility(WindowInsetsCompat.Type.systemBars())
     val displayCutoutInsets = rootWindowInsets?.getInsets(WindowInsetsCompat.Type.displayCutout())
-    val screensaverTopInsetPx = if (uiState.hideStatusBar) {
-        0f
-    } else {
-        maxOf(
-            systemBarInsets?.top ?: 0,
-            displayCutoutInsets?.top ?: 0,
-        ).toFloat()
+    val systemBarInsetsSample = ReaderEngine.ReaderSystemBarInsets(
+        statusBarTopPx = systemBarsIgnoringVisibility?.top ?: 0,
+        navigationBarBottomPx = systemBarsIgnoringVisibility?.bottom ?: 0,
+        cutoutLeftPx = displayCutoutInsets?.left ?: 0,
+        cutoutTopPx = displayCutoutInsets?.top ?: 0,
+        cutoutRightPx = displayCutoutInsets?.right ?: 0,
+        cutoutBottomPx = displayCutoutInsets?.bottom ?: 0,
+    )
+    val contentPadding = remember(systemBarInsetsSample, uiState.hideStatusBar) {
+        EInkEngineRegistry.readerEngine.resolveContentPadding(
+            insets = systemBarInsetsSample,
+            hideStatusBar = uiState.hideStatusBar,
+        )
     }
-    val screensaverBottomInsetPx = (systemBarInsets?.bottom ?: 0).toFloat()
+    val contentPaddingValues = with(LocalDensity.current) {
+        PaddingValues(
+            start = contentPadding.left.toDp(),
+            top = contentPadding.top.toDp(),
+            end = contentPadding.right.toDp(),
+            bottom = contentPadding.bottom.toDp(),
+        )
+    }
     val screensaverRequest = uiState.toScreensaverRequest(
-        viewportWidthPx = contentWidthPx,
-        viewportHeightPx = contentHeightPx,
+        viewportWidthPx = viewportWidthPx,
+        viewportHeightPx = viewportHeightPx,
         density = density,
         colors = ReaderScreensaverColors(
             backgroundArgb = colorScheme.background.toArgb(),
@@ -232,8 +247,10 @@ fun ReaderRoute(
         imageAntiAlias = EInkEngineRegistry.globalSettings.useAntiAlias,
         headerExtentPx = EInkEngineRegistry.readerEngine.headerDecorationExtentPx,
         footerExtentPx = EInkEngineRegistry.readerEngine.footerDecorationExtentPx,
-        systemBarTopInsetPx = screensaverTopInsetPx,
-        systemBarBottomInsetPx = screensaverBottomInsetPx,
+        systemBarTopInsetPx = contentPadding.top.toFloat(),
+        systemBarBottomInsetPx = contentPadding.bottom.toFloat(),
+        contentPaddingLeftPx = contentPadding.left.toFloat(),
+        contentPaddingRightPx = contentPadding.right.toFloat(),
     )
     val latestScreensaverRequest by rememberUpdatedState(screensaverRequest)
 
@@ -249,13 +266,21 @@ fun ReaderRoute(
     }
     LaunchedEffect(
         uiState.pageVersion,
-        contentWidthPx,
-        contentHeightPx,
+        viewportWidthPx,
+        viewportHeightPx,
+        contentPadding,
         colorScheme,
     ) {
         screensaverRequest?.let { request ->
             screensaverPublisher.updateRequest(request)
             screensaverPublisher.requestPublish()
+        }
+    }
+    // 排版视口上报：全屏画布尺寸 + 内容边距任一变化即重报（画布尺寸
+    // 稳定后边距仍会随开关/多窗/刘海独立变化）
+    LaunchedEffect(viewportWidthPx, viewportHeightPx, contentPadding) {
+        if (viewportWidthPx > 0 && viewportHeightPx > 0) {
+            viewModel.updateViewSize(viewportWidthPx, viewportHeightPx, contentPadding)
         }
     }
     // 按键转发枢纽：宿主入口 Activity onKeyDown/onKeyUp 经注册表下发
@@ -653,32 +678,43 @@ fun ReaderRoute(
     // 是顶部操作条在场时强制显示——墨水屏固件的状态栏未必随
     // insetsController.hide() 真正退场（常驻绘制或保留顶部触控拦截），
     // 操作条顶格排版时图标落进状态栏区域内不可操作；强制显示后操作条经
-    // 插图消费链自动下移让位（见顶部操作条 safeDrawing 顶避让）。顶栏
-    // 在场条件与 [topBarVisible] 同源（缓存面板期顶栏保持可见，状态栏
-    // 随之保持显示，与无面板的菜单态一致）；进度与翻页/排版/其它面板与
-    // 排版弹层（操作条不在场）不受例外影响，保持跟随开关——排版弹层的
-    // 页眉调参实时预览语义不变。对齐完整模式沉浸条件「开关开启 &&
-    // 操作条收起」（ReadBookController 的 toolBarHide && hideStatusBar，
-    // 菜单展开期恢复显示）；与完整模式的差异只剩正文侧：顶部避让仍只
-    // 跟随开关本身置零，正文排版区域尺寸不随菜单开合变化（规范 §15），
-    // 页眉（时间/电量）仍恒定承载顶部信息、无让位透明与菜单层高度快照
-    // 避让配合。状态栏临时查看走边缘下滑（TRANSIENT 浮层，不占用插图）。
-    // 旧平台（API < 30）legacy 布局标记 LAYOUT_STABLE 下系统栏插图冻结在
-    // 「栏可见」尺寸、不随 hide() 归零，不能依赖 safeDrawing 自动收缩。
-    // 离开阅读页（含去目录/换源）时恢复显示，其余界面不受影响。
+    // 插图消费链自动下移让位（见顶部操作条顶避让）。顶栏在场条件与
+    // [topBarVisible] 同源（缓存面板期顶栏保持可见，状态栏随之保持显示，
+    // 与无面板的菜单态一致）；进度与翻页面板/排版/其它面板与排版弹层
+    // （操作条不在场）不受例外影响，保持跟随开关——排版弹层的页眉调参
+    // 实时预览语义不变。对齐完整模式沉浸条件「开关开启 && 操作条收起」
+    // （ReadBookController 的 toolBarHide && 开关，菜单展开期恢复显示）；
+    // 正文侧避让只跟随开关本身（contentPadding 按忽略可见性采样解析，
+    // 菜单开合不重排——与完整模式占位 View 语义一致）。导航栏同款管理
+    // （完整模式 upSystemUiVisibility 同源语义）：开关开启且操作条收起时
+    // 一并收起，避让同步归零。旧平台（API < 30）legacy 布局标记
+    // LAYOUT_STABLE 下系统栏插图冻结在「栏可见」尺寸、不随 hide() 归零，
+    // 不能依赖可见性感知插图收缩。离开阅读页（含去目录/换源）时恢复显示，
+    // 其余界面不受影响。
     val topBarShown = uiState.controlsVisible && (panel?.keepsTopBar ?: true)
     val statusBarHidden = uiState.hideStatusBar && !topBarShown
-    DisposableEffect(statusBarHidden) {
+    val navigationBarHidden = EInkEngineRegistry.globalSettings.hideNavigationBar && !topBarShown
+    DisposableEffect(statusBarHidden, navigationBarHidden) {
         val controller = (view.context as? Activity)?.window
             ?.let { WindowCompat.getInsetsController(it, view) }
-        if (statusBarHidden) {
+        if (statusBarHidden || navigationBarHidden) {
             controller?.systemBarsBehavior =
                 WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+        }
+        if (statusBarHidden) {
             controller?.hide(WindowInsetsCompat.Type.statusBars())
         } else {
             controller?.show(WindowInsetsCompat.Type.statusBars())
         }
-        onDispose { controller?.show(WindowInsetsCompat.Type.statusBars()) }
+        if (navigationBarHidden) {
+            controller?.hide(WindowInsetsCompat.Type.navigationBars())
+        } else {
+            controller?.show(WindowInsetsCompat.Type.navigationBars())
+        }
+        onDispose {
+            controller?.show(WindowInsetsCompat.Type.statusBars())
+            controller?.show(WindowInsetsCompat.Type.navigationBars())
+        }
     }
 
     // 音量键翻页（对齐 View 版 ReadBookController.volumeKeyPage）：
@@ -780,6 +816,8 @@ fun ReaderRoute(
             // 的返回与选中态；排版弹层例外：操作条隐藏，保证排版调参实时可见
             topBarVisible = topBarShown,
             bottomBarVisible = uiState.controlsVisible && styleDialog == null,
+            contentPaddingValues = contentPaddingValues,
+            contentPaddingPx = contentPadding,
             onPrevPage = viewModel::prevPage,
             onNextPage = viewModel::nextPage,
             onCenterTap = {
@@ -794,9 +832,8 @@ fun ReaderRoute(
                 }
             },
             onContentSized = { width, height ->
-                contentWidthPx = width
-                contentHeightPx = height
-                viewModel.updateViewSize(width, height)
+                viewportWidthPx = width
+                viewportHeightPx = height
             },
             // 加载失败页的退出按钮同走退出门控（装载失败 bookUrl 为空即直退）
             onBack = exitReader,
@@ -931,22 +968,21 @@ fun ReaderRoute(
         // 排版弹层期间面板隐藏（panel 状态保留），关闭弹层后回到展开态
         panel?.takeIf { styleDialog == null }?.let { current ->
             val onClose = { panel = null }
-            // 面板与阅读内容对齐（Edge-to-Edge 下避免被系统栏遮挡，
-            // 顶部避让与正文同规则——readerSystemBarInsets 随开关消费
-            // safeDrawing 顶部），底部避开常驻操作条，保持其可见可点。
+            // 面板与阅读内容对齐（Edge-to-Edge 下避免被系统栏遮挡），
+            // 避让与正文同源同值（contentPaddingValues：宿主策略按忽略
+            // 可见性采样解析），底部避开常驻操作条，保持其可见可点。
             // 顶栏保持可见的面板（缓存，见 topBarShown）：覆盖层顶部再
             // 避让顶栏占位——含「隐藏状态栏」开启期的强制状态栏背衬高度，
             // 透明背板/面板卡片不遮挡顶栏按钮的点击
             val panelTopInset = if (current.keepsTopBar) {
-                ReaderTopBarInset +
-                    if (uiState.hideStatusBar) forcedStatusBarTop() else 0.dp
+                ReaderTopBarInset + forcedStatusBarTop()
             } else {
                 0.dp
             }
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .readerSystemBarInsets(uiState.hideStatusBar)
+                    .padding(contentPaddingValues)
                     .padding(top = panelTopInset, bottom = ReaderBottomBarInset)
             ) {
                 when (current) {
@@ -1238,10 +1274,11 @@ fun ReaderRoute(
  * 可见（经顶栏进入、无顶部反馈需求），其余面板期隐藏以保持页眉调参
  * 预览与跳章后的章节标题反馈。
  *
- * 系统栏避让由本界面自管（readerSystemBarInsets）：窗口 Edge-to-Edge、
- * 状态栏默认可见，页眉紧贴状态栏下方；「隐藏状态栏」开启时状态栏
- * 收起，状态栏区域转为页眉区域（页眉上移占位），正文始终从页眉之下
- * 开始排版。菜单展开期状态栏恢复显示，正文不移位不重排；顶栏以
+ * 系统栏避让由本界面自管（[contentPaddingValues] / [contentPaddingPx]，
+ * 宿主策略按忽略可见性采样解析）：窗口 Edge-to-Edge、画布全屏不随系统
+ * 栏缩放，状态栏默认可见，页眉紧贴状态栏下方；「隐藏状态栏」开启时
+ * 状态栏收起，状态栏区域转为页眉区域（页眉上移占位），正文始终从页眉
+ * 之下开始排版。菜单展开期状态栏恢复显示，正文不移位不重排；顶栏以
  * surface 实底自屏幕上缘铺起（垫在透明状态栏后方），内容按高度快照
  * 固定避让、一步落位。
  *
@@ -1291,6 +1328,8 @@ internal fun ReaderScreen(
     state: ReaderUiState,
     topBarVisible: Boolean,
     bottomBarVisible: Boolean,
+    contentPaddingValues: PaddingValues,
+    contentPaddingPx: ReaderEngine.ReaderContentPadding,
     onPrevPage: () -> Unit,
     onNextPage: () -> Unit,
     onCenterTap: () -> Unit,
@@ -1326,14 +1365,19 @@ internal fun ReaderScreen(
     onImageAction: (action: String, source: String) -> Unit,
 ) {
     // 纯净阅读底色/字色随日/夜间主题（决策 B1/B2 修订：仍不读取
-    // bgStrEInk / textColorEInk 等用户配色配置，颜色由主题统一下发）
+    // bgStrEInk / textColorEInk 等用户配色配置，颜色由主题统一下发）。
+    // 画布全屏（窗口尺寸，系统栏 overlay 其上）：系统栏避让并入分页
+    // contentPadding（见 [contentPaddingPx]），画布不随系统栏缩放——
+    // 与宿主完整模式「全屏画布 + 内容边距避让」同构，两套界面排版
+    // 输入一致
     Box(
         modifier = Modifier
             .fillMaxSize()
             .background(EInkTheme.colorScheme.background)
-            .readerSystemBarInsets(state.hideStatusBar)
     ) {
         val density = LocalDensity.current
+        // 像素换算因子（density 本体是 Density 对象，用于 toDp/toPx 接收者）
+        val densityFactor = density.density
         // ===== 长按选择手势支撑 =====
         val haptics = LocalHapticFeedback.current
         // pointerInput 闭包跨手势存活：page/selection 经 State 读实时值，
@@ -1721,6 +1765,11 @@ internal fun ReaderScreen(
                 page = state.page,
                 pageVersion = state.pageVersion,
                 modifier = Modifier.fillMaxSize(),
+                // 快照行坐标为窗口坐标（画布全屏），书签角标等锚定正文顶：
+                // 正文顶 = 顶部内容边距 + 阅读上边距 + 页眉预留
+                contentTopPx = contentPaddingPx.top +
+                    state.style.paddingTop * densityFactor +
+                    EInkEngineRegistry.readerEngine.headerDecorationExtentPx,
             )
             // 选区覆盖层：灰色选中带垫在页画布下方（zIndex 由覆盖层自管），
             // 把手/指针独占在正文上方；操作条以 zIndex(2f) 组合在本层之上
@@ -1811,15 +1860,22 @@ internal fun ReaderScreen(
             }
         if (state.headerVisible) {
             val extentPx = EInkEngineRegistry.readerEngine.headerDecorationExtentPx
+            // 页眉带 = 窗口绝对 [contentPadding.top, +extent)：画布全屏后
+            // 覆盖层自避让（此前由 readerSystemBarInsets 布局层承担）
             Box(
                 modifier = Modifier
                     .align(Alignment.TopCenter)
                     .fillMaxWidth()
+                    .padding(top = contentPaddingValues.calculateTopPadding())
                     .height(with(density) { extentPx.toDp() })
             ) {
                 ReaderHeader(
                     state = state,
                     extentPx = extentPx,
+                    rowLeftPx = contentPaddingPx.left +
+                        state.style.headerPaddingLeft * densityFactor,
+                    rowRightPx = canvasWidthPx - contentPaddingPx.right -
+                        state.style.headerPaddingRight * densityFactor,
                 )
             }
         }
@@ -1829,9 +1885,17 @@ internal fun ReaderScreen(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
                     .fillMaxWidth()
+                    .padding(bottom = contentPaddingValues.calculateBottomPadding())
                     .height(with(density) { extentPx.toDp() })
             ) {
-                ReaderFooter(state = state, extentPx = extentPx)
+                ReaderFooter(
+                    state = state,
+                    extentPx = extentPx,
+                    rowLeftPx = contentPaddingPx.left +
+                        state.style.footerPaddingLeft * densityFactor,
+                    rowRightPx = canvasWidthPx - contentPaddingPx.right -
+                        state.style.footerPaddingRight * densityFactor,
+                )
             }
         }
 
@@ -1840,9 +1904,8 @@ internal fun ReaderScreen(
             // 的插图回调晚于重组一帧以上，可见性感知的 safeDrawing 在栏显示前
             // 读 0——顶栏会先画在屏幕顶端、栏高到达后再被顶下来（打开菜单的
             // 可见跳动）。getInsetsIgnoringVisibility 与状态栏显隐无关，顶栏
-            // 一次定位；刘海顶取恒定的 displayCutout 与之取 max。仅开关开启
-            // （外层 readerSystemBarInsets 置零）时自避让——开关关闭期外层已
-            // 消费 safeDrawing 顶，此处不重复垫（取值见 [forcedStatusBarTop]）
+            // 一次定位；刘海顶取恒定的 displayCutout 与之取 max。画布全屏后
+            // 外层不再消费插图，此处无条件自避让（取值见 [forcedStatusBarTop]）
             Box(
                 modifier = Modifier
                     .align(Alignment.TopCenter)
@@ -1852,10 +1915,7 @@ internal fun ReaderScreen(
                     // 盖住其后透出的正文首行；随后的固定栏高避让把操作条
                     // 内容落在状态栏下方（图标不再落进状态栏区域不可操作）
                     .background(EInkTheme.colorScheme.surface)
-                    .then(
-                        if (state.hideStatusBar) Modifier.padding(top = forcedStatusBarTop())
-                        else Modifier
-                    )
+                    .padding(top = forcedStatusBarTop())
             ) {
                 ReaderTopBar(
                     state = state,
@@ -1877,6 +1937,7 @@ internal fun ReaderScreen(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
                     .fillMaxWidth()
+                    .padding(bottom = contentPaddingValues.calculateBottomPadding())
             ) {
                 ReaderBottomBar(
                     state = state,
@@ -1922,37 +1983,11 @@ private fun AnchoredSelectionActionBar(
 }
 
 /**
- * 阅读界面系统栏避让：左右/底部取 displayCutout ∪ systemBars；顶部按「隐藏状态栏」
- * 开关显式置零——旧平台（API < 30）legacy 布局标记 LAYOUT_STABLE 下，
- * 系统栏插图冻结在「栏可见」尺寸、不随 insetsController.hide() 归零，
- * safeDrawing 自动收缩不可依赖，置零后状态栏区域转为页眉区域。
- * 对齐完整模式 LAYOUT_FULLSCREEN：隐藏时不避让刘海（墨水屏设备无刘海）。
- *
- * 左右/底部不用 safeDrawing：safeDrawing 含 ime，若进避让，输入法弹出会压缩
- * 阅读视口 → 宿主按新视口全量重排（updateViewport → requestPagination）→
- * 正文跳页且弹框被页变效应关闭。阅读区与面板均无内嵌输入场景，键盘一律以
- * 覆盖层出现，输入型弹框的避让由 EInkDialog 的 imePadding 承担。
- */
-@Composable
-private fun Modifier.readerSystemBarInsets(hideStatusBar: Boolean): Modifier {
-    val top = if (hideStatusBar) {
-        WindowInsets(0, 0, 0, 0)
-    } else {
-        WindowInsets.safeDrawing.only(WindowInsetsSides.Top)
-    }
-    return windowInsetsPadding(
-        WindowInsets.displayCutout
-            .union(WindowInsets.systemBars)
-            .only(WindowInsetsSides.Horizontal + WindowInsetsSides.Bottom)
-    ).windowInsetsPadding(top)
-}
-
-/**
  * 「隐藏状态栏」开启期的固定顶避让高度：菜单展开期状态栏被强制显示，
  * 可见性感知的 safeDrawing 在栏显示前读 0（定位跳动），故取与显隐无关
  * 的 getInsetsIgnoringVisibility；刘海顶取恒定的 displayCutout 与之取
- * max。顶栏装载与进度面板覆盖层避让共用本值；开关关闭期避让由
- * [readerSystemBarInsets] 统一承担，不重复垫。
+ * max。顶栏装载与进度面板覆盖层避让共用本值；画布全屏后（避让并入
+ * 排版 contentPadding）顶栏无条件自避让本值。
  */
 @Composable
 private fun forcedStatusBarTop(): Dp {
@@ -1971,178 +2006,143 @@ private fun forcedStatusBarTop(): Dp {
 }
 
 /**
- * 页眉：时间（左）+ 电量%（右）。可见性与内容按 View 版 ReadTipConfig 默认规则。
- * 字号优先取协商目录的页眉字号配置（[configuredTipTextStyle]），推导仅兜底。
- * 字体按「设置→跟随正文→系统默认」链从端口解析
- * （[io.legado.app.eink.contract.ReaderEngine.headerFooterTypefaces]）。
+ * 页眉：时间（左）+ 电量%（右）——**内容项锁定**（不采用宿主三槽可配置
+ * tip 项），绘制参数与宿主同源同规则：配置字号/字体（端口解析链
+ * [io.legado.app.eink.contract.ReaderEngine.headerFooterTypefaces]）、
+ * 上下边距、分割线（showHeaderLine：0.5dp 画在条带最底缘、贴正文侧）、
+ * 几何基线（文字顶贴上边距，includeFontPadding=false 口径）——经
+ * [ReaderTipRowGeometry] 镜像宿主 ReaderTipRowLayout，与屏保同一份，
+ * 两端条带像素级一致。左右行缘 [rowLeftPx]/[rowRightPx] 由调用方并入
+ * 内容边距与左右边距。
  */
 @Composable
 private fun ReaderHeader(
     state: ReaderUiState,
     extentPx: Float,
+    rowLeftPx: Float,
+    rowRightPx: Float,
 ) {
-    val textColor = EInkTheme.colorScheme.onSurfaceVariant
+    val density = LocalDensity.current.density
+    val dividerColor = EInkTheme.colorScheme.outline.toArgb()
+    val tipColor = EInkTheme.colorScheme.onSurfaceVariant.toArgb()
     val tipTypeface = EInkEngineRegistry.readerEngine.headerFooterTypefaces().header
-    val tipStyle = configuredTipTextStyle(
-        availablePx = extentPx -
-            state.style.headerPaddingTop.dpPx() -
-            state.style.headerPaddingBottom.dpPx(),
-        configuredSizeSp = state.style.headerSize,
-        typeface = tipTypeface,
-    )
-    val tipStyleWithFont = tipTypeface
-        ?.let { tipStyle.copy(fontFamily = FontFamily(it)) }
-        ?: tipStyle
-    // fillMaxSize：容器已按宿主页眉预留高度定高，行撑满预留区、文字
-    // 纵向居中，与完整模式装饰的几何一致
-    Row(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(
-                start = state.style.headerPaddingLeft.dp,
-                top = state.style.headerPaddingTop.dp,
-                end = state.style.headerPaddingRight.dp,
-                bottom = state.style.headerPaddingBottom.dp,
-            ),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        BasicText(
-            text = state.headerTime,
-            modifier = Modifier.weight(1f),
-            style = tipStyleWithFont.copy(color = textColor),
-            maxLines = 1,
+    val style = state.style
+    val dividerExtent =
+        if (style.headerDivider == true) ReaderTipRowGeometry.DIVIDER_THICKNESS_DP * density else 0f
+    val paddingTopPx = style.headerPaddingTop * density
+    val paddingBottomPx = style.headerPaddingBottom * density
+    val availablePx = (extentPx - paddingTopPx - paddingBottomPx - dividerExtent)
+        .coerceAtLeast(1f)
+    Canvas(modifier = Modifier.fillMaxSize()) {
+        val native = drawContext.canvas.nativeCanvas
+        val paint = tipRowPaint(
+            typeface = tipTypeface,
+            configuredSizeSp = style.headerSize,
+            availablePx = availablePx,
+            density = density,
+            colorArgb = tipColor,
         )
-        BasicText(
-            text = "${state.batteryPercent}%",
-            style = tipStyleWithFont.copy(color = textColor),
-            maxLines = 1,
+        val metrics = paint.fontMetrics
+        val baseline = ReaderTipRowGeometry.headerBaseline(paddingTopPx, metrics.ascent)
+        drawTipRowLeftRight(
+            canvas = native,
+            paint = paint,
+            rowLeftPx = rowLeftPx,
+            rowRightPx = rowRightPx,
+            baselineY = baseline,
+            leftText = state.headerTime,
+            rightText = "${state.batteryPercent}%",
         )
-    }
-}
-
-/**
- * 页脚：顶部自动翻页进度条 + 章节标题（左）/ 页数及进度（右，View 版 pageAndTotal 格式）。
- * 字体按「设置→跟随正文→系统默认」链从端口解析
- * （[io.legado.app.eink.contract.ReaderEngine.headerFooterTypefaces]）。
- */
-@Composable
-private fun ReaderFooter(state: ReaderUiState, extentPx: Float) {
-    // 进度条 2dp 是模块自有装饰，不在宿主预留预算内，需先扣减；
-    // 字号与页眉统一——按配置字号直接渲染（非 14/20 推导）
-    val tipTypeface = EInkEngineRegistry.readerEngine.headerFooterTypefaces().footer
-    val tipStyle = configuredTipTextStyle(
-        availablePx = extentPx - 2.dpPx() -
-            state.style.footerPaddingTop.dpPx() -
-            state.style.footerPaddingBottom.dpPx(),
-        configuredSizeSp = state.style.footerSize,
-        typeface = tipTypeface,
-    )
-    val tipStyleWithFont = tipTypeface
-        ?.let { tipStyle.copy(fontFamily = FontFamily(it)) }
-        ?: tipStyle
-    // fillMaxSize：容器已按宿主页脚预留高度定高，文字行在剩余空间内
-    // 纵向居中
-    Column(modifier = Modifier.fillMaxSize()) {
-        AutoPlayProgressBar(active = state.autoPlay, progress = state.autoPlayProgress)
-        Row(
-            modifier = Modifier
-                .weight(1f)
-                .fillMaxWidth()
-                .padding(
-                    start = state.style.footerPaddingLeft.dp,
-                    top = state.style.footerPaddingTop.dp,
-                    end = state.style.footerPaddingRight.dp,
-                    bottom = state.style.footerPaddingBottom.dp,
-                ),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            BasicText(
-                text = state.chapterTitle,
-                modifier = Modifier.weight(1f),
-                style = tipStyleWithFont.copy(color = EInkTheme.colorScheme.onSurfaceVariant),
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
+        if (style.headerDivider == true) {
+            val dividerY = ReaderTipRowGeometry.extent(
+                paddingTopPx = paddingTopPx,
+                fontTopPx = metrics.ascent,
+                fontBottomPx = metrics.descent,
+                paddingBottomPx = paddingBottomPx,
             )
-            BasicText(
-                text = state.pageAndTotal,
-                style = tipStyleWithFont.copy(color = EInkTheme.colorScheme.onSurfaceVariant),
-                maxLines = 1,
+            drawTipDivider(
+                canvas = native,
+                leftPx = rowLeftPx,
+                rightPx = rowRightPx,
+                yPx = dividerY,
+                thicknessPx = dividerExtent,
+                colorArgb = dividerColor,
             )
         }
     }
 }
 
-/** dp 转像素（字体缩放不参与——排版装饰几何锚定像素）。 */
-@Composable
-private fun Int.dpPx(): Float = with(LocalDensity.current) { dp.toPx() }
-
 /**
- * 页眉/页脚文字样式：排版装饰语义——**行盒回归字体自然高度**（lineHeight
- * 显式 Unspecified，覆盖主题 bodyMedium 钉住的 24sp），字号按 14/20 的
- * 字面/行高比缩放、再按渲染字体行需求钳制。不变量：
- *  - 字形完整：固定 lineHeight 小于字体自然行高时，长文本（章节标题
- *    被 weight 压宽）走 StaticLayout 路径、行盒按 lineHeight 收窄，字形
- *    下缘被裁（短文本走 BoringLayout、高度即自然行高故完整——同一条带
- *    左槽被裁右槽正常的根因）。不设 lineHeight 后两条布局路径行为一致，
- *    字号钳制（[clampTipFontSizeToAvailablePx]）保证自然行高 ≤ 条带
- *    可用高度，文字垂直居中由容器（Row CenterVertically）完成；
- *  - 像素锚定不随字体缩放：用 Dp.toSp() 换算，应用内字体缩放不放大
- *    页眉/页脚（同正文；正文排版坐标是引擎测量像素）。宿主预留随其
- *    页眉/页脚字号设置变化时，模块文字同步伸缩。
- * 刻意不走 EInkText：其 14sp 下限按 sp 语义钳制，与像素锚定冲突。
+ * 页脚：顶部自动翻页进度条（模块自有 2dp 装饰，先从条带预算扣减）+
+ * 章节标题（左，右槽边界处省略）/ 页数及进度（右，pageAndTotal 格式）
+ * ——内容项锁定；绘制参数与宿主同源（配置字号：applyHeaderStyle 跟随
+ * 页眉档在宿主桥解析、字体、上下边距、分割线贴正文侧画在条带顶缘），
+ * 几何镜像宿主（文字底贴下边距）。左右行缘由调用方并入内容边距。
  */
 @Composable
-private fun tipTextStyle(
-    availablePx: Float,
-    fontLineRequirementRatio: Float? = null,
-): TextStyle {
-    val density = LocalDensity.current
-    val available = availablePx.takeIf { it > 0f } ?: with(density) { 23.dp.toPx() }
-    val fontPx = clampTipFontSizeToAvailablePx(
-        requestedFontSizePx = available * 14f / 20f,
-        availablePx = available,
-        fontLineRequirementRatio = fontLineRequirementRatio,
-    )
-    return EInkTheme.typography.bodyMedium.copy(
-        fontSize = with(density) { fontPx.toDp().toSp() },
-        lineHeight = TextUnit.Unspecified,
-    )
-}
-
-/**
- * 页眉/页脚文字样式（配置字号渲染）：协商目录字号可见后按配置字号
- * 渲染（配置值按 dp 像素锚定，不随应用内字体缩放）；行盒回归字体自然
- * 高度（见 [tipTextStyle]：固定 lineHeight 是同条带左右槽裁切差异的
- * 根因），配置字号经 [clampTipFontSizeToAvailablePx] 按渲染字体行需求
- * 钳制，保证自然行高 ≤ 条带可用高度、字形完整。页眉与页脚用同一配置
- * 字号（eink 统一写入两侧），视觉上严格同字号。字号缺失或非正（旧宿
- * 主桥/极端配置）时回落 [tipTextStyle] 推导。
- */
-@Composable
-private fun configuredTipTextStyle(
-    availablePx: Float,
-    configuredSizeSp: Int?,
-    typeface: android.graphics.Typeface?,
-): TextStyle {
-    val density = LocalDensity.current
-    // 无字体（"系统默认"且正文/预设均未回落）时，BasicText 用主题默认
-    // （bodyMedium 无 fontFamily → 平台 sans-serif）渲染，按同一字体测行需求。
-    val lineRatio = remember(typeface) {
-        (typeface ?: android.graphics.Typeface.SANS_SERIF).fontLineRequirementRatio()
+private fun ReaderFooter(
+    state: ReaderUiState,
+    extentPx: Float,
+    rowLeftPx: Float,
+    rowRightPx: Float,
+) {
+    val density = LocalDensity.current.density
+    val dividerColor = EInkTheme.colorScheme.outline.toArgb()
+    val tipColor = EInkTheme.colorScheme.onSurfaceVariant.toArgb()
+    val tipTypeface = EInkEngineRegistry.readerEngine.headerFooterTypefaces().footer
+    val style = state.style
+    val dividerExtent =
+        if (style.footerDivider == true) ReaderTipRowGeometry.DIVIDER_THICKNESS_DP * density else 0f
+    val progressHeightPx = 2f * density
+    val paddingTopPx = style.footerPaddingTop * density
+    val paddingBottomPx = style.footerPaddingBottom * density
+    Column(modifier = Modifier.fillMaxSize()) {
+        AutoPlayProgressBar(active = state.autoPlay, progress = state.autoPlayProgress)
+        Canvas(
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxWidth(),
+        ) {
+            val native = drawContext.canvas.nativeCanvas
+            val bandHeightPx = size.height
+            val availablePx =
+                (bandHeightPx - paddingTopPx - paddingBottomPx - dividerExtent)
+                    .coerceAtLeast(1f)
+            val paint = tipRowPaint(
+                typeface = tipTypeface,
+                configuredSizeSp = style.footerSize,
+                availablePx = availablePx,
+                density = density,
+                colorArgb = tipColor,
+            )
+            val metrics = paint.fontMetrics
+            // 分割线贴正文侧：页脚条带的最顶缘（进度条之下）
+            if (style.footerDivider == true) {
+                drawTipDivider(
+                    canvas = native,
+                    leftPx = rowLeftPx,
+                    rightPx = rowRightPx,
+                    yPx = 0f,
+                    thicknessPx = dividerExtent,
+                    colorArgb = dividerColor,
+                )
+            }
+            val baseline = ReaderTipRowGeometry.footerBaseline(
+                bandHeightPx = bandHeightPx,
+                paddingBottomPx = paddingBottomPx,
+                fontBottomPx = metrics.descent,
+            )
+            drawTipRowLeftRight(
+                canvas = native,
+                paint = paint,
+                rowLeftPx = rowLeftPx,
+                rowRightPx = rowRightPx,
+                baselineY = baseline,
+                leftText = state.chapterTitle,
+                rightText = state.pageAndTotal,
+            )
+        }
     }
-    if (configuredSizeSp != null && configuredSizeSp > 0) {
-        val available = availablePx.takeIf { it > 0f } ?: with(density) { 23.dp.toPx() }
-        val fontPx = clampTipFontSizeToAvailablePx(
-            requestedFontSizePx = with(density) { configuredTipFontSizeSp(configuredSizeSp, density).toPx() },
-            availablePx = available,
-            fontLineRequirementRatio = lineRatio,
-        )
-        return EInkTheme.typography.bodyMedium.copy(
-            fontSize = with(density) { fontPx.toDp().toSp() },
-            lineHeight = TextUnit.Unspecified,
-        )
-    }
-    return tipTextStyle(availablePx, lineRatio)
 }
 
 /**

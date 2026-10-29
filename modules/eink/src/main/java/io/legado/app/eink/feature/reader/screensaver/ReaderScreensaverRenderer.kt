@@ -4,22 +4,24 @@ import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Paint
 import android.graphics.RectF
-import android.graphics.Typeface
-import android.text.TextPaint
-import android.text.TextUtils
 import io.legado.app.eink.feature.reader.ReaderPageRenderStyle
 import io.legado.app.eink.feature.reader.ReaderPageSnapshotPainter
-import io.legado.app.eink.feature.reader.clampTipFontSizeToAvailablePx
-import io.legado.app.eink.feature.reader.fontLineRequirementRatio
+import io.legado.app.eink.feature.reader.ReaderTipRowGeometry
+import io.legado.app.eink.feature.reader.drawTipDivider
+import io.legado.app.eink.feature.reader.drawTipRowLeftRight
+import io.legado.app.eink.feature.reader.tipRowPaint
 
 /**
  * Renders the current reader page at the device's real display size.
  *
- * The live Compose page is drawn through the same [ReaderPageSnapshotPainter]
- * and scaled from the reader viewport into the wallpaper canvas. Header/footer
- * rendering mirrors the reader's configured pixel-anchored font sizing and is
- * drawn in the host-reserved extents before the canvas scale is restored. The
- * system illustration is applied last at full target size.
+ * Coordinates are **window space**：the eink reader canvas is full-screen and
+ * the snapshot already contains the content-padding offsets（同 live 阅读页，
+ * 共用 [ReaderPageSnapshotPainter]）——快照按窗口坐标原样绘制，仅当窗口
+ * 与设备面板尺寸不一致时整体缩放。页眉/页脚条带用与 live 同一份
+ * [ReaderTipRowGeometry] 几何与配置参数（字号/字体/边距/分割线）绘制，
+ * 内容项为锁屏专属锁定（页眉=书名、页脚=章节标题+页码）；状态栏带
+ * （页眉隐且有带高时）填垂直居中的书名——带高来自系统栏，非条带几何。
+ * The system illustration is applied last at full target size.
  */
 internal class ReaderScreensaverRenderer {
 
@@ -62,40 +64,26 @@ internal class ReaderScreensaverRenderer {
             backgroundPaint,
         )
 
+        // 快照坐标系 = 窗口坐标（画布全屏，避让已并入排版 contentPadding）
         val sourceWidth = request.viewportWidthPx.coerceAtLeast(1)
         val sourceHeight = request.viewportHeightPx.coerceAtLeast(1)
-        val viewport = resolveReaderScreensaverViewport(
-            contentWidthPx = sourceWidth,
-            contentHeightPx = sourceHeight,
+        val bands = resolveReaderScreensaverBands(
+            sourceHeightPx = sourceHeight,
             systemBarTopInsetPx = request.systemBarTopInsetPx,
             systemBarBottomInsetPx = request.systemBarBottomInsetPx,
-            targetWidthPx = targetWidthPx,
-            targetHeightPx = targetHeightPx,
+            headerExtentPx = request.headerExtentPx,
+            footerExtentPx = request.footerExtentPx,
+            footerVisible = request.footerVisible,
         )
 
         canvas.save()
-        canvas.scale(viewport.scaleX, viewport.scaleY)
-        if (!request.headerVisible && request.systemBarTopInsetPx > 0f) {
-            drawBookName(
-                canvas = canvas,
-                request = request,
-                top = 0f,
-                bottom = request.systemBarTopInsetPx,
-            )
-        }
-        canvas.translate(0f, request.systemBarTopInsetPx)
-        val bodyBottomPx = if (request.footerVisible && request.footerExtentPx > 0f) {
-            sourceHeight - request.footerExtentPx
-        } else {
-            sourceHeight.toFloat()
-        }
-        canvas.save()
-        canvas.clipRect(
-            0f,
-            request.headerExtentPx,
-            sourceWidth.toFloat(),
-            bodyBottomPx,
+        canvas.scale(
+            targetWidthPx.toFloat() / sourceWidth,
+            targetHeightPx.toFloat() / sourceHeight,
         )
+        // 正文裁剪到内容带（窗口坐标），快照行已含 contentPadding 偏移
+        canvas.save()
+        canvas.clipRect(0f, bands.bodyTopPx, sourceWidth.toFloat(), bands.bodyBottomPx)
         ReaderPageSnapshotPainter().draw(
             canvas = canvas,
             snapshot = request.page,
@@ -107,21 +95,20 @@ internal class ReaderScreensaverRenderer {
                 highlightColorArgb = request.colors.highlightArgb,
                 badgeColorArgb = request.colors.badgeArgb,
                 imageAntiAlias = request.imageAntiAlias,
-                headerExtentPx = request.headerExtentPx,
+                contentTopPx = request.systemBarTopInsetPx +
+                    request.style.paddingTop * request.density +
+                    request.headerExtentPx,
             ),
         )
         canvas.restore()
-        if (request.headerVisible) {
-            val density = request.density
-            drawBookName(
-                canvas = canvas,
-                request = request,
-                top = request.style.headerPaddingTop * density,
-                bottom = request.headerExtentPx -
-                    request.style.headerPaddingBottom * density,
-            )
+
+        if (!request.headerVisible && request.systemBarTopInsetPx > 0f) {
+            drawStatusBandBookName(canvas, request, sourceWidth)
         }
-        drawFooter(canvas, request)
+        if (request.headerVisible && request.headerExtentPx > 0f) {
+            drawHeaderBand(canvas, request, sourceWidth)
+        }
+        drawFooterBand(canvas, request, sourceWidth)
         canvas.restore()
 
         if (illustration != null && !illustration.isRecycled) {
@@ -135,114 +122,158 @@ internal class ReaderScreensaverRenderer {
         return bitmap
     }
 
-    private fun illustrationPaint(): Paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        isFilterBitmap = true
-        isDither = true
-    }
-
-    private fun drawBookName(
+    /**
+     * 状态栏带书名（页眉隐 + 有带高）：带高来自系统栏而非页眉条带几何，
+     * 垂直居中；水平仍按页眉左右边距（含内容边距）内缩。
+     */
+    private fun drawStatusBandBookName(
         canvas: Canvas,
         request: ReaderScreensaverRequest,
-        top: Float,
-        bottom: Float,
+        sourceWidth: Int,
     ) {
-        if (bottom <= top) return
         val density = request.density
-        val left = request.style.headerPaddingLeft * density
-        val right = request.viewportWidthPx -
+        val left = request.contentPaddingLeftPx + request.style.headerPaddingLeft * density
+        val right = sourceWidth - request.contentPaddingRightPx -
             request.style.headerPaddingRight * density
-        val availableHeight = (bottom - top).coerceAtLeast(1f)
-        val paint = TextPaint(
-            tipPaint(
-                typeface = request.headerTypeface,
-                configuredSizeSp = request.style.headerSize,
-                availablePx = availableHeight,
-                density = density,
-                colorArgb = request.colors.tipArgb,
-            ),
+        val availableHeight = request.systemBarTopInsetPx
+        val paint = tipRowPaint(
+            typeface = request.headerTypeface,
+            configuredSizeSp = request.style.headerSize,
+            availablePx = availableHeight,
+            density = density,
+            colorArgb = request.colors.tipArgb,
         )
-        val baseline = centeredBaseline(top, availableHeight, paint)
-        val title = TextUtils.ellipsize(
+        val baseline = centeredBaseline(0f, availableHeight, paint)
+        val available = (right - left).coerceAtLeast(0f)
+        val title = android.text.TextUtils.ellipsize(
             request.bookName,
             paint,
-            (right - left).coerceAtLeast(0f),
-            TextUtils.TruncateAt.END,
+            available,
+            android.text.TextUtils.TruncateAt.END,
         )
         canvas.drawText(title, 0, title.length, left, baseline, paint)
     }
 
-    private fun drawFooter(canvas: Canvas, request: ReaderScreensaverRequest) {
+    /** 页眉带书名：与 live 页眉同一份几何/字号/字体/边距/分割线。 */
+    private fun drawHeaderBand(
+        canvas: Canvas,
+        request: ReaderScreensaverRequest,
+        sourceWidth: Int,
+    ) {
+        val density = request.density
+        val style = request.style
+        val extentPx = request.headerExtentPx
+        val bandTop = request.systemBarTopInsetPx
+        val dividerExtent =
+            if (style.headerDivider == true) ReaderTipRowGeometry.DIVIDER_THICKNESS_DP * density else 0f
+        val paddingTopPx = style.headerPaddingTop * density
+        val paddingBottomPx = style.headerPaddingBottom * density
+        val paint = tipRowPaint(
+            typeface = request.headerTypeface,
+            configuredSizeSp = style.headerSize,
+            availablePx = (extentPx - paddingTopPx - paddingBottomPx - dividerExtent)
+                .coerceAtLeast(1f),
+            density = density,
+            colorArgb = request.colors.tipArgb,
+        )
+        val metrics = paint.fontMetrics
+        val rowLeft = request.contentPaddingLeftPx + style.headerPaddingLeft * density
+        val rowRight = sourceWidth - request.contentPaddingRightPx -
+            style.headerPaddingRight * density
+        drawTipRowLeftRight(
+            canvas = canvas,
+            paint = paint,
+            rowLeftPx = rowLeft,
+            rowRightPx = rowRight,
+            baselineY = bandTop +
+                ReaderTipRowGeometry.headerBaseline(paddingTopPx, metrics.ascent),
+            leftText = request.bookName,
+            rightText = "",
+        )
+        if (style.headerDivider == true) {
+            drawTipDivider(
+                canvas = canvas,
+                leftPx = rowLeft,
+                rightPx = rowRight,
+                yPx = bandTop + ReaderTipRowGeometry.extent(
+                    paddingTopPx = paddingTopPx,
+                    fontTopPx = metrics.ascent,
+                    fontBottomPx = metrics.descent,
+                    paddingBottomPx = paddingBottomPx,
+                ),
+                thicknessPx = dividerExtent,
+                colorArgb = request.colors.tipArgb,
+            )
+        }
+    }
+
+    /** 页脚带：与 live 页脚同一份几何/参数（含自动翻页 2dp 条与分割线）。 */
+    private fun drawFooterBand(
+        canvas: Canvas,
+        request: ReaderScreensaverRequest,
+        sourceWidth: Int,
+    ) {
         if (!request.footerVisible || request.footerExtentPx <= 0f) return
         val density = request.density
-        val footerTop = request.viewportHeightPx - request.footerExtentPx
+        val style = request.style
+        val extentPx = request.footerExtentPx
+        val footerTop = request.viewportHeightPx -
+            request.systemBarBottomInsetPx - extentPx
         val progressHeight = 2f * density
+        val dividerExtent =
+            if (style.footerDivider == true) ReaderTipRowGeometry.DIVIDER_THICKNESS_DP * density else 0f
+        val rowTop = footerTop + progressHeight
         if (request.autoPlay) {
             canvas.drawRect(
                 0f,
                 footerTop,
-                request.viewportWidthPx.toFloat(),
+                sourceWidth.toFloat(),
                 footerTop + progressHeight,
                 Paint().apply { color = request.colors.textArgb },
             )
         }
-
-        val rowTop = footerTop + progressHeight + request.style.footerPaddingTop * density
-        val rowBottom = request.viewportHeightPx -
-            request.style.footerPaddingBottom * density
-        val availableHeight = (rowBottom - rowTop).coerceAtLeast(1f)
-        val paint = TextPaint(
-            tipPaint(
-                typeface = request.footerTypeface,
-                configuredSizeSp = request.style.footerSize,
-                availablePx = availableHeight,
-                density = density,
-                colorArgb = request.colors.tipArgb,
-            ),
+        val paddingTopPx = style.footerPaddingTop * density
+        val paddingBottomPx = style.footerPaddingBottom * density
+        val paint = tipRowPaint(
+            typeface = request.footerTypeface,
+            configuredSizeSp = style.footerSize,
+            availablePx = (extentPx - progressHeight - paddingTopPx - paddingBottomPx -
+                dividerExtent).coerceAtLeast(1f),
+            density = density,
+            colorArgb = request.colors.tipArgb,
         )
-        val baseline = centeredBaseline(rowTop, availableHeight, paint)
-        val left = request.style.footerPaddingLeft * density
-        val right = request.viewportWidthPx - request.style.footerPaddingRight * density
-        val pageText = request.pageAndTotal
-        val pageWidth = paint.measureText(pageText)
-        val gap = 12f * density
-        val titleWidth = (right - left - pageWidth - gap).coerceAtLeast(0f)
-        if (titleWidth > 0f) {
-            val title = TextUtils.ellipsize(
-                request.chapterTitle,
-                paint,
-                titleWidth,
-                TextUtils.TruncateAt.END,
+        val metrics = paint.fontMetrics
+        val rowLeft = request.contentPaddingLeftPx + style.footerPaddingLeft * density
+        val rowRight = sourceWidth - request.contentPaddingRightPx -
+            style.footerPaddingRight * density
+        if (style.footerDivider == true) {
+            drawTipDivider(
+                canvas = canvas,
+                leftPx = rowLeft,
+                rightPx = rowRight,
+                yPx = rowTop,
+                thicknessPx = dividerExtent,
+                colorArgb = request.colors.tipArgb,
             )
-            canvas.drawText(title, 0, title.length, left, baseline, paint)
         }
-        canvas.drawText(pageText, right - pageWidth, baseline, paint)
+        drawTipRowLeftRight(
+            canvas = canvas,
+            paint = paint,
+            rowLeftPx = rowLeft,
+            rowRightPx = rowRight,
+            baselineY = rowTop + ReaderTipRowGeometry.footerBaseline(
+                bandHeightPx = extentPx - progressHeight,
+                paddingBottomPx = paddingBottomPx,
+                fontBottomPx = metrics.descent,
+            ),
+            leftText = request.chapterTitle,
+            rightText = request.pageAndTotal,
+        )
     }
 
-    private fun tipPaint(
-        typeface: Typeface?,
-        configuredSizeSp: Int?,
-        availablePx: Float,
-        density: Float,
-        colorArgb: Int,
-    ): TextPaint {
-        val effectiveTypeface = typeface ?: Typeface.DEFAULT
-        val lineRatio = effectiveTypeface.fontLineRequirementRatio()
-        val requestedSize = if (configuredSizeSp != null && configuredSizeSp > 0) {
-            configuredSizeSp * density
-        } else {
-            availablePx * 14f / 20f
-        }
-        val fontSize = clampTipFontSizeToAvailablePx(
-            requestedFontSizePx = requestedSize,
-            availablePx = availablePx,
-            fontLineRequirementRatio = lineRatio,
-        )
-        return TextPaint().apply {
-            isAntiAlias = true
-            this.color = colorArgb
-            textSize = fontSize
-            this.typeface = effectiveTypeface
-        }
+    private fun illustrationPaint(): Paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        isFilterBitmap = true
+        isDither = true
     }
 
     private fun centeredBaseline(top: Float, availableHeight: Float, paint: Paint): Float {

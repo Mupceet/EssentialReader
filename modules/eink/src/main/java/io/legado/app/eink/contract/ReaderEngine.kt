@@ -446,10 +446,52 @@ interface ReaderEngine {
     // ---- 排版 ----
 
     /**
-     * 上报阅读区可用尺寸（px，扣除页眉页脚等内容边距前的整页区域）。
-     * 首帧布局与旋转变化时调用；宿主引擎在拿到真实尺寸前无法排版。
+     * 系统栏/刘海的「忽略可见性」采样（px）。显隐动画期间恒定，
+     * 是宿主避让策略的原始输入（与宿主完整模式同口径）。
      */
-    fun updateViewSize(width: Int, height: Int)
+    data class ReaderSystemBarInsets(
+        val statusBarTopPx: Int = 0,
+        val navigationBarBottomPx: Int = 0,
+        val cutoutLeftPx: Int = 0,
+        val cutoutTopPx: Int = 0,
+        val cutoutRightPx: Int = 0,
+        val cutoutBottomPx: Int = 0,
+    )
+
+    /**
+     * 排版内容边距（px）：系统栏/刘海避让值。画布保持全屏（系统栏
+     * overlay 其上），该值并入分页器 contentPadding——与宿主完整模式
+     * 「全屏画布 + 内容边距避让」同构，两套阅读界面的排版输入一致。
+     */
+    data class ReaderContentPadding(
+        val left: Int = 0,
+        val top: Int = 0,
+        val right: Int = 0,
+        val bottom: Int = 0,
+    )
+
+    /**
+     * 解析排版内容边距：宿主用同一策略同一配置（hideStatusBar /
+     * hideNavigationBar / paddingDisplayCutouts / 多窗）计算，模块只交
+     * [ReaderSystemBarInsets] 采样与状态栏开关。策略单一事实源在宿主，
+     * 配置演进模块零改动。默认实现返回全零（旧宿主语义：画布已在
+     * 布局层避让，无需内容边距）。
+     */
+    fun resolveContentPadding(
+        insets: ReaderSystemBarInsets,
+        hideStatusBar: Boolean,
+    ): ReaderContentPadding = ReaderContentPadding()
+
+    /**
+     * 上报阅读画布尺寸（px，全屏画布＝窗口尺寸，系统栏 overlay 其上、
+     * 不缩画布）与其排版内容边距。首帧布局、旋转、边距变化时调用；
+     * 宿主引擎在拿到真实尺寸前无法排版。
+     */
+    fun updateViewSize(
+        width: Int,
+        height: Int,
+        contentPadding: ReaderContentPadding = ReaderContentPadding(),
+    )
 
     /**
      * 排版视口是否已就绪。宿主引擎为进程级单例时视口跨会话保留，

@@ -195,6 +195,8 @@ class ReaderScreensaverFingerprintTest {
             footerExtentPx = 90f,
             systemBarTopInsetPx = 50f,
             systemBarBottomInsetPx = 30f,
+            contentPaddingLeftPx = 0f,
+            contentPaddingRightPx = 0f,
         )
     }
 
@@ -222,6 +224,8 @@ class ReaderScreensaverFingerprintTest {
             footerExtentPx = footerExtentPx,
             systemBarTopInsetPx = systemBarTopInsetPx,
             systemBarBottomInsetPx = systemBarBottomInsetPx,
+            contentPaddingLeftPx = contentPaddingLeftPx,
+            contentPaddingRightPx = contentPaddingRightPx,
         )
 
     private fun ReaderScreensaverRequest.copyWithBookAuthor(
@@ -250,6 +254,8 @@ class ReaderScreensaverFingerprintTest {
             footerExtentPx = footerExtentPx,
             systemBarTopInsetPx = systemBarTopInsetPx,
             systemBarBottomInsetPx = systemBarBottomInsetPx,
+            contentPaddingLeftPx = contentPaddingLeftPx,
+            contentPaddingRightPx = contentPaddingRightPx,
         )
 
     private fun ReaderScreensaverRequest.copyWithBookUrl(
@@ -278,5 +284,7 @@ class ReaderScreensaverFingerprintTest {
             footerExtentPx = footerExtentPx,
             systemBarTopInsetPx = systemBarTopInsetPx,
             systemBarBottomInsetPx = systemBarBottomInsetPx,
+            contentPaddingLeftPx = contentPaddingLeftPx,
+            contentPaddingRightPx = contentPaddingRightPx,
         )
 }

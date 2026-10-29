@@ -19,20 +19,22 @@ import io.legado.app.eink.designsystem.theme.EInkTheme
  * ribbon cannot drift between the visible page and the generated `.rmb`.
  *
  * [pageVersion] forces a draw when the engine replaces content behind the same
- * snapshot object.
+ * snapshot object. Snapshot coordinates are window coordinates (the canvas is
+ * full-screen); [contentTopPx] anchors the bookmark ribbon at the first body
+ * line top (top content padding + reading margin + header extent).
  */
 @Composable
 internal fun ReaderPageSnapshotCanvas(
     page: ReaderPageSnapshot?,
     pageVersion: Int,
     modifier: Modifier = Modifier,
+    contentTopPx: Float = 0f,
 ) {
     val scheme = EInkTheme.colorScheme
     val textColorArgb = scheme.onBackground.toArgb()
     val highlightColorArgb = scheme.secondaryContainer.toArgb()
     val badgeColorArgb = scheme.selectionContainer.toArgb()
     val imageAntiAlias = EInkEngineRegistry.globalSettings.useAntiAlias
-    val headerExtentPx = EInkEngineRegistry.readerEngine.headerDecorationExtentPx
     val painter = remember { ReaderPageSnapshotPainter() }
 
     key(pageVersion) {
@@ -49,7 +51,7 @@ internal fun ReaderPageSnapshotCanvas(
                     highlightColorArgb = highlightColorArgb,
                     badgeColorArgb = badgeColorArgb,
                     imageAntiAlias = imageAntiAlias,
-                    headerExtentPx = headerExtentPx,
+                    contentTopPx = contentTopPx,
                 ),
             )
         }

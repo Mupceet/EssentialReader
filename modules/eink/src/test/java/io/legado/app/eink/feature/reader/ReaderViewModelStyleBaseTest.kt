@@ -149,7 +149,11 @@ class ReaderViewModelStyleBaseTest {
         override fun startCache(count: Int, cacheAll: Boolean): Boolean? = null
         override suspend fun addSessionBookToShelf(): Boolean? = null
         override suspend fun removeSessionBookFromShelf(): Boolean? = null
-        override fun updateViewSize(width: Int, height: Int) = Unit
+        override fun updateViewSize(
+            width: Int,
+            height: Int,
+            contentPadding: io.legado.app.eink.contract.ReaderEngine.ReaderContentPadding,
+        ) = Unit
         override fun relayout() = Unit
         override val pageTouchSlop: Int get() = 0
         override fun headerFooterVisibility(): ReaderHeaderFooterVisibility =

@@ -16,6 +16,7 @@ import io.legado.app.eink.contract.FallbackReaderStyleCatalog
 import io.legado.app.eink.contract.PageTurnRippleMode
 import io.legado.app.eink.contract.ReaderBookSnapshot
 import io.legado.app.eink.contract.ReaderCloudProgress
+import io.legado.app.eink.contract.ReaderEngine
 import io.legado.app.eink.contract.ReaderEngineCallback
 import io.legado.app.eink.contract.ReaderFontOption
 import io.legado.app.eink.contract.ReaderFontSelection
@@ -249,6 +250,9 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application),
     private val viewSizeReady = CompletableDeferred<Unit>()
     private var lastViewWidth = 0
     private var lastViewHeight = 0
+
+    /** 最近一次上报的排版内容边距（与尺寸一起去重）。 */
+    private var lastContentPadding = ReaderEngine.ReaderContentPadding()
     private var relayoutJob: Job? = null
 
     /** 云端同步触发门槛（进书武装 + 初始装载窗口，宿主 justInitData 同位）。 */
@@ -381,17 +385,28 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application),
     }
 
     /**
-     * 阅读区域尺寸回调（首帧布局/旋转）。
-     * 唤醒 attach 的尺寸等待；若引擎已加载内容则清空章节缓存重新排版
-     * （覆盖超时后仍以 0 尺寸加载失败的自愈场景）。
+     * 阅读画布尺寸回调（首帧布局/旋转/内容边距变化）。画布为全屏窗口
+     * 尺寸（系统栏 overlay 其上），系统栏避让经 [contentPadding] 并入
+     * 排版——与宿主完整模式同构。唤醒 attach 的尺寸等待；若引擎已加载
+     * 内容则清空章节缓存重新排版（覆盖超时后仍以 0 尺寸加载失败的自愈
+     * 场景）。
      */
-    fun updateViewSize(width: Int, height: Int) {
+    fun updateViewSize(
+        width: Int,
+        height: Int,
+        contentPadding: ReaderEngine.ReaderContentPadding = ReaderEngine.ReaderContentPadding(),
+    ) {
         if (width <= 0 || height <= 0) return
-        if (width == lastViewWidth && height == lastViewHeight) return
+        if (width == lastViewWidth && height == lastViewHeight &&
+            contentPadding == lastContentPadding
+        ) {
+            return
+        }
         lastViewWidth = width
         lastViewHeight = height
+        lastContentPadding = contentPadding
         viewModelScope.launch(Dispatchers.IO) {
-            engine.updateViewSize(width, height)
+            engine.updateViewSize(width, height, contentPadding)
             viewSizeReady.complete(Unit)
             if (loadedBookUrl != null) {
                 scheduleRelayoutNow()

@@ -122,6 +122,18 @@ interface GlobalSettings {
     var hideStatusBar: Boolean
 
     /**
+     * 阅读页隐藏系统导航栏（转发宿主阅读设置，与完整模式「隐藏导航栏」
+     * 同键共享存储；模块只读——在宿主阅读配置界面修改）。
+     *
+     * 语义对齐完整模式 upSystemUiVisibility：开启且顶部操作条收起时收起
+     * 导航栏，操作条展开期强制显示；排版内容边距同步归零（宿主避让策略
+     * 同源），正文区域随之扩大。
+     *
+     * 默认实现（旧宿主）恒 false：导航栏始终显示并参与避让，行为不回退。
+     */
+    val hideNavigationBar: Boolean get() = false
+
+    /**
      * 段评气泡参与排版（转发宿主阅读设置键 showReviewBubbles，与完整模式
      * 共享同一存储；默认 true）。
      *

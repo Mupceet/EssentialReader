@@ -63,7 +63,8 @@ import io.legado.app.eink.designsystem.theme.EInkTheme
  *
  * IME 避让（DS §20 Dialog / §21 输入）：根 Box 自带 imePadding——弹框自身
  * 上抬到键盘上方；无输入场景 ime 插图为 0，无行为变化。宿主阅读区不响应
- * ime 插图（见 readerSystemBarInsets），故输入型弹框打开键盘不会引起正文重排。
+ * ime 插图（系统栏避让走 contentPadding、画布尺寸不随插图缩放），故输入型
+ * 弹框打开键盘不会引起正文重排。
  *
  * 定位：[contentAlignment] 默认居中；输入型弹框可传 `TopCenter` + [panelPadding]
  * 把卡片固定到顶部（键盘弹出时输入区不被顶走，符合墨水屏长文输入习惯）。
