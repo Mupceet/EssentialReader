@@ -5,8 +5,6 @@ import android.graphics.Paint
 import android.graphics.Typeface
 import android.text.TextPaint
 import android.text.TextUtils
-import io.legado.app.eink.feature.reader.clampTipFontSizeToAvailablePx
-import io.legado.app.eink.feature.reader.fontLineRequirementRatio
 
 /**
  * 页眉/页脚条带的几何规则——逐式镜像宿主
@@ -44,8 +42,11 @@ internal object ReaderTipRowGeometry {
 }
 
 /**
- * 条带文字画笔：配置字号（sp×density 像素锚定）优先、按渲染字体行需求
- * 钳制到条带可用高度——与屏保此前口径一致，live 页眉页脚同用。
+ * 条带文字画笔：配置字号（sp×density 像素锚定）**直渲不钳制**——宿主
+ * extent 本就按同一字号的 (descent − ascent)（includeFontPadding=false
+ * 口径）精确预留，配置字号天然吻合；仅退化配置（边距吃光条带）时按
+ * 同一口径收缩，保证字形完整且与宿主的隐式吻合规则一致。live 页眉
+ * 页脚与屏保同用。
  */
 internal fun tipRowPaint(
     typeface: Typeface?,
@@ -55,22 +56,20 @@ internal fun tipRowPaint(
     colorArgb: Int,
 ): TextPaint {
     val effectiveTypeface = typeface ?: Typeface.DEFAULT
-    val lineRatio = effectiveTypeface.fontLineRequirementRatio()
     val requestedSize = if (configuredSizeSp != null && configuredSizeSp > 0) {
         configuredSizeSp * density
     } else {
         availablePx * 14f / 20f
     }
-    val fontSize = clampTipFontSizeToAvailablePx(
-        requestedFontSizePx = requestedSize,
-        availablePx = availablePx,
-        fontLineRequirementRatio = lineRatio,
-    )
     return TextPaint().apply {
         isAntiAlias = true
         this.color = colorArgb
-        textSize = fontSize
         this.typeface = effectiveTypeface
+        textSize = requestedSize
+        val line = fontMetrics.descent - fontMetrics.ascent
+        if (availablePx > 0f && line > availablePx && line > 0f) {
+            textSize = requestedSize * availablePx / line
+        }
     }
 }
 
@@ -93,10 +92,17 @@ internal fun drawTipRowLeftRight(
     rightText: String,
 ) {
     if (rightText.isNotEmpty()) {
-        val rightWidth = paint.measureText(rightText)
+        // 右槽右对齐（宿主 END 槽语义：textAlign=RIGHT 画在右缘），
+        // 只在整行宽度处省略；barrier 取右槽**全宽**（未省略宽度，
+        // 宿主同款——右槽过长时左槽可用宽压到 0 直接不画）
         val available = (rowRightPx - rowLeftPx).coerceAtLeast(0f)
         val text = TextUtils.ellipsize(rightText, paint, available, TextUtils.TruncateAt.END)
-        canvas.drawText(text, 0, text.length, rowRightPx, baselineY, paint)
+        if (text.isNotEmpty()) {
+            paint.textAlign = Paint.Align.RIGHT
+            canvas.drawText(text, 0, text.length, rowRightPx, baselineY, paint)
+            paint.textAlign = Paint.Align.LEFT
+        }
+        val rightWidth = paint.measureText(rightText)
         val leftAvailable = (rowRightPx - rightWidth - rowLeftPx).coerceAtLeast(0f)
         if (leftText.isNotEmpty() && leftAvailable > 0f) {
             val left = TextUtils.ellipsize(leftText, paint, leftAvailable, TextUtils.TruncateAt.END)

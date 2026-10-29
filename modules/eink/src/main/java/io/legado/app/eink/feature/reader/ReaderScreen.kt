@@ -29,7 +29,6 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.displayCutout
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -50,6 +49,8 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.toArgb
@@ -2073,11 +2074,12 @@ private fun ReaderHeader(
 }
 
 /**
- * 页脚：顶部自动翻页进度条（模块自有 2dp 装饰，先从条带预算扣减）+
- * 章节标题（左，右槽边界处省略）/ 页数及进度（右，pageAndTotal 格式）
- * ——内容项锁定；绘制参数与宿主同源（配置字号：applyHeaderStyle 跟随
- * 页眉档在宿主桥解析、字体、上下边距、分割线贴正文侧画在条带顶缘），
- * 几何镜像宿主（文字底贴下边距）。左右行缘由调用方并入内容边距。
+ * 页脚：章节标题（左，右槽边界处省略）/ 页数及进度（右，pageAndTotal
+ * 格式）——内容项锁定；绘制参数与宿主同源（配置字号：applyHeaderStyle
+ * 跟随页眉档在宿主桥解析、字体、上下边距、文字底贴下边距的基线、
+ * 分割线贴正文侧画在条带顶缘）。自动翻页进度条是模块自有 2dp 装饰，
+ * 画在分割线之下、**不占文字预算**（宿主 extent 无此项，扣减会让字号
+ * 与宿主不一致）。左右行缘由调用方并入内容边距。
  */
 @Composable
 private fun ReaderFooter(
@@ -2089,6 +2091,7 @@ private fun ReaderFooter(
     val density = LocalDensity.current.density
     val dividerColor = EInkTheme.colorScheme.outline.toArgb()
     val tipColor = EInkTheme.colorScheme.onSurfaceVariant.toArgb()
+    val barColor = EInkTheme.colorScheme.primary
     val tipTypeface = EInkEngineRegistry.readerEngine.headerFooterTypefaces().footer
     val style = state.style
     val dividerExtent =
@@ -2096,52 +2099,56 @@ private fun ReaderFooter(
     val progressHeightPx = 2f * density
     val paddingTopPx = style.footerPaddingTop * density
     val paddingBottomPx = style.footerPaddingBottom * density
-    Column(modifier = Modifier.fillMaxSize()) {
-        AutoPlayProgressBar(active = state.autoPlay, progress = state.autoPlayProgress)
-        Canvas(
-            modifier = Modifier
-                .weight(1f)
-                .fillMaxWidth(),
-        ) {
-            val native = drawContext.canvas.nativeCanvas
-            val bandHeightPx = size.height
-            val availablePx =
-                (bandHeightPx - paddingTopPx - paddingBottomPx - dividerExtent)
-                    .coerceAtLeast(1f)
-            val paint = tipRowPaint(
-                typeface = tipTypeface,
-                configuredSizeSp = style.footerSize,
-                availablePx = availablePx,
-                density = density,
-                colorArgb = tipColor,
-            )
-            val metrics = paint.fontMetrics
-            // 分割线贴正文侧：页脚条带的最顶缘（进度条之下）
-            if (style.footerDivider == true) {
-                drawTipDivider(
-                    canvas = native,
-                    leftPx = rowLeftPx,
-                    rightPx = rowRightPx,
-                    yPx = 0f,
-                    thicknessPx = dividerExtent,
-                    colorArgb = dividerColor,
-                )
-            }
-            val baseline = ReaderTipRowGeometry.footerBaseline(
-                bandHeightPx = bandHeightPx,
-                paddingBottomPx = paddingBottomPx,
-                fontBottomPx = metrics.descent,
-            )
-            drawTipRowLeftRight(
+    Canvas(modifier = Modifier.fillMaxSize()) {
+        val native = drawContext.canvas.nativeCanvas
+        val bandHeightPx = size.height
+        val availablePx =
+            (bandHeightPx - paddingTopPx - paddingBottomPx - dividerExtent)
+                .coerceAtLeast(1f)
+        val paint = tipRowPaint(
+            typeface = tipTypeface,
+            configuredSizeSp = style.footerSize,
+            availablePx = availablePx,
+            density = density,
+            colorArgb = tipColor,
+        )
+        val metrics = paint.fontMetrics
+        if (style.footerDivider == true) {
+            drawTipDivider(
                 canvas = native,
-                paint = paint,
-                rowLeftPx = rowLeftPx,
-                rowRightPx = rowRightPx,
-                baselineY = baseline,
-                leftText = state.chapterTitle,
-                rightText = state.pageAndTotal,
+                leftPx = rowLeftPx,
+                rightPx = rowRightPx,
+                yPx = 0f,
+                thicknessPx = dividerExtent,
+                colorArgb = dividerColor,
             )
         }
+        if (state.autoPlay) {
+            // 进度条：分割线之下 2dp，按时间进度从左到右以主色填充
+            // （未运行不绘制、不占高度预算——与背景融合不可见）
+            drawRect(
+                color = barColor,
+                topLeft = Offset(0f, dividerExtent),
+                size = Size(
+                    size.width * state.autoPlayProgress.coerceIn(0f, 1f),
+                    progressHeightPx,
+                ),
+            )
+        }
+        val baseline = ReaderTipRowGeometry.footerBaseline(
+            bandHeightPx = bandHeightPx,
+            paddingBottomPx = paddingBottomPx,
+            fontBottomPx = metrics.descent,
+        )
+        drawTipRowLeftRight(
+            canvas = native,
+            paint = paint,
+            rowLeftPx = rowLeftPx,
+            rowRightPx = rowRightPx,
+            baselineY = baseline,
+            leftText = state.chapterTitle,
+            rightText = state.pageAndTotal,
+        )
     }
 }
 
@@ -2183,30 +2190,6 @@ internal fun clampTipFontSizeToAvailablePx(
  */
 internal fun configuredTipFontSizeSp(configuredSizeSp: Int, density: Density): TextUnit =
     with(density) { configuredSizeSp.dp.toSp() }
-
-/**
- * 自动翻页进度条：2dp 高度常驻占位——开关自动翻页不改变页脚高度，
- * 正文排版区域尺寸恒定，避免布局跳动/重排；未运行时不绘制（与背景
- * 融合不可见），运行时从左到右按时间进度以主色（日间纯黑）填充，
- * 未填充段保持背景色，进度随填充长度可感知。
- */
-@Composable
-private fun AutoPlayProgressBar(active: Boolean, progress: Float) {
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(2.dp),
-    ) {
-        if (active) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth(progress.coerceIn(0f, 1f))
-                    .fillMaxHeight()
-                    .background(EInkTheme.colorScheme.primary),
-            )
-        }
-    }
-}
 
 @Composable
 private fun ErrorView(

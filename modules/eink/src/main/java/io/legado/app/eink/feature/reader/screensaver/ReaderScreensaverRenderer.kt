@@ -222,13 +222,12 @@ internal class ReaderScreensaverRenderer {
         val progressHeight = 2f * density
         val dividerExtent =
             if (style.footerDivider == true) ReaderTipRowGeometry.DIVIDER_THICKNESS_DP * density else 0f
-        val rowTop = footerTop + progressHeight
         if (request.autoPlay) {
             canvas.drawRect(
                 0f,
-                footerTop,
+                footerTop + dividerExtent,
                 sourceWidth.toFloat(),
-                footerTop + progressHeight,
+                footerTop + dividerExtent + progressHeight,
                 Paint().apply { color = request.colors.textArgb },
             )
         }
@@ -237,7 +236,7 @@ internal class ReaderScreensaverRenderer {
         val paint = tipRowPaint(
             typeface = request.footerTypeface,
             configuredSizeSp = style.footerSize,
-            availablePx = (extentPx - progressHeight - paddingTopPx - paddingBottomPx -
+            availablePx = (extentPx - paddingTopPx - paddingBottomPx -
                 dividerExtent).coerceAtLeast(1f),
             density = density,
             colorArgb = request.colors.tipArgb,
@@ -251,7 +250,7 @@ internal class ReaderScreensaverRenderer {
                 canvas = canvas,
                 leftPx = rowLeft,
                 rightPx = rowRight,
-                yPx = rowTop,
+                yPx = footerTop,
                 thicknessPx = dividerExtent,
                 colorArgb = request.colors.tipArgb,
             )
@@ -261,8 +260,8 @@ internal class ReaderScreensaverRenderer {
             paint = paint,
             rowLeftPx = rowLeft,
             rowRightPx = rowRight,
-            baselineY = rowTop + ReaderTipRowGeometry.footerBaseline(
-                bandHeightPx = extentPx - progressHeight,
+            baselineY = footerTop + ReaderTipRowGeometry.footerBaseline(
+                bandHeightPx = extentPx,
                 paddingBottomPx = paddingBottomPx,
                 fontBottomPx = metrics.descent,
             ),
