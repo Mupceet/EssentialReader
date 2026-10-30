@@ -115,7 +115,7 @@ private fun CountBadge(bookCount: Int) {
             text = "$bookCount 本",
             style = EInkTheme.typography.labelSmall,
             color = colors.onSurface,
-            modifier = Modifier.padding(horizontal = EInkSpacing.xs, vertical = 0.dp),
+            modifier = Modifier.padding(horizontal = EInkSpacing.s, vertical = EInkSpacing.xs),
         )
     }
 }
