@@ -395,7 +395,8 @@ private fun BookGridItem(
                 height = gridCoverHeight
             )
             // 角标规则与列表项一致：刷新中"…"，未读角标受宿主开关门控
-            //（本次刷新发现新章时高亮）；位置同 View 版网格（封面右上角）
+            //（本次刷新发现新章时高亮）；位置在封面左上角——文字占位封面
+            // 的书名大字贴右缘，右上角会重叠（2026-10-30 用户反馈）
             val badgeText = shelfBadgeText(isUpdating, style.showUnreadBadge, unreadCount)
             if (badgeText != null) {
                 ShelfBadge(
@@ -407,8 +408,8 @@ private fun BookGridItem(
                         book.hasNewChapter
                     ),
                     modifier = Modifier
-                        .align(Alignment.TopEnd)
-                        .padding(EInkSpacing.xxs)
+                        .align(Alignment.TopStart)
+                        .padding(EInkSpacing.xs)
                 )
             }
         }
@@ -609,7 +610,7 @@ private fun ShelfBadge(
                     )
                 }
             )
-            .padding(horizontal = EInkSpacing.xs, vertical = 0.dp),
+            .padding(horizontal = EInkSpacing.xs, vertical = EInkSpacing.xxs),
         contentAlignment = Alignment.Center
     ) {
         EInkText(
