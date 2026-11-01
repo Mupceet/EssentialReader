@@ -84,6 +84,14 @@ interface GlobalSettings {
     var pullDownBookmark: Boolean
 
     /**
+     * 阅读界面「书源信息行」开关（E-InK 自有界面偏好，完整模式无对应
+     * 设置，默认 false）：开启后阅读菜单展开期顶栏下方增加一行——左侧
+     * 当前章节名、右侧书源名；书源具备登录/章节付费能力时书源名可点开
+     * 下拉菜单执行登录与购买（能力入口按书源条件出现的通用化承载）。
+     */
+    var readerSourceInfoBar: Boolean
+
+    /**
      * 水波纹翻页档位（E-InK 自有界面偏好，完整模式无对应设置）。
      *
      * 四档：关闭（默认）/慢速/标准/快速（[PageTurnRippleMode]）。开启

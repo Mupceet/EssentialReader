@@ -56,6 +56,7 @@ object EInkEngineRegistry {
     private var _bookshelfGroupEngine: BookshelfGroupEngine? = null
     private var _backupSyncEngine: BackupSyncEngine? = null
     private var _pageTurnEffectEngine: PageTurnEffectEngine? = null
+    private var _bookSourceEngine: BookSourceEngine? = null
 
     /** 模块自有的按键枢纽（非宿主端口）：每次 install 重置，丢弃陈旧 handler。 */
     private var _keyEventHub = EInkKeyEventHub()
@@ -132,6 +133,14 @@ object EInkEngineRegistry {
     val pageTurnEffectEngine: PageTurnEffectEngine?
         get() = _pageTurnEffectEngine
 
+    /**
+     * 书源管理端口——**可选**端口：未注册 = 宿主无书源管理能力，
+     * 「我的 → 书源管理」入口不渲染，不参与 install 必填校验，
+     * 见 [BookSourceEngine] 接口 KDoc。
+     */
+    val bookSourceEngine: BookSourceEngine?
+        get() = _bookSourceEngine
+
     /** 模块自有按键枢纽（入口基类分发、阅读页注册处理器；恒可用）。 */
     val keyEventHub: EInkKeyEventHub
         get() = _keyEventHub
@@ -165,6 +174,8 @@ object EInkEngineRegistry {
      * @param pageTurnEffectEngine 硬件翻页波纹端口实现（可选，默认
      *   null：宿主无水波纹设备能力时不传，阅读「其它设置」的水波纹
      *   翻页开关不渲染）。
+     * @param bookSourceEngine 书源管理端口实现（可选，默认 null：宿主
+     *   无书源管理能力时不传，「我的 → 书源管理」入口不渲染）。
      */
     fun install(
         globalSettings: GlobalSettings,
@@ -180,6 +191,7 @@ object EInkEngineRegistry {
         bookshelfGroupEngine: BookshelfGroupEngine? = null,
         backupSyncEngine: BackupSyncEngine? = null,
         pageTurnEffectEngine: PageTurnEffectEngine? = null,
+        bookSourceEngine: BookSourceEngine? = null,
     ) {
         _globalSettings = globalSettings
         _bookshelfEngine = bookshelfEngine
@@ -194,6 +206,7 @@ object EInkEngineRegistry {
         _bookshelfGroupEngine = bookshelfGroupEngine
         _backupSyncEngine = backupSyncEngine
         _pageTurnEffectEngine = pageTurnEffectEngine
+        _bookSourceEngine = bookSourceEngine
         _keyEventHub = EInkKeyEventHub()
     }
 

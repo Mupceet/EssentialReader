@@ -17,4 +17,9 @@
     <string name="eink_change_source_failed">换源失败</string>
     <string name="eink_change_source_no_result">未找到其它可用书源</string>
     <string name="eink_change_source_already_current">已是当前书源</string>
+    <!-- 章节付费 -->
+    <string name="eink_reader_pay_page_opened">已打开付费页面，完成购买后可刷新本章</string>
+    <string name="eink_reader_pay_refreshed">购买成功，正在刷新本章</string>
+    <string name="eink_reader_pay_failed">购买操作失败：%1$s</string>
+    <string name="eink_reader_pay_busy">正在执行购买操作</string>
 </resources>

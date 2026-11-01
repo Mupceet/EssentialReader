@@ -31,6 +31,9 @@ class GlobalSettingsChineseConverterCompatTest {
         override var pullDownBookmark: Boolean
             get() = false
             set(value) {}
+        override var readerSourceInfoBar: Boolean
+            get() = false
+            set(value) {}
         override var hideStatusBar: Boolean
             get() = false
             set(value) {}

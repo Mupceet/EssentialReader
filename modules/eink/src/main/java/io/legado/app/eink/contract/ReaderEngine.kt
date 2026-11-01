@@ -119,6 +119,22 @@ data class ReaderCloudProgress(
 )
 
 /**
+ * 当前会话书源的能力信息（书源信息行/登录与购买入口门控）。
+ *
+ * 宿主实现义务：从会话书源实体即时读取；无会话或本地书返回 null。
+ */
+data class ReaderSourceInfo(
+    /** 书源地址（登录入口 [BookSourceEngine.openSourceLogin] 的回传键）。 */
+    val url: String,
+    /** 书源显示名。 */
+    val name: String,
+    /** 是否配置了登录地址。 */
+    val hasLogin: Boolean,
+    /** 是否配置了章节付费动作（正文规则 payAction）。 */
+    val hasPayAction: Boolean,
+)
+
+/**
  * 阅读引擎 → 模块的事件回调。
  *
  * 宿主实现义务：把宿主阅读引擎的状态推送转发到当前注册的回调
@@ -557,6 +573,59 @@ interface ReaderEngine {
      * 「点击图片方式 = 禁用」一致。
      */
     fun dispatchImageAction(action: String, source: String) {}
+
+    // ---- 会话书源信息（可选能力，默认无）----
+
+    /**
+     * 当前会话书源的能力信息（名称/登录/付费）：书源信息行与登录入口
+     * 的数据源。无会话、本地书或宿主不支持返回 null（信息行随之不
+     * 渲染书源段，属诚实降级）。组合期读取：菜单展开/书籍变更的重组
+     * 都会重读。
+     */
+    fun sessionSourceInfo(): ReaderSourceInfo? = null
+
+    // ---- 章节付费（可选能力，默认不支持）----
+
+    /**
+     * 章节付费动作执行结果（[ReaderEngine.requestChapterPay] 的返回值）。
+     */
+    sealed interface ReaderPayResult {
+
+        /** payAction 求值返回付费页 URL，宿主已打开付费页面（墨水屏宿主
+         *  以全屏浏览器弹框呈现）；用户完成购买返回后自行触发
+         *  [refreshCurrentChapter] 或重进章节见新内容。 */
+        data object PayPageOpened : ReaderPayResult
+
+        /** payAction 求值返回成功，宿主已清当前章缓存并刷新目录与当前章
+         *  正文（内容更新经既有内容回调推送，模块无需再触发刷新）。 */
+        data object ChapterRefreshed : ReaderPayResult
+
+        /** 执行失败（无会话/无书源/无付费动作/求值异常），[cause] 供模块
+         *  错误文案。 */
+        data class Failed(val cause: Throwable) : ReaderPayResult
+    }
+
+    /**
+     * 当前会话书源是否定义了章节付费动作（正文规则 `payAction` 非空且
+     * 会话书非本地书）。阅读菜单的「购买本章」入口按本值渲染。
+     *
+     * 默认 false——旧宿主上无付费入口（诚实降级）。组合期读取：菜单
+     * 展开/书籍变更（onNotifyBookChanged）都会触发重组重读。
+     */
+    fun hasPayAction(): Boolean = false
+
+    /**
+     * 执行当前章的付费动作：求值书源 payAction 脚本（绑定 book/chapter
+     * 上下文）——返回 URL 时宿主打开付费页（结果 [ReaderPayResult.
+     * PayPageOpened]）；返回 true 时宿主清当前章缓存、重拉目录并重载
+     * 当前章（结果 [ReaderPayResult.ChapterRefreshed]）。语义对齐宿主
+     * 完整模式阅读器的 confirmPayAction。
+     *
+     * 默认实现 = 不支持（[ReaderPayResult.Failed]）——调用面已被
+     * [hasPayAction] 门控，默认实现仅兜底异常宿主。
+     */
+    suspend fun requestChapterPay(): ReaderPayResult =
+        ReaderPayResult.Failed(UnsupportedOperationException("章节付费不受支持"))
 
     // ---- 触控与页眉页脚 ----
 

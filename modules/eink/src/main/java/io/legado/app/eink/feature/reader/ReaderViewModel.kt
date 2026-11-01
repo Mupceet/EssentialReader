@@ -17,6 +17,7 @@ import io.legado.app.eink.contract.PageTurnRippleMode
 import io.legado.app.eink.contract.ReaderBookSnapshot
 import io.legado.app.eink.contract.ReaderCloudProgress
 import io.legado.app.eink.contract.ReaderEngine
+import io.legado.app.eink.contract.ReaderSourceInfo
 import io.legado.app.eink.contract.ReaderEngineCallback
 import io.legado.app.eink.contract.ReaderFontOption
 import io.legado.app.eink.contract.ReaderFontSelection
@@ -80,6 +81,10 @@ data class ReaderUiState(
     val autoPlayProgress: Float = 0f,
     val isLocalBook: Boolean = false,
     val inBookshelf: Boolean = false,
+    /** 会话书源能力信息（书源信息行/登录购买入口门控；本地书/无源 null）。 */
+    val sourceInfo: ReaderSourceInfo? = null,
+    /** 书源信息行开关（「其它设置」，E-InK 自有偏好与宿主共享存储）。 */
+    val sourceInfoBarEnabled: Boolean = false,
     /** 音量键翻页（转发完整模式同键阅读设置；纯按键语义，切换不触发重排）。 */
     val volumeKeyPage: Boolean = false,
     /** 阅读区竖直下拉添加书签开关（E-InK 自有偏好，默认关；关闭时下拉手势只吞并不动作）。 */
@@ -417,6 +422,8 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application),
     private fun syncBookState(book: ReaderBookSnapshot) {
         val inBookshelf = book.isInBookshelf
         engine.setInBookshelf(inBookshelf)
+        val sourceInfo = engine.sessionSourceInfo()
+        val sourceInfoBarEnabled = EInkEngineRegistry.globalSettings.readerSourceInfoBar
         _uiState.update {
             it.copy(
                 bookName = book.name,
@@ -424,6 +431,8 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application),
                 bookUrl = book.bookUrl,
                 isLocalBook = book.isLocal,
                 inBookshelf = inBookshelf,
+                sourceInfo = sourceInfo,
+                sourceInfoBarEnabled = sourceInfoBarEnabled,
             )
         }
         updateTipInfo()
@@ -748,7 +757,7 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application),
     }
 
     /**
-     * 缓存章节（当前章起往后）。
+     * 缓存章节（当前章起向后）。
      * @param count 向后缓存的章节数；[CACHE_ALL] 表示全本
      */
     fun cacheChapters(count: Int) {
@@ -757,6 +766,48 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application),
                 null -> Unit
                 false -> _messages.emit(UserMessage.from(R.string.eink_reader_local_no_cache))
                 true -> _messages.emit(UserMessage.from(R.string.eink_reader_cache_started))
+            }
+        }
+    }
+
+    /**
+     * 书源信息行开关（「其它设置」面板）：UiState 即时生效 + 宿主共享
+     * 存储落盘（冷启动/重建恢复）。
+     */
+    fun toggleSourceInfoBar() {
+        val next = !EInkEngineRegistry.globalSettings.readerSourceInfoBar
+        EInkEngineRegistry.globalSettings.readerSourceInfoBar = next
+        _uiState.update { it.copy(sourceInfoBarEnabled = next) }
+    }
+
+    /**
+     * 执行当前章付费动作（阅读顶栏「购买本章」，入口由 engine.hasPayAction
+     * 门控）：宿主求值书源 payAction——付费页结果由宿主全屏浏览器弹框打开
+     * （用户完成购买返回后刷新本章见新内容）；true 结果宿主已清缓存重载，
+     * 内容更新经既有回调推送。执行中防重复触发。
+     */
+    private var payJob: Job? = null
+
+    fun requestChapterPay() {
+        if (payJob?.isActive == true) {
+            _messages.tryEmit(UserMessage.from(R.string.eink_reader_pay_busy))
+            return
+        }
+        payJob = viewModelScope.launch(Dispatchers.IO) {
+            when (val result = engine.requestChapterPay()) {
+                ReaderEngine.ReaderPayResult.PayPageOpened ->
+                    _messages.emit(UserMessage.from(R.string.eink_reader_pay_page_opened))
+
+                ReaderEngine.ReaderPayResult.ChapterRefreshed ->
+                    _messages.emit(UserMessage.from(R.string.eink_reader_pay_refreshed))
+
+                is ReaderEngine.ReaderPayResult.Failed ->
+                    _messages.emit(
+                        UserMessage.from(
+                            R.string.eink_reader_pay_failed,
+                            result.cause.localizedMessage ?: "",
+                        )
+                    )
             }
         }
     }
@@ -1179,6 +1230,9 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application),
                 bookAuthor = book.author,
                 bookUrl = book.bookUrl,
                 chapterSize = engine.chapterSize,
+                // 换源走本回调（目录装载）：书源信息随之刷新，否则信息行
+                // 停留在换源前的旧源
+                sourceInfo = engine.sessionSourceInfo(),
             )
         }
     }

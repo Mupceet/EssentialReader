@@ -168,6 +168,7 @@ class ReaderViewModelStyleBaseTest {
         override var volumeKeyPage = false
         override var useDefaultCover = false
         override var pullDownBookmark = false
+        override var readerSourceInfoBar = false
         override var hideStatusBar = false
         override var showReviewBubbles = true
         override val threadCount = 1

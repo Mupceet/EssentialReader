@@ -82,6 +82,7 @@ import io.legado.app.eink.contract.ReaderEngine
 import io.legado.app.eink.contract.ReaderPageSnapshot
 import io.legado.app.eink.designsystem.content.EInkText
 import io.legado.app.eink.designsystem.control.EInkDialog
+import io.legado.app.eink.designsystem.control.EInkModalPresence
 import io.legado.app.eink.designsystem.interaction.einkClickable
 import io.legado.app.eink.designsystem.theme.EInkTheme
 import io.legado.app.eink.feature.reader.selection.FlipTrigger
@@ -300,6 +301,12 @@ fun ReaderRoute(
     // 操作条返回）离开时弹出，形态对齐详情页「移出书架」确认框；
     // 确认 = 加入并退出，取消 = 直接退出
     var showAddToShelfPrompt by remember { mutableStateOf(false) }
+
+    // 章节付费确认（顶栏「购买本章」）：确认后由 VM 走端口求值 payAction
+    // ——付费页经宿主全屏浏览器弹框打开；购买成功宿主自动清缓存重载本章
+    var showPayConfirm by remember { mutableStateOf(false) }
+    // 书源信息行的操作下拉（登录/购买本章；书源具备对应能力才可展开）
+    var showSourceMenu by remember { mutableStateOf(false) }
 
     // 页内长按选区（Screen 无状态渲染，选区状态在此持有）：选区坐标绑定
     // 单页快照，pageVersion 推进（翻页/重排/批注落库重绘）即自动清空，
@@ -863,6 +870,7 @@ fun ReaderRoute(
             onRefresh = viewModel::refreshChapter,
             onOpenCachePanel = { panel = ReaderPanel.CACHE },
             onTogglePageBookmark = onPageBookmarkToggle,
+            onOpenSourceMenu = { showSourceMenu = true },
             selectedPanel = panel,
             onOpenPanel = { target ->
                 // 再次点击已打开的面板按钮 = 关闭（取消选中）；
@@ -1036,6 +1044,7 @@ fun ReaderRoute(
                             onSetPageTurnRippleMode = viewModel::setPageTurnRippleMode,
                             onToggleHideStatusBar = viewModel::toggleHideStatusBar,
                             onToggleShowReviewBubbles = viewModel::toggleShowReviewBubbles,
+                            onToggleSourceInfoBar = viewModel::toggleSourceInfoBar,
                             onOpenTapZones = { tapZoneEditor = true },
                         )
                     }
@@ -1166,6 +1175,51 @@ fun ReaderRoute(
                 )
             }
         }
+        // 书源信息行操作下拉（锚定信息行右端下方）：登录（经宿主书源
+        // 登录界面）与购买本章（复用付费确认弹框）；能力之外不渲染对应项
+        if (showSourceMenu) {
+            val info = uiState.sourceInfo
+            if (info != null && (info.hasLogin || info.hasPayAction)) {
+                ReaderSourceMenu(
+                    statusBarTop = forcedStatusBarTop(),
+                    hasLogin = info.hasLogin,
+                    hasPayAction = info.hasPayAction,
+                    onLogin = {
+                        showSourceMenu = false
+                        val opened = EInkEngineRegistry.bookSourceEngine
+                            ?.openSourceLogin(info.url) == true
+                        if (!opened) {
+                            Toast.makeText(context, "宿主不支持书源登录", Toast.LENGTH_SHORT).show()
+                        }
+                    },
+                    onPay = {
+                        showSourceMenu = false
+                        showPayConfirm = true
+                    },
+                    onDismiss = { showSourceMenu = false },
+                )
+            }
+        }
+
+        // 章节付费确认（形态对齐完整模式 ConfirmChapterPay：正文 = 当前
+        // 章节标题）；确认即关弹层，执行反馈走 messages 流的 Toast
+        if (showPayConfirm) {
+            EInkDialog(
+                onDismiss = { showPayConfirm = false },
+                title = "购买本章",
+                confirmText = "购买",
+                onConfirm = {
+                    showPayConfirm = false
+                    viewModel.requestChapterPay()
+                },
+            ) {
+                EInkText(
+                    text = "是否购买当前章节《${uiState.chapterTitle}》？",
+                    style = EInkTheme.typography.bodyMedium,
+                )
+            }
+        }
+
         // 云端进度恢复确认（宿主 ConfirmRestoreProgress 同义；文案对齐
         // 宿主 restore_progress / found_cloud_progress）。第三动作
         // 「以本设备为准」：无条件上传本设备进度覆盖云端（宿主菜单
@@ -1343,6 +1397,7 @@ internal fun ReaderScreen(
     onRefresh: () -> Unit,
     onOpenCachePanel: () -> Unit,
     onTogglePageBookmark: () -> Unit,
+    onOpenSourceMenu: () -> Unit,
     selectedPanel: ReaderPanel?,
     onOpenPanel: (ReaderPanel) -> Unit,
     onRetry: () -> Unit,
@@ -1918,19 +1973,33 @@ internal fun ReaderScreen(
                     .background(EInkTheme.colorScheme.surface)
                     .padding(top = forcedStatusBarTop())
             ) {
-                ReaderTopBar(
-                    state = state,
-                    // 页面书签钮（v2 Task 9，设计 §4）：选中态 = 当前页快照
-                    // bookmarkBadge；书签能力关闭（pageBookmarkEnabled =
-                    // false）时整颗不渲染（契约 §3.3 降级语义）
-                    bookmarkEnabled = pageBookmarkEnabled,
-                    bookmarkBadge = state.page?.bookmarkBadge == true,
-                    onOpenDetail = onOpenDetail,
-                    onChangeSource = onChangeSource,
-                    onRefresh = onRefresh,
-                    onOpenCachePanel = onOpenCachePanel,
-                    onToggleBookmark = onTogglePageBookmark,
-                )
+                // Column：顶栏与信息行纵向顺排（Box 子级会堆叠——信息行
+                // 曾与顶栏重叠即此因），信息行贴顶栏下边缘
+                Column {
+                    ReaderTopBar(
+                        state = state,
+                        // 页面书签钮（v2 Task 9，设计 §4）：选中态 = 当前页快照
+                        // bookmarkBadge；书签能力关闭（pageBookmarkEnabled =
+                        // false）时整颗不渲染（契约 §3.3 降级语义）
+                        bookmarkEnabled = pageBookmarkEnabled,
+                        bookmarkBadge = state.page?.bookmarkBadge == true,
+                        onOpenDetail = onOpenDetail,
+                        onChangeSource = onChangeSource,
+                        onRefresh = onRefresh,
+                        onOpenCachePanel = onOpenCachePanel,
+                        onToggleBookmark = onTogglePageBookmark,
+                    )
+                    // 书源信息行（「其它设置 → 显示书源信息」开启时）：左当前
+                    // 章节名、右书源名；具备登录/付费能力时书源名可点开下拉
+                    // （章节付费入口收敛于此，顶栏不再设付费图标）
+                    if (state.sourceInfoBarEnabled && state.chapterTitle.isNotEmpty()) {
+                        ReaderSourceInfoBar(
+                            chapterTitle = state.chapterTitle,
+                            sourceInfo = state.sourceInfo,
+                            onOpenMenu = onOpenSourceMenu,
+                        )
+                    }
+                }
             }
         }
         if (bottomBarVisible) {

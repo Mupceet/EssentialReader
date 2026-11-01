@@ -31,6 +31,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.Dp
@@ -51,7 +52,13 @@ import io.legado.app.eink.designsystem.control.EInkSteppedSlider
 import io.legado.app.eink.designsystem.interaction.EInkPressBlock
 import io.legado.app.eink.designsystem.interaction.einkClickable
 import io.legado.app.eink.designsystem.navigation.EInkOperationBarIcon
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.ui.text.style.TextOverflow
 import io.legado.app.eink.designsystem.navigation.EInkTopBar
+import androidx.compose.foundation.layout.IntrinsicSize
+import androidx.compose.ui.zIndex
+import io.legado.app.eink.contract.ReaderSourceInfo
+import io.legado.app.eink.designsystem.control.EInkModalPresence
 import io.legado.app.eink.designsystem.theme.EInkShapes
 import io.legado.app.eink.designsystem.theme.EInkSpacing
 import io.legado.app.eink.designsystem.theme.EInkTheme
@@ -82,9 +89,10 @@ internal val ReaderBottomBarInset = BarHeight + 1.dp
 internal val ReaderTopBarInset = BarHeight + 1.dp
 
 // ====================================================================
-// 顶部操作条：书签 / 换源 / 刷新 / 缓存。加/移书架不设入口：未加书架的
-// 书在退出阅读时经「加入书架」弹框提示（见 Route 退出门控），在架管理
-// 走详情页
+// 顶部操作条：书签 / 换源 / 刷新 / 缓存。加/移书架不设入口：未加书
+// 架的书在退出阅读时经「加入书架」弹框提示（见 Route 退出门控），在架
+// 管理走详情页。登录与章节付费入口在书源信息行的下拉菜单（「其它设置
+// → 显示书源信息」开启），顶栏不设图标——能力不通用不占常驻位
 // ====================================================================
 
 @Composable
@@ -144,6 +152,164 @@ internal fun ReaderTopBar(
             )
         },
     )
+}
+
+// ====================================================================
+// 书源信息行（「其它设置 → 显示书源信息」开启时，顶栏下方一行）
+// ====================================================================
+
+/** 书源信息行定高（操作下拉的锚定偏移也引用它）。 */
+internal val ReaderSourceInfoBarHeight = 32.dp
+
+/** 信息行总占位（含底部分隔线 1dp，锚定偏移用；同 ReaderTopBarInset 口径）。 */
+internal val ReaderSourceInfoBarInset = ReaderSourceInfoBarHeight + 1.dp
+
+/**
+ * 书源信息行：左侧当前章节名（填充剩余空间，避免左段空白）、右侧书源
+ * 名；书源具备登录/付费能力时书源名段可点开操作下拉（按压反色 §35），
+ * 否则纯展示；本地书/降级宿主（[sourceInfo] null）只显章节名。
+ * 通宽 surface + 底部分隔线（与顶栏一体呈现，随菜单显隐）。
+ */
+@Composable
+internal fun ReaderSourceInfoBar(
+    chapterTitle: String,
+    sourceInfo: ReaderSourceInfo?,
+    onOpenMenu: () -> Unit,
+) {
+    val scheme = EInkTheme.colorScheme
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(ReaderSourceInfoBarHeight)
+                .background(scheme.surface)
+                .padding(horizontal = EInkSpacing.m)
+                // 整行消费点击：不可点区域若不消费，点击会穿透到画布的
+                // 中键分发（一点信息行=整个菜单收起的根因）
+                .einkClickable(onClick = {}),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            if (chapterTitle.isNotEmpty()) {
+                EInkText(
+                    text = chapterTitle,
+                    style = EInkTheme.typography.bodyMedium,
+                    color = scheme.onSurfaceVariant,
+                    modifier = Modifier.weight(1f),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+            if (sourceInfo != null) {
+                val actionable = sourceInfo.hasLogin || sourceInfo.hasPayAction
+                if (actionable) {
+                    // 可点段（具备登录/付费能力）：按压反色承载「可展开」
+                    EInkPressBlock(
+                        onClick = onOpenMenu,
+                        modifier = Modifier.padding(start = EInkSpacing.m),
+                    ) { colors, _ ->
+                        EInkText(
+                            text = sourceInfo.name,
+                            style = EInkTheme.typography.bodyMedium,
+                            color = colors.contentColor,
+                            maxLines = 1,
+                        )
+                    }
+                } else {
+                    EInkText(
+                        text = sourceInfo.name,
+                        style = EInkTheme.typography.bodyMedium,
+                        color = scheme.onSurface,
+                        maxLines = 1,
+                        modifier = Modifier.padding(start = EInkSpacing.m),
+                    )
+                }
+            }
+        }
+        EInkHorizontalDivider()
+    }
+}
+
+/**
+ * 书源信息行的操作下拉（锚定信息行右端下方、靠右留边距；IntrinsicSize.Max
+ * 内容自适应宽）：「书源登录」（经宿主书源登录界面覆盖承载）与「购买
+ * 本章」（点击时求值书源 payAction 脚本，复用付费确认弹框）按能力
+ * 条件渲染——书源未提供该动作则不出现；返回键/点外收起。
+ */
+@Composable
+internal fun ReaderSourceMenu(
+    statusBarTop: Dp,
+    hasLogin: Boolean,
+    hasPayAction: Boolean,
+    onLogin: () -> Unit,
+    onPay: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val colors = EInkTheme.colorScheme
+    BackHandler(onBack = onDismiss)
+    DisposableEffect(Unit) {
+        EInkModalPresence.acquire()
+        onDispose { EInkModalPresence.release() }
+    }
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .zIndex(2f)
+            .einkClickable(role = Role.Button, onClickLabel = "收起菜单", onClick = onDismiss),
+    ) {
+        Column(
+            modifier = Modifier
+                // （调用方经 padding 传入，本组件不自算状态栏高度）
+                .align(Alignment.TopEnd)
+                .padding(top = statusBarTop + sourceMenuAnchorOffset(), end = EInkSpacing.m)
+                .width(IntrinsicSize.Max)
+                .background(colors.surface)
+                .border(1.dp, colors.outline, EInkShapes.medium)
+                .clip(EInkShapes.medium)
+                .einkClickable(onClick = {}), // 消费面板内空白点击，避免透传关闭
+        ) {
+            // 能力条件渲染（书源未提供该动作则不出现，不做禁用置灰）：
+            // payAction 只是脚本无动作名元数据，完整模式亦固定文案
+            if (hasLogin) {
+                SourceMenuActionRow(label = "书源登录", onClick = onLogin)
+            }
+            if (hasPayAction) {
+                SourceMenuActionRow(label = "购买本章", onClick = onPay)
+            }
+        }
+    }
+}
+
+/**
+ * 信息行下方锚点的垂直偏移：顶栏占位（ReaderTopBarInset 含底部分隔线）+
+ * 信息行占位（含分隔线）——菜单紧贴信息行下缘（挨着即可，无额外间隙）；
+ * 此前少算两条 1dp 分隔线，菜单顶部盖住信息行底部。状态栏由调用方补。
+ */
+internal fun sourceMenuAnchorOffset(): Dp =
+    ReaderTopBarInset + ReaderSourceInfoBarInset
+
+@Composable
+private fun SourceMenuActionRow(
+    label: String,
+    onClick: () -> Unit,
+) {
+    EInkPressBlock(
+        onClick = onClick,
+        modifier = Modifier.fillMaxWidth(),
+    ) { colors, _ ->
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = EInkSpacing.m, vertical = EInkSpacing.s),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            EInkText(
+                text = label,
+                style = EInkTheme.typography.bodyMedium,
+                color = colors.contentColor,
+                maxLines = 1,
+            )
+        }
+    }
 }
 
 // ====================================================================
@@ -667,6 +833,7 @@ internal fun ReaderOtherPanel(
     onSetPageTurnRippleMode: (PageTurnRippleMode) -> Unit,
     onToggleHideStatusBar: () -> Unit,
     onToggleShowReviewBubbles: () -> Unit,
+    onToggleSourceInfoBar: () -> Unit,
     onOpenTapZones: () -> Unit,
 ) {
     // 行序按功能域分组：翻页交互 → 界面显示 → 阅读区手势（点击区域设置
@@ -677,6 +844,9 @@ internal fun ReaderOtherPanel(
     // 音量键翻页纯按键语义（阅读页按键处理器实时读端口值），切换不触发重排
     ToggleRow(label = "音量键翻页", checked = state.volumeKeyPage, onToggle = onToggleVolumeKeyPage)
     ToggleRow(label = "隐藏状态栏", checked = state.hideStatusBar, onToggle = onToggleHideStatusBar)
+    // 书源信息行：开启后顶栏下增加一行（章节名 | 书源名），具备登录/
+    // 付费能力的书源可从该行下拉进入操作
+    ToggleRow(label = "显示书源信息", checked = state.sourceInfoBarEnabled, onToggle = onToggleSourceInfoBar)
     if (io.legado.app.eink.contract.EInkEngineRegistry.globalSettings.supportsReviewBubbles) {
         ToggleRow(label = "显示段评气泡", checked = state.showReviewBubbles, onToggle = onToggleShowReviewBubbles)
     }
