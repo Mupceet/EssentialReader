@@ -12,10 +12,17 @@ class HostStyleCatalogTest {
     private val catalog = HostStyleCatalog.create()
 
     @Test
-    fun `完整目录覆盖全部33个参数且全部可用`() {
-        assertEquals(33, catalog.params.size)
-        assertEquals(33, catalog.params.map { it.id }.toSet().size)
+    fun `完整目录覆盖全部31个参数且全部可用`() {
+        assertEquals(31, catalog.params.size)
+        assertEquals(31, catalog.params.map { it.id }.toSet().size)
         assertTrue(catalog.params.all { it.available })
+    }
+
+    @Test
+    fun `分隔线不声明_EInk模式不渲染分隔线`() {
+        listOf(Ids.HEADER_DIVIDER, Ids.FOOTER_DIVIDER).forEach { id ->
+            assertEquals("$id 不应进目录（模块设置整行隐藏，快照样式恒发 false）", null, catalog.find(id))
+        }
     }
 
     @Test
@@ -61,7 +68,9 @@ class HostStyleCatalogTest {
             .filter { it.type == String::class.java } // 排除 object 的 INSTANCE 字段
             .map { it.get(null) as String }
         assertEquals(33, declaredIds.size)
-        assertEquals(declaredIds.toSet(), catalog.params.map { it.id }.toSet())
+        // 分隔线两 id 声明于契约但目录不收（E-Ink 不渲染分隔线，见上）
+        val catalogIds = declaredIds - Ids.HEADER_DIVIDER - Ids.FOOTER_DIVIDER
+        assertEquals(catalogIds.toSet(), catalog.params.map { it.id }.toSet())
     }
 
     @Test

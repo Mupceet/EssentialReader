@@ -1,6 +1,5 @@
 package io.legado.app.eink.bridge
 
-import io.legado.app.domain.gateway.ReadStyleBooleanKey
 import io.legado.app.domain.gateway.ReadStyleFloatKey
 import io.legado.app.domain.gateway.ReadStyleIntKey
 import io.legado.app.domain.gateway.ReadStyleMutation
@@ -67,12 +66,8 @@ internal fun buildStyleMutations(
 
     style.headerSize?.let { int(ReadStyleIntKey.HeaderFontSize, it) }
     style.footerSize?.let { int(ReadStyleIntKey.FooterFontSize, it) }
-    style.headerDivider?.let {
-        add(ReadStyleMutation.BooleanValue(ReadStyleBooleanKey.ShowHeaderLine, it))
-    }
-    style.footerDivider?.let {
-        add(ReadStyleMutation.BooleanValue(ReadStyleBooleanKey.ShowFooterLine, it))
-    }
+    // 分隔线不跨桥（目录未声明，模块不发射）：E-Ink 模式不渲染分隔线，
+    // showHeaderLine/showFooterLine 保留给完整模式
     style.headerMode?.let { int(ReadStyleIntKey.HeaderMode, it.coerceIn(0, 2)) }
     style.footerVisible?.let { int(ReadStyleIntKey.FooterMode, if (it) 0 else 1) }
 }

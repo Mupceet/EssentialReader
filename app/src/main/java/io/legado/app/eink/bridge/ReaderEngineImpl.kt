@@ -588,8 +588,13 @@ internal object ReaderEngineImpl : ReaderEngine, KoinComponent {
         } else {
             durConfig.footerFontSize
         },
-        headerDivider = durConfig.showHeaderLine,
-        footerDivider = durConfig.showFooterLine,
+        // 分隔线恒 false：E-Ink 模式不渲染分隔线（模块 tip 绘制按 true 才画，
+        // 目录亦未声明——宿主 showHeaderLine/showFooterLine 与完整模式互不
+        // 影响）。布局尊重配置：header/footerDecorationExtentPx 仍按宿主
+        // 配置计入分隔线厚度，分隔线位留在带内（页眉带底/页脚带顶），文字
+        // 锚点（顶锚/底锚）不受影响，两模式分页一致
+        headerDivider = false,
+        footerDivider = false,
         headerMode = when (durConfig.headerMode) {
             1 -> 1
             2 -> 2
