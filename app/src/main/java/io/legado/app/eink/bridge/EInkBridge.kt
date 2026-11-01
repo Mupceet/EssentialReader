@@ -57,6 +57,9 @@ internal object EinkLegacyPrefsStore {
     /** 最近文件字体历史的自有键（换行分隔 path 列表，格式见模块侧）。 */
     const val KEY_RECENT_FONTS = "einkRecentFontPaths"
 
+    /** 阅读界面「书源信息行」开关的自有键（默认 false）。 */
+    const val KEY_READER_SOURCE_INFO_BAR = "einkReaderSourceInfoBar"
+
     /** 「我的 → 字体设置」反显记录：所选字体文件夹枚举项 path（源）。 */
     const val KEY_APP_FONT_SOURCE = "einkAppFontSourcePath"
 
@@ -152,6 +155,7 @@ object EInkBridge {
             bookshelfGroupEngine = BookshelfGroupEngineImpl,
             backupSyncEngine = BackupSyncEngineImpl,
             pageTurnEffectEngine = PageTurnEffectEngineImpl,
+            bookSourceEngine = BookSourceEngineImpl,
         )
         // 封面开关为快照状态缓存：每次进入 E-Ink 与宿主设置快照对齐，
         // 防止完整模式（或上一会话）修改后的陈旧值
@@ -230,6 +234,13 @@ private object GlobalSettingsImpl : GlobalSettings, KoinComponent {
         set(value) {
             einkLegacyPrefs.edit()
                 .putBoolean(EinkLegacyPrefsStore.KEY_PULL_DOWN_BOOKMARK, value).apply()
+        }
+
+    override var readerSourceInfoBar: Boolean
+        get() = einkLegacyPrefs.getBoolean(EinkLegacyPrefsStore.KEY_READER_SOURCE_INFO_BAR, false)
+        set(value) {
+            einkLegacyPrefs.edit()
+                .putBoolean(EinkLegacyPrefsStore.KEY_READER_SOURCE_INFO_BAR, value).apply()
         }
 
     override var pageTurnRippleMode: PageTurnRippleMode

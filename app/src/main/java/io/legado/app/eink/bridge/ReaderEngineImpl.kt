@@ -9,6 +9,7 @@ import io.legado.app.constant.AppLog
 import io.legado.app.constant.BookType
 import io.legado.app.data.appDb
 import io.legado.app.data.entities.Book
+import io.legado.app.data.repository.BookRepository
 import io.legado.app.data.repository.ReadSettingsRepository
 import io.legado.app.domain.gateway.BackupSettingsGateway
 import io.legado.app.domain.gateway.ReadStyleGateway
@@ -24,6 +25,7 @@ import io.legado.app.eink.contract.ReaderFontSelection
 import io.legado.app.eink.contract.ReaderHeaderFooterVisibility
 import io.legado.app.eink.contract.ReaderPageSnapshot
 import io.legado.app.eink.contract.ReaderPrepareResult
+import io.legado.app.eink.contract.ReaderSourceInfo
 import io.legado.app.eink.contract.ReaderStyleCatalog
 import io.legado.app.eink.contract.ReaderSyncTrigger
 import io.legado.app.eink.contract.ReaderTextStyle
@@ -45,9 +47,17 @@ import io.legado.app.model.cache.ChapterSelection
 import io.legado.app.model.localBook.LocalBook
 import io.legado.app.model.webBook.WebBook
 import io.legado.app.feature.reader.legacy.LegacyReaderPageDecorationFactory
+import io.legado.app.model.analyzeRule.AnalyzeRule
+import io.legado.app.model.analyzeRule.AnalyzeRule.Companion.setChapter
+import io.legado.app.model.analyzeRule.AnalyzeRule.Companion.setCoroutineContext
 import io.legado.app.ui.book.read.ReaderContentAvoidancePolicy
 import io.legado.app.ui.config.readConfig.ReadConfig
 import io.legado.app.ui.login.SourceLoginJsExtensions
+import io.legado.app.ui.login.forcedFullscreenBrowserConfig
+import io.legado.app.ui.widget.dialog.BottomWebViewDialog
+import io.legado.app.utils.isAbsUrl
+import io.legado.app.utils.isTrue
+import io.legado.app.utils.showDialogFragment
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
 import splitties.init.appCtx
@@ -59,6 +69,8 @@ import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.currentCoroutineContext
 
 /** Book 快照实现。 */
 internal class ReaderBookSnapshotImpl(override val handle: BookHandle) : ReaderBookSnapshot {
@@ -97,6 +109,7 @@ internal object ReaderEngineImpl : ReaderEngine, KoinComponent {
     private val getReadingProgressUseCase: GetReadingProgressUseCase by inject()
     private val uploadReadingProgressUseCase: UploadReadingProgressUseCase by inject()
     private val backupSettingsGateway: BackupSettingsGateway by inject()
+    private val bookRepository: BookRepository by inject()
 
     private val progressSyncer by lazy {
         ReaderProgressSyncer(
@@ -674,6 +687,128 @@ internal object ReaderEngineImpl : ReaderEngine, KoinComponent {
             } catch (e: Throwable) {
                 AppLog.put("执行图片链接click键值出错\n${e.localizedMessage}", e, true)
             }
+        }
+    }
+
+    // ---- 会话书源信息 ----
+
+    /**
+     * 当前会话书源能力信息（[ReaderEngine.sessionSourceInfo] 实现）：
+     * 从 ReadBook 会话书源即时读取；本地书/无会话/无源返回 null。
+     */
+    override fun sessionSourceInfo(): ReaderSourceInfo? {
+        val book = ReadBook.book ?: return null
+        if (book.isLocal) return null
+        val source = ReadBook.bookSource ?: return null
+        return ReaderSourceInfo(
+            url = source.bookSourceUrl,
+            name = source.bookSourceName,
+            hasLogin = !source.loginUrl.isNullOrBlank(),
+            hasPayAction = !source.getContentRule().payAction.isNullOrBlank(),
+        )
+    }
+
+    // ---- 章节付费 ----
+
+    /**
+     * 当前会话书源是否配置了章节付费动作（正文规则 payAction）。
+     * 阅读菜单「购买本章」入口按本值渲染；本地书无书源恒 false。
+     */
+    override fun hasPayAction(): Boolean {
+        val book = ReadBook.book ?: return false
+        if (book.isLocal) return false
+        val source = ReadBook.bookSource ?: return false
+        return !source.getContentRule().payAction.isNullOrBlank()
+    }
+
+    /**
+     * 执行当前章付费动作（[ReaderEngine.requestChapterPay] 实现）：语义
+     * 复刻完整模式 ReadBookViewModel.confirmPayAction 与漫画侧
+     * MangaReaderActionRepository.payCurrentChapter——书源 JS 上下文里
+     * 求值 payAction（绑定 book/chapter）：
+     *  - 返回 URL：经 [BottomWebViewDialog] 打开付费页（墨水屏强制全屏
+     *    呈现 + 翻页控制条，与段评 showBrowser 同呈现口径），Cookie 随
+     *    sourceKey 绑定书源；
+     *  - 返回 true：清当前章缓存 → 重拉目录替换入库 →
+     *    [ReadBook.onChapterListUpdated] 刷新会话并自动重载当前章
+     *    （内容更新经既有回调推送模块）。
+     */
+    override suspend fun requestChapterPay(): ReaderEngine.ReaderPayResult {
+        val book = ReadBook.book
+            ?: return ReaderEngine.ReaderPayResult.Failed(
+                NoStackTraceException("无阅读会话")
+            )
+        if (book.isLocal) {
+            return ReaderEngine.ReaderPayResult.Failed(
+                NoStackTraceException("本地书籍无付费动作")
+            )
+        }
+        val source = ReadBook.bookSource
+            ?: return ReaderEngine.ReaderPayResult.Failed(
+                NoStackTraceException("无书源")
+            )
+        val payAction = source.getContentRule().payAction
+        if (payAction.isNullOrBlank()) {
+            return ReaderEngine.ReaderPayResult.Failed(
+                NoStackTraceException("no pay action")
+            )
+        }
+        val chapter = appDb.bookChapterDao.getChapter(book.bookUrl, ReadBook.durChapterIndex)
+            ?: return ReaderEngine.ReaderPayResult.Failed(
+                NoStackTraceException("no find chapter")
+            )
+        return try {
+            val callerContext = currentCoroutineContext()
+            val result = runScriptWithContext {
+                val analyzeRule = AnalyzeRule(book, source)
+                analyzeRule.setCoroutineContext(callerContext)
+                analyzeRule.setBaseUrl(chapter.url)
+                analyzeRule.setChapter(chapter)
+                analyzeRule.evalJS(payAction).toString()
+            }
+            when {
+                result.isAbsUrl() -> {
+                    // 付费页在宿主 Activity 上弹出（主线程事务）；弹层关闭即
+                    // 返回 E-Ink 界面，用户完成购买后自行刷新本章见新内容
+                    val activity = EInkBridge.hostActivity()
+                        ?: return ReaderEngine.ReaderPayResult.Failed(
+                            NoStackTraceException("宿主界面不在前台")
+                        )
+                    withContext(Dispatchers.Main) {
+                        activity.showDialogFragment(
+                            BottomWebViewDialog(
+                                source.getKey(),
+                                BookType.text,
+                                result,
+                                config = forcedFullscreenBrowserConfig(null),
+                                noTransition = true,
+                            )
+                        )
+                    }
+                    ReaderEngine.ReaderPayResult.PayPageOpened
+                }
+
+                result.isTrue() -> {
+                    // 购买成功：清当前章缓存，重拉目录替换入库，会话刷新
+                    // （onChapterListUpdated 内部 loadContent(true) 重载当前章）
+                    BookHelp.delContent(book, chapter)
+                    val chapters = WebBook.getChapterListAwait(source, book, true).getOrThrow()
+                    appDb.bookChapterDao.delByBook(book.bookUrl)
+                    appDb.bookChapterDao.insert(*chapters.toTypedArray())
+                    bookRepository.update(book)
+                    ReadBook.onChapterListUpdated(book)
+                    ReaderEngine.ReaderPayResult.ChapterRefreshed
+                }
+
+                else -> ReaderEngine.ReaderPayResult.Failed(
+                    NoStackTraceException("pay action returned $result")
+                )
+            }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Throwable) {
+            AppLog.put("执行购买操作出错\n${e.localizedMessage}", e, true)
+            ReaderEngine.ReaderPayResult.Failed(e)
         }
     }
 
