@@ -15,14 +15,15 @@ import io.legado.app.eink.designsystem.pager.EInkPageSwipe
  * GlobalSettings.mouseWheelPage，200ms 冷却去抖）。
  *
  * 按键语义与阅读页共用 [hubPagingKeyEvent]（designsystem 纯函数
- * 语义）：开关关闭或页内模态弹框在场放行系统音量调节；首按翻页、
- * 长按重复不翻；翻页到头由各分页器 canPage 守卫（不动作、仍消费）。
+ * 语义）：音量开关关闭或页内模态弹框在场时音量键放行系统（自定义键
+ * 不受音量开关控制）；首按翻页、长按重复不翻；翻页到头由各分页器
+ * canPage 守卫（不动作、仍消费）。
  *
  * [onSwipeLeft]/[onSwipeRight]（可选）：横向主导滑动切走（如目录页
  * 切 Tab），与竖直翻页共用 [EInkPageSwipe] 的统一轴向仲裁；null 时
  * 手势行为与历史版本一致（仅竖直翻页）。
  *
- * [enabled] = false 时不注册按键（手势同 EInkPageSwipe 一并停用）：
+ * [enabled] = false 时不注册按键与滚轮处理（手势同 EInkPageSwipe 一并停用）：
  * 同屏常驻多个分页区（首页双 Tab）以激活态互斥，避免隐藏区占住
  * 枢纽栈顶吃掉按键；组合互斥的分页区（搜索结果/历史、目录 Tab、
  * 书架列表/网格）保持默认 true 即可。

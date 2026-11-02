@@ -1,5 +1,6 @@
 package io.legado.app.eink.feature.home
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Box
@@ -33,6 +34,7 @@ import io.legado.app.eink.contract.EInkEngineRegistry
 import io.legado.app.eink.designsystem.content.EInkHorizontalDivider
 import io.legado.app.eink.designsystem.content.EInkText
 import io.legado.app.eink.designsystem.control.EInkButton
+import io.legado.app.eink.designsystem.control.EInkModalPresence
 import io.legado.app.eink.designsystem.interaction.EInkPressBlock
 import io.legado.app.eink.designsystem.navigation.EInkOperationBar
 import io.legado.app.eink.designsystem.navigation.EInkOperationBarIcon
@@ -77,6 +79,13 @@ fun PagingSettingsRoute(onBack: () -> Unit) {
     var nextKeys by remember { mutableStateOf(parseKeyCodes(globalSettings.nextKeys)) }
     // 录入方向（null = 非录入态）；提示方向 + 序号（序号自增驱动计时重启）
     var captureDirection by remember { mutableStateOf<PagingDirection?>(null) }
+
+    // 返回双路径（API 33+ OnBackInvokedCallback 不走 onKeyDown）：录入态
+    // 返回仅退出录入，不退本页；非录入态不启用，返回照常退页
+    BackHandler(enabled = captureDirection != null) {
+        captureDirection = null
+    }
+
     var hintDirection by remember { mutableStateOf<PagingDirection?>(null) }
     var hintSequence by remember { mutableStateOf(0) }
 
@@ -108,27 +117,33 @@ fun PagingSettingsRoute(onBack: () -> Unit) {
     val currentNextKeys by rememberUpdatedState(nextKeys)
     DisposableEffect(keyHub) {
         val unregister = keyHub.register { event ->
-            val capturing = currentCapture
-            if (capturing != null) {
-                handleCaptureKey(
-                    action = event.action,
-                    keyCode = event.keyCode,
-                    repeatCount = event.repeatCount,
-                    direction = capturing,
-                    prevKeyCodes = currentPrevKeys,
-                    nextKeyCodes = currentNextKeys,
-                    onRecorded = { prev, next ->
-                        commitKeys(prev, next)
-                        flashHint(capturing)
-                    },
-                    onExitCapture = { captureDirection = null },
-                )
+            // 模态弹框在场时不录键也不预览，放行系统/Compose（与预览分支
+            // hubPagingKeyEvent 的 modalPresent 同语义）
+            if (EInkModalPresence.isPresent) {
+                false
             } else {
-                hubPagingKeyEvent(
-                    event,
-                    onPageUp = { flashHint(PagingDirection.PREV) },
-                    onPageDown = { flashHint(PagingDirection.NEXT) },
-                )
+                val capturing = currentCapture
+                if (capturing != null) {
+                    handleCaptureKey(
+                        action = event.action,
+                        keyCode = event.keyCode,
+                        repeatCount = event.repeatCount,
+                        direction = capturing,
+                        prevKeyCodes = currentPrevKeys,
+                        nextKeyCodes = currentNextKeys,
+                        onRecorded = { prev, next ->
+                            commitKeys(prev, next)
+                            flashHint(capturing)
+                        },
+                        onExitCapture = { captureDirection = null },
+                    )
+                } else {
+                    hubPagingKeyEvent(
+                        event,
+                        onPageUp = { flashHint(PagingDirection.PREV) },
+                        onPageDown = { flashHint(PagingDirection.NEXT) },
+                    )
+                }
             }
         }
         onDispose { unregister() }
