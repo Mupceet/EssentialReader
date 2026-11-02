@@ -81,6 +81,7 @@ class EInkEngineRegistryTest {
         assertSame(appUpdate, EInkEngineRegistry.appUpdateEngine)
 
         val hubBefore = EInkEngineRegistry.keyEventHub
+        val wheelHubBefore = EInkEngineRegistry.wheelHub
         EInkEngineRegistry.install(
             globalSettings = stub(),
             bookshelfEngine = stub(),
@@ -93,6 +94,7 @@ class EInkEngineRegistryTest {
         )
         assertTrue("整体替换：设置端口指向新桩", EInkEngineRegistry.globalSettings !== settings)
         assertTrue("keyEventHub 随 install 重置", EInkEngineRegistry.keyEventHub !== hubBefore)
+        assertTrue("wheelHub 随 install 重置", EInkEngineRegistry.wheelHub !== wheelHubBefore)
     }
 
     @Test

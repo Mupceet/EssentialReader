@@ -1,6 +1,7 @@
 package io.legado.app.eink.contract
 
 import io.legado.app.eink.app.EInkKeyEventHub
+import io.legado.app.eink.app.EInkWheelHub
 import io.legado.app.eink.contract.EInkEngineRegistry.install
 import io.legado.app.eink.contract.EInkEngineRegistry.keyEventHub
 
@@ -17,7 +18,7 @@ import io.legado.app.eink.contract.EInkEngineRegistry.keyEventHub
  *    └─ onInstallEngines() ──► 宿主 bridge（如 EInkBridge.install()）
  *                                └─ install(8 个必填端口实现 + 可选 appUpdateEngine / marksEngine / bookshelfGroupEngine / backupSyncEngine / pageTurnEffectEngine)
  *                                      └─ 静态注册表整体替换（last-wins）
- *                                             │ keyEventHub 一并重建
+ *                                             │ keyEventHub/wheelHub 一并重建
  *                                             ▼
  * 模块侧任意取用（VM 构造 / Screen 组合 / 入口模板）
  *    EInkEngineRegistry.readerEngine / globalSettings / tocEngine / …
@@ -34,7 +35,7 @@ import io.legado.app.eink.contract.EInkEngineRegistry.keyEventHub
  * IllegalStateException 会指名缺失的端口与修复入口 —— 而非 lateinit
  * 的裸字段崩溃栈。install 允许重复调用（同进程内入口 Activity 重入，
  * 静态注册表仍在），语义为整体替换（last-wins）；每次进入 E-Ink
- * 重新装配同时承担宿主设置快照对齐（[keyEventHub] 亦随之重置），
+ * 重新装配同时承担宿主设置快照对齐（[keyEventHub]/[wheelHub] 亦随之重置），
  * 装配模板见 app 侧 EInkBridge.install。
  *
  * 移植到新上游时：模块树原样复制，仅重写宿主侧 bridge/ 下的端口实现
@@ -60,6 +61,9 @@ object EInkEngineRegistry {
 
     /** 模块自有的按键枢纽（非宿主端口）：每次 install 重置，丢弃陈旧 handler。 */
     private var _keyEventHub = EInkKeyEventHub()
+
+    /** 模块自有的滚轮枢纽（非宿主端口）：每次 install 重置，丢弃陈旧 handler。 */
+    private var _wheelHub = EInkWheelHub()
 
     /** 全局设置端口（多屏与「我的」页读写全部设置项）。 */
     val globalSettings: GlobalSettings
@@ -145,6 +149,10 @@ object EInkEngineRegistry {
     val keyEventHub: EInkKeyEventHub
         get() = _keyEventHub
 
+    /** 模块自有滚轮枢纽（入口基类分发、分页区注册处理器；恒可用）。 */
+    val wheelHub: EInkWheelHub
+        get() = _wheelHub
+
     /**
      * 注册全部引擎端口实现。由模块入口模板 [EInkHostActivity]
      * 在 attachBaseContext（宿主 onInstallEngines 钩子）调用，必须早于任何
@@ -208,6 +216,7 @@ object EInkEngineRegistry {
         _pageTurnEffectEngine = pageTurnEffectEngine
         _bookSourceEngine = bookSourceEngine
         _keyEventHub = EInkKeyEventHub()
+        _wheelHub = EInkWheelHub()
     }
 
     /**

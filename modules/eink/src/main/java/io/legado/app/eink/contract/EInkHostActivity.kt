@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.res.Configuration
 import android.os.Bundle
 import android.view.KeyEvent
+import android.view.MotionEvent
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
@@ -250,6 +251,18 @@ abstract class EInkHostActivity : AppCompatActivity() {
             return true
         }
         return super.onKeyUp(keyCode, event)
+    }
+
+    /**
+     * 通用运动事件（滚轮等）优先交给活跃屏幕的处理器
+     * （[io.legado.app.eink.app.EInkWheelHub]，如滚轮翻页）；非竖直滚动
+     * 或无人消费时交还系统默认行为。
+     */
+    final override fun onGenericMotionEvent(event: MotionEvent?): Boolean {
+        if (event != null && EInkEngineRegistry.wheelHub.dispatch(event)) {
+            return true
+        }
+        return super.onGenericMotionEvent(event)
     }
 
     /**

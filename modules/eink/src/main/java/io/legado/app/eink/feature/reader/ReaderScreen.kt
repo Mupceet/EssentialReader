@@ -76,6 +76,7 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import io.legado.app.eink.app.hubPagingKeyEvent
+import io.legado.app.eink.app.hubWheelPagingEvent
 import io.legado.app.eink.contract.EInkEngineRegistry
 import io.legado.app.eink.contract.EInkHostActivity
 import io.legado.app.eink.contract.ReaderEngine
@@ -287,6 +288,7 @@ fun ReaderRoute(
     }
     // 按键转发枢纽：宿主入口 Activity onKeyDown/onKeyUp 经注册表下发
     val keyEventHub = EInkEngineRegistry.keyEventHub
+    val wheelHub = EInkEngineRegistry.wheelHub
     var panel by remember { mutableStateOf<ReaderPanel?>(null) }
     // 排版设置弹层（字体配置/信息配置/边距调整）：居中透明卡片，
     // 打开期间面板与操作条隐藏；返回键逐级回退到排版展开态。
@@ -725,20 +727,30 @@ fun ReaderRoute(
         }
     }
 
-    // 翻页按键（音量键/自定义键，对齐 View 版 ReadBookController 判定优先级）：
-    // 语义与分页列表共用 hubPagingKeyEvent（首按翻页、长按重复不翻、
-    // 抬起吞掉）；页内模态弹框（边距调整/想法等）在场时放行系统音量
-    // 调节。开关关闭或离开阅读页时处理器注销/放行，音量键回归系统调节。
-    // 设置实时读取（GlobalSettings.volumeKeyPage 经桥接层走宿主快照）
-    DisposableEffect(keyEventHub) {
-        val unregister = keyEventHub.register { event ->
+    // 翻页按键（音量键/自定义键）与滚轮（对齐 View 版 ReadBookController
+    // 判定优先级与滚轮方向）：语义与分页列表共用 hubPagingKeyEvent /
+    // hubWheelPagingEvent（首按翻页、长按重复不翻、抬起吞掉；滚轮 200ms
+    // 冷却）；页内模态弹框（边距调整/想法等）在场时放行系统。开关关闭
+    // 或离开阅读页时处理器注销/放行。
+    DisposableEffect(keyEventHub, wheelHub) {
+        val unregisterKeys = keyEventHub.register { event ->
             hubPagingKeyEvent(
                 event,
                 onPageUp = viewModel::prevPage,
                 onPageDown = viewModel::nextPage,
             )
         }
-        onDispose { unregister() }
+        val unregisterWheel = wheelHub.register { axis ->
+            hubWheelPagingEvent(
+                axis,
+                onPageUp = viewModel::prevPage,
+                onPageDown = viewModel::nextPage,
+            )
+        }
+        onDispose {
+            unregisterKeys()
+            unregisterWheel()
+        }
     }
 
     // 自动翻页随界面可见性暂停/恢复：退后台（ON_STOP）暂停倒计时，

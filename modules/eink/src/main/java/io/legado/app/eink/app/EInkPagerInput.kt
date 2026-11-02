@@ -11,7 +11,8 @@ import io.legado.app.eink.designsystem.pager.EInkPageSwipe
 /**
  * 分页区域统一输入（app 层组装）：滑动翻页手势（designsystem
  * [EInkPageSwipe] 直通）+ 翻页按键（音量键/自定义键，[EInkKeyEventHub] 栈顶
- * 注册，事件时实时读设置）。
+ * 注册，事件时实时读设置）+ 滚轮翻页（[EInkWheelHub] 栈顶注册，实时读
+ * GlobalSettings.mouseWheelPage，200ms 冷却去抖）。
  *
  * 按键语义与阅读页共用 [hubPagingKeyEvent]（designsystem 纯函数
  * 语义）：开关关闭或页内模态弹框在场放行系统音量调节；首按翻页、
@@ -37,12 +38,19 @@ fun Modifier.EInkPagerInput(
     val currentUp by rememberUpdatedState(onPageUp)
     val currentDown by rememberUpdatedState(onPageDown)
     val hub = EInkEngineRegistry.keyEventHub
-    DisposableEffect(hub, enabled) {
+    val wheelHub = EInkEngineRegistry.wheelHub
+    DisposableEffect(hub, wheelHub, enabled) {
         if (!enabled) return@DisposableEffect onDispose { }
-        val unregister = hub.register { event ->
+        val unregisterKeys = hub.register { event ->
             hubPagingKeyEvent(event, onPageUp = currentUp, onPageDown = currentDown)
         }
-        onDispose { unregister() }
+        val unregisterWheel = wheelHub.register { axis ->
+            hubWheelPagingEvent(axis, onPageUp = currentUp, onPageDown = currentDown)
+        }
+        onDispose {
+            unregisterKeys()
+            unregisterWheel()
+        }
     }
     return EInkPageSwipe(
         enabled = enabled,
