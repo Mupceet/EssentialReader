@@ -1051,7 +1051,6 @@ fun ReaderRoute(
                     ) {
                         ReaderOtherPanel(
                             state = uiState,
-                            onToggleVolumeKeyPage = viewModel::toggleVolumeKeyPage,
                             onTogglePullDownBookmark = viewModel::togglePullDownBookmark,
                             onSetPageTurnRippleMode = viewModel::setPageTurnRippleMode,
                             onToggleHideStatusBar = viewModel::toggleHideStatusBar,

@@ -85,8 +85,6 @@ data class ReaderUiState(
     val sourceInfo: ReaderSourceInfo? = null,
     /** 书源信息行开关（「其它设置」，E-InK 自有偏好与宿主共享存储）。 */
     val sourceInfoBarEnabled: Boolean = false,
-    /** 音量键翻页（转发完整模式同键阅读设置；纯按键语义，切换不触发重排）。 */
-    val volumeKeyPage: Boolean = false,
     /** 阅读区竖直下拉添加书签开关（E-InK 自有偏好，默认关；关闭时下拉手势只吞并不动作）。 */
     val pullDownBookmark: Boolean = false,
     /**
@@ -218,7 +216,6 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application),
         run {
             val style = engine.currentStyle()
             ReaderUiState(
-                volumeKeyPage = EInkEngineRegistry.globalSettings.volumeKeyPage,
                 pullDownBookmark = EInkEngineRegistry.globalSettings.pullDownBookmark,
                 pageTurnRippleMode = EInkEngineRegistry.globalSettings.pageTurnRippleMode,
                 hideStatusBar = EInkEngineRegistry.globalSettings.hideStatusBar,
@@ -1141,16 +1138,6 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application),
         EInkEngineRegistry.globalSettings.chineseConverterType = type
         _uiState.update { it.copy(chineseConverterType = type) }
         scheduleRelayout()
-    }
-
-    /**
-     * 音量键翻页（转发完整模式同键设置）：写入 + 乐观更新开关态——
-     * 纯按键语义，阅读页按键处理器每次按键实时读端口值，不触发重排。
-     */
-    fun toggleVolumeKeyPage() {
-        val newValue = !EInkEngineRegistry.globalSettings.volumeKeyPage
-        EInkEngineRegistry.globalSettings.volumeKeyPage = newValue
-        _uiState.update { it.copy(volumeKeyPage = newValue) }
     }
 
     /**

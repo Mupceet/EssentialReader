@@ -828,7 +828,6 @@ internal fun PanelTabRow(labels: List<String>, selected: Int, onSelect: (Int) ->
 @Composable
 internal fun ReaderOtherPanel(
     state: ReaderUiState,
-    onToggleVolumeKeyPage: () -> Unit,
     onTogglePullDownBookmark: () -> Unit,
     onSetPageTurnRippleMode: (PageTurnRippleMode) -> Unit,
     onToggleHideStatusBar: () -> Unit,
@@ -836,13 +835,11 @@ internal fun ReaderOtherPanel(
     onToggleSourceInfoBar: () -> Unit,
     onOpenTapZones: () -> Unit,
 ) {
-    // 行序按功能域分组：翻页交互 → 界面显示 → 阅读区手势（点击区域设置
+    // 行序按功能域分组：界面显示 → 阅读区手势（点击区域设置
     // 是面板内唯一的子界面入口行，箭头样式与开关行不同，固定收尾避免
     // 异质样式插在中间；能力门控产生的洞在各宿主上仍保持组结构完整。
     // 例外：水波纹段选行虽属翻页交互，因形态与开关行不同，收在开关组
     // 尾部紧贴点击区域设置）
-    // 音量键翻页纯按键语义（阅读页按键处理器实时读端口值），切换不触发重排
-    ToggleRow(label = "音量键翻页", checked = state.volumeKeyPage, onToggle = onToggleVolumeKeyPage)
     ToggleRow(label = "隐藏状态栏", checked = state.hideStatusBar, onToggle = onToggleHideStatusBar)
     // 书源信息行：开启后顶栏下增加一行（章节名 | 书源名），具备登录/
     // 付费能力的书源可从该行下拉进入操作
