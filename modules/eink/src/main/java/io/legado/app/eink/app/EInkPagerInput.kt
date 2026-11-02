@@ -10,10 +10,10 @@ import io.legado.app.eink.designsystem.pager.EInkPageSwipe
 
 /**
  * 分页区域统一输入（app 层组装）：滑动翻页手势（designsystem
- * [EInkPageSwipe] 直通）+ 音量键/翻页器翻页（[EInkKeyEventHub] 栈顶
- * 注册，事件时实时读 GlobalSettings.volumeKeyPage）。
+ * [EInkPageSwipe] 直通）+ 翻页按键（音量键/自定义键，[EInkKeyEventHub] 栈顶
+ * 注册，事件时实时读设置）。
  *
- * 音量语义与阅读页共用 [hubVolumePagingEvent]（designsystem 纯函数
+ * 按键语义与阅读页共用 [hubPagingKeyEvent]（designsystem 纯函数
  * 语义）：开关关闭或页内模态弹框在场放行系统音量调节；首按翻页、
  * 长按重复不翻；翻页到头由各分页器 canPage 守卫（不动作、仍消费）。
  *
@@ -40,7 +40,7 @@ fun Modifier.EInkPagerInput(
     DisposableEffect(hub, enabled) {
         if (!enabled) return@DisposableEffect onDispose { }
         val unregister = hub.register { event ->
-            hubVolumePagingEvent(event, onPageUp = currentUp, onPageDown = currentDown)
+            hubPagingKeyEvent(event, onPageUp = currentUp, onPageDown = currentDown)
         }
         onDispose { unregister() }
     }

@@ -75,7 +75,7 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
-import io.legado.app.eink.app.hubVolumePagingEvent
+import io.legado.app.eink.app.hubPagingKeyEvent
 import io.legado.app.eink.contract.EInkEngineRegistry
 import io.legado.app.eink.contract.EInkHostActivity
 import io.legado.app.eink.contract.ReaderEngine
@@ -725,14 +725,14 @@ fun ReaderRoute(
         }
     }
 
-    // 音量键翻页（对齐 View 版 ReadBookController.volumeKeyPage）：
-    // 语义与分页列表共用 hubVolumePagingEvent（首按翻页、长按重复不翻、
+    // 翻页按键（音量键/自定义键，对齐 View 版 ReadBookController 判定优先级）：
+    // 语义与分页列表共用 hubPagingKeyEvent（首按翻页、长按重复不翻、
     // 抬起吞掉）；页内模态弹框（边距调整/想法等）在场时放行系统音量
     // 调节。开关关闭或离开阅读页时处理器注销/放行，音量键回归系统调节。
     // 设置实时读取（GlobalSettings.volumeKeyPage 经桥接层走宿主快照）
     DisposableEffect(keyEventHub) {
         val unregister = keyEventHub.register { event ->
-            hubVolumePagingEvent(
+            hubPagingKeyEvent(
                 event,
                 onPageUp = viewModel::prevPage,
                 onPageDown = viewModel::nextPage,

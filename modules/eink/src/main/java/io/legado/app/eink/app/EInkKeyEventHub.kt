@@ -3,13 +3,14 @@ package io.legado.app.eink.app
 import android.view.KeyEvent
 import io.legado.app.eink.contract.EInkEngineRegistry
 import io.legado.app.eink.designsystem.control.EInkModalPresence
-import io.legado.app.eink.designsystem.pager.volumePagingKeyEvent
+import io.legado.app.eink.designsystem.pager.pagingKeyEvent
+import io.legado.app.eink.designsystem.pager.parseKeyCodes
 
 /**
  * 系统按键转发枢纽（模块自有，经
  * [io.legado.app.eink.contract.EInkEngineRegistry] 持有与重置）。
  *
- * 单 Activity 架构下，音量键等系统按键先到达入口 Activity；基类
+ * 单 Activity 架构下，翻页按键（音量键/自定义键）等系统按键先到达入口 Activity；基类
  * [io.legado.app.eink.contract.EInkHostActivity] 的 onKeyDown/onKeyUp 统一经 [dispatch] 转发。
  * 活跃界面元素（阅读页、分页列表的 EInkPagerInput）在组合期经 [register]
  * 注册处理器（入栈），随组合离开注销（弹栈）。
@@ -39,19 +40,22 @@ class EInkKeyEventHub {
 }
 
 /**
- * 按键事件 → 音量键翻页判定（阅读页与分页列表共用）：读取开关
- * （宿主快照桥接，实时生效）与页内模态在场状态后委托 designsystem
- * 纯函数语义（volumePagingKeyEvent，见其 KDoc）。
+ * 按键事件 → 翻页判定（阅读页与分页列表共用）：读取音量开关与自定义
+ * 键集（宿主快照桥接，实时生效）与页内模态在场状态后委托 designsystem
+ * 纯函数语义（pagingKeyEvent，见其 KDoc）。自定义键优先于音量键且
+ * 不受音量开关控制。
  */
-internal fun hubVolumePagingEvent(
+internal fun hubPagingKeyEvent(
     event: KeyEvent,
     onPageUp: () -> Unit,
     onPageDown: () -> Unit,
-): Boolean = volumePagingKeyEvent(
+): Boolean = pagingKeyEvent(
     action = event.action,
     keyCode = event.keyCode,
     repeatCount = event.repeatCount,
-    pagingEnabled = EInkEngineRegistry.globalSettings.volumeKeyPage,
+    volumePagingEnabled = EInkEngineRegistry.globalSettings.volumeKeyPage,
+    prevKeyCodes = parseKeyCodes(EInkEngineRegistry.globalSettings.prevKeys),
+    nextKeyCodes = parseKeyCodes(EInkEngineRegistry.globalSettings.nextKeys),
     modalPresent = EInkModalPresence.isPresent,
     onPageUp = onPageUp,
     onPageDown = onPageDown,
