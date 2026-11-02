@@ -64,6 +64,53 @@ interface GlobalSettings {
     var volumeKeyPage: Boolean
 
     /**
+     * 鼠标滚轮翻页（转发宿主阅读设置键 mouseWheelPage，与完整模式共享
+     * 同一存储）。
+     *
+     * 开启后滚轮（AXIS_VSCROLL）在阅读页与书架/目录/搜索/换源/详情/
+     * 字体设置等分页列表中翻页（下滚下一页、上滚上一页）；页内模态
+     * 弹框打开期间放行系统。生效范围与完整模式不同：完整模式滚轮仅在
+     * 阅读页翻页（列表为普通滚动列表），eink 模式列表本身为分页器，
+     * 滚轮与音量键全局化同套语义。
+     *
+     * 可写（「我的 → 翻页设置」开关）：fire-and-forget 写入；实时生效
+     * ——滚轮处理器每次事件时读取，无一致性窗口。
+     *
+     * 默认实现（旧宿主）getter 恒 false、写入丢弃：滚轮不翻页，行为
+     * 不回退（诚实降级——不假装生效）。
+     */
+    var mouseWheelPage: Boolean
+        get() = false
+        set(value) {}
+
+    /**
+     * 自定义上一页键码串（逗号分隔十进制，默认空；转发宿主阅读设置键
+     * prevKeys，与完整模式共享同一存储——eink 侧录入的键在完整模式
+     * 阅读器同样生效，完整模式侧配置在 eink 模式同样翻页）。
+     *
+     * 语义对齐完整模式 ReadBookController：自定义键优先于音量键判定，
+     * 且**不受** [volumeKeyPage] 开关控制——三项翻页输入（自定义键/
+     * 音量键/滚轮）各自独立开关。
+     *
+     * 读取在按键事件时实时进行（fire-and-forget 档位）；写入经
+     * [setPageKeys] 两方向原子提交。
+     *
+     * 默认实现（旧宿主）恒空串：无自定义键，行为不回退。
+     */
+    val prevKeys: String get() = ""
+
+    /** 自定义下一页键码串（语义见 [prevKeys]）。默认实现（旧宿主）恒空串。 */
+    val nextKeys: String get() = ""
+
+    /**
+     * 自定义翻页键对写入（两方向关联字段，一次原子提交）：逗号分隔
+     * 键码串，空串 = 清空。fire-and-forget。
+     *
+     * 默认实现（旧宿主）为无操作：录入不持久化（诚实降级）。
+     */
+    fun setPageKeys(prevKeys: String, nextKeys: String) {}
+
+    /**
      * 总是使用默认封面（不加载网络封面）。
      *
      * 可写（「我的」页开关）：**快照状态**档——读取由宿主 Compose 快照
