@@ -51,7 +51,8 @@ import kotlinx.coroutines.launch
  * 为启动期语义（写入后下次进入生效），总是使用默认封面为快照语义
  * （组合内读取订阅变化，切换后开关行立即重组）。音量键翻页为全局
  * 语义（阅读页与书架/目录/搜索等分页列表共用按键处理器实时读取），
- * 本页与阅读界面「其它设置」面板同键双入口。
+ * 开关已迁「翻页设置」页（本页保留入口行），与阅读界面「其它设置」
+ * 面板同键双入口。
  * 「检查更新」行只在宿主注册了应用更新端口时渲染（companion 宿主可能
  * 没有 app 级更新机制，入口随之消失）；检查状态机由 Activity 级
  * [EInkAppUpdateViewModel] 持有（与启动自动检查共用）：本页点击发起
@@ -76,6 +77,7 @@ internal fun MineScreen(
     updateViewModel: EInkAppUpdateViewModel,
     onOpenFontSettings: () -> Unit = {},
     onOpenWebDavSync: () -> Unit = {},
+    onOpenPagingSettings: () -> Unit = {},
     onOpenFullMode: () -> Unit = {},
     onOpenThemeDebug: () -> Unit = {},
     onOpenComponentGallery: () -> Unit = {},
@@ -89,7 +91,6 @@ internal fun MineScreen(
     val context = LocalContext.current
     var autoRefresh by remember { mutableStateOf(globalSettings.autoRefreshBook) }
     var defaultToRead by remember { mutableStateOf(globalSettings.defaultToRead) }
-    var volumeKeyPage by remember { mutableStateOf(globalSettings.volumeKeyPage) }
     val currentVersionName = remember(context) { context.readAppVersionName() }
     val scope = rememberCoroutineScope()
 
@@ -167,17 +168,10 @@ internal fun MineScreen(
         }
         item { EInkHorizontalDivider() }
         item {
-            MineToggleRow(
-                label = "音量键翻页",
-                description = "音量键用于阅读和列表翻页",
-                // 全局语义：阅读页与各分页列表的按键处理器事件时实时读取，
-                // 本地乐观状态仅保显示（同自动刷新）
-                checked = volumeKeyPage,
-                onToggle = {
-                    val next = !volumeKeyPage
-                    globalSettings.volumeKeyPage = next
-                    volumeKeyPage = next
-                }
+            MineEntry(
+                label = "翻页设置",
+                sublabel = "音量键 / 滚轮 / 自定义按键",
+                onClick = onOpenPagingSettings
             )
         }
         if (appUpdateEngine != null) {

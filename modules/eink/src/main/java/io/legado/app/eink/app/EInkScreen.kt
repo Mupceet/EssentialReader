@@ -69,4 +69,12 @@ sealed interface EInkScreen {
      * 手动闭环；恢复交互为恢复云端最新一份（确认层后执行）。
      */
     data object WebDavSync : EInkScreen
+
+    /**
+     * 翻页设置（入口：「我的 → 翻页设置」）：三项翻页输入统一设置面
+     * ——音量键翻页/鼠标滚轮翻页开关 + 自定义翻页按键捕获式录入；
+     * 预览条与生产判定同源（事件时实时读设置），滚轮与自定义键在
+     * eink 模式与音量键同套全局语义（阅读页 + 各分页列表）。
+     */
+    data object PagingSettings : EInkScreen
 }

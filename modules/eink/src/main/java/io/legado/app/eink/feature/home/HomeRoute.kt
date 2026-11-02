@@ -112,6 +112,7 @@ internal fun HomeRoute(
     onOpenFullMode: () -> Unit = {},
     onOpenFontSettings: () -> Unit = {},
     onOpenWebDavSync: () -> Unit = {},
+    onOpenPagingSettings: () -> Unit = {},
     onOpenThemeDebug: () -> Unit = {},
     onOpenComponentGallery: () -> Unit = {},
     viewModel: BookshelfViewModel = viewModel()
@@ -506,6 +507,7 @@ internal fun HomeRoute(
                     updateViewModel = updateViewModel,
                     onOpenFontSettings = onOpenFontSettings,
                     onOpenWebDavSync = onOpenWebDavSync,
+                    onOpenPagingSettings = onOpenPagingSettings,
                     onOpenFullMode = onOpenFullMode,
                     onOpenThemeDebug = onOpenThemeDebug,
                     onOpenComponentGallery = onOpenComponentGallery,
