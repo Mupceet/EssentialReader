@@ -1,25 +1,48 @@
 package io.legado.app.ui.book.manga
 
 import android.app.Application
+import android.graphics.Bitmap
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveableStateHolder
+import io.legado.app.ui.theme.LocalLegadoColorScheme
+import io.legado.app.ui.theme.LocalLegadoTypography
+import io.legado.app.ui.theme.toLegadoColorScheme
+import io.legado.app.ui.theme.toLegadoTypography
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toPixelMap
+import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.doubleClick
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.hasScrollToIndexAction
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performScrollToIndex
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.swipe
 import androidx.compose.ui.unit.dp
+import coil3.BitmapImage
 import coil3.ColorImage
+import coil3.Image
 import coil3.ImageLoader
+import coil3.asImage
 import coil3.decode.DataSource
 import coil3.fetch.Fetcher
 import coil3.fetch.ImageFetchResult
+import coil3.intercept.Interceptor
 import io.legado.app.R
+import io.legado.app.help.coil.CoverExtras
+import io.legado.app.ui.book.manga.config.MangaScrollMode
 import kotlinx.collections.immutable.toImmutableList
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -57,17 +80,43 @@ class MangaReaderScreenLayoutTest {
     private val visible = mutableStateOf(true)
     private val reports = mutableListOf<MangaReaderIntent.VisibleItemChanged>()
     private val intents = mutableListOf<MangaReaderIntent>()
+    private val translatedPages = mutableListOf<Pair<String, Boolean>>()
+    private val hasTranslation = mutableStateOf(false)
+    private val recomposedPages = mutableListOf<String>()
+    private val prefetchOutcomes = java.util.Collections.synchronizedList(mutableListOf<String>())
+
+    /** 按 imageUrl 覆盖原图尺寸，预览可以使用不同的采样比例。 */
+    private val imageSizes = mutableMapOf<String, Pair<Int, Int>>()
+    private val images = mutableMapOf<String, Image>()
 
     @Before
     fun setUp() {
         val application = RuntimeEnvironment.getApplication()
         application.injectAsAppCtx()
         imageLoader = ImageLoader.Builder(application).components {
+            // Match CoverInterceptor: original dimensions also reach owners on memory-cache hits.
+            add(Interceptor { chain ->
+                imageSizes[chain.request.data.toString()]?.let { (width, height) ->
+                    val ratio = width.toFloat() / height
+                    chain.request.extras[CoverExtras.MangaFileOwner]?.setAspectRatio(ratio)
+                    chain.request.extras[CoverExtras.MangaAspectRatio]?.invoke(ratio)
+                }
+                chain.proceed().also { result ->
+                    if (chain.request.extras[CoverExtras.MangaDataPrefetch] == true) prefetchOutcomes +=
+                        if (result is coil3.request.ErrorResult) result.throwable.toString() else result.javaClass.simpleName
+                }
+            })
             // Render the actual reader without source rules, storage or network variability.
-            add(Fetcher.Factory<Any> { _, _, _ ->
+            add(Fetcher.Factory<Any> { data, _, _ ->
+                // coil3 会把 String 规范化为 coil3.Uri，按 toString 匹配。
+                val originalSize = imageSizes[data.toString()]
+                val size = originalSize ?: (80 to 800)
                 Fetcher {
                     ImageFetchResult(
-                        ColorImage(width = 80, height = 800),
+                        images[data.toString()] ?: ColorImage(
+                            color = android.graphics.Color.CYAN,
+                            width = size.first, height = size.second,
+                        ),
                         false,
                         DataSource.MEMORY
                     )
@@ -76,14 +125,34 @@ class MangaReaderScreenLayoutTest {
         }.build()
         compose.setContent {
             val savedState = rememberSaveableStateHolder()
+            // 阅读器里的文字样式与颜色直接读 LegadoTheme；测试只补这两个 local，
+            // 不套 AppTheme，避免背景绘制打断截图中未绘制区域的黑色断言。
             MaterialTheme {
-                if (visible.value) savedState.SaveableStateProvider("reader") {
-                    MangaReaderScreen(
-                        reader.value,
-                        ::onIntent,
-                        imageLoader = imageLoader,
-                        canHandleBack = false
-                    )
+                val colorScheme = MaterialTheme.colorScheme
+                val typography = MaterialTheme.typography
+                CompositionLocalProvider(
+                    LocalLegadoColorScheme provides remember(colorScheme) {
+                        colorScheme.toLegadoColorScheme()
+                    },
+                    LocalLegadoTypography provides remember(typography) {
+                        typography.toLegadoTypography()
+                    },
+                ) {
+                    if (visible.value) savedState.SaveableStateProvider("reader") {
+                        val content: @Composable () -> Unit = {
+                            MangaReaderScreen(
+                                reader.value,
+                                ::onIntent,
+                                imageLoader = imageLoader,
+                                canHandleBack = false,
+                                onTranslatePage = { key, force -> translatedPages += key to force },
+                                onRecomposePage = { key -> recomposedPages += key },
+                                canRecomposePage = { it == "page:2:0" },
+                                hasTranslatedPage = { it == "page:2:0" && hasTranslation.value },
+                            )
+                        }
+                        content()
+                    }
                 }
             }
         }
@@ -107,6 +176,37 @@ class MangaReaderScreenLayoutTest {
     @After
     fun tearDown() {
         imageLoader.shutdown()
+        images.values.filterIsInstance<BitmapImage>().forEach { it.bitmap.recycle() }
+    }
+
+    @Test fun `data prefetch reports source readiness for pages outside the viewport`() {
+        compose.runOnIdle { reader.value = reader.value.copy(settings = reader.value.settings.copy(preDownloadCount = 10)) }
+        compose.waitForIdle()
+        try { compose.waitUntil(10_000) {
+            intents.filterIsInstance<MangaReaderIntent.PageSourceLoaded>().map { it.requestId.key }.toSet().size == currentPages.size
+        } } catch (failure: Throwable) {
+            throw AssertionError("Source callbacks: ${intents.filterIsInstance<MangaReaderIntent.PageSourceLoaded>()}; prefetch results: $prefetchOutcomes", failure)
+        }
+        assertTrue(intents.filterIsInstance<MangaReaderIntent.PageSourceLoaded>().any { it.requestId.key == "page:1:56" })
+        assertEquals(0, reader.value.currentPage)
+    }
+
+    @Test fun `image menu routes translation and retypesetting to the held adjacent page`() {
+        val app = RuntimeEnvironment.getApplication()
+        val sheet = MangaReaderSheet.PageActions("page:2:0")
+        reader.value = reader.value.copy(pages = (currentPages + pages(2, 1)).toImmutableList(), activeSheet = sheet)
+        compose.onNodeWithText(app.getString(R.string.feature_manga_retranslate_short)).assertDoesNotExist()
+        compose.onNodeWithText(app.getString(R.string.feature_manga_translate_short)).performScrollTo().performClick()
+        assertEquals(listOf("page:2:0" to false), translatedPages)
+        assertTrue(intents.contains(MangaReaderIntent.DismissSheet))
+        compose.runOnIdle { hasTranslation.value = true }
+        compose.onNodeWithText(app.getString(R.string.feature_manga_translate_short)).assertDoesNotExist()
+        compose.onNodeWithText(app.getString(R.string.feature_manga_retranslate_short)).performScrollTo().performClick()
+        assertEquals("page:2:0" to true, translatedPages.last())
+        compose.onNodeWithText(app.getString(R.string.feature_manga_recompose_short)).performScrollTo().performClick()
+        assertEquals(listOf("page:2:0"), recomposedPages)
+        reader.value = reader.value.copy(activeSheet = MangaReaderSheet.PageActions("untranslated"))
+        compose.onNodeWithText(app.getString(R.string.feature_manga_recompose_short)).assertIsNotEnabled()
     }
 
     @Test
@@ -274,6 +374,132 @@ class MangaReaderScreenLayoutTest {
                 false,
                 intents.filterIsInstance<MangaReaderIntent.PagerScrollChanged>().last().inProgress
             )
+        }
+    }
+
+    @Test
+    fun `an ultra tall stitched strip renders in segments without constraints crash`() {
+        // 400px 宽、比例 0.001：显示高度 400000px，超过 Constraints 可表示上限（#2475，
+        // 修复前 Constraints.fixed(400, 400001) 在测量期直接抛异常）。应拆成多段行渲染。
+        imageSizes["manga://1/long/0"] = 80 to 80_000
+        compose.runOnIdle {
+            reader.value = reader.value.copy(
+                pages = longStripPages().toImmutableList(),
+                currentItemIndex = 0,
+                navigationId = 2,
+            )
+        }
+        compose.waitForIdle()
+        // 比例异步到达：首行高度从兜底整屏（800dp）切到约 80000dp 的分段即说明已拆分。
+        try {
+            compose.waitUntil(5_000) {
+                val bounds = page(1, 0).getUnclippedBoundsInRoot()
+                bounds.bottom - bounds.top > 10_000.dp
+            }
+        } catch (error: Throwable) {
+            throw AssertionError(
+                "bounds: ${page(1, 0).getUnclippedBoundsInRoot()}; events: $intents", error,
+            )
+        }
+        // ceil(400000 / 87380) = 5 段；瞬时跳到第 4 段（列表下标 3）不会产生 scroll-idle，
+        // 追加一次小滑动驱动可见页上报，断言仍按页下标 0 上报。
+        compose.onNode(hasScrollToIndexAction()).performScrollToIndex(3)
+        page(1, 0).assertIsDisplayed()
+        compose.onNode(hasScrollToIndexAction()).performTouchInput {
+            swipe(Offset(centerX, height * 0.7f), Offset(centerX, height * 0.6f), 300)
+        }
+        try {
+            compose.waitUntil(5_000) {
+                intents.filterIsInstance<MangaReaderIntent.VisibleItemChanged>()
+                    .any { it.navigationId == 2L }
+            }
+        } catch (error: Throwable) {
+            throw AssertionError("events: $intents", error)
+        }
+        val report = intents.filterIsInstance<MangaReaderIntent.VisibleItemChanged>()
+            .last { it.navigationId == 2L }
+        assertEquals(0, report.itemIndex)
+        assertTrue(reader.value.pages[report.itemIndex] is MangaReaderItemUi.Page)
+    }
+
+    @Test
+    fun `each segment shows its own preview region`() {
+        showStripWithColoredSegments()
+        val colors = listOf(Color.Red, Color.Green, Color.Blue, Color.Yellow, Color.Magenta)
+        colors.forEachIndexed { index, expected ->
+            compose.onNode(hasScrollToIndexAction()).performScrollToIndex(index)
+            page(1, 0).assertIsDisplayed()
+            val pixels = compose.onRoot().captureToImage().toPixelMap()
+            assertEquals("segment $index", expected, pixels[pixels.width / 2, pixels.height / 2])
+        }
+        compose.onNode(hasScrollToIndexAction()).performTouchInput {
+            doubleClick(Offset(centerX, centerY))
+        }
+        page(1, 0).assertIsDisplayed()
+        val zoomed = compose.onRoot().captureToImage().toPixelMap()
+        assertEquals(Color.Magenta, zoomed[zoomed.width / 2, zoomed.height / 2])
+    }
+
+    @Test
+    fun `gap mode joins segments seamlessly and keeps gaps between pages`() {
+        showStripWithColoredSegments(withGap = true)
+        fun boundaryColors(index: Int): List<Color> {
+            compose.onNode(hasScrollToIndexAction()).performScrollToIndex(index)
+            compose.onNode(hasScrollToIndexAction()).performTouchInput {
+                swipe(Offset(centerX, height * 0.2f), Offset(centerX, height * 0.8f), 1_000)
+            }
+            val pixels = compose.onRoot().captureToImage().toPixelMap()
+            return (0 until pixels.height).map { pixels[pixels.width / 2, it] }
+        }
+
+        val segmentJoin = boundaryColors(1)
+        assertTrue(
+            "both segments must be visible", Color.Red in segmentJoin && Color.Green in segmentJoin,
+        )
+        assertEquals("no gap inside an image", 0, segmentJoin.count { it == Color.Black })
+
+        val pageJoin = boundaryColors(5)
+        assertTrue(
+            "both pages must be visible", Color.Magenta in pageJoin && Color.Cyan in pageJoin,
+        )
+        assertEquals(
+            "one page gap", with(compose.density) { 8.dp.roundToPx() },
+            pageJoin.count { it == Color.Black },
+        )
+    }
+
+    private fun showStripWithColoredSegments(withGap: Boolean = false) {
+        // The original is 1:1000; integer downsampling changes this preview to 1:500.
+        // Each band must still cover exactly one segment of the 400000px virtual image.
+        imageSizes["manga://1/long/0"] = 80 to 80_000
+        val bitmap = Bitmap.createBitmap(2, 1_000, Bitmap.Config.ARGB_8888)
+        val colors = intArrayOf(
+            android.graphics.Color.RED, android.graphics.Color.GREEN, android.graphics.Color.BLUE,
+            android.graphics.Color.YELLOW, android.graphics.Color.MAGENTA,
+        )
+        colors.forEachIndexed { band, color ->
+            repeat(200) { y -> repeat(2) { x -> bitmap.setPixel(x, band * 200 + y, color) } }
+        }
+        images["manga://1/long/0"] = bitmap.asImage()
+        compose.runOnIdle {
+            reader.value = reader.value.copy(
+                pages = longStripPages().toImmutableList(), currentItemIndex = 0, navigationId = 2,
+                settings = reader.value.settings.copy(
+                    scrollMode = if (withGap) MangaScrollMode.WEBTOON_WITH_GAP else MangaScrollMode.WEBTOON,
+                ),
+            )
+        }
+        compose.waitUntil(5_000) {
+            val bounds = page(1, 0).getUnclippedBoundsInRoot()
+            bounds.bottom - bounds.top > 10_000.dp
+        }
+    }
+
+    private fun longStripPages() = currentPages.mapIndexed { index, page ->
+        if (index == 0) {
+            page.copy(imageUrl = "manga://1/long/0", key = "page:1:0:manga://1/long/0")
+        } else {
+            page
         }
     }
 

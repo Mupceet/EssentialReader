@@ -1,6 +1,5 @@
 package io.legado.app.help
 
-import io.legado.app.constant.AppConst
 import io.legado.app.data.appDb
 import io.legado.app.data.entities.DictRule
 import io.legado.app.data.entities.HttpTTS
@@ -21,24 +20,40 @@ import splitties.init.appCtx
 object DefaultData {
 
     fun upVersion() {
-        if (LocalConfig.versionCode < AppConst.appInfo.versionCode) {
-            Coroutine.async {
-                if (LocalConfig.needUpHttpTTS) {
-                    importDefaultHttpTTS()
-                }
-                if (LocalConfig.needUpTxtTocRule) {
-                    importDefaultTocRules()
-                }
-                if (LocalConfig.needUpRssSources) {
-                    importDefaultRssSources()
-                }
-                if (LocalConfig.needUpDictRule) {
-                    importDefaultDictRules()
-                }
-            }.onError {
-                it.printOnDebug()
-            }
+        // 只读判断，无副作用：是否有待迁移项不依赖 MainActivity 写入
+        // LocalConfig.versionCode 的时机，因此不受 Activity 启动顺序影响。
+        if (!hasPendingMigration) {
+            return
         }
+        Coroutine.async {
+            // 每项独立执行：单项失败不影响其余项；
+            // 只有导入成功才提交标记，失败的项下次冷启动会重试。
+            migrate(LocalConfig.needUpHttpTTS, ::importDefaultHttpTTS, LocalConfig::markHttpTTSUpToDate)
+            migrate(
+                LocalConfig.needUpTxtTocRule,
+                ::importDefaultTocRules,
+                LocalConfig::markTxtTocRuleUpToDate
+            )
+            migrate(
+                LocalConfig.needUpRssSources,
+                ::importDefaultRssSources,
+                LocalConfig::markRssSourcesUpToDate
+            )
+            migrate(LocalConfig.needUpDictRule, ::importDefaultDictRules, LocalConfig::markDictRuleUpToDate)
+        }.onError {
+            it.printOnDebug()
+        }
+    }
+
+    private val hasPendingMigration: Boolean
+        get() = LocalConfig.needUpHttpTTS || LocalConfig.needUpTxtTocRule ||
+                LocalConfig.needUpRssSources || LocalConfig.needUpDictRule
+
+    private fun migrate(needed: Boolean, import: () -> Unit, mark: () -> Unit) {
+        if (!needed) return
+        runCatching(import)
+            .onSuccess { mark() }
+            .onFailure { it.printOnDebug() }
     }
 
     val httpTTS: List<HttpTTS> by lazy {
@@ -124,7 +139,20 @@ object DefaultData {
         appDb.rssSourceDao.insert(*rssSources.toTypedArray())
     }
 
+    /**
+     * 历史上内置过、但源站已不可解析的词典规则（规则名 -> 旧 urlRule）。
+     * 只在 urlRule 与旧内置值完全一致时删除，避免误删用户自建的同名规则。
+     */
+    private val obsoleteDictRules = mapOf(
+        "百度汉语" to "https://dict.baidu.com/s?wd={{key}}"
+    )
+
     fun importDefaultDictRules() {
+        // 清理已失效的内置词典规则（源站改为前端渲染，规则无法解析出内容）
+        obsoleteDictRules.forEach { (name, urlRule) ->
+            val existing = appDb.dictRuleDao.getByName(name) ?: return@forEach
+            if (existing.urlRule == urlRule) appDb.dictRuleDao.deleteByName(name)
+        }
         appDb.dictRuleDao.insert(*dictRules.toTypedArray())
     }
 

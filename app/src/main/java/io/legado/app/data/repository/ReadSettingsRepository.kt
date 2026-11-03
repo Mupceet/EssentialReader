@@ -407,6 +407,7 @@ class ReadSettingsRepository(
             sliderVibrator = compatDsValue(Keys.SliderVibrator, false),
             useNewTocSheet = compatDsValue(Keys.UseNewTocSheet, true),
             maxLengthWithNoToc = compatDsValue(Keys.MaxLengthWithNoToc, 3000),
+            themeGridColumns = compatDsValue(Keys.ThemeGridColumns, 4),
             selectVibrator = compatDsValue(Keys.SelectVibrator, false),
             autoChangeSource = compatDsValue(Keys.AutoChangeSource, true),
             autoSuggestDayNight = compatDsValue(Keys.AutoSuggestDayNight, false),
@@ -425,6 +426,9 @@ class ReadSettingsRepository(
             showReadTitleAddition = compatDsValue(Keys.ShowReadTitleAddition, true),
             autoReadSpeed = compatDsValue(Keys.AutoReadSpeed, 10),
             systemTypefaces = compatDsValue(Keys.SystemTypefaces, 0),
+            paragraphBubblePackage = compatDsValue(Keys.ParagraphBubblePackage, "builtin_default"),
+            forceSoftwareParagraphBubble =
+                compatDsValue(Keys.ForceSoftwareParagraphBubble, false),
             preDownloadNum = compatDsValue(Keys.PreDownloadNum, 10),
             preDownloadNumPrev = compatDsValue(Keys.PreDownloadNumPrev, 0),
             prevKeys = compatDsValue(Keys.PrevKeys, ""),
@@ -512,6 +516,7 @@ class ReadSettingsRepository(
         val TextBottomJustify = booleanPreferencesKey(PreferKey.textBottomJustify)
         val AdaptSpecialStyle = booleanPreferencesKey(PreferKey.adaptSpecialStyle)
         val UseZhLayout = booleanPreferencesKey(PreferKey.useZhLayout)
+        val ThemeGridColumns = intPreferencesKey(PreferKey.themeGridColumns)
         val ReadBrightness = intPreferencesKey(PreferKey.brightness)
         val BrightnessAuto = booleanPreferencesKey(PreferKey.brightnessAuto)
         val UseUnderline = booleanPreferencesKey(PreferKey.useUnderline)
@@ -547,6 +552,9 @@ class ReadSettingsRepository(
         val ShowReadTitleAddition = booleanPreferencesKey(PreferKey.showReadTitleAddition)
         val AutoReadSpeed = intPreferencesKey(PreferKey.autoReadSpeed)
         val SystemTypefaces = intPreferencesKey(PreferKey.systemTypefaces)
+        val ParagraphBubblePackage = stringPreferencesKey(PreferKey.paragraphBubblePackage)
+        val ForceSoftwareParagraphBubble =
+            booleanPreferencesKey(PreferKey.forceSoftwareParagraphBubble)
         val PreDownloadNum = intPreferencesKey(PreferKey.preDownloadNum)
         val PreDownloadNumPrev = intPreferencesKey(PreferKey.preDownloadNumPrev)
         val PrevKeys = stringPreferencesKey(PreferKey.prevKeys)
@@ -644,6 +652,7 @@ internal fun ReadSettings.toGatewayPrefMap(): Map<String, Any?> = mapOf(
     PreferKey.textBottomJustify to textBottomJustify,
     PreferKey.adaptSpecialStyle to adaptSpecialStyle,
     PreferKey.useZhLayout to useZhLayout,
+    PreferKey.themeGridColumns to themeGridColumns,
     PreferKey.readBrightnessMode to showBrightnessView,
     PreferKey.readBrightnessControlPosition to brightnessVwPos,
     PreferKey.brightness to readBrightness,
@@ -681,6 +690,8 @@ internal fun ReadSettings.toGatewayPrefMap(): Map<String, Any?> = mapOf(
     PreferKey.showReadTitleAddition to showReadTitleAddition,
     PreferKey.autoReadSpeed to autoReadSpeed,
     PreferKey.systemTypefaces to systemTypefaces,
+    PreferKey.paragraphBubblePackage to paragraphBubblePackage,
+    PreferKey.forceSoftwareParagraphBubble to forceSoftwareParagraphBubble,
     PreferKey.preDownloadNum to preDownloadNum,
     PreferKey.preDownloadNumPrev to preDownloadNumPrev,
     PreferKey.prevKeys to prevKeys,

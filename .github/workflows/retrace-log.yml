@@ -13,6 +13,15 @@ on:
         required: true
         type: string
 
+      product:
+        description: "日志来自哪个产品：core 轻量版 / full 完整版，两者的 mapping 不同"
+        required: true
+        type: choice
+        options:
+          - core
+          - full
+        default: core
+
 permissions:
   contents: read
 
@@ -64,28 +73,34 @@ jobs:
       - name: Download Mapping File
         env:
           VERSION: ${{ inputs.version }}
+          PRODUCT: ${{ inputs.product }}
         run: |
           mkdir -p logs
           echo "获取版本:"
           echo "$VERSION"
-          
+          echo "产品: $PRODUCT"
+
+          # 双包发布后每个产品各有一份 mapping，不能像以前那样随便取第一个
           gh release download "$VERSION" \
             --repo "HapeLee/legado-with-MD3" \
-            --pattern "*mapping*.txt" \
-            --dir logs
-            
-          if [ ! -f logs/mapping.txt ]; then
-            FILE=$(find logs -name "*.txt" | head -n 1)
-            if [ -n "$FILE" ]; then
-              mv "$FILE" logs/mapping.txt
-            fi
+            --pattern "mapping-${PRODUCT}.txt" \
+            --dir logs || true
+
+          if [ -f "logs/mapping-${PRODUCT}.txt" ]; then
+            mv "logs/mapping-${PRODUCT}.txt" logs/mapping.txt
+          else
+            # 双包之前的 Release 只有一个 mapping.txt
+            gh release download "$VERSION" \
+              --repo "HapeLee/legado-with-MD3" \
+              --pattern "mapping.txt" \
+              --dir logs || true
           fi
-          
+
           if [ ! -f logs/mapping.txt ]; then
-            echo "未找到 mapping 文件"
+            echo "未找到 mapping 文件（产品: ${PRODUCT}）"
             exit 1
           fi
-          
+
           echo "Mapping:"
           ls -lh logs/mapping.txt
 

@@ -117,13 +117,24 @@ class ReadBookDomainSplitBoundaryTest {
      * 行数只作粗棘轮：散落在 VM 的域内状态比总行数更能说明边界是否干净，各域另受
      * `域状态不回流进 ReadBookViewModel` 守卫约束。
      *
-     * 当前上限 2748：2026-10 由 2745 放宽 3 行，两条新增都属本注释已列出的合法接线，
+     * 当前上限 2763：由 2750 放宽 13 行，两条新增都属本注释已列出的合法接线，
+     * 没有新的域回流，因此只抬数字、不摘 delegate：
+     * - 本地富文本链接导航（#2521）：`openInternalBookLink` 一行转发
+     *   （+1，Screen 的意图入口只能在 VM；目标解析与跳转本体在
+     *   `ReadBookmarkNavigateDelegate.navigateToInternalLink`，不占 VM 行）；
+     * - 长按重新翻译（#2526）：`retranslateCurrentChapter()` 的任务占位拦截与状态更新
+     *   （+12，`_effects` / `_uiState` 只有 VM 能碰，占位判定本体在 `TranslationManager`；
+     *   该函数合入时未同步抬棘轮，本次合并一并记账）。
+     * 回溯（上一档 2750）：由 2748 放宽 2 行——`syncFromReadBook` 投影表加 `chapterPayable`
+     *   （+1，一个字段一行；判定本体在 `ReaderChapterInput.isPayable`，不占 VM 行）
+     *   及其 import（+1）。
+     * 回溯（上一档 2748）：2026-10 由 2745 放宽 3 行，两条新增都属本注释已列出的合法接线，
      * 没有新的域回流，因此只抬数字、不摘 delegate：
      * - 顶栏按钮可配置：在意图 `when` 里加 `SaveTitleBarActionConfig` 分支转发
      *   （+2，意图入口只能在 VM，读写与默认按钮全在 `ReadButtonConfigDelegate`）；
      * - 同上：在 `ReadMenuConfig` 投影表加 `titleBarActions`
      *   （+1，一个字段一行，沿用 `titleBarButtons` / `bottomBarButtons` 的既有投影）。
-     * 回溯（上一档）：界面优化（`ba128d4c5`）`OpenReadAloudSubPage` 分支（+2）；
+     * 再上一档：界面优化（`ba128d4c5`）`OpenReadAloudSubPage` 分支（+2）；
      * 字号兼容（`45d842b73`）`buildStyleConfig()` 投影表加 `titleSizeRelative`（+1）。
      *
      * VM 里合法保留、逐行摘不掉的接线类型：
@@ -161,14 +172,14 @@ class ReadBookDomainSplitBoundaryTest {
      * （TocViewModel 自持 flow）。
      */
     @Test
-    fun `ReadBookViewModel 不超过 2748 行`() {
+    fun `ReadBookViewModel 不超过 2763 行`() {
         val lineCount = mainSourceFile("io/legado/app/ui/book/read/ReadBookViewModel.kt")
             .readLines().size
         assertTrue(
-            "ReadBookViewModel 涨到了 $lineCount 行，超过上限 2748。\n" +
+            "ReadBookViewModel 涨到了 $lineCount 行，超过上限 2763。\n" +
                 "新功能请摘成 io/legado/app/ui/book/read/ 下的 XxxDelegate，" +
                 "并在本测试的 DOMAINS 里加一条边界。",
-            lineCount <= 2748,
+            lineCount <= 2763,
         )
     }
 

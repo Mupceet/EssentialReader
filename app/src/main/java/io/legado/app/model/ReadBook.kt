@@ -17,6 +17,7 @@ import io.legado.app.domain.gateway.OtherSettingsGateway
 import io.legado.app.domain.gateway.ReadSettingsGateway
 import io.legado.app.feature.reader.core.navigation.ReaderChapterPaginationSnapshot
 import io.legado.app.feature.reader.core.source.ReaderChapterSourceParser
+import io.legado.app.feature.reader.core.semantic.ReaderSemanticLocation
 import io.legado.app.feature.reader.legacy.LegacyReaderChapterPaginationResult
 import io.legado.app.feature.reader.legacy.LegacyReaderChapterPaginator
 import io.legado.app.feature.reader.legacy.LegacyReaderPageDecorationFactory
@@ -128,6 +129,10 @@ data class ReaderPaginationEnvironment(
 
 @Suppress("MemberVisibilityCanBePrivate")
 object ReadBook : CoroutineScope by MainScope(), KoinComponent {
+    // 主线程写（打开/关闭书籍），IO 线程读——缓存维护在 Dispatchers.IO 上用它判断
+    // "这本书正在被读"，从而不把它的缓存判成孤儿。没有 @Volatile 时 IO 侧可能读到
+    // 陈旧值，表现为正在阅读的书的缓存被删掉（删除不可逆）。
+    @Volatile
     var book: Book? = null
         private set
     var callBack: CallBack? = null
@@ -400,8 +405,6 @@ object ReadBook : CoroutineScope by MainScope(), KoinComponent {
         val processor = contentProcessor ?: ContentProcessor.get(book)
 
         val config = PageEstimateConfig(
-            // Canvas uses different line/page boundaries; never reuse View-engine exact counts.
-            textEngineVersion = 14,
             titleLayoutKey = "${style.titleSegmentation}|${style.titleLineSpacingSub}",
             readerType = pageAnim(),
             textSizePx = style.bodyPaint.textSize,
@@ -425,6 +428,7 @@ object ReadBook : CoroutineScope by MainScope(), KoinComponent {
             doublePage = columns == 2,
             useZhLayout = ReadBookConfig.useZhLayout,
             textFullJustify = ReadBookConfig.textFullJustify,
+            adaptSpecialStyle = readSettingsGateway.currentSettings.adaptSpecialStyle,
             imageLayoutKey = book.getImageStyle().orEmpty(),
             contentKey = buildString {
                 append(book.config.useReplaceRule)
@@ -511,7 +515,7 @@ object ReadBook : CoroutineScope by MainScope(), KoinComponent {
                 useReplaceRule,
                 chineseConverterType = readSettingsGateway.currentSettings.chineseConverterType,
             )
-            val processed = processor.getContent(book, chapter, content, includeTitle = false)
+            val processed = processor.getContent(book, chapter, content, includeTitle = false, paragraphIndent = null, includePresentation = true)
             wholeBookPageCoordinator.updateChapterContent(
                 chapterIndex = chapter.index,
                 actualLength = processed.textList
@@ -529,6 +533,7 @@ object ReadBook : CoroutineScope by MainScope(), KoinComponent {
                 chapterIndex = chapter.index,
                 title = displayTitle,
                 paragraphs = processed.textList,
+                localPresentation = processed.presentation,
                 includeTitle = ReadBookConfig.titleMode != 2 || chapter.isVolume || processed.textList.isEmpty(),
                 adaptSpecialStyle = readSettingsGateway.currentSettings.adaptSpecialStyle,
                 htmlSemanticTextResolver = AndroidReaderHtmlSemanticTextResolver,
@@ -791,7 +796,10 @@ object ReadBook : CoroutineScope by MainScope(), KoinComponent {
         if (book?.bookUrl != input.book.bookUrl) return false
         readerChapterInputWindow = when (input.chapter.index - durChapterIndex) {
             -1 -> readerChapterInputWindow.copy(previous = input)
-            0 -> readerChapterInputWindow.copy(current = input)
+            0 -> {
+                durChapterPos = ReaderSemanticLocation.clampOffset(input.source.semanticContent, durChapterPos)
+                readerChapterInputWindow.copy(current = input)
+            }
             1 -> readerChapterInputWindow.copy(next = input)
             else -> return false
         }
@@ -1737,7 +1745,7 @@ object ReadBook : CoroutineScope by MainScope(), KoinComponent {
             chineseConverterType = readSettingsGateway.currentSettings.chineseConverterType,
         )
         val contents = ReaderPerfTrace.section("content.process") {
-            contentProcessor.getContent(book, chapter, content, includeTitle = false)
+            contentProcessor.getContent(book, chapter, content, includeTitle = false, paragraphIndent = null, includePresentation = true)
         }
         ensureActive()
         wholeBookPageCoordinator.updateChapterContent(
@@ -1766,6 +1774,7 @@ object ReadBook : CoroutineScope by MainScope(), KoinComponent {
                 chapterIndex = chapter.index,
                 title = displayTitle,
                 paragraphs = contents.textList,
+                localPresentation = contents.presentation,
                 includeTitle = ReadBookConfig.titleMode != 2 || chapter.isVolume || contents.textList.isEmpty(),
                 adaptSpecialStyle = readSettingsGateway.currentSettings.adaptSpecialStyle,
                 htmlSemanticTextResolver = AndroidReaderHtmlSemanticTextResolver,

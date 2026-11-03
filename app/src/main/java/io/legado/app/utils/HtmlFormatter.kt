@@ -1,6 +1,8 @@
 package io.legado.app.utils
 
+import io.legado.app.domain.model.TextProjection
 import io.legado.app.model.analyzeRule.AnalyzeUrl
+import org.apache.commons.text.StringEscapeUtils
 import org.jsoup.Jsoup
 import java.net.URL
 
@@ -73,17 +75,17 @@ object HtmlFormatter {
     fun format(html: String?, otherRegex: Regex = otherHtmlRegex): String =
         format(html, otherRegex, "　　")
 
-    private fun format(html: String?, otherRegex: Regex, paragraphIndent: String): String {
+    private fun format(html: String?, otherRegex: Regex, paragraphIndent: String, projection: TextProjection? = null): String {
         html ?: return ""
-        return html.replace(nbspRegex, " ")
-            .replace(espRegex, " ")
-            .replace(noPrintRegex, "")
-            .replace(wrapHtmlRegex, "\n")
-            .replace(commentRegex, "")
-            .replace(otherRegex, "")
-            .replace(indent1Regex, "\n$paragraphIndent")
-            .replace(indent2Regex, paragraphIndent)
-            .replace(lastRegex, "")
+        return html.replaceMapped(nbspRegex, " ", projection)
+            .replaceMapped(espRegex, " ", projection)
+            .replaceMapped(noPrintRegex, "", projection)
+            .replaceMapped(wrapHtmlRegex, "\n", projection)
+            .replaceMapped(commentRegex, "", projection)
+            .replaceMapped(otherRegex, "", projection)
+            .replaceMapped(indent1Regex, "\n$paragraphIndent", projection)
+            .replaceMapped(indent2Regex, paragraphIndent, projection)
+            .replaceMapped(lastRegex, "", projection)
     }
 
     /**
@@ -105,6 +107,8 @@ object HtmlFormatter {
             .map { it.replaceFirst(introLabelRegex, "").trim(*blankChars) }
             .filterNot { it.isEmpty() }
             .joinToString("\n") { PARAGRAPH_INDENT + it }
+            //body.html() 输出时会把文本节点的 &<> 与命名实体重新转义, 此时已是纯文本, 补一次反转义
+            .let { StringEscapeUtils.unescapeHtml4(it) }
     }
 
     /**
@@ -148,15 +152,19 @@ object HtmlFormatter {
             .joinToString(" ")
     }
 
-    fun formatKeepImg(html: String?, redirectUrl: URL? = null): String {
+    fun formatKeepImg(html: String?, redirectUrl: URL? = null): String = formatKeepImgMapped(html, redirectUrl, null)
+
+    internal fun formatKeepImgMapped(html: String?, redirectUrl: URL? = null, projection: TextProjection?): String {
         html ?: return ""
-        val keepImgHtml = format(html, notImgHtmlRegex)
+        val keepImgHtml = format(html, notImgHtmlRegex, "　　", projection)
 
         //正则的“|”处于顶端而不处于（）中时，具有类似||的熔断效果，故以此机制简化原来的代码
         var appendPos = 0
         val sb = StringBuilder()
+        val edits = mutableListOf<TextProjection.Edit>()
         for (m in formatImagePattern.findAll(keepImgHtml)) {
             var param = ""
+            val before = sb.length
             sb.append(
                 keepImgHtml.substring(appendPos, m.range.first), "<img src=\"${
                     NetworkUtils.getAbsoluteURL(
@@ -171,6 +179,8 @@ object HtmlFormatter {
                     ) + param
                 }\">"
             )
+            if (projection != null) edits += TextProjection.Edit(m.range.first, m.range.last + 1,
+                sb.length - before - (m.range.first - appendPos))
             appendPos = m.range.last + 1
         }
         if (appendPos < keepImgHtml.length) sb.append(
@@ -179,6 +189,7 @@ object HtmlFormatter {
                 keepImgHtml.length
             )
         )
+        projection?.replace(edits)
         return sb.toString()
     }
 
@@ -207,7 +218,9 @@ object HtmlFormatter {
         val document = Jsoup.parseBodyFragment(body)
         document.outputSettings().prettyPrint(false)
         document.select("script, style, noscript").remove()
+        //同 formatDisplayText: body.html() 的再转义需反转, 否则 &amp; 等字面量露出
         return format(document.body().html(), otherHtmlRegex, "")
+            .let { StringEscapeUtils.unescapeHtml4(it) }
     }
 
     /**

@@ -8,6 +8,7 @@ import io.legado.app.feature.reader.core.source.ReaderChapterSourceBlock
 import io.legado.app.feature.reader.core.source.ReaderChapterSourceParser
 import io.legado.app.feature.reader.core.style.ReaderCharacterStyle
 import io.legado.app.feature.reader.core.style.ReaderStyleTarget
+import io.legado.app.utils.dpToPx
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -135,6 +136,34 @@ class LegacyReaderStyleRangeMapperTest {
                 .rangesForLiteralRange(rule, 5, 5, ReaderStyleTarget.BODY, 0)
                 .isEmpty(),
         )
+    }
+
+    /** 边框三件套按 dp→px 原样进样式；没设颜色时粗细与圆角不许单独跑出来。 */
+    @Test
+    fun borderTripletMapsToTheStyleInPixels() {
+        val ranges = rangesFor(
+            HighlightRule(
+                pattern = "我是李四",
+                targetScope = HighlightRule.TARGET_BODY,
+                borderColor = 0xFF63C37D.toInt(),
+                borderWidth = 2f,
+                borderRadius = 6f,
+            )
+        )
+        ranges.forEach {
+            assertEquals(0xFF63C37D.toInt(), it.style.borderColorArgb)
+            assertEquals(2f.dpToPx(), it.style.borderWidthPx)
+            assertEquals(6f.dpToPx(), it.style.borderRadiusPx)
+        }
+
+        val unset = rangesFor(
+            HighlightRule(pattern = "我是李四", targetScope = HighlightRule.TARGET_BODY)
+        )
+        unset.forEach {
+            assertEquals(null, it.style.borderColorArgb)
+            assertEquals(0f, it.style.borderWidthPx)
+            assertEquals(0f, it.style.borderRadiusPx)
+        }
     }
 
     /**
@@ -299,4 +328,37 @@ class LegacyReaderStyleRangeMapperTest {
         ninePatchTop = 0.1f,
         ninePatchBottom = 0.1f,
     )
+
+    /**
+     * 引号跨段：上一段只有开引号，闭引号落在下一段。跟踪器报的区间起点在本段之外，
+     * 减回本段坐标得到负数下标，`substring` 抛 StringIndexOutOfBoundsException，
+     * 整章排版被兜底 catch 标成 unsupported（界面只剩「加载失败」）。
+     */
+    @Test
+    fun quoteSpanningIntoTheNextBlockDoesNotBreakPagination() {
+        val first = "张三：“<<张三（男青）>>我是李四。"
+        val second = "”他惊了！"
+        val source = ReaderChapterSource(
+            chapterIndex = 0,
+            title = "",
+            blocks = listOf(
+                ReaderChapterSourceBlock.Text(value = first, chapterPosition = 0),
+                ReaderChapterSourceBlock.Text(value = second, chapterPosition = first.length),
+            ),
+            characterCount = first.length + second.length,
+            semanticContent = first + second,
+        )
+        val ranges = LegacyReaderStyleRangeMapper.map(
+            source = source,
+            rules = emptyList(),
+            processes = emptyList(),
+            castBubbles = mapOf(
+                "张三" to ReaderCharacterStyle(colorArgb = 0xFFEEDDCC.toInt()),
+            ),
+        ).filter { it.priority == LegacyReaderStyleRangeMapper.CAST_BUBBLE_PRIORITY }
+
+        // 引号跨段时整句都画不出气泡：闭引号那一段查不到归属标记，
+        // 开引号那一段还没闭合。宁可不画，也不把台词尾巴单独包成一句。
+        assertTrue(ranges.isEmpty())
+    }
 }

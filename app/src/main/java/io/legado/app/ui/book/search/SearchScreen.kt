@@ -571,6 +571,7 @@ fun SearchScreen(
                                                 sharedCoverKey = sharedCoverKey,
                                                 sourceCount = item.book.origins.size,
                                                 qualityMasked = qualityMasked,
+                                                adaptCoverAspectRatio = true,
                                             )
                                         }
 
@@ -748,6 +749,7 @@ fun SearchScreen(
                     0 to stringResource(R.string.noval),
                     2 to stringResource(R.string.manga),
                     1 to stringResource(R.string.audio),
+                    4 to stringResource(R.string.video),
                 ).forEach { (type, label) ->
                     SelectionItemCard(
                         title = label,
@@ -1188,6 +1190,7 @@ private fun ExpandedSourceSheet(
                     shelfState = BookShelfState.NOT_IN_SHELF,
                     onClick = { onBookClick(book, null) },
                     onLongClick = onBookLongClick,
+                    adaptCoverAspectRatio = true,
                 )
             }
 

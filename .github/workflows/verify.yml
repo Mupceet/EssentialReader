@@ -17,16 +17,26 @@ on:
 permissions:
   contents: read
 
-concurrency:
-  group: verify-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
-
 jobs:
+  # 按变体分组：core / full 各跑一个 runner，避免同一 runner 上两个变体的 Kotlin 编译
+  # 互相争内存（OutOfMemoryError: Java heap space）。
+  # 墨本只发布 appCore（appFull 的漫画本地推理栈与墨水屏定位无关），此处只验证 Core。
   verify:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - product: Core
+            label: core
+    name: Verify (${{ matrix.label }})
     runs-on: ubuntu-latest
     # 打包段曾在 CI 挂死 4~6 小时（GitHub 6h 上限才杀）；45 分钟足以覆盖
     # 正常 16~23 分钟的完整验证，超时即失败并保留当时日志。
     timeout-minutes: 45
+    # concurrency 放在 job 层：workflow 层的 concurrency 不保证能解析 matrix 上下文。
+    concurrency:
+      group: verify-${{ github.workflow }}-${{ github.ref }}-${{ matrix.product }}
+      cancel-in-progress: true
     steps:
       - name: Checkout
         uses: actions/checkout@v5
@@ -49,15 +59,18 @@ jobs:
         run: |
           sed -i '/maven.aliyun.com/d' settings.gradle
 
-      # 测试/lint/架构检查先行；--stacktrace 保证失败时输出完整异常链
+      # 测试/lint/架构检查/AndroidTest 编译先行；--stacktrace 保证失败时输出完整异常链
       #（曾出现 packageAppDebug 内层异常 message 为空、日志无因可查）。
-      - name: Run tests, lint, and architecture check
+      # Reader semantic golden/contract/consumer/file tests are discovered by the
+      # same unfiltered JVM task, preserving per-class Robolectric isolation.
+      - name: Run tests, lint, architecture check, and androidTest compile
         run: |
           chmod +x gradlew
           ./gradlew \
-            testAppDebugUnitTest \
-            lintAppDebug \
+            testApp${{ matrix.product }}DebugUnitTest \
+            lintApp${{ matrix.product }}Debug \
             verifyConfigArchitecture \
+            compileApp${{ matrix.product }}DebugAndroidTestKotlin \
             --continue \
             --stacktrace \
             --no-daemon \
@@ -71,7 +84,7 @@ jobs:
       - name: Package debug APK (isolated from tests)
         run: |
           ./gradlew \
-            assembleAppDebug \
+            assembleApp${{ matrix.product }}Debug \
             --stacktrace \
             --no-daemon \
             --no-configuration-cache
@@ -80,20 +93,20 @@ jobs:
         if: ${{ always() }}
         uses: actions/upload-artifact@v4
         with:
-          name: verify-unit-test-reports
+          name: verify-unit-test-reports-${{ matrix.label }}
           if-no-files-found: warn
           path: |
-            app/build/test-results/testAppDebugUnitTest/**
-            app/build/reports/tests/testAppDebugUnitTest/**
+            app/build/test-results/testApp${{ matrix.product }}DebugUnitTest/**
+            app/build/reports/tests/testApp${{ matrix.product }}DebugUnitTest/**
 
       - name: Upload lint reports
         if: ${{ always() }}
         uses: actions/upload-artifact@v4
         with:
-          name: verify-lint-reports
+          name: verify-lint-reports-${{ matrix.label }}
           if-no-files-found: warn
           path: |
-            app/build/reports/lint-results-appDebug.html
-            app/build/reports/lint-results-appDebug.xml
-            app/build/reports/lint-results-appDebug.txt
-            app/build/reports/lint-results-appDebug.sarif
+            app/build/reports/lint-results-app${{ matrix.product }}Debug.html
+            app/build/reports/lint-results-app${{ matrix.product }}Debug.xml
+            app/build/reports/lint-results-app${{ matrix.product }}Debug.txt
+            app/build/reports/lint-results-app${{ matrix.product }}Debug.sarif

@@ -12,12 +12,16 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Chat
+import androidx.compose.material.icons.automirrored.filled.Login
 import androidx.compose.material.icons.automirrored.filled.Toc
 import androidx.compose.material.icons.filled.Animation
 import androidx.compose.material.icons.filled.AutoStories
+import androidx.compose.material.icons.filled.Block
 import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.BugReport
 import androidx.compose.material.icons.filled.CleanHands
+import androidx.compose.material.icons.filled.Comment
 import androidx.compose.material.icons.filled.CloudDownload
 import androidx.compose.material.icons.filled.DisplaySettings
 import androidx.compose.material.icons.filled.Download
@@ -25,6 +29,7 @@ import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Extension
 import androidx.compose.material.icons.filled.FindReplace
 import androidx.compose.material.icons.filled.Image
+import androidx.compose.material.icons.filled.Payment
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.SwapHoriz
@@ -312,6 +317,27 @@ private fun moreActionSpecs(
         applicable = isReadMenuActionApplicable("source_custom_button", state),
         onClick = { dispatch(ReadBookIntent.SourceCustomButton(false)) },
     ),
+    // 书源四项：顶栏那行在开胶囊或「精简顶部按钮」时不可达，这里作为兜底入口
+    MoreActionSpec(
+        "source_login", stringResource(R.string.login), Icons.AutoMirrored.Filled.Login,
+        applicable = isReadMenuActionApplicable("source_login", state),
+        onClick = { dispatch(ReadBookIntent.ShowLogin) },
+    ),
+    MoreActionSpec(
+        "source_pay", stringResource(R.string.chapter_pay), Icons.Default.Payment,
+        applicable = isReadMenuActionApplicable("source_pay", state),
+        onClick = { dispatch(ReadBookIntent.PayAction) },
+    ),
+    MoreActionSpec(
+        "edit_source", stringResource(R.string.edit_source), Icons.Default.Edit,
+        applicable = isReadMenuActionApplicable("edit_source", state),
+        onClick = { dispatch(ReadBookIntent.OpenSourceEdit) },
+    ),
+    MoreActionSpec(
+        "disable_source", stringResource(R.string.disable_source), Icons.Default.Block,
+        applicable = isReadMenuActionApplicable("disable_source", state),
+        onClick = { dispatch(ReadBookIntent.DisableSource) },
+    ),
     MoreActionSpec(
         "change_source", stringResource(R.string.change_origin), Icons.Default.SwapHoriz,
         applicable = isReadMenuActionApplicable("change_source", state),
@@ -336,6 +362,9 @@ private fun moreActionSpecs(
         "charset", stringResource(R.string.set_charset), Icons.Default.Translate,
         applicable = isReadMenuActionApplicable("charset", state),
         onClick = { onIntent(ReadBookIntent.ShowSheet(ReadBookSheet.Charset)) }),
+    MoreActionSpec(
+        "ai_chat", stringResource(R.string.ai_chat), Icons.AutoMirrored.Filled.Chat,
+        onClick = { dispatch(ReadBookIntent.OpenAiChat) }),
     MoreActionSpec(
         "edit_content", stringResource(R.string.edit_content), Icons.Default.Edit,
         onClick = { dispatch(ReadBookIntent.OpenContentEdit) }),
@@ -383,6 +412,9 @@ private fun moreActionSpecs(
         applicable = state.inBookshelf && state.isReadingProgressSyncConfigured,
         onClick = { dispatch(ReadBookIntent.MenuCoverProgress) }),
     MoreActionSpec(
+        "bubble_style", stringResource(R.string.bubble_config), Icons.Default.Comment,
+        onClick = { onIntent(ReadBookIntent.ShowSheet(ReadBookSheet.BubbleStyle)) }),
+    MoreActionSpec(
         "bottom_button_config", stringResource(R.string.config_btn), Icons.Default.Settings,
         onClick = { onIntent(ReadBookIntent.ShowSheet(ReadBookSheet.ToolButtonConfig)) }),
     MoreActionSpec(
@@ -420,6 +452,8 @@ private fun PageAnimDropdown(
     onDismissRequest: () -> Unit,
     onIntent: (ReadBookIntent) -> Unit,
 ) {
+    // 墨本不列出 iosCurl/googleCurl/parallax（PageAnim 6/7/8）：墨水屏刷新模型与
+    // 逐帧翻页动画不兼容，内核代码随上游合入但不在设置层暴露。
     val pageAnimOptions = listOf(
         R.string.btn_default_s to -1,
         R.string.page_anim_cover to PageAnim.coverPageAnim,

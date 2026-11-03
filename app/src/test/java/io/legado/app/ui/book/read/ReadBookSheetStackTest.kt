@@ -7,6 +7,59 @@ import org.junit.Test
 
 class ReadBookSheetStackTest {
     @Test
+    fun `switching menu tabs replaces the top and back returns to main`() {
+        val state = ReadBookUiState().withMenuRoute(ReadBookMenuRoute.ReadStyle)
+            .withMenuRoute(ReadBookMenuRoute.ThemeList, replaceTop = true)
+
+        assertEquals(listOf(ReadBookMenuRoute.Main, ReadBookMenuRoute.ThemeList), state.menuState.routeStack)
+        assertEquals(ReadBookMenuRoute.Main, state.withMenuBack().menuState.currentRoute)
+        assertEquals(true, state.withMenuBack().menuVisible)
+        assertEquals(false, state.withMenuBack().withMenuBack().menuVisible)
+        assertEquals(
+            state.menuState.routeStack,
+            ReadBookUiState().withMenuRoute(ReadBookMenuRoute.ThemeList, replaceTop = true).menuState.routeStack,
+        )
+    }
+
+    @Test
+    fun `opening menu routes pushes once and root navigation resets older routes`() {
+        val state = ReadBookUiState().withMenuRoute(ReadBookMenuRoute.ReadStyle)
+            .withMenuRoute(ReadBookMenuRoute.ThemeList)
+
+        assertEquals(3, state.menuState.routeStack.size)
+        assertEquals(state, state.withMenuRoute(ReadBookMenuRoute.ThemeList))
+        assertEquals(ReadBookMenuRoute.ReadStyle, state.withMenuBack().menuState.currentRoute)
+        assertEquals(
+            listOf(ReadBookMenuRoute.Main, ReadBookMenuRoute.ReadAloud),
+            state.withMenuRoute(ReadBookMenuRoute.ReadAloud, resetStack = true).menuState.routeStack,
+        )
+    }
+
+    @Test
+    fun `dismissing theme editing restores its menu and keeps parent sheets`() {
+        val state = ReadBookUiState().withMenuRoute(ReadBookMenuRoute.ThemeList)
+            .withSheet(ReadBookSheet.MoreConfig).withSheet(ReadBookSheet.BgTextConfig)
+            .let { it.copy(menuState = it.menuState.copy(visible = false), menuHiddenBySheet = true) }
+        val dismissed = state.withDismissedSheet()
+
+        assertEquals(ReadBookSheet.MoreConfig, dismissed.activeSheet)
+        assertEquals(ReadBookMenuRoute.ThemeList, dismissed.menuState.currentRoute)
+        assertEquals(true, dismissed.menuVisible)
+        assertEquals(false, dismissed.menuHiddenBySheet)
+        assertEquals(false, state.withMenuRoute(ReadBookMenuRoute.ReadStyle).menuHiddenBySheet)
+        assertEquals(true, state.withMenuRoute(ReadBookMenuRoute.ReadStyle).menuVisible)
+    }
+
+    @Test
+    fun `ordinary sheet dismissal preserves a hidden menu`() {
+        val state = ReadBookUiState().withSheet(ReadBookSheet.BgTextConfig).withDismissedSheet()
+
+        assertNull(state.activeSheet)
+        assertEquals(false, state.menuVisible)
+        assertEquals(false, state.menuHiddenBySheet)
+    }
+
+    @Test
     fun `nested settings retain their parents and dismiss one layer at a time`() {
         val parent = ReadBookSheet.MoreConfig
         val child = ReadBookSheet.ClickActionConfig
@@ -18,6 +71,30 @@ class ReadBookSheetStackTest {
         assertEquals(listOf(parent), state.withSheet(null).sheetStack)
         assertNull(state.withSheet(null).withSheet(null).activeSheet)
         assertNull(ReadBookUiState().withSheet(null).activeSheet)
+    }
+
+    @Test
+    fun `only the top sheet layer is shown above its parent`() {
+        val parent = ReaderSheetLayer(1L, ReadBookSheet.MoreConfig, present = true)
+        val child = ReaderSheetLayer(2L, ReadBookSheet.ClickActionConfig, present = true)
+        val exiting = ReaderSheetLayer(3L, ReadBookSheet.PageAnim, present = false)
+
+        // 「更多」里打开点击区域：点击区域独占屏幕，下层的「更多」窗口必须收起
+        assertEquals(
+            2L,
+            topReaderSheetLayerId(
+                listOf(parent, child, exiting),
+                listOf(ReadBookSheet.MoreConfig, ReadBookSheet.ClickActionConfig),
+            ),
+        )
+        // 关掉点击区域后「更多」重新成为栈顶
+        assertEquals(
+            1L,
+            topReaderSheetLayerId(listOf(parent, child), listOf(ReadBookSheet.MoreConfig)),
+        )
+        // 正在退场的层不算栈顶；栈空了就没有可见层
+        assertEquals(1L, topReaderSheetLayerId(listOf(parent, exiting), listOf(ReadBookSheet.MoreConfig)))
+        assertNull(topReaderSheetLayerId(listOf(parent), emptyList()))
     }
 
     @Test

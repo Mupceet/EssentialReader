@@ -75,6 +75,54 @@ class AppReleaseInfoTest {
         assertEquals(listOf("legado-1.0.0-arm64-v8a.apk"), selected.map { it.name })
     }
 
+    @Test
+    fun `each product only picks its own apk from a dual release`() {
+        val assets = listOf(
+            asset("legado-1.0.0-core-arm64-v8a.apk"),
+            asset("legado-1.0.0-core-universal.apk"),
+            asset("legado-1.0.0-full-arm64-v8a.apk"),
+            asset("legado-1.0.0-full-universal.apk")
+        )
+
+        assertEquals(
+            listOf("legado-1.0.0-core-arm64-v8a.apk"),
+            selectCompatibleAssets(assets, listOf("arm64-v8a"), AppProduct.CORE).map { it.name }
+        )
+        assertEquals(
+            listOf("legado-1.0.0-full-arm64-v8a.apk"),
+            selectCompatibleAssets(assets, listOf("arm64-v8a"), AppProduct.FULL).map { it.name }
+        )
+        assertEquals(
+            listOf("legado-1.0.0-full-universal.apk"),
+            selectCompatibleAssets(listOf(asset("legado-1.0.0-full-universal.apk")), listOf("arm64-v8a"), AppProduct.FULL)
+                .map { it.name }
+        )
+    }
+
+    @Test
+    fun `single apk release without product marker still updates every product`() {
+        val assets = listOf(asset("legado-1.0.0-arm64-v8a.apk"))
+
+        assertEquals(
+            listOf("legado-1.0.0-arm64-v8a.apk"),
+            selectCompatibleAssets(assets, listOf("arm64-v8a"), AppProduct.CORE).map { it.name }
+        )
+        assertEquals(
+            listOf("legado-1.0.0-arm64-v8a.apk"),
+            selectCompatibleAssets(assets, listOf("arm64-v8a"), AppProduct.FULL).map { it.name }
+        )
+    }
+
+    @Test
+    fun `missing apk for the current product reports nothing instead of the other product`() {
+        val assets = listOf(asset("legado-1.0.0-core-arm64-v8a.apk"))
+
+        assertEquals(
+            emptyList<Asset>(),
+            selectCompatibleAssets(assets, listOf("arm64-v8a"), AppProduct.FULL)
+        )
+    }
+
     private fun asset(name: String) = Asset(
         apkUrl = "https://example.com/$name",
         contentType = "application/vnd.android.package-archive",

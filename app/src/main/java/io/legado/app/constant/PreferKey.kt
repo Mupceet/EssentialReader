@@ -14,6 +14,7 @@ object PreferKey {
     const val hideEmptyGroups = "hideEmptyGroups"
     const val useDefaultCover = "useDefaultCover"
     const val loadCoverOnlyWifi = "loadCoverOnlyWifi"
+    const val coverRestrictRatio = "coverRestrictRatio"
     const val coverShowName = "coverShowName"
     const val coverShowAuthor = "coverShowAuthor"
     const val coverShowShadow = "coverShowShadow"
@@ -190,6 +191,14 @@ object PreferKey {
     const val clearWebViewData = "clearWebViewData"
     const val blockSourceBrowser = "blockSourceBrowser"
     const val onlyLatestBackup = "onlyLatestBackup"
+
+    // —— 视频播放设置 ——
+    const val videoAutoPlay = "videoAutoPlay"
+    const val videoStartFull = "videoStartFull"
+    const val videoLongPressSpeed = "videoLongPressSpeed"
+    const val videoPlaySpeed = "videoPlaySpeed"
+    const val videoDanmakuShow = "videoDanmakuShow"
+    const val videoFloatingEnabled = "videoFloatingEnabled"
     const val brightnessVwPos = "brightnessVwPos"
     const val readBrightnessControlPosition = "readBrightnessControlPosition"
     const val brightnessAuto = "brightnessAuto"
@@ -251,6 +260,7 @@ object PreferKey {
     const val bookInfoBackgroundBlur = "bookInfoBackgroundBlur"
     const val bookInfoNetworkCoverBackground = "bookInfoNetworkCoverBackground"
     const val bookInfoDefaultCoverBackground = "bookInfoDefaultCoverBackground"
+    const val bookInfoAuthorSearchFallback = "bookInfoAuthorSearchFallback"
     const val cBackground = "colorBackground"
     const val cBBackground = "colorBottomBackground"
     const val enableDeepPersonalization = "enableDeepPersonalization"
@@ -420,6 +430,10 @@ object PreferKey {
     const val moreActionsConfig = "moreActionsConfig"
     const val disableReturnKey = "disableReturnKey"
     const val selectText = "selectText"
+    /** 当前生效的段评气泡包目录名（bubblePackages/<dirName>）。 */
+    const val paragraphBubblePackage = "paragraphBubblePackage"
+    /** 正文里图片形式的段评入口是否强制用软件气泡渲染。 */
+    const val forceSoftwareParagraphBubble = "forceSoftwareParagraphBubble"
     //我在干什么
 
     const val disableMangaScrollAnimation = "disableMangaScrollAnimation"
@@ -445,6 +459,8 @@ object PreferKey {
     const val sliderVibrator = "sliderVibrator"
     const val useNewTocSheet = "useNewTocSheet"
     const val maxLengthWithNoToc = "maxLengthWithNoToc"
+    /** 阅读主题弹窗（背景网格）的列数。 */
+    const val themeGridColumns = "themeGridColumns"
     const val selectVibrator = "selectVibrator"
     const val audioCacheCleanTime = "audioCacheCleanTime"
     const val audioPreDownloadNum = "audioPreDownloadNum"

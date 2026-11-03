@@ -48,8 +48,11 @@
         <!-- 图标0 -->
         <activity
             android:name=".ui.main.LauncherW"
+            android:alwaysRetainTaskState="true"
             android:enabled="false"
             android:configChanges="locale|layoutDirection|uiMode|screenLayout"
+            android:enableOnBackInvokedCallback="true"
+            android:windowSoftInputMode="adjustResize"
             android:exported="true"
             android:icon="@mipmap/ic_launcher">
             <intent-filter>
@@ -64,8 +67,11 @@
         </activity>
         <activity
             android:name=".ui.main.Launcher0"
+            android:alwaysRetainTaskState="true"
             android:enabled="false"
             android:configChanges="locale|layoutDirection|uiMode|screenLayout"
+            android:enableOnBackInvokedCallback="true"
+            android:windowSoftInputMode="adjustResize"
             android:exported="true"
             android:icon="@mipmap/launcher0">
             <intent-filter>
@@ -81,8 +87,11 @@
         <!-- 图标1 -->
         <activity
             android:name=".ui.main.Launcher1"
+            android:alwaysRetainTaskState="true"
             android:enabled="false"
             android:configChanges="locale|layoutDirection|uiMode|screenLayout"
+            android:enableOnBackInvokedCallback="true"
+            android:windowSoftInputMode="adjustResize"
             android:exported="true"
             android:icon="@mipmap/launcher1">
             <intent-filter>
@@ -98,8 +107,11 @@
         <!-- 图标2 -->
         <activity
             android:name=".ui.main.Launcher2"
+            android:alwaysRetainTaskState="true"
             android:enabled="false"
             android:configChanges="locale|layoutDirection|uiMode|screenLayout"
+            android:enableOnBackInvokedCallback="true"
+            android:windowSoftInputMode="adjustResize"
             android:exported="true"
             android:icon="@mipmap/launcher2">
             <intent-filter>
@@ -115,8 +127,11 @@
         <!-- 图标3 -->
         <activity
             android:name=".ui.main.Launcher3"
+            android:alwaysRetainTaskState="true"
             android:enabled="false"
             android:configChanges="locale|layoutDirection|uiMode|screenLayout"
+            android:enableOnBackInvokedCallback="true"
+            android:windowSoftInputMode="adjustResize"
             android:exported="true"
             android:icon="@mipmap/launcher3">
             <intent-filter>
@@ -132,8 +147,11 @@
         <!-- 图标4 -->
         <activity
             android:name=".ui.main.Launcher4"
+            android:alwaysRetainTaskState="true"
             android:enabled="false"
             android:configChanges="locale|layoutDirection|uiMode|screenLayout"
+            android:enableOnBackInvokedCallback="true"
+            android:windowSoftInputMode="adjustResize"
             android:exported="true"
             android:icon="@mipmap/launcher4">
             <intent-filter>
@@ -149,8 +167,11 @@
         <!-- 图标5 -->
         <activity
             android:name=".ui.main.Launcher5"
+            android:alwaysRetainTaskState="true"
             android:enabled="false"
             android:configChanges="locale|layoutDirection|uiMode|screenLayout"
+            android:enableOnBackInvokedCallback="true"
+            android:windowSoftInputMode="adjustResize"
             android:exported="true"
             android:icon="@mipmap/launcher5">
             <intent-filter>
@@ -166,8 +187,11 @@
         <!-- 图标6 -->
         <activity
             android:name=".ui.main.Launcher6"
+            android:alwaysRetainTaskState="true"
             android:enabled="false"
             android:configChanges="locale|layoutDirection|uiMode|screenLayout"
+            android:enableOnBackInvokedCallback="true"
+            android:windowSoftInputMode="adjustResize"
             android:exported="true"
             android:icon="@mipmap/launcher6">
             <intent-filter>
@@ -184,8 +208,9 @@
         <activity
             android:name=".ui.main.MainActivity"
             android:alwaysRetainTaskState="true"
-            android:configChanges="locale|layoutDirection|uiMode|screenLayout"
+            android:configChanges="locale|layoutDirection|uiMode|orientation|screenSize|smallestScreenSize|screenLayout"
             android:enableOnBackInvokedCallback="true"
+            android:supportsPictureInPicture="true"
             android:windowSoftInputMode="adjustResize"
             android:exported="true">
             <intent-filter>
@@ -415,6 +440,9 @@
             android:foregroundServiceType="mediaPlayback" />
         <service
             android:name=".service.AudioPlayService"
+            android:foregroundServiceType="mediaPlayback" />
+        <service
+            android:name=".service.VideoPlayService"
             android:foregroundServiceType="mediaPlayback" />
         <service
             android:name=".service.DownloadService"

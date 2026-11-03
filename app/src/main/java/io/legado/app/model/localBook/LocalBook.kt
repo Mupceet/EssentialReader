@@ -59,7 +59,6 @@ import io.legado.app.utils.parseToUri
 import io.legado.app.utils.printOnDebug
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.runBlocking
-import org.apache.commons.text.StringEscapeUtils
 import org.koin.core.context.GlobalContext
 import splitties.init.appCtx
 import java.io.ByteArrayInputStream
@@ -183,7 +182,7 @@ object LocalBook {
     }
 
     fun getContent(book: Book, chapter: BookChapter): String? {
-        var content = try {
+        val content = try {
             when {
                 book.isEpub -> {
                     EpubFile.getContent(book, chapter)
@@ -210,17 +209,25 @@ object LocalBook {
             AppLog.put("获取本地书籍内容失败\n${e.localizedMessage}", e)
             "获取本地书籍内容失败\n${e.localizedMessage}"
         }
-        if (book.isEpub) {
-            content ?: return null
-            if (content.indexOf('&') > -1) {
-                content = content.replace("&lt;img", "&lt; img", true)
-                return StringEscapeUtils.unescapeHtml4(content)
-            }
-        }
-        if (content.isNullOrEmpty() && !chapter.isVolume) {
-            return null
-        }
+        // EPUB's mixed-channel emitter already decodes plain text once. Rich text is
+        // decoded by the reader parser; decoding here would corrupt literal entities.
+        // An empty chapter body ("") is a valid blank page and renders through the
+        // title pipeline; only null means the content is genuinely unavailable.
         return content
+    }
+
+    /** Optional original markup. Failure must never replace the authoritative chapter text. */
+    fun getPresentation(book: Book, chapter: BookChapter): io.legado.app.feature.reader.core.source.ReaderLocalPresentation? = try {
+        when {
+            book.isEpub -> EpubFile.getPresentation(book, chapter)
+            book.isMobi -> MobiFile.getPresentation(book, chapter)
+            else -> null
+        }
+    } catch (cancelled: kotlinx.coroutines.CancellationException) {
+        throw cancelled
+    } catch (error: Exception) {
+        AppLog.put("本地呈现读取失败: chapter=${chapter.index}, ${error.javaClass.simpleName}")
+        null
     }
 
     fun getCoverPath(book: Book): String {

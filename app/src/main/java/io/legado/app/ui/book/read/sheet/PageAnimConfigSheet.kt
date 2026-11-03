@@ -15,6 +15,8 @@ fun PageAnimConfigSheet(
 ) {
     // 每项自带 PageAnim 取值，不按「下标 - 1」推导：列表少一项就会整体错位一格
     // （最后一项写着「无动画」，落库的却是别的值）。
+    // 墨本不列出 iosCurl/googleCurl/parallax（PageAnim 6/7/8）：墨水屏刷新模型与
+    // 逐帧翻页动画不兼容，内核代码随上游合入但不在设置层暴露。
     val items = listOf(
         R.string.btn_default_s to -1,
         R.string.page_anim_cover to PageAnim.coverPageAnim,

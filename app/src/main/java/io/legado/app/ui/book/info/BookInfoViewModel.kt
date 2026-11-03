@@ -9,7 +9,6 @@ import androidx.lifecycle.viewModelScope
 import coil3.ImageLoader
 import coil3.request.SuccessResult
 import coil3.toBitmap
-import com.google.gson.annotations.SerializedName
 import io.legado.app.R
 import io.legado.app.base.BaseViewModel
 import io.legado.app.constant.AppLog
@@ -72,6 +71,7 @@ import io.legado.app.model.ReadBook
 import io.legado.app.model.SourceCallBack
 import io.legado.app.model.analyzeRule.AnalyzeUrl
 import io.legado.app.model.localBook.LocalBook
+import io.legado.app.model.webBook.RelatedBooks
 import io.legado.app.model.webBook.WebBook
 import io.legado.app.ui.main.MainIntent
 import io.legado.app.ui.widget.components.image.cover.buildCoverImageRequest
@@ -86,10 +86,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers.IO
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.async
-import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.channels.awaitClose
-import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -413,7 +410,7 @@ class BookInfoViewModel(
             BookInfoIntent.SaveVariable -> saveVariableDraft()
             BookInfoIntent.DismissDialog -> dismissDialog()
             is BookInfoIntent.MenuAction -> handleMenuAction(intent.action)
-            is BookInfoIntent.AuthorClick -> onAuthorClick(intent.longClick)
+            is BookInfoIntent.AuthorClick -> onAuthorClick(intent.longClick, intent.author)
             is BookInfoIntent.BookNameClick -> onBookNameClick(intent.longClick)
             BookInfoIntent.OriginClick -> onOriginClick()
             BookInfoIntent.DismissAppLogSheet -> {
@@ -1635,14 +1632,14 @@ class BookInfoViewModel(
         }
     }
 
-    private fun onAuthorClick(longClick: Boolean) {
+    private fun onAuthorClick(longClick: Boolean, author: String? = null) {
         val book = currentBook ?: return
         emitEffect(
             BookInfoEffect.RunSourceCallback(
                 event = if (longClick) SourceCallBack.LONG_CLICK_AUTHOR else SourceCallBack.CLICK_AUTHOR,
                 source = bookSource,
                 book = book.uiCopy(),
-                action = BookInfoCallbackAction.Search(book.author),
+                action = BookInfoCallbackAction.Search(author ?: book.author),
             )
         )
     }
@@ -1847,6 +1844,8 @@ class BookInfoViewModel(
     }
 
     private fun onRelatedBooksMore(title: String, resolvedUrl: String) {
+        // 作者搜索兜底模块没有对应的发现页地址
+        if (resolvedUrl.isBlank()) return
         val source = bookSource ?: return
         emitEffect(
             BookInfoEffect.NavigateToExploreShow(
@@ -1999,16 +1998,26 @@ class BookInfoViewModel(
             delay(delayMillis)
             if (!isCurrentBookSource(book, source)) return@launch
 
-            val modules = parseRelatedBookModules(source)
-            if (modules.isEmpty()) {
-                currentRelatedBooks = emptyList()
-                syncUiState()
-                return@launch
-            }
-
             try {
                 val result = withContext(IO) {
-                    loadRelatedBooks(book, source, modules)
+                    val modules = RelatedBooks.load(book, source).map { module ->
+                        RelatedBooksUi(
+                            key = module.key,
+                            title = module.title,
+                            url = module.url,
+                            resolvedUrl = module.resolvedUrl,
+                            books = module.books.toImmutableList(),
+                        )
+                    }
+                    // 书源没有配置关联规则时，可按作者搜索兜底显示“作者其它作品”。
+                    if (modules.isEmpty() &&
+                        themeSettingsGateway.currentSettings.bookInfoAuthorSearchFallback &&
+                        source.ruleBookInfo?.relatedBooks.isNullOrBlank()
+                    ) {
+                        listOfNotNull(loadAuthorOtherWorks(book, source))
+                    } else {
+                        modules
+                    }
                 }
                 if (!isCurrentBookSource(book, source)) return@launch
                 currentRelatedBooks = result
@@ -2016,6 +2025,7 @@ class BookInfoViewModel(
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Throwable) {
+                AppLog.put("关联书籍 relatedBooks 加载失败", e)
                 if (!isCurrentBookSource(book, source)) return@launch
                 currentRelatedBooks = emptyList()
                 syncUiState()
@@ -2027,56 +2037,46 @@ class BookInfoViewModel(
         return currentBook?.bookUrl == book.bookUrl && bookSource?.bookSourceUrl == source.bookSourceUrl
     }
 
-    private fun parseRelatedBookModules(source: BookSource): List<RelatedBooksDef> {
-        val modulesJson = source.ruleBookInfo?.relatedBooks
-        if (modulesJson.isNullOrBlank()) {
-            return emptyList()
-        }
+    private fun normalizeAuthorName(author: String): String {
+        return author.replace(AppPattern.authorRegex, "").trim()
+    }
+
+    /**
+     * 关联书籍的作者搜索兜底：用当前书源以作者名搜索第一页，
+     * 保留归一化后作者一致、排除当前书的结果。失败时静默为空，不影响页面其他内容。
+     */
+    private suspend fun loadAuthorOtherWorks(book: Book, source: BookSource): RelatedBooksUi? {
+        val author = normalizeAuthorName(book.author)
+        if (author.isBlank()) return null
         return try {
-            GSON.fromJsonArray<RelatedBooksDef>(modulesJson)
-                .getOrNull()
-                ?.filter { !it.url.isNullOrBlank() }
-                ?.map { it.copy(url = it.url!!.replace(Regex("\\s"), "")) }
-                ?: emptyList()
-        } catch (e: Exception) {
-            emptyList()
-        }
-    }
-
-    private suspend fun loadRelatedBooks(
-        book: Book,
-        source: BookSource,
-        modules: List<RelatedBooksDef>,
-    ): List<RelatedBooksUi> {
-        return coroutineScope {
-            modules.map { def ->
-                async {
-                    val url = def.url.orEmpty()
-                    val (resolvedUrl, books) = try {
-                        resolveAndExplore(source, url, book)
-                    } catch (e: CancellationException) {
-                        throw e
-                    } catch (e: Exception) {
-                        url to emptyList()
-                    }
-                    RelatedBooksUi(
-                        key = def.key ?: def.title.orEmpty(),
-                        title = def.title.orEmpty(),
-                        url = url,
-                        resolvedUrl = resolvedUrl,
-                        books = books.filter { it.bookUrl != book.bookUrl }.toImmutableList(),
-                    )
+            val books = WebBook.searchBookAwait(
+                bookSource = source,
+                key = author,
+                page = 1,
+                filter = { _, itemAuthor, _ ->
+                    normalizeAuthorName(itemAuthor) == author
+                },
+            )
+            val currentName = book.name.trim()
+            val filtered = books
+                .map { it.apply { releaseHtmlData() } }
+                .filter {
+                    it.bookUrl != book.bookUrl && it.name.trim() != currentName
                 }
-            }.awaitAll().filter { it.books.isNotEmpty() }
+                .distinctBy { it.bookUrl.ifBlank { "${it.name}-${it.author}-${it.origin}" } }
+            RelatedBooksUi(
+                key = AUTHOR_OTHER_WORKS_KEY,
+                title = context.getString(R.string.book_other_works),
+                url = "",
+                resolvedUrl = "",
+                books = filtered.toImmutableList(),
+            ).takeIf { filtered.isNotEmpty() }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Throwable) {
+            AppLog.put("按作者搜索关联书籍失败: ${source.bookSourceName}", e)
+            null
         }
-    }
-
-    private suspend fun resolveAndExplore(
-        source: BookSource,
-        url: String,
-        book: Book,
-    ): Pair<String, List<SearchBook>> {
-        return WebBook.exploreBookWithResolvedUrl(source, url, 1, book)
     }
 
     private fun showMessage(resId: Int) = showMessage(context.getString(resId))
@@ -2129,6 +2129,11 @@ class BookInfoViewModel(
             snapshot.downloadUrls = downloadUrls
         }
     }
+
+    companion object {
+        /** 作者搜索兜底模块的固定 key，与书源规则的模块 key 区分开 */
+        private const val AUTHOR_OTHER_WORKS_KEY = "author-other-works"
+    }
 }
 
 /**
@@ -2157,13 +2162,3 @@ private val BookInfoWebFile.isSupported: Boolean
 
 private val BookInfoWebFile.isSupportDecompress: Boolean
     get() = AppPattern.archiveFileRegex.matches(name)
-
-/**
- * 书源 `ruleBookInfo.relatedBooks` 的 JSON 结构。键名由书源约定、代码外生成，
- * 必须写死在 [SerializedName]：否则 R8 改名后三个字段全反序列化为 null，关联书籍整组消失。
- */
-private data class RelatedBooksDef(
-    @SerializedName("key") val key: String? = null,
-    @SerializedName("title") val title: String? = null,
-    @SerializedName("url") val url: String? = null,
-)

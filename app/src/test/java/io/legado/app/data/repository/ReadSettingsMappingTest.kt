@@ -34,11 +34,11 @@ class ReadSettingsMappingTest {
     }
 
     @Test
-    fun `gateway 持久化映射覆盖 ReadSettings 全部 114 个字段`() {
+    fun `gateway 持久化映射覆盖 ReadSettings 全部 117 个字段`() {
         val actualKeys = ReadSettings().toGatewayPrefMap().keys
         val expectedKeys = ReadSettings().expectedGatewayPrefMap().keys
 
-        assertEquals(114, actualKeys.size)
+        assertEquals(117, actualKeys.size)
         assertEquals(expectedKeys, actualKeys)
     }
 
@@ -124,6 +124,7 @@ class ReadSettingsMappingTest {
         assertFalse(settings.titleBarCompact)
         assertEquals(10, settings.preDownloadNum)
         assertEquals(0, settings.preDownloadNumPrev)
+        assertEquals(4, settings.themeGridColumns)
     }
 }
 
@@ -148,6 +149,8 @@ private fun readSettingsMappingSamples(): List<ReadSettings> {
         nextKeys = "next-keys",
         fontFolder = "font-folder",
         systemTypefaces = 23,
+        paragraphBubblePackage = "sample-bubble",
+        forceSoftwareParagraphBubble = true,
         preDownloadNum = 29,
         preDownloadNumPrev = 7,
         menuAlpha = 1001,
@@ -159,6 +162,7 @@ private fun readSettingsMappingSamples(): List<ReadSettings> {
         useNewTocSheet = false,
         maxLengthWithNoToc = 3000,
         readStyleSelect = 1007,
+        themeGridColumns = 6,
         comicStyleSelect = 1008,
         shareLayout = true,
         readBarStyleFollowPage = true,
@@ -299,6 +303,8 @@ private fun ReadSettings.expectedGatewayPrefMap(): Map<String, Any?> = mapOf(
     PreferKey.showReadTitleAddition to showReadTitleAddition,
     PreferKey.autoReadSpeed to autoReadSpeed,
     PreferKey.systemTypefaces to systemTypefaces,
+    PreferKey.paragraphBubblePackage to paragraphBubblePackage,
+    PreferKey.forceSoftwareParagraphBubble to forceSoftwareParagraphBubble,
     PreferKey.preDownloadNum to preDownloadNum,
     PreferKey.preDownloadNumPrev to preDownloadNumPrev,
     PreferKey.prevKeys to prevKeys,
@@ -309,6 +315,7 @@ private fun ReadSettings.expectedGatewayPrefMap(): Map<String, Any?> = mapOf(
     PreferKey.maxLengthWithNoToc to maxLengthWithNoToc,
     PreferKey.readUrlOpenInBrowser to readUrlInBrowser,
     PreferKey.readStyleSelect to readStyleSelect,
+    PreferKey.themeGridColumns to themeGridColumns,
     PreferKey.comicStyleSelect to comicStyleSelect,
     PreferKey.shareLayout to shareLayout,
     PreferKey.readBarStyleFollowPage to readBarStyleFollowPage,

@@ -10,11 +10,13 @@ import io.legado.app.constant.ReadTipType
 import io.legado.app.data.entities.HighlightRule
 import io.legado.app.data.repository.ReadStyleConfigStore
 import io.legado.app.domain.gateway.ReadSettingsGateway
+import io.legado.app.domain.model.settings.ReadSettings
 import io.legado.app.model.ReadSessionState
 import io.legado.app.utils.GSON
 import io.legado.app.utils.fromJsonObject
 import io.legado.app.utils.hexString
 import splitties.init.appCtx
+import java.util.UUID
 
 /**
  * 阅读界面配置
@@ -24,7 +26,14 @@ import splitties.init.appCtx
 object ReadBookConfig {
     private lateinit var configStore: ReadStyleConfigStore
     private lateinit var readSettingsGateway: ReadSettingsGateway
-    private val readSettings get() = readSettingsGateway.currentSettings
+
+    /** 初始化前（单测或极早调用）回退默认值，不抛 lateinit 异常。 */
+    private val readSettings: ReadSettings
+        get() = if (::readSettingsGateway.isInitialized) {
+            readSettingsGateway.currentSettings
+        } else {
+            ReadSettings()
+        }
 
     internal fun initialize(
         configStore: ReadStyleConfigStore,
@@ -229,6 +238,10 @@ object ReadBookConfig {
 
     val textItalic: Boolean
         get() = config.textItalic
+
+    /** 系统字族（0=默认 / 1=衬线 / 2=等宽）；正文排版与气泡兜底字体共用这一口径。 */
+    val systemTypefaces: Int
+        get() = readSettings.systemTypefaces
 
     val textShadow: Boolean
         get() = config.textShadow
@@ -652,7 +665,10 @@ object ReadBookConfig {
         val menuBottomHorizontalMargin: Int = 0,
         @Transient
         val menuBottomBottomMargin: Int = 0,
-        val highlightRules: ArrayList<HighlightRule> = arrayListOf()
+        val highlightRules: ArrayList<HighlightRule> = arrayListOf(),
+        /** 进程内列表身份；不写入主题包，旧配置无需迁移，字段编辑时由 copy 保留。 */
+        @Transient
+        val id: String = UUID.randomUUID().toString(),
     ) {
 
         /**
@@ -951,6 +967,31 @@ object ReadBookConfig {
 
         fun withCurBg(bgType: Int, bg: String): Config =
             ReadStyleResolver.withCurrentBackground(this, bgType, bg)
+
+        /**
+         * 复刻排版做"新样式"：把**背景整组**清回默认（背景图/背景色/背景透明度/状态栏明暗
+         * ⇒ 纯色、默认底色），名字清空留给用户起；其余（字体、字号、间距、标题、页眉页脚、
+         * 配色、翻页动画…）原样保留。
+         *
+         * 默认值直接取自 [Config] 的构造默认值（不写死字符串），构造默认值将来变了也不会漂移。
+         * 注意：`darkStatusIcon*` 跟着背景明暗走，所以必须和背景一起回默认。
+         */
+        fun asNewStyle(): Config {
+            val defaults = Config()
+            return copy(
+                name = "",
+                bgType = defaults.bgType,
+                bgStr = defaults.bgStr,
+                bgTypeNight = defaults.bgTypeNight,
+                bgStrNight = defaults.bgStrNight,
+                bgTypeEInk = defaults.bgTypeEInk,
+                bgStrEInk = defaults.bgStrEInk,
+                bgAlpha = defaults.bgAlpha,
+                darkStatusIcon = defaults.darkStatusIcon,
+                darkStatusIconNight = defaults.darkStatusIconNight,
+                darkStatusIconEInk = defaults.darkStatusIconEInk,
+            )
+        }
 
         fun curBgStr(): String {
             return ReadStyleResolver.currentBackground(this).value

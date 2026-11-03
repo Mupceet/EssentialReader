@@ -356,6 +356,7 @@ object BackupConfig {
         PreferKey.bookInfoBackgroundBlur,
         PreferKey.bookInfoNetworkCoverBackground,
         PreferKey.bookInfoDefaultCoverBackground,
+        PreferKey.bookInfoAuthorSearchFallback,
         PreferKey.cBackground,
         PreferKey.cBBackground,
         PreferKey.cNBackground,
