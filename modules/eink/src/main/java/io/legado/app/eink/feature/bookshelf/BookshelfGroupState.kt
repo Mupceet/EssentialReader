@@ -15,7 +15,8 @@ import kotlinx.coroutines.launch
  * 镜像 [BookshelfStyleState]。
  *
  * - [submit] 同步置覆盖：切换渲染即时生效，不等待宿主落库
- *  （saveTabPosition / einkShelfFilter 经 DataStore 原子提交）；
+ *  （saveTabPosition 经宿主 DataStore 原子提交；einkShelfFilter 自有键落宿主
+ *  eink_preferences，变化即写、不再与 saveTabPosition 同事务）；
  * - 覆盖在宿主快照追平后清除：落库完成与流发射之间的空窗不回跳旧值；
  * - 选中项不在已加载列表中（被隐藏/删除/移出精选集，含加载后清空）时
  *   回退「全部」：避免 chip 与列表失联导致空书架假象；列表未加载（尚未
