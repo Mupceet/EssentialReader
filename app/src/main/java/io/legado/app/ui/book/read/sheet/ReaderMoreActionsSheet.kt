@@ -452,13 +452,14 @@ private fun PageAnimDropdown(
     onDismissRequest: () -> Unit,
     onIntent: (ReadBookIntent) -> Unit,
 ) {
-    // 墨本不列出 iosCurl/googleCurl/parallax（PageAnim 6/7/8）：墨水屏刷新模型与
-    // 逐帧翻页动画不兼容，内核代码随上游合入但不在设置层暴露。
     val pageAnimOptions = listOf(
         R.string.btn_default_s to -1,
         R.string.page_anim_cover to PageAnim.coverPageAnim,
         R.string.page_anim_slide to PageAnim.slidePageAnim,
         R.string.page_anim_simulation to PageAnim.simulationPageAnim,
+        R.string.page_anim_ios_curl to PageAnim.iosCurlPageAnim,
+        R.string.page_anim_google_curl to PageAnim.googleCurlPageAnim,
+        R.string.page_anim_parallax to PageAnim.parallaxPageAnim,
         R.string.page_anim_scroll to PageAnim.scrollPageAnim,
         R.string.page_anim_fade to PageAnim.fadePageAnim,
         R.string.page_anim_none to PageAnim.noAnim,

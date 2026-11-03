@@ -11,8 +11,8 @@ import io.legado.app.eink.contract.BookshelfStyle
  * 缺失（设计 §5 逐键依据）：契约不扩字段即不生效，后续新键按设计 §6
  * 演进规则走「契约字段 + 本函数映射 + 模块消费」三处一次提交。
  */
-internal fun BookshelfSettings.toBookshelfStyle(): BookshelfStyle = BookshelfStyle(
-    groupsEnabled = einkGroupsEnabled,
+internal fun BookshelfSettings.toBookshelfStyle(groupsEnabled: Boolean): BookshelfStyle = BookshelfStyle(
+    groupsEnabled = groupsEnabled,
     showUnreadBadge = showUnread,
     highlightNewChapter = showUnreadNew,
     showLatestChapter = bookshelfShowLatestChapter,
@@ -26,7 +26,7 @@ internal fun BookshelfSettings.toBookshelfStyle(): BookshelfStyle = BookshelfSty
  * 非本通道键（排序/横屏等）由调用方 update 语义保持原值。
  */
 internal fun BookshelfSettings.withStyleProjection(style: BookshelfStyle): BookshelfSettings = copy(
-    einkGroupsEnabled = style.groupsEnabled,
+    // groupsEnabled 落 eink_preferences 自有键，由 setStyle 调用方先行写 SP
     showUnread = style.showUnreadBadge,
     showUnreadNew = style.highlightNewChapter,
     bookshelfShowLatestChapter = style.showLatestChapter,

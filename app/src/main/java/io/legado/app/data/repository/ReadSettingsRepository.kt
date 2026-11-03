@@ -154,9 +154,6 @@ class ReadSettingsRepository(
     suspend fun setClickImgWay(value: String) =
         settingsRepository.putString(PreferKey.clickImgWay, value)
 
-    suspend fun setShowReviewBubbles(value: Boolean) =
-        settingsRepository.putBoolean(PreferKey.showReviewBubbles, value)
-
     suspend fun setOptimizeRender(value: Boolean) =
         settingsRepository.putBoolean(PreferKey.optimizeRender, value)
 
@@ -416,7 +413,6 @@ class ReadSettingsRepository(
             selectText = compatDsValue(Keys.SelectText, true),
             noAnimScrollPage = compatDsValue(Keys.NoAnimScrollPage, false),
             clickImgWay = compatDsValue(Keys.ClickImgWay, "2"),
-            showReviewBubbles = compatDsValue(Keys.ShowReviewBubbles, true),
             optimizeRender = compatDsValue(Keys.OptimizeRender, false),
             disableReturnKey = compatDsValue(Keys.DisableReturnKey, false),
             expandTextMenu = compatDsValue(Keys.ExpandTextMenu, false),
@@ -542,7 +538,6 @@ class ReadSettingsRepository(
         val SelectText = booleanPreferencesKey(PreferKey.selectText)
         val NoAnimScrollPage = booleanPreferencesKey(PreferKey.noAnimScrollPage)
         val ClickImgWay = stringPreferencesKey(PreferKey.clickImgWay)
-        val ShowReviewBubbles = booleanPreferencesKey(PreferKey.showReviewBubbles)
         val OptimizeRender = booleanPreferencesKey(PreferKey.optimizeRender)
         val DisableReturnKey = booleanPreferencesKey(PreferKey.disableReturnKey)
         val ExpandTextMenu = booleanPreferencesKey(PreferKey.expandTextMenu)
@@ -680,7 +675,6 @@ internal fun ReadSettings.toGatewayPrefMap(): Map<String, Any?> = mapOf(
     PreferKey.selectText to selectText,
     PreferKey.noAnimScrollPage to noAnimScrollPage,
     PreferKey.clickImgWay to clickImgWay,
-    PreferKey.showReviewBubbles to showReviewBubbles,
     PreferKey.optimizeRender to optimizeRender,
     PreferKey.disableReturnKey to disableReturnKey,
     PreferKey.expandTextMenu to expandTextMenu,

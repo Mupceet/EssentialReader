@@ -18,6 +18,9 @@ interface BookmarkDao {
     @Query("select * from bookmarks order by bookName collate localized, bookAuthor collate localized, chapterIndex, chapterPos")
     fun flowAll(): Flow<List<Bookmark>>
 
+    // 上游原为 order by chapterIndex（同章多书签次序不稳定）；这里对齐
+    // flowAll 的口径追加 chapterPos——同章书签按章内位置排序，eink 书签
+    // 列表/跳转需要稳定的章内次序。getByBook 同改。
     @Query(
         """select * from bookmarks
         where bookName = :bookName and bookAuthor = :bookAuthor

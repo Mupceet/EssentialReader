@@ -1,6 +1,7 @@
 package io.legado.app.eink.bridge
 
 import io.legado.app.R
+import io.legado.app.eink.R as EinkR
 import io.legado.app.data.appDb
 import io.legado.app.data.entities.Book
 import io.legado.app.data.entities.BookGroup
@@ -25,6 +26,7 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.withContext
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
@@ -90,7 +92,7 @@ internal object BookshelfGroupEngineImpl : BookshelfGroupEngine, KoinComponent {
                 .sortedBy { it.order }
             buildFilterUiModels(
                 system, counts.associate { it.groupId to it.count }, hideEmpty,
-                noneName = appCtx.getString(R.string.eink_shelf_filter_none),
+                noneName = appCtx.getString(EinkR.string.eink_shelf_filter_none),
                 nameOf = ::filterNameOf,
             )
         }
@@ -113,13 +115,21 @@ internal object BookshelfGroupEngineImpl : BookshelfGroupEngine, KoinComponent {
         }
 
     override val selectedFilter: Flow<Long> =
-        bookshelfSettingsGateway.settings
-            .map { raw ->
-                // 读路径收敛：NONE 与系统筛选器 id 直通，其余（策展调整后的
-                // 存量值）回落 NONE（文件夹视图），不让 error 外溢成冷启动崩溃
-                if (raw.einkShelfFilter == BookshelfGroupIds.NONE ||
-                    raw.einkShelfFilter in SYSTEM_FILTER_NAMES
-                ) raw.einkShelfFilter else BookshelfGroupIds.NONE
+        // 筛选值落 eink_preferences 自有键，发射源用 SP 变更事件；旧选中组推导
+        // 兜底见 EinkLegacyPrefsStore.shelfFilter。读路径收敛：NONE 与系统筛选器
+        // id 直通，其余（策展调整后的存量值）回落 NONE（文件夹视图），不让
+        // error 外溢成冷启动崩溃
+        EinkLegacyPrefsStore.changes(EinkLegacyPrefsStore.KEY_SHELF_FILTER)
+            .onStart { emit(EinkLegacyPrefsStore.KEY_SHELF_FILTER) }
+            .map {
+                val raw = EinkLegacyPrefsStore.shelfFilter(
+                    bookshelfSettingsGateway.currentSettings.saveTabPosition
+                )
+                if (raw == BookshelfGroupIds.NONE || raw in SYSTEM_FILTER_NAMES) {
+                    raw
+                } else {
+                    BookshelfGroupIds.NONE
+                }
             }
             .distinctUntilChanged()
 
@@ -127,7 +137,7 @@ internal object BookshelfGroupEngineImpl : BookshelfGroupEngine, KoinComponent {
         require(
             filterId == BookshelfGroupIds.NONE || filterId in SYSTEM_FILTER_NAMES
         ) { "非系统筛选器: $filterId" }
-        bookshelfSettingsGateway.update { it.copy(einkShelfFilter = filterId) }
+        EinkLegacyPrefsStore.writeShelfFilter(filterId)
     }
 
     // —— 范围 ——

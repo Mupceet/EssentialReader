@@ -6,7 +6,7 @@ import io.legado.app.data.repository.BookSourceRepository
 import io.legado.app.eink.contract.BookSourceEngine
 import io.legado.app.eink.contract.BookSourceEntryUiModel
 import io.legado.app.help.CacheManager
-import io.legado.app.ui.login.SourceLoginActivity
+import io.legado.app.eink.SourceLoginActivity
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map

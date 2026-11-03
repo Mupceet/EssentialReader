@@ -41,11 +41,6 @@ private const val PUBLIC_GROUP_MASK =
 private const val PUBLIC_BOOK_FILTER =
     "(`group` = 0 OR (`group` & $PRIVATE_GROUP_MASK) = 0)"
 
-/** 智能分组谓词常量：单组查询（flowUnread/flowReading）、系统组计数与 eink 组合查询共用，防两处漂移。 */
-internal const val UNREAD_PREDICATE = "durChapterIndex = 0 AND durChapterPos = 0"
-internal const val READING_PREDICATE =
-    "totalChapterNum > 0 AND durChapterIndex > 0 AND durChapterIndex < totalChapterNum - 1"
-
 @Dao
 interface BookDao {
 
@@ -465,7 +460,7 @@ interface BookDao {
     )
     fun flowBookShelfUpdateError(): Flow<List<BookShelfItem>>
 
-    @Query("""SELECT * FROM books WHERE $UNREAD_PREDICATE""")
+    @Query("""SELECT * FROM books WHERE durChapterIndex = 0 AND durChapterPos = 0""")
     fun flowUnread(): Flow<List<Book>>
 
     @Query(
@@ -613,7 +608,7 @@ interface BookDao {
     )
     fun flowBookShelfReadFinishedComplete(): Flow<List<BookShelfItem>>
 
-    @Query("""SELECT * FROM books WHERE $READING_PREDICATE""")
+    @Query("""SELECT * FROM books WHERE totalChapterNum > 0 AND durChapterIndex > 0 AND durChapterIndex < totalChapterNum - 1""")
     fun flowReading(): Flow<List<Book>>
 
     @Query(
@@ -972,8 +967,8 @@ interface BookDao {
         UNION ALL SELECT ${BookGroup.IdManga}, COUNT(*) FROM books WHERE type & ${BookType.image} > 0 AND $PUBLIC_BOOK_FILTER
         UNION ALL SELECT ${BookGroup.IdText}, COUNT(*) FROM books WHERE type & ${BookType.text} > 0 AND $PUBLIC_BOOK_FILTER
         UNION ALL SELECT ${BookGroup.IdError}, COUNT(*) FROM books WHERE type & ${BookType.updateError} > 0 AND $PUBLIC_BOOK_FILTER
-        UNION ALL SELECT ${BookGroup.IdUnread}, COUNT(*) FROM books WHERE $UNREAD_PREDICATE AND $PUBLIC_BOOK_FILTER
-        UNION ALL SELECT ${BookGroup.IdReading}, COUNT(*) FROM books WHERE $READING_PREDICATE AND $PUBLIC_BOOK_FILTER
+        UNION ALL SELECT ${BookGroup.IdUnread}, COUNT(*) FROM books WHERE durChapterIndex = 0 AND durChapterPos = 0 AND $PUBLIC_BOOK_FILTER
+        UNION ALL SELECT ${BookGroup.IdReading}, COUNT(*) FROM books WHERE totalChapterNum > 0 AND durChapterIndex > 0 AND durChapterIndex < totalChapterNum - 1 AND $PUBLIC_BOOK_FILTER
         UNION ALL SELECT ${BookGroup.IdReadFinished}, COUNT(*) FROM books WHERE totalChapterNum > 0 AND durChapterIndex >= totalChapterNum - 1 AND $PUBLIC_BOOK_FILTER
         UNION ALL SELECT ${BookGroup.IdReadFinishedUpdate}, COUNT(*) FROM books WHERE totalChapterNum > 0 AND durChapterIndex >= totalChapterNum - 1 AND canUpdate = 1 AND $PUBLIC_BOOK_FILTER
         UNION ALL SELECT ${BookGroup.IdReadFinishedComplete}, COUNT(*) FROM books WHERE totalChapterNum > 0 AND durChapterIndex >= totalChapterNum - 1 AND canUpdate = 0 AND $PUBLIC_BOOK_FILTER

@@ -44,13 +44,15 @@ object AppUpdateEngineImpl : AppUpdateEngine {
     }
 
     /**
-     * 启动自动检查门控：设置键与进程级一次性闸均沿用宿主完整模式
-     * 同一套（MainActivity 启动链同款），两模式合计每进程最多自动
-     * 检查一次；E-Ink 冷启动分流发生在宿主编排之前，闸从未消耗，
-     * 此处首次 consume 即完整模式的等效位置。
+     * 启动自动检查门控：eink 自有闸实例——不与完整模式 MainActivity 的闸
+     * 共享单例（宿主侧保持上游类形态原样，不为跨模式去重改造原代码）。
+     * 跨模式往返各消耗一次是接受的代价：设置键与检查链路仍同一套，
+     * 重复表现为多一次启动检查。闸语义仍是「本模式生命周期最多一次」。
      */
+    private val einkStartupUpdateCheckGate = ProcessStartupUpdateCheckGate()
+
     override fun shouldAutoCheckOnStart(): Boolean {
-        return ProcessStartupUpdateCheckGate.consume(
+        return einkStartupUpdateCheckGate.consume(
             otherSettingsGateway.currentSettings.autoCheckUpdateOnStart
         )
     }

@@ -1,10 +1,14 @@
-package io.legado.app.ui.login
+package io.legado.app.eink
 
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
 import androidx.compose.runtime.Composable
 import io.legado.app.base.BaseComposeActivity
+import io.legado.app.ui.login.SourceLoginIntent
+import io.legado.app.ui.login.SourceLoginRoute
+import io.legado.app.ui.login.SourceLoginType
+import io.legado.app.ui.login.SourceLoginViewModel
 import org.koin.androidx.compose.koinViewModel
 
 /**

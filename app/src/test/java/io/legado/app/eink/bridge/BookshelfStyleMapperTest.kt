@@ -23,7 +23,7 @@ class BookshelfStyleMapperTest {
             bookshelfLayoutModePortrait = 0,
             bookshelfGridCoverWidth = 5,
             bookshelfTitleMaxLines = 4,
-        ).toBookshelfStyle()
+        ).toBookshelfStyle(groupsEnabled = false)
 
         assertTrue(style.showUnreadBadge)
         assertFalse(style.highlightNewChapter)
@@ -35,20 +35,20 @@ class BookshelfStyleMapperTest {
 
     @Test
     fun `布局模式非 0 为网格`() {
-        val style = BookshelfSettings(bookshelfLayoutModePortrait = 1).toBookshelfStyle()
+        val style = BookshelfSettings(bookshelfLayoutModePortrait = 1).toBookshelfStyle(groupsEnabled = false)
         assertTrue(style.isGridLayout)
     }
 
     @Test
     fun `封面宽非正回落 120`() {
-        assertEquals(120, BookshelfSettings(bookshelfGridCoverWidth = 0).toBookshelfStyle().gridCoverWidth)
-        assertEquals(120, BookshelfSettings(bookshelfGridCoverWidth = -2).toBookshelfStyle().gridCoverWidth)
+        assertEquals(120, BookshelfSettings(bookshelfGridCoverWidth = 0).toBookshelfStyle(groupsEnabled = false).gridCoverWidth)
+        assertEquals(120, BookshelfSettings(bookshelfGridCoverWidth = -2).toBookshelfStyle(groupsEnabled = false).gridCoverWidth)
     }
 
     @Test
     fun `标题行数越界回落 2`() {
-        assertEquals(2, BookshelfSettings(bookshelfTitleMaxLines = 0).toBookshelfStyle().titleMaxLines)
-        assertEquals(2, BookshelfSettings(bookshelfTitleMaxLines = 6).toBookshelfStyle().titleMaxLines)
+        assertEquals(2, BookshelfSettings(bookshelfTitleMaxLines = 0).toBookshelfStyle(groupsEnabled = false).titleMaxLines)
+        assertEquals(2, BookshelfSettings(bookshelfTitleMaxLines = 6).toBookshelfStyle(groupsEnabled = false).titleMaxLines)
     }
 
     @Test
@@ -94,12 +94,12 @@ class BookshelfStyleMapperTest {
             bookshelfTitleSmallFont = true,
             bookshelfTitleCenter = false,
         )
-        assertEquals(base.toBookshelfStyle(), changed.toBookshelfStyle())
+        assertEquals(base.toBookshelfStyle(groupsEnabled = true), changed.toBookshelfStyle(groupsEnabled = true))
     }
 
     @Test
     fun `默认设置投影等于契约默认快照`() {
-        val style = BookshelfSettings().toBookshelfStyle()
+        val style = BookshelfSettings().toBookshelfStyle(groupsEnabled = false)
         assertEquals(BookshelfStyle(), style)
     }
 }

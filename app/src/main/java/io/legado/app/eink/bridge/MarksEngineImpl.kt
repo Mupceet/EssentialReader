@@ -25,7 +25,7 @@ import io.legado.app.eink.contract.ReaderPageBookmarkContent
 import io.legado.app.eink.contract.ReaderSelectionCommit
 import io.legado.app.help.book.BookHelp
 import io.legado.app.help.book.ContentProcessor
-import io.legado.app.help.bookmark.MarkingExporter
+import io.legado.app.eink.MarkingExporter
 import io.legado.app.model.ReadBook
 import io.legado.app.utils.GSON
 import io.legado.app.utils.MD5Utils

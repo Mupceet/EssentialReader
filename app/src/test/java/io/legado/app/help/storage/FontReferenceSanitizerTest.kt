@@ -125,4 +125,45 @@ class FontReferenceSanitizerTest {
 
         assertNull(sanitize(json))
     }
+
+    // ---- 存在性谓词：目标机可读的引用保留，仅悬空引用置空 ----
+
+    private val knownFonts = listOf(
+        // 主题包导入字体：applicationId 相同 → 两台设备路径逐字符一致
+        "/storage/emulated/0/Android/data/io.legato.kazusa.eink/files/font/theme.ttf",
+        "file:///storage/emulated/0/Android/data/io.legato.kazusa.eink/files/font/hei.ttf",
+    )
+
+    private fun sanitizeWithExists(json: String) =
+        FontReferenceSanitizer.sanitizeForCrossDeviceRestore(json) { it in knownFonts }
+
+    @Test
+    fun `readable references survive and dangling ones are stripped`() {
+        val json = """
+            {"textFont": "${knownFonts.first()}", "titleFont": "content://other/device/x.ttf"}
+        """.trimIndent()
+
+        val result = JsonParser.parseString(sanitizeWithExists(json)!!).asJsonObject
+
+        // 目标机仍可读的主题包字体原样保留；异机 SAF URI（无持久化权限）置空
+        assertEquals(knownFonts.first(), result["textFont"].asString)
+        assertEquals("", result["titleFont"].asString)
+    }
+
+    @Test
+    fun `all references readable keeps file byte identical`() {
+        val json = """
+            {"textFont": "${knownFonts[0]}", "highlightRules": [{"fontPath": "${knownFonts[1]}"}]}
+        """.trimIndent()
+
+        assertNull(sanitizeWithExists(json))
+    }
+
+    @Test
+    fun `default predicate stays conservative`() {
+        // 不注入谓词 = 恒不可读 = 全部置空（等价于存在性检查引入前的行为）
+        val json = """{"textFont": "${knownFonts.first()}"}"""
+        val result = JsonParser.parseString(sanitize(json)!!).asJsonObject
+        assertEquals("", result["textFont"].asString)
+    }
 }

@@ -1,4 +1,4 @@
-package io.legado.app.help.bookmark
+package io.legado.app.eink
 
 import android.net.Uri
 import io.legado.app.data.entities.BookMarking

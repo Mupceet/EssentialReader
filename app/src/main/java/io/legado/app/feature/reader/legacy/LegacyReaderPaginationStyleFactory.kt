@@ -3,6 +3,7 @@ package io.legado.app.feature.reader.legacy
 import android.os.Build
 import io.legado.app.domain.gateway.ReadSettingsGateway
 import io.legado.app.domain.gateway.ThemeSettingsGateway
+import io.legado.app.eink.bridge.EinkLegacyPrefsStore
 import io.legado.app.feature.reader.core.layout.ReaderColumnMode
 import io.legado.app.feature.reader.core.layout.ReaderPageUnderline
 import io.legado.app.feature.reader.core.model.ReaderEmphasisUnderline
@@ -62,7 +63,11 @@ object LegacyReaderPaginationStyleFactory : KoinComponent {
             isTablet = appCtx.isPad,
             isScroll = ReadBook.pageAnim() == 3,
             textBottomJustify = settings.textBottomJustify,
-            excludeActionImages = !settings.showReviewBubbles,
+            // 段评气泡显隐（eink 自有偏好，落 eink_preferences；两条渲染轨同值消费：
+            // 完整模式经本工厂、eink 模式经 ReaderChapterPager 序列化传递）
+            excludeActionImages = !EinkLegacyPrefsStore.prefs().getBoolean(
+                EinkLegacyPrefsStore.KEY_SHOW_REVIEW_BUBBLES, true
+            ),
             pageUnderline = ReadBookConfig.underline
                 .takeIf { it && ReadBook.book?.isImage != true }
                 ?.let {

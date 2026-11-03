@@ -25,6 +25,7 @@ import io.legado.app.constant.AppConst.channelIdReadAloud
 import io.legado.app.constant.AppConst.channelIdWeb
 import io.legado.app.constant.PreferKey
 import io.legado.app.data.appDb
+import io.legado.app.eink.bridge.EinkLegacyPrefsStore
 import io.legado.app.data.entities.Book
 import io.legado.app.data.entities.BookChapter
 import io.legado.app.data.entities.BookSource
@@ -112,6 +113,31 @@ class App : Application(), SingletonImageLoader.Factory {
         if (AppConfigStore.getBoolean(PreferKey.eInkMode) == null) {
             AppConfigStore.getBoolean(PreferKey.labEInkDisplay)?.let { inherited ->
                 AppConfigStore.putBoolean(PreferKey.eInkMode, inherited)
+            }
+        }
+        // 一次性迁移：段评气泡开关（eink 专属界面偏好）从 ReadSettings DataStore
+        // 的无前缀键 showReviewBubbles 迁入 eink_preferences 自有键
+        // einkShowReviewBubbles（归拢见 EinkLegacyPrefsStore）。SP 键缺省即守卫；
+        // 旧 DataStore 键不清理——旧备份恢复写入的旧键值已无消费者，无害
+        with(EinkLegacyPrefsStore.prefs()) {
+            if (!contains(EinkLegacyPrefsStore.KEY_SHOW_REVIEW_BUBBLES)) {
+                AppConfigStore.getBoolean("showReviewBubbles")?.let { inherited ->
+                    edit()
+                        .putBoolean(EinkLegacyPrefsStore.KEY_SHOW_REVIEW_BUBBLES, inherited)
+                        .apply()
+                }
+            }
+            // 同批迁移：eink 书架筛选与分组开关（原 settings DataStore 同名键）。
+            // SP 键缺省即守卫；旧键不清理（旧备份恢复写入的旧键值已无消费者，无害）
+            if (!contains(EinkLegacyPrefsStore.KEY_SHELF_FILTER)) {
+                AppConfigStore.getLong("einkBookshelfFilterId")?.let { inherited ->
+                    edit().putLong(EinkLegacyPrefsStore.KEY_SHELF_FILTER, inherited).apply()
+                }
+            }
+            if (!contains(EinkLegacyPrefsStore.KEY_GROUPS_ENABLED)) {
+                AppConfigStore.getBoolean("einkBookshelfGroupsEnabled")?.let { inherited ->
+                    edit().putBoolean(EinkLegacyPrefsStore.KEY_GROUPS_ENABLED, inherited).apply()
+                }
             }
         }
         // 一次性迁移：把旧版语言偏好写入 AppCompat per-app locales，之后交由

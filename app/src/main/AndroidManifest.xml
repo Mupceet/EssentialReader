@@ -308,7 +308,7 @@
             android:theme="@style/AppTheme.Transparent" />
         <!-- 书源登录薄宿主（墨水屏模式下 MainActivity 深链被 eInkMode 分流弹回，登录经此承载） -->
         <activity
-            android:name=".ui.login.SourceLoginActivity"
+            android:name=".eink.SourceLoginActivity"
             android:configChanges="locale|layoutDirection|uiMode|keyboardHidden|orientation|screenSize|smallestScreenSize|screenLayout"
             android:enableOnBackInvokedCallback="true" />
         <!-- 跳转确认 -->

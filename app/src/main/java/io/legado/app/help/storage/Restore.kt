@@ -633,9 +633,11 @@ object Restore : KoinComponent {
 
     /**
      * 跨设备恢复时清洗备份 JSON 中的字体文件引用（字段级「忽略清单」，纯逻辑见
-     * [FontReferenceSanitizer]）：字体文件不随备份走，异机引用必悬空，置空后阅读器
-     * 回落系统预设字体。只处理本次恢复会实际消费的文件（readConfig 受忽略开关、
-     * highlightRule 受数据库忽略项控制）；无可清洗引用时文件字节不变。
+     * [FontReferenceSanitizer]）：置空前先按 [fontReferenceReadable] 检查目标设备
+     * 可读性——同路径同字体（两台设备装同一字体、主题包导入字体路径逐字符一致）
+     * 原样保留，只清洗确认悬空的引用，置空后阅读器回落系统预设字体。只处理本次
+     * 恢复会实际消费的文件（readConfig 受忽略开关、highlightRule 受数据库忽略项
+     * 控制）；无可清洗引用时文件字节不变。
      */
     private fun sanitizeFontReferences(path: String) {
         val targetFileNames = buildList {
@@ -652,7 +654,10 @@ object Restore : KoinComponent {
             val file = File(path, fileName)
             if (!file.exists()) return@forEach
             runCatching {
-                val sanitized = FontReferenceSanitizer.sanitizeForCrossDeviceRestore(file.readText())
+                val sanitized = FontReferenceSanitizer.sanitizeForCrossDeviceRestore(
+                    file.readText(),
+                    referenceExists = ::fontReferenceReadable,
+                )
                 if (sanitized != null) {
                     file.writeText(sanitized)
                     sanitizedFiles++
@@ -662,9 +667,29 @@ object Restore : KoinComponent {
             }
         }
         if (sanitizedFiles > 0) {
-            AppLog.put("跨设备恢复：已忽略 $sanitizedFiles 个备份文件中的字体文件引用（字体文件不随备份迁移，恢复后回落系统默认字体）")
+            AppLog.put(
+                "跨设备恢复：已置空 $sanitizedFiles 个备份文件中本机不可读的字体引用" +
+                    "（字体文件不随备份迁移，悬空引用回落系统默认字体；本机仍可读的引用已保留）"
+            )
         }
     }
+
+    /**
+     * 字体引用的目标设备可读性检查，与 ReaderAndroidPaintFactory.loadTypeface 的
+     * 解析形态一一对应（content:///file:///裸路径三形态；谓词可读 ⇒ 渲染端能加载）。
+     * content:// 在异机无持久化 URI 权限，openFileDescriptor 会抛 SecurityException，
+     * 按不可读处理（runCatching 兜底其余 IO 异常）。
+     */
+    private fun fontReferenceReadable(reference: String): Boolean = runCatching {
+        when {
+            reference.startsWith("content://", ignoreCase = true) ->
+                appCtx.contentResolver.openFileDescriptor(reference.toUri(), "r")
+                    ?.use { it.fileDescriptor.valid() } ?: false
+            reference.startsWith("file://", ignoreCase = true) ->
+                reference.toUri().path?.let { File(it).isFile } ?: false
+            else -> File(reference).isFile
+        }
+    }.getOrDefault(false)
 
     /**
      * 同机判定：config.xml 内嵌的来源设备名（[backupOriginDeviceKey]）与本机

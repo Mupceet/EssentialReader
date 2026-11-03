@@ -24,6 +24,11 @@ interface BookChapterDao {
     @Query("select url, title, isVolume, `index` from chapters where bookUrl = :bookUrl order by `index`")
     fun getChapterCacheInfoList(bookUrl: String): List<BookChapterCacheInfo>
 
+    /**
+     * [getChapterCacheInfoList] 的 Flow 版（上游只有一次性查询，无此方法）：
+     * eink 目录页（TocEngineImpl）以响应式流消费章节缓存状态，目录/缓存
+     * 变化时列表自动刷新，避免一次性快照后状态陈旧。
+     */
     @Query("select url, title, isVolume, `index` from chapters where bookUrl = :bookUrl order by `index`")
     fun getChapterCacheInfoListFlow(bookUrl: String): Flow<List<BookChapterCacheInfo>>
 

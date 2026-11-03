@@ -5,6 +5,7 @@ import android.content.SharedPreferences
 import android.net.Uri
 import androidx.compose.runtime.mutableStateOf
 import io.legado.app.constant.PreferKey
+import io.legado.app.data.entities.BookGroup
 import io.legado.app.domain.gateway.CoverSettingsGateway
 import io.legado.app.domain.gateway.DownloadCacheSettingsGateway
 import io.legado.app.domain.gateway.OtherSettingsGateway
@@ -18,6 +19,9 @@ import io.legado.app.help.config.AppFontStore
 import io.legado.app.utils.FileDoc
 import io.legado.app.utils.LogUtils
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -60,14 +64,58 @@ internal object EinkLegacyPrefsStore {
     /** 阅读界面「书源信息行」开关的自有键（默认 false）。 */
     const val KEY_READER_SOURCE_INFO_BAR = "einkReaderSourceInfoBar"
 
+    /** 阅读界面「显示段评气泡」开关的自有键（默认 true；eink 专属界面偏好，
+     * 曾以无前缀键 showReviewBubbles 落 ReadSettings DataStore，已迁入本文件——
+     * 迁移见 App.onCreate）。 */
+    const val KEY_SHOW_REVIEW_BUBBLES = "einkShowReviewBubbles"
+
     /** 「我的 → 字体设置」反显记录：所选字体文件夹枚举项 path（源）。 */
     const val KEY_APP_FONT_SOURCE = "einkAppFontSourcePath"
 
     /** 反显记录：安装后的私有副本路径（与当前 appFontPath 相等时源记录有效）。 */
     const val KEY_APP_FONT_COPY = "einkAppFontCopyPath"
 
+    /** eink 书架筛选当前选中项的自有键（Long；0 = 无筛选，负值为在读/未读等系统
+     * 筛选。曾落 settings DataStore 同名键，已迁入，迁移见 App.onCreate）。 */
+    const val KEY_SHELF_FILTER = "einkBookshelfFilterId"
+
+    /** eink 书架分组开关的自有键（默认关；曾落 settings DataStore 同名键，已迁入）。 */
+    const val KEY_GROUPS_ENABLED = "einkBookshelfGroupsEnabled"
+
     fun prefs(): SharedPreferences =
         appCtx.getSharedPreferences(FILE_NAME, Context.MODE_PRIVATE)
+
+    /** SP 键变更事件（进程内监听，作桥接侧 Flow 的发射源——SP 本身无响应式）。 */
+    private val prefChangeEvents = MutableSharedFlow<String>(extraBufferCapacity = 16)
+
+    init {
+        prefs().registerOnSharedPreferenceChangeListener { _, key ->
+            if (key != null) prefChangeEvents.tryEmit(key)
+        }
+    }
+
+    /** [key] 的变更流（不含初值；消费方用 onStart 补一次当前读）。 */
+    fun changes(key: String): Flow<String> = prefChangeEvents.filter { it == key }
+
+    /** 读取书架筛选：SP 键缺失（全新安装且迁移未命中旧值）时按旧选中组推导——
+     *  在读/未读采纳为初始筛选，其余回落 0L（无筛选）。 */
+    fun shelfFilter(fallbackSelectedGroupId: Long): Long =
+        prefs().takeIf { it.contains(KEY_SHELF_FILTER) }
+            ?.getLong(KEY_SHELF_FILTER, 0L)
+            ?: fallbackSelectedGroupId.takeIf {
+                it == BookGroup.IdReading || it == BookGroup.IdUnread
+            }
+            ?: 0L
+
+    fun writeShelfFilter(filterId: Long) {
+        prefs().edit().putLong(KEY_SHELF_FILTER, filterId).apply()
+    }
+
+    fun groupsEnabled(): Boolean = prefs().getBoolean(KEY_GROUPS_ENABLED, false)
+
+    fun writeGroupsEnabled(enabled: Boolean) {
+        prefs().edit().putBoolean(KEY_GROUPS_ENABLED, enabled).apply()
+    }
 
     /** 备份恢复时跨设备跳过的路径类自有键（内容 URI/私有副本路径，异机必悬空）。 */
     private val crossDeviceLocalKeys =
@@ -176,10 +224,12 @@ internal val einkSettingsWriteScope =
  * 设置项全部经设置网关读写：threadCount/preDownloadNum 经
  * DownloadCacheSettingsGateway（与旧 AppConfig 门面同键同默认值的
  * 快照）；autoRefreshBook/defaultToRead（「我的」页可写）经
- * OtherSettingsGateway、volumeKeyPage、hideStatusBar、showReviewBubbles
- * 与 chineseConverterType（后四者为阅读界面其它设置开关、转发宿主阅读
+ * OtherSettingsGateway、volumeKeyPage、hideStatusBar
+ * 与 chineseConverterType（后三者为阅读界面其它设置开关、转发宿主阅读
  * 设置键，与完整模式共享同一存储；chineseConverterType 由宿主内容处理
- * 管线逐章消费）经 ReadSettingsGateway、
+ * 管线逐章消费）经 ReadSettingsGateway；showReviewBubbles 为 eink 自有
+ * 偏好，落 eink_preferences 自有键（EinkLegacyPrefsStore），两条渲染轨
+ * （完整模式排版工厂与 eink 阅读链路）同值消费；
  * changeSourceCheckAuthor 经 ChangeSourceSettingsGateway；
  * useDefaultCover（「我的」页可写）为本对象持有的 Compose 快照状态 +
  * CoverSettingsGateway 异步落盘——组合内读取订阅变化，切换后开关行与
@@ -389,11 +439,10 @@ private object GlobalSettingsImpl : GlobalSettings, KoinComponent {
 
 
     override var showReviewBubbles: Boolean
-        get() = readSettingsGateway.currentSettings.showReviewBubbles
+        get() = einkLegacyPrefs.getBoolean(EinkLegacyPrefsStore.KEY_SHOW_REVIEW_BUBBLES, true)
         set(value) {
-            einkSettingsWriteScope.launch {
-                readSettingsGateway.update { it.copy(showReviewBubbles = value) }
-            }
+            einkLegacyPrefs.edit()
+                .putBoolean(EinkLegacyPrefsStore.KEY_SHOW_REVIEW_BUBBLES, value).apply()
         }
 
     override var chineseConverterType: Int

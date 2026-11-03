@@ -28,6 +28,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.onStart
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
 import kotlin.coroutines.cancellation.CancellationException
@@ -57,11 +58,18 @@ internal object BookshelfEngineImpl : BookshelfEngine, KoinComponent {
         }.map { books -> books.map { it.toBookshelfItemUiModel() } }
 
     override val style: Flow<BookshelfStyle> =
-        bookshelfSettingsGateway.settings
-            .map { it.toBookshelfStyle() }
-            .distinctUntilChanged()
+        // 分组开关落 eink_preferences 自有键：DataStore 六键 + SP 开关双源合并，
+        // 任一变化都重投影
+        combine(
+            bookshelfSettingsGateway.settings,
+            EinkLegacyPrefsStore.changes(EinkLegacyPrefsStore.KEY_GROUPS_ENABLED)
+                .onStart { emit(EinkLegacyPrefsStore.KEY_GROUPS_ENABLED) },
+        ) { settings, _ ->
+            settings.toBookshelfStyle(EinkLegacyPrefsStore.groupsEnabled())
+        }.distinctUntilChanged()
 
     override suspend fun setStyle(style: BookshelfStyle) {
+        EinkLegacyPrefsStore.writeGroupsEnabled(style.groupsEnabled)
         bookshelfSettingsGateway.update { it.withStyleProjection(style) }
     }
 

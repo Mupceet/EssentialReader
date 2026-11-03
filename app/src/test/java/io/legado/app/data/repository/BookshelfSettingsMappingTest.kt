@@ -20,21 +20,13 @@ class BookshelfSettingsMappingTest {
             mapOf(PreferKey.saveTabPosition to 2).toTestPreferences()
                 .toBookshelfSettings().saveTabPosition
         )
-        // eink 筛选键 legacy 回退：旧选中组为精选筛选器时采纳，否则回落全部
-        assertEquals(BookGroup.IdReading,
-            mapOf(PreferKey.saveTabPosition to BookGroup.IdReading).toTestPreferences()
-                .toBookshelfSettings().einkShelfFilter
-        )
-        // 旧选中组非精选筛选器 → 回落 0L（无筛选，双模式默认态）
-        assertEquals(0L,
-            mapOf(PreferKey.saveTabPosition to BookGroup.IdText).toTestPreferences()
-                .toBookshelfSettings().einkShelfFilter
-        )
+        // eink 筛选的 legacy 回退已随键迁 EinkLegacyPrefsStore.shelfFilter（运行时
+        // SP + 网关快照种子，JVM 不可直测）；saveTabPosition 本键的读写语义不变
     }
 
     @Test
-    fun `Bookshelf 53 键写读映射逐字段对应`() {
-        assertEquals(53, BookshelfSettings().toPrefMap().size)
+    fun `Bookshelf 51 键写读映射逐字段对应`() {
+        assertEquals(51, BookshelfSettings().toPrefMap().size)
         bookshelfMappingSamples().forEach { expected ->
             assertEquals(expected.expectedPrefMap(), expected.toPrefMap())
             assertEquals(
@@ -142,8 +134,6 @@ private fun bookshelfMappingSamples(): List<BookshelfSettings> {
         bookshelfSearchActionDirectToSearch = false,
         autoRefreshBook = false,
         saveTabPosition = 987654321L,
-        einkShelfFilter = BookGroup.IdReading,
-        einkGroupsEnabled = true,
     )
     return listOf(
         base,
@@ -227,6 +217,4 @@ private fun BookshelfSettings.expectedPrefMap(): Map<String, Any?> = mapOf(
     PreferKey.bookshelfSearchActionDirectToSearch to bookshelfSearchActionDirectToSearch,
     PreferKey.autoRefresh to autoRefreshBook,
     PreferKey.bookshelfSelectedGroupId to saveTabPosition,
-    PreferKey.einkBookshelfFilterId to einkShelfFilter,
-    PreferKey.einkBookshelfGroupsEnabled to einkGroupsEnabled,
 )

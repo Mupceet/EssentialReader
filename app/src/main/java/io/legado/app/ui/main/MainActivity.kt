@@ -162,6 +162,8 @@ open class MainActivity : BaseComposeActivity(), AudioPlay.CallBack {
         /** 播放页收起后等待的时长：期间若重新展开（听书 ⇄ 朗读切换）就不还原本地系统栏状态。 */
         private const val SYSTEM_BARS_RESTORE_DELAY_MILLIS = 200L
 
+        private val startupUpdateCheckGate = ProcessStartupUpdateCheckGate()
+
         @Volatile
         var hasActiveReadBookRoute: Boolean = false
 
@@ -436,7 +438,7 @@ open class MainActivity : BaseComposeActivity(), AudioPlay.CallBack {
             finish()
             return
         }
-        val shouldAutoCheckUpdate = ProcessStartupUpdateCheckGate.consume(
+        val shouldAutoCheckUpdate = startupUpdateCheckGate.consume(
             otherSettingsGateway.currentSettings.autoCheckUpdateOnStart
         )
 
