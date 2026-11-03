@@ -142,13 +142,14 @@ interface GlobalSettings {
     val hideNavigationBar: Boolean get() = false
 
     /**
-     * 段评气泡参与排版（转发宿主阅读设置键 showReviewBubbles，与完整模式
-     * 共享同一存储；默认 true）。
+     * 段评气泡参与排版（E-InK 自有界面偏好：嵌入式宿主以自有键
+     * `einkShowReviewBubbles` 落宿主侧自有 prefs 文件 eink_preferences；
+     * 完整模式排版工厂同值消费，两轨一致；默认 true）。
      *
      * false 时带 click 动作脚本的图片（段评气泡）不参与排版：不绘制、
      * 不可点、不解析图片尺寸。切换需重排——调用方写后显式触发重排。
-     * 嵌入式宿主经设置网关 pending-overlay 内存同步可见（主线程写后
-     * 重排即可读到新值）；若宿主写入为纯异步可见（写后读 getter 拿到
+     * 宿主为 SharedPreferences 存储时写后内存立即可见（主线程写后重排
+     * 即可读到新值）；若宿主写入为纯异步可见（写后读 getter 拿到
      * 旧值），排版最迟随下一次翻页的内容刷新对齐。
      *
      * 可写（阅读菜单开关）：fire-and-forget 写入 + 显式重排触发。
