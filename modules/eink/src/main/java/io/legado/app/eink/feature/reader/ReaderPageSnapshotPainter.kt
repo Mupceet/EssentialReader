@@ -366,7 +366,20 @@ internal fun Paint.applySpec(spec: ReaderPaintSpec, colorArgb: Int) {
     letterSpacing = spec.letterSpacing
     typeface = spec.typeface ?: Typeface.DEFAULT
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-        fontVariationSettings = spec.fontVariationSettings ?: ""
+        // 目标为空且画笔本无 variation 时跳过写入：此前是无条件写 ""（全新画笔为
+        // null→"" 的首次写入）。iFlytek EBook Cube2（Android 16，定制
+        // libeinkhwui/minikin）对空串也会走 Typeface.createFromTypefaceWithVariation
+        // 克隆字体族，其默认字体族内含 null Font，minikin::Font::isAxisSupported
+        // 直接空指针 SIGSEGV——墨水屏快照页每次绘制必经此处（含选区测量与屏保
+        // 渲染），2026-11-05 崩溃报告 12 次同栈启动即崩；标准平台对空串短路，
+        // 语义无变化。目标为空但画笔仍持有非空 variation 时才写 "" 清除，
+        // 维持"幂等、重复设置无害"的既有语义。
+        val variation = spec.fontVariationSettings
+        if (variation.isNullOrBlank()) {
+            if (!fontVariationSettings.isNullOrBlank()) fontVariationSettings = ""
+        } else {
+            fontVariationSettings = variation
+        }
     }
 }
 
