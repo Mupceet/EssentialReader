@@ -9,11 +9,11 @@ internal enum class PagingDirection { PREV, NEXT }
  * 录入一个物理键为指定方向的翻页键（纯函数）：
  *  - 非正键码拒录（返回 null）；
  *  - 一键只属一个方向：录入时自动从另一方向键集移除（静默迁移——
- *    键块从另一行消失即可见，不另弹提示）。
+ *    保存后方向行摘要随之更新，不另弹提示）。
  *
- * 返回新的键对；调用方负责序列化（formatKeyCodes）与原子提交
- * （GlobalSettings.setPageKeys）。BACK 键在录入处理器更早分支拦截
- * （退出录入态），不会到达本函数。
+ * 返回新的键对；调用方负责序列化（formatKeyCodes）与提交时机
+ * （GlobalSettings.setPageKeys——弹框形态下保存时一次提交）。BACK 键
+ * 在录入处理器更早分支拦截（收起录入弹框），不会到达本函数。
  */
 internal fun recordPageKey(
     prevKeyCodes: Set<Int>,
@@ -29,10 +29,10 @@ internal fun recordPageKey(
 }
 
 /**
- * 录入态按键处理（纯函数形态，Screen 内接线）：
- *  - BACK 按下：退出录入态并消费（返回键留给导航，不可录为翻页键）；
- *  - 其它键首按：经 [recordPageKey] 录入（非正键码静默忽略）；
- *  - 长按重复/抬起/其它动作：吞掉——录入期间所有按键对整体消费，
+ * 录入弹框打开期间的按键处理（纯函数形态，Screen 内接线）：
+ *  - BACK 按下：收起弹框并消费（返回键留给导航，不可录为翻页键）；
+ *  - 其它键首按：经 [recordPageKey] 录入待定集（非正键码静默忽略）；
+ *  - 长按重复/抬起/其它动作：吞掉——弹框打开期间所有按键对整体消费，
  *    防止穿透到翻页判定。
  */
 internal fun handleCaptureKey(

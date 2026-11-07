@@ -116,7 +116,7 @@ internal fun MineScreen(
         // 备份与恢复：云端备份端口开放管理能力位才渲染（WebDAV 配置、
         // 手动备份/恢复与同步阅读进度开关的模块内闭环入口，见
         // WebDavSyncScreen——进度同步依赖 WebDAV 配置才生效，开关随迁该页）。
-        // 紧跟字体设置排布：两个跳转条目相邻成组，其后为开关行
+        // 跳转条目相邻成组（字体设置/备份与恢复/翻页设置），其后为开关行
         if (backupSyncEngine?.supportsWebDavManagement == true) {
             item {
                 MineEntry(
@@ -127,6 +127,14 @@ internal fun MineScreen(
             }
             item { EInkHorizontalDivider() }
         }
+        item {
+            MineEntry(
+                label = "翻页设置",
+                sublabel = "设置阅读和列表的翻页按键",
+                onClick = onOpenPagingSettings
+            )
+        }
+        item { EInkHorizontalDivider() }
         item {
             MineToggleRow(
                 label = "自动刷新",
@@ -163,14 +171,6 @@ internal fun MineScreen(
                 onToggle = {
                     globalSettings.useDefaultCover = !globalSettings.useDefaultCover
                 }
-            )
-        }
-        item { EInkHorizontalDivider() }
-        item {
-            MineEntry(
-                label = "翻页设置",
-                sublabel = "音量键 / 滚轮 / 自定义按键",
-                onClick = onOpenPagingSettings
             )
         }
         if (appUpdateEngine != null) {
