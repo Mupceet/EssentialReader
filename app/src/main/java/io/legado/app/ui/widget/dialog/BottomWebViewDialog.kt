@@ -17,6 +17,7 @@ import android.view.ViewGroup
 import android.view.WindowManager
 import android.webkit.ConsoleMessage
 import android.webkit.JavascriptInterface
+import android.webkit.RenderProcessGoneDetail
 import android.webkit.SslErrorHandler
 import android.webkit.URLUtil
 import android.webkit.WebChromeClient
@@ -49,6 +50,7 @@ import io.legado.app.domain.gateway.OtherSettingsGateway
 import io.legado.app.exception.NoStackTraceException
 import io.legado.app.help.WebCacheManager
 import io.legado.app.help.coroutine.Coroutine
+import io.legado.app.help.http.handleRenderProcessGone
 import io.legado.app.help.http.newCallResponse
 import io.legado.app.help.http.newCallResponseBody
 import io.legado.app.help.http.okHttpClient
@@ -821,6 +823,9 @@ class BottomWebViewDialog() : BottomSheetDialogFragment(R.layout.dialog_web_view
         }
     }
 
+    // 该规则按 Java PSI 检查 WebViewClient 的构造调用，看不到 Kotlin 里的实现；
+    // 本类已实现 onRenderProcessGone（见下方 override）。
+    @SuppressLint("MissingOnRenderProcessGone")
     inner class CustomWebViewClient : WebViewClient() {
 
         override fun shouldOverrideUrlLoading(
@@ -849,6 +854,10 @@ class BottomWebViewDialog() : BottomSheetDialogFragment(R.layout.dialog_web_view
             super.onPageFinished(view, url)
             applyWebViewTheme(appliedDarkTheme ?: isNightTheme, force = true)
         }
+
+        // 渲染进程被系统回收时默认会连带杀掉宿主进程
+        override fun onRenderProcessGone(view: WebView, detail: RenderProcessGoneDetail): Boolean =
+            view.handleRenderProcessGone()
 
         private fun shouldOverrideUrlLoading(url: Uri): Boolean {
             return when (url.scheme) {

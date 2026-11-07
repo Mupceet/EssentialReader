@@ -185,10 +185,10 @@ KMP 任务名在模块实际创建后才存在；不要假装运行尚未定义�
 - Rhino 书源/RSS/TTS 规则、Android 服务、Web 服务和阅读器渲染属于高行为风险平台能力，迁移前必须建立兼容测试或
   capability 边界。
 - `modules/web` 必须连接应用内 Ktor WebService；开发环境通过 `VITE_API` 指向设备服务地址。
-- 发布形态（上游为 `core` + `full` 双包；**墨本只发布 `appCore`**，2026-11-03 md3 合并时定案）：
-  full 变体携带漫画本地推理栈（ONNX/ML Kit），与墨水屏定位无关。APK 附件名仍必须带 `core`
-  产品标记（`moben-<版本>-core-<abi>.apk`），应用内更新按 `AppProduct` 挑包依赖该标记；
-  CI 只构建/发布 appCore。
+- 发布形态（上游为 `core` + `comic` 双包——full 已于 2026-11-05 更名 comic；**墨本只发布
+  `appCore`**，2026-11-03 定案）：comic 变体携带漫画本地推理栈（ONNX/ML Kit），与墨水屏
+  定位无关。APK 附件名仍必须带 `core` 产品标记（`moben-<版本>-core-<abi>.apk`），应用内
+  更新按 `AppProduct` 挑包依赖该标记；CI 只构建/发布 appCore。
 
 ## 交付说明
 

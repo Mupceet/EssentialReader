@@ -650,6 +650,15 @@ class ReadBookViewModel(
         }
     }
 
+    /** 离线缓存域；范围预览是弹窗瞬态，仍留在 UiState（同 pendingBookmarkTarget）。 */
+    private val cacheDelegate by lazy {
+        ReadBookCacheDelegate(
+            context, viewModelScope, bookRepository,
+            emit = { _effects.tryEmit(it) },
+            onPreview = { preview -> _uiState.update { it.copy(cacheRangePreview = preview) } },
+        )
+    }
+
     init {
         // 订阅必须早于 attach()：会话事件用 tryEmit 投递，没有订阅者会被丢弃。
         // viewModelScope 是 Main.immediate，VM 在主线程构造，故 launch 会同步跑到
@@ -1608,9 +1617,9 @@ class ReadBookViewModel(
                 _effects.tryEmit(ReadBookEffect.PageAnimChanged)
             }
 
-            is ReadBookIntent.DownloadChapters -> {
-                _effects.tryEmit(ReadBookEffect.DownloadChapters(intent.start, intent.end))
-            }
+            is ReadBookIntent.DownloadChapters -> cacheDelegate.downloadRange(intent.start, intent.end)
+
+            is ReadBookIntent.ScanCacheRange -> cacheDelegate.previewRange(intent.start, intent.end)
 
             is ReadBookIntent.SaveChapterContent -> {
                 ReadBook.book?.let {

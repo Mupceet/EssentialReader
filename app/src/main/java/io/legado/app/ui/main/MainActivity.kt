@@ -124,6 +124,7 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
@@ -460,6 +461,10 @@ open class MainActivity : BaseComposeActivity(), AudioPlay.CallBack {
         }
 
         lifecycleScope.launch {
+            // 有新版本先提示更新，用户关闭后再走版本更新日志，避免两个弹窗叠在一起
+            if (shouldAutoCheckUpdate) {
+                checkUpdateOnStart()
+            }
             //版本更新
             upVersion()
             //备份同步
@@ -468,9 +473,6 @@ open class MainActivity : BaseComposeActivity(), AudioPlay.CallBack {
             val isAutoRefreshedBook = savedInstanceState?.getBoolean("isAutoRefreshedBook") ?: false
             if (otherSettingsGateway.currentSettings.autoRefresh && !isAutoRefreshedBook) {
                 viewModel.upAllBookToc()
-            }
-            if (shouldAutoCheckUpdate) {
-                checkUpdateOnStart()
             }
         }
 
@@ -1122,11 +1124,27 @@ open class MainActivity : BaseComposeActivity(), AudioPlay.CallBack {
         }
     }
 
-    private fun checkUpdateOnStart() {
-        AppUpdateGitHub.check(lifecycleScope)
-            .onSuccess { updateInfo ->
-                showDialogFragment(UpdateDialog(updateInfo))
+    /**
+     * 启动时的版本检查：检查失败（离线、镜像不可用、已是最新）静默跳过，
+     * 有新版本才弹窗，并等到弹窗关闭再继续启动流程。
+     */
+    private suspend fun checkUpdateOnStart() {
+        val updateInfo = try {
+            AppUpdateGitHub.checkNow()
+        } catch (error: CancellationException) {
+            throw error
+        } catch (_: Exception) {
+            return
+        }
+        suspendCancellableCoroutine { continuation ->
+            val dialog = UpdateDialog(updateInfo)
+            dialog.setOnDismissListener {
+                if (continuation.isActive) continuation.resume(Unit)
             }
+            continuation.invokeOnCancellation { dialog.dismissAllowingStateLoss() }
+            runCatching { showDialogFragment(dialog) }
+                .onFailure { if (continuation.isActive) continuation.resume(Unit) }
+        }
     }
 
     /**

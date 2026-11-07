@@ -985,8 +985,14 @@ fun BookshelfScreen(
                     val folderColumns =
                         if (bookshelfFolderLayoutMode == 0) bookshelfFolderLayoutList else bookshelfFolderLayoutGrid
                     val isGridMode = bookshelfFolderLayoutMode != 0
+                    // 分组网格与书籍网格共用同一套尺寸开关，避免同一开关在两层页面表现不一致
+                    val folderCells = if (isGridMode && !uiState.settings.bookshelfGridFixedColumns) {
+                        GridCells.Adaptive(minSize = (uiState.settings.bookshelfGridCoverWidth + 8).dp)
+                    } else {
+                        GridCells.Fixed(folderColumns.coerceAtLeast(1))
+                    }
                     FastScrollLazyVerticalGrid(
-                        columns = GridCells.Fixed(folderColumns.coerceAtLeast(1)),
+                        columns = folderCells,
                         state = folderGridState,
                         modifier = Modifier
                             .fillMaxSize()
@@ -1716,6 +1722,12 @@ fun BookshelfPage(
     }
     val columns = if (bookshelfLayoutMode == 0) bookshelfLayoutList else bookshelfLayoutGrid
     val isGridMode = bookshelfLayoutMode != 0
+    // 关闭「固定列数」时列数由封面宽度推出：单元格最小宽度 = 封面 + 左右各 4dp 内边距。
+    val gridCells = if (isGridMode && !uiState.settings.bookshelfGridFixedColumns) {
+        GridCells.Adaptive(minSize = (uiState.settings.bookshelfGridCoverWidth + 8).dp)
+    } else {
+        GridCells.Fixed(columns.coerceAtLeast(1))
+    }
     val bookItemGridStyle = uiState.settings.bookshelfGridLayout
     val bookItemIsCompact = uiState.settings.bookshelfLayoutCompact
     val bookItemTitleSmallFont = uiState.settings.bookshelfTitleSmallFont
@@ -1752,7 +1764,7 @@ fun BookshelfPage(
             )
     ) {
         FastScrollLazyVerticalGrid(
-            columns = GridCells.Fixed(columns.coerceAtLeast(1)),
+            columns = gridCells,
             state = gridState,
             modifier = Modifier
                 .fillMaxSize()
@@ -1772,8 +1784,10 @@ fun BookshelfPage(
                     .coerceAtLeast(LocalBottomOverlayPadding.current),
                 horizontal = 8.dp
             ),
+            // 列表模式同样支持每行多本：卡片宽度被切分后，相邻卡片的边框会贴成一条线，
+            // 所以水平方向也要留间距，取与网格一致的 8dp（垂直方向由卡片自身 4dp 内边距提供）。
             verticalArrangement = Arrangement.spacedBy(if (isGridMode) 8.dp else 0.dp),
-            horizontalArrangement = Arrangement.spacedBy(if (isGridMode) 8.dp else 0.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
             showFastScroll = showFastScroll
         ) {
             itemsIndexed(displayBooks, key = { _, item -> item.book.bookUrl }) { index, bookUi ->
