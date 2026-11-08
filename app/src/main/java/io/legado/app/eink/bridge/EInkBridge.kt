@@ -425,6 +425,29 @@ private object GlobalSettingsImpl : GlobalSettings, KoinComponent {
             }
         }
 
+    override var mouseWheelPage: Boolean
+        get() = readSettingsGateway.currentSettings.mouseWheelPage
+        set(value) {
+            einkSettingsWriteScope.launch {
+                readSettingsGateway.update { it.copy(mouseWheelPage = value) }
+            }
+        }
+
+    /** 自定义翻页键对：两方向一次 copy 原子提交（与音量/滚轮开关独立的第三路翻页输入）。 */
+    override val prevKeys: String
+        get() = readSettingsGateway.currentSettings.prevKeys
+
+    override val nextKeys: String
+        get() = readSettingsGateway.currentSettings.nextKeys
+
+    override fun setPageKeys(prevKeys: String, nextKeys: String) {
+        einkSettingsWriteScope.launch {
+            readSettingsGateway.update {
+                it.copy(prevKeys = prevKeys, nextKeys = nextKeys)
+            }
+        }
+    }
+
     override var hideStatusBar: Boolean
         get() = readSettingsGateway.currentSettings.hideStatusBar
         set(value) {
