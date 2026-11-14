@@ -1,22 +1,25 @@
 package io.legado.app.ui.widget.components.topbar
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.RowScope
-import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import io.legado.app.ui.theme.ComposeEngine
 import io.legado.app.ui.theme.LegadoTheme
-import io.legado.app.ui.theme.LocalHazeState
-import io.legado.app.ui.theme.ThemeResolver
-import io.legado.app.ui.theme.responsiveHazeEffect
+import io.legado.app.ui.theme.LocalMiuixBarBackdrop
+import io.legado.app.ui.theme.MiuixBlurredTopBar
+import io.legado.app.ui.theme.isMiuixHyperOs4Enabled
+import io.legado.app.ui.widget.components.GlassDefaults
+import top.yukonga.miuix.kmp.basic.TopAppBarDefaults as MiuixTopAppBarDefaults
 import top.yukonga.miuix.kmp.basic.SmallTopAppBar as MiuixSmallTopAppBar
+import top.yukonga.miuix.kmp.glass.GlassTopAppBarDefaults as MiuixGlassTopAppBarDefaults
+import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 /**
  * 小型玻璃顶栏。
- * M3 引擎走 [GlassTopAppBar]，Miuix 引擎走 MiuixSmallTopAppBar（与 RSS 阅读页一致）。
- * 网页类页面统一用它，保证两引擎下顶栏一致。
+ * Miuix 保留紧凑栏的高度，HyperOS 4 使用玻璃按钮。
  */
 @Composable
 fun GlassSmallTopAppBar(
@@ -25,7 +28,7 @@ fun GlassSmallTopAppBar(
     navigationIcon: @Composable () -> Unit = {},
     actions: @Composable RowScope.() -> Unit = {},
 ) {
-    if (!ThemeResolver.isMiuixEngine(LegadoTheme.composeEngine)) {
+    if (LegadoTheme.composeEngine != ComposeEngine.Miuix) {
         GlassTopAppBar(
             title = title,
             modifier = modifier,
@@ -35,28 +38,27 @@ fun GlassSmallTopAppBar(
         return
     }
 
-    val hazeState = LocalHazeState.current
-    val containerColor = GlassTopAppBarDefaults.getMiuixAppBarColor()
-    val finalModifier = if (hazeState != null) {
-        modifier
-            .background(containerColor)
-            .responsiveHazeEffect(hazeState)
+    val glass = isMiuixHyperOs4Enabled()
+    val containerColor = if (glass && LocalMiuixBarBackdrop.current == null) {
+        GlassDefaults.secondaryColorOr { MiuixTheme.colorScheme.surface }
     } else {
-        modifier.background(containerColor)
+        GlassTopAppBarDefaults.getMiuixAppBarColor()
     }
-
-    Column(modifier = finalModifier) {
-        MiuixSmallTopAppBar(
-            title = title,
-            navigationIcon = navigationIcon,
-            actions = {
-                TopBarActionsRow(
-                    modifier = Modifier.padding(end = miuixTopBarActionsEndPadding())
-                ) { actions() }
-            },
-            color = Color.Transparent,
-            navigationIconPadding = miuixTopBarSlotPadding(),
-            actionIconPadding = miuixTopBarSlotPadding(),
-        )
+    MiuixBlurredTopBar(modifier.background(containerColor)) {
+        CompositionLocalProvider(
+            LocalMiuixGlassTopBar provides glass,
+            LocalMiuixGlassTopBarActionProgress provides null,
+        ) {
+            MiuixSmallTopAppBar(
+                title = title,
+                navigationIcon = navigationIcon,
+                actions = { if (glass) MiuixGlassTopBarActions(content = actions) else actions() },
+                color = Color.Transparent,
+                navigationIconPadding = if (glass) MiuixGlassTopAppBarDefaults.HorizontalPadding
+                    else MiuixTopAppBarDefaults.NavigationIconPadding,
+                actionIconPadding = if (glass) MiuixGlassTopAppBarDefaults.HorizontalPadding
+                    else MiuixTopAppBarDefaults.ActionIconPadding,
+            )
+        }
     }
 }

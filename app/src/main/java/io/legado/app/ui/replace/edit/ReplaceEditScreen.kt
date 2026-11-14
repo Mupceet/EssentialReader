@@ -29,9 +29,6 @@ import androidx.compose.material3.AssistChip
 import androidx.compose.material3.BottomAppBar
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
-import androidx.compose.material3.ExposedDropdownMenuAnchorType
-import androidx.compose.material3.ExposedDropdownMenuBox
-import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.animateFloatingActionButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -64,17 +61,25 @@ import io.legado.app.ui.widget.components.alert.AppAlertDialog
 import io.legado.app.ui.widget.components.button.ToggleChip
 import io.legado.app.ui.widget.components.button.series.MediumPlainButton
 import io.legado.app.ui.widget.components.checkBox.CheckboxItem
+import io.legado.app.ui.widget.components.icon.AppIcon
 import io.legado.app.ui.widget.components.icon.AppIcons
-import io.legado.app.ui.widget.components.menuItem.RoundDropdownMenu
-import io.legado.app.ui.widget.components.menuItem.RoundDropdownMenuItem
+import io.legado.app.ui.widget.components.menu.AppAction
+import io.legado.app.ui.widget.components.menu.AppActionGroup
+import io.legado.app.ui.widget.components.menu.AppActionMenu
+import io.legado.app.ui.widget.components.menu.AppChoiceDropdown
+import io.legado.app.ui.widget.components.menu.AppChoiceOption
 import io.legado.app.ui.widget.components.text.AppText
 import io.legado.app.ui.widget.components.topbar.GlassMediumFlexibleTopAppBar
 import io.legado.app.ui.widget.components.topbar.GlassTopAppBarDefaults
 import io.legado.app.ui.widget.components.topbar.TopBarActionButton
 import io.legado.app.ui.widget.components.topbar.TopBarNavigationButton
 import io.legado.app.utils.toastOnUi
+import kotlinx.collections.immutable.persistentListOf
+import kotlinx.collections.immutable.toImmutableList
 import kotlinx.coroutines.flow.collectLatest
 import org.koin.androidx.compose.koinViewModel
+
+private const val GROUP_OPTION_ID_PREFIX = "replace_group_"
 
 @Composable
 fun keyboardAsState(): State<Boolean> {
@@ -116,7 +121,6 @@ fun ReplaceEditScreen(
     onBack: () -> Unit,
 ) {
     val scrollBehavior = GlassTopAppBarDefaults.defaultScrollBehavior()
-    var showMenu by remember { mutableStateOf(false) }
     val isKeyboardVisible by keyboardAsState()
     val focusManager = LocalFocusManager.current
     val keyboardController = LocalSoftwareKeyboardController.current
@@ -159,28 +163,32 @@ fun ReplaceEditScreen(
                             contentDescription = stringResource(R.string.action_save)
                         )
                     }
-                    TopBarActionButton(
-                        onClick = { showMenu = true },
-                        imageVector = AppIcons.MoreVert,
-                        contentDescription = stringResource(R.string.more_actions)
-                    )
-                    RoundDropdownMenu(
-                        expanded = showMenu,
-                        onDismissRequest = { showMenu = false }
+                    AppActionMenu(
+                        groups = persistentListOf(
+                            AppActionGroup(
+                                id = "replace_edit_menu",
+                                actions = persistentListOf(
+                                    AppAction(
+                                        id = "copy_rule",
+                                        label = stringResource(R.string.copy_rule),
+                                    ),
+                                    AppAction(
+                                        id = "paste_rule",
+                                        label = stringResource(R.string.paste_rule),
+                                    ),
+                                ),
+                            ),
+                        ),
+                        onAction = { id ->
+                            when (id) {
+                                "copy_rule" -> onIntent(ReplaceEditIntent.CopyRule)
+                                "paste_rule" -> onIntent(ReplaceEditIntent.PasteRule)
+                            }
+                        },
                     ) {
-                        RoundDropdownMenuItem(
-                            text = stringResource(R.string.copy_rule),
-                            onClick = {
-                                showMenu = false
-                                onIntent(ReplaceEditIntent.CopyRule)
-                            }
-                        )
-                        RoundDropdownMenuItem(
-                            text = stringResource(R.string.paste_rule),
-                            onClick = {
-                                showMenu = false
-                                onIntent(ReplaceEditIntent.PasteRule)
-                            }
+                        AppIcon(
+                            imageVector = AppIcons.MoreVert,
+                            contentDescription = stringResource(R.string.more_actions),
                         )
                     }
                 },
@@ -256,6 +264,7 @@ fun ReplaceEditScreen(
                     onValueChange = { onIntent(ReplaceEditIntent.OnPatternChange(it)) },
                     label = stringResource(R.string.match_pattern),
                     placeholder = { AppText(stringResource(R.string.input_regex_or_keyword)) },
+                    placeholderText = stringResource(R.string.input_regex_or_keyword),
                     backgroundColor = LegadoTheme.colorScheme.surfaceInput,
                     modifier = Modifier
                         .fillMaxWidth()
@@ -269,6 +278,7 @@ fun ReplaceEditScreen(
                     onValueChange = { onIntent(ReplaceEditIntent.OnReplacementChange(it)) },
                     label = stringResource(R.string.replace_with),
                     placeholder = { AppText(stringResource(R.string.input_replacement_or_group)) },
+                    placeholderText = stringResource(R.string.input_replacement_or_group),
                     backgroundColor = LegadoTheme.colorScheme.surfaceInput,
                     modifier = Modifier
                         .fillMaxWidth()
@@ -314,6 +324,7 @@ fun ReplaceEditScreen(
                     onValueChange = { onIntent(ReplaceEditIntent.OnScopeChange(it)) },
                     label = stringResource(R.string.specific_scope),
                     placeholder = { AppText(stringResource(R.string.scope_hint)) },
+                    placeholderText = stringResource(R.string.scope_hint),
                     backgroundColor = LegadoTheme.colorScheme.surfaceInput,
                     modifier = Modifier
                         .fillMaxWidth()
@@ -327,6 +338,7 @@ fun ReplaceEditScreen(
                     onValueChange = { onIntent(ReplaceEditIntent.OnExcludeScopeChange(it)) },
                     label = stringResource(R.string.exclude_scope),
                     placeholder = { AppText(stringResource(R.string.exclude_scope_hint)) },
+                    placeholderText = stringResource(R.string.exclude_scope_hint),
                     backgroundColor = LegadoTheme.colorScheme.surfaceInput,
                     modifier = Modifier
                         .fillMaxWidth()
@@ -340,6 +352,7 @@ fun ReplaceEditScreen(
                     onValueChange = { onIntent(ReplaceEditIntent.OnTimeoutChange(it)) },
                     label = stringResource(R.string.timeout_ms),
                     placeholder = { AppText("3000") },
+                    placeholderText = "3000",
                     backgroundColor = LegadoTheme.colorScheme.surfaceInput,
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -359,7 +372,6 @@ fun ReplaceEditScreen(
 }
 
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun GroupSelector(
     currentGroup: String,
@@ -368,42 +380,40 @@ fun GroupSelector(
     onManageClick: () -> Unit,
     backgroundColor: Color = Color.Unspecified,
 ) {
-    var expanded by remember { mutableStateOf(false) }
-
     Row(verticalAlignment = Alignment.CenterVertically) {
-        ExposedDropdownMenuBox(
-            expanded = expanded,
-            onExpandedChange = { expanded = !expanded },
+        AppTextField(
+            value = currentGroup,
+            onValueChange = onGroupChange,
+            label = stringResource(R.string.group),
+            backgroundColor = backgroundColor,
+            placeholder = { AppText("默认") },
+            placeholderText = "默认",
             modifier = Modifier.weight(1f)
+        )
+        // 下拉触发按钮移到输入框旁：自由输入能力不变，建议列表交给四引擎原生单选入口。
+        // ID 用带前缀的序号（分组名可重复、可含任意字符），回解按 allGroups 取值校验；
+        // 当前值是用户新输入的分组时 selectedId 落空，Mochi 以 -1 表示无选中。
+        AppChoiceDropdown(
+            options = allGroups.mapIndexed { index, group ->
+                AppChoiceOption(id = "$GROUP_OPTION_ID_PREFIX$index", label = group)
+            }.toImmutableList(),
+            selectedId = allGroups.indexOfFirst { it == currentGroup }
+                .takeIf { it >= 0 }
+                ?.let { "$GROUP_OPTION_ID_PREFIX$it" },
+            onSelect = { id ->
+                id.removePrefix(GROUP_OPTION_ID_PREFIX).toIntOrNull()
+                    ?.let { allGroups.getOrNull(it) }
+                    ?.let(onGroupChange)
+            },
+            title = stringResource(R.string.group),
+            compact = true,
         ) {
-            AppTextField(
-                value = currentGroup,
-                onValueChange = onGroupChange,
-                label = stringResource(R.string.group),
-                backgroundColor = backgroundColor,
-                placeholder = { AppText("默认") },
-                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .menuAnchor(
-                        ExposedDropdownMenuAnchorType.PrimaryEditable,
-                        true
-                    )
+            MediumPlainButton(
+                onClick = null,
+                modifier = this.modifier,
+                icon = AppIcons.ExpandMore,
+                contentDescription = stringResource(R.string.expand),
             )
-            RoundDropdownMenu(
-                expanded = expanded,
-                onDismissRequest = { expanded = false }
-            ) {
-                allGroups.forEach { selectionOption ->
-                    RoundDropdownMenuItem(
-                        text = selectionOption,
-                        onClick = {
-                            onGroupChange(selectionOption)
-                            expanded = false
-                        }
-                    )
-                }
-            }
         }
         MediumPlainButton(
             onClick = onManageClick,

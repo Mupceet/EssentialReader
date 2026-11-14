@@ -15,6 +15,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -40,8 +41,8 @@ import io.legado.app.ui.widget.components.AppTextField
 import io.legado.app.ui.widget.components.alert.AppAlertDialog
 import io.legado.app.ui.widget.components.button.series.MediumTonalButton
 import io.legado.app.ui.widget.components.icon.AppIcon
-import io.legado.app.ui.widget.components.menuItem.RoundDropdownMenu
-import io.legado.app.ui.widget.components.menuItem.RoundDropdownMenuItem
+import io.legado.app.ui.widget.components.menu.AppChoiceDropdown
+import io.legado.app.ui.widget.components.menu.AppChoiceOption
 import io.legado.app.ui.widget.components.modalBottomSheet.AppModalBottomSheet
 import kotlinx.collections.immutable.toImmutableList
 
@@ -167,33 +168,34 @@ fun <T> HomepageModuleManageSheet(
                         contentDescription = stringResource(R.string.confirm)
                 )
             } else if ((showSourceBrowser || browsingSourceUrl != null) && !browsingDetail) {
-                var expanded by remember { mutableStateOf(false) }
-                Box {
-                    MediumTonalButton(
-                        onClick = { expanded = true },
-                        icon = Icons.Default.FilterList,
-                        contentDescription = stringResource(R.string.screen)
-                    )
-                    RoundDropdownMenu(
-                        expanded = expanded,
-                        onDismissRequest = { expanded = false }) {
-                        RoundDropdownMenuItem(
-                            text = stringResource(R.string.homepage_all_groups),
-                            onClick = { groupFilter = null; expanded = false },
-                            trailingIcon = if (groupFilter == null) {
-                                { AppIcon(Icons.Default.Check, null, Modifier.size(18.dp)) }
-                            } else null
+                val filterTitle = stringResource(R.string.screen)
+                // 空串代表「全部」，避免把 nullable 渗进 AppChoiceOption.id。
+                val groupOptions = buildList {
+                    add(
+                        AppChoiceOption(
+                            id = "",
+                            label = stringResource(R.string.homepage_all_groups),
                         )
-                        allGroups.forEach { group ->
-                            RoundDropdownMenuItem(
-                                text = group,
-                                onClick = { groupFilter = group; expanded = false },
-                                trailingIcon = if (groupFilter == group) {
-                                    { AppIcon(Icons.Default.Check, null, Modifier.size(18.dp)) }
-                                } else null
-                            )
-                        }
+                    )
+                    allGroups.forEach { group ->
+                        add(AppChoiceOption(id = group, label = group))
                     }
+                }.toImmutableList()
+                AppChoiceDropdown(
+                    options = groupOptions,
+                    selectedId = groupFilter.orEmpty(),
+                    onSelect = { groupFilter = it.ifBlank { null } },
+                    title = filterTitle,
+                    compact = true,
+                    // MediumTonalButton 用 SeriesButton 默认形状，裁剪必须同源。
+                    triggerShape = IconButtonDefaults.extraSmallRoundShape,
+                ) {
+                    MediumTonalButton(
+                        onClick = null,
+                        icon = Icons.Default.FilterList,
+                        contentDescription = filterTitle,
+                        modifier = this.modifier,
+                    )
                 }
             }
         }

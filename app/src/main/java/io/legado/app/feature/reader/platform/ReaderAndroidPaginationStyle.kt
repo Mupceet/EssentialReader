@@ -41,6 +41,7 @@ data class ReaderAndroidPaginationStyle(
      * 生成该字段，段评气泡开关关闭即剔除；字段同时参与两处分页缓存键。
      */
     val excludeActionImages: Boolean = false,
+    val density: Float = 1f,
 ) {
     fun columnCount(widthPx: Int, heightPx: Int): Int =
         columnMode.columnCount(widthPx, heightPx, isTablet, isScroll)

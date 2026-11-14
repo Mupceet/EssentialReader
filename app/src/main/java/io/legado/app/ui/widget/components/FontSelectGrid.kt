@@ -23,10 +23,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Sort
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -52,9 +49,11 @@ import io.legado.app.domain.gateway.OtherSettingsGateway
 import io.legado.app.help.FontFolderRead
 import io.legado.app.help.scanFontFiles
 import io.legado.app.ui.theme.LegadoTheme
-import io.legado.app.ui.theme.ProvideAppDensity
+import io.legado.app.ui.widget.components.menu.AppChoiceDropdown
+import io.legado.app.ui.widget.components.menu.AppChoiceOption
 import io.legado.app.utils.FileDoc
 import io.legado.app.utils.cnCompare
+import kotlinx.collections.immutable.toImmutableList
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -160,41 +159,30 @@ fun FontSelectGrid(
             placeholder = stringResource(R.string.search_placeholder),
             autoFocus = false,
             trailingIcon = {
-                var expanded by remember { mutableStateOf(false) }
-                Box {
-                    IconButton(onClick = { expanded = true }) {
+                val sortOptions = FontSort.entries.map { sort ->
+                    AppChoiceOption(id = sort.ordinal.toString(), label = stringResource(sort.labelRes))
+                }.toImmutableList()
+                AppChoiceDropdown(
+                    options = sortOptions,
+                    selectedId = fontSort.toString(),
+                    onSelect = { id ->
+                        scope.launch {
+                            otherSettings.update { it.copy(fontSort = id.toInt()) }
+                        }
+                    },
+                    title = stringResource(R.string.sort),
+                    compact = true,
+                ) {
+                    // 纯展示 trigger：尺寸对齐原 IconButton，由入口包装出唯一可点控件。
+                    Box(
+                        modifier = this.modifier.size(48.dp),
+                        contentAlignment = Alignment.Center,
+                    ) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.Sort,
                             contentDescription = stringResource(R.string.sort),
-                            tint = LegadoTheme.colorScheme.onSurfaceVariant
+                            tint = LegadoTheme.colorScheme.onSurfaceVariant,
                         )
-                    }
-                    DropdownMenu(
-                        expanded = expanded,
-                        onDismissRequest = { expanded = false }
-                    ) {
-                        ProvideAppDensity {
-                            FontSort.entries.forEach { sort ->
-                                DropdownMenuItem(
-                                    text = { Text(stringResource(sort.labelRes)) },
-                                    onClick = {
-                                        scope.launch {
-                                            otherSettings.update { it.copy(fontSort = sort.ordinal) }
-                                        }
-                                        expanded = false
-                                    },
-                                    trailingIcon = if (fontSort == sort.ordinal) {
-                                        {
-                                            Icon(
-                                                imageVector = Icons.Default.Check,
-                                                contentDescription = null,
-                                                tint = LegadoTheme.colorScheme.primary
-                                            )
-                                        }
-                                    } else null
-                                )
-                            }
-                        }
                     }
                 }
             }

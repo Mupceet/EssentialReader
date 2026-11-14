@@ -19,6 +19,23 @@ plugins {
 dependencyResolutionManagement {
     repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
     repositories {
+        // 固定 fork 只读取本项目生成的 Maven 产物，避免命中开发机旧包或回落到上游。
+        // 首次构建运行 python scripts/prepare-ui-forks.py，CI 由公共 action 执行。
+        exclusiveContent {
+            forRepository {
+                maven {
+                    name = 'pinnedUiForks'
+                    url = uri(file('build/ui-forks/maven'))
+                }
+            }
+            filter {
+                includeModule('io.github.feice11', 'mochi-compose')
+                includeModule('io.github.feice11', 'mochi-ios')
+                includeModule('io.github.itoseo', 'coui')
+                includeModule('io.github.itoseo', 'coui-material3')
+                includeModule('io.github.itoseo', 'coui-icons')
+            }
+        }
         google {
             content {
                 includeGroupByRegex("com\\.android.*")
@@ -47,6 +64,12 @@ dependencyResolutionManagement {
     }
 }
 rootProject.name = 'legado'
+
+// Build the pinned Miuix snapshot without GitHub Packages credentials.
+if (!file('modules/miuix/settings.gradle.kts').isFile()) {
+    throw new GradleException('Initialize Miuix with git submodule update --init modules/miuix')
+}
+includeBuild('modules/miuix')
 
 include ':app'
 include ':modules:book'

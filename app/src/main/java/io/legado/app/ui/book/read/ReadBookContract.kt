@@ -3,6 +3,7 @@ package io.legado.app.ui.book.read
 import android.net.Uri
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.Stable
+import io.legado.app.domain.model.readaloud.ReadAloudProgress
 import io.legado.app.constant.ReadMenuBlurMode
 import io.legado.app.constant.ReadMenuBlurStyle
 import io.legado.app.data.entities.Book
@@ -146,6 +147,9 @@ data class ReadSheetConfigUiState(
     val titleColorNight: Int = 0,
     val textColorDay: Int = 0,
     val textColorNight: Int = 0,
+    /** 预览底色：白天/夜间那两套阅读背景（背景是图时为 0，预览回落到主题表面）。 */
+    val bgColorDay: Int = 0,
+    val bgColorNight: Int = 0,
     val textShadow: Boolean = false,
     val textShadowColor: Int = 0,
     val shadowRadius: Float = 0f,
@@ -948,7 +952,7 @@ sealed interface ReadBookIntent {
 
     // Media / TTS
     data class MediaButtonPressed(val play: Boolean) : ReadBookIntent
-    data class TtsProgress(val chapterStart: Int) : ReadBookIntent
+    data class TtsProgress(val progress: ReadAloudProgress) : ReadBookIntent
 
     // Dialog callback bridge
     data object ReadAloudAction : ReadBookIntent
@@ -2044,6 +2048,9 @@ sealed interface ConfigUpdate {
     }
 
     data class BookmarkBadgeSize(val value: Int) : ConfigUpdate {
+        override val actions = emptySet<ConfigUpdateAction>()
+    }
+    data class ParagraphCommentHeight(val percent: Int) : ConfigUpdate {
         override val actions = emptySet<ConfigUpdateAction>()
     }
     data class SliderVibrator(val value: Boolean) : ConfigUpdate {

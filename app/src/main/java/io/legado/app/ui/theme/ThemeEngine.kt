@@ -48,17 +48,27 @@ object ThemeEngine {
         forceOpaque: Boolean = false,
         customSeedColor: Int? = null,
         customContrast: String? = null,
+        composeEngine: ComposeEngine = ComposeEngine.Material,
+        /** COUI 关闭「自定义主题色」时由引擎内置 CouiPresets 接管；开启时按 mode 正常解析。 */
+        useBuiltInPalette: Boolean = false,
     ): ColorScheme {
         val resolvedMode = resolveMode(mode = mode, forceOpaque = forceOpaque)
-        val baseColorScheme = resolveBaseColorScheme(
-            context = context,
-            mode = resolvedMode,
-            darkTheme = darkTheme,
-            paletteStyle = paletteStyle,
-            materialVersion = materialVersion,
-            customSeedColor = customSeedColor,
-            customContrast = customContrast,
-        )
+        val baseColorScheme = if (
+            composeEngine == ComposeEngine.Coui && useBuiltInPalette &&
+            resolvedMode == AppThemeMode.Dynamic && ThemeResolver.isCouiSupported()
+        ) {
+            couiDefaultColorScheme(darkTheme)
+        } else {
+            resolveBaseColorScheme(
+                context = context,
+                mode = resolvedMode,
+                darkTheme = darkTheme,
+                paletteStyle = paletteStyle,
+                materialVersion = materialVersion,
+                customSeedColor = customSeedColor,
+                customContrast = customContrast,
+            )
+        }
 
         return baseColorScheme
             .applyAmoledIfNeeded(darkTheme = darkTheme, isAmoled = isAmoled)

@@ -1,6 +1,7 @@
 package io.legado.app.ui.widget.components.menuItem
 
 import androidx.compose.foundation.LocalIndication
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
@@ -28,12 +29,21 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.itos.coui.effect.couiButtonFeedback
+import com.itos.coui.menu.CouiMenuDefaults
+import io.legado.app.ui.theme.ComposeEngine
 import io.legado.app.ui.theme.LegadoTheme
-import io.legado.app.ui.theme.ThemeResolver
+import io.legado.app.ui.theme.ProvideAppContentColor
+import ui.feice.mochi.effect.elastic.mochiPressDeform
+import ui.feice.mochi.shape.MochiRoundedRectangle
 import io.legado.app.ui.widget.components.icon.AppIcon
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.basic.Check
@@ -53,128 +63,205 @@ fun RoundDropdownMenuItem(
     contentPadding: PaddingValues = MenuDefaults.DropdownMenuItemContentPadding,
     interactionSource: MutableInteractionSource? = null,
 ) {
-    val isMiuix = ThemeResolver.isMiuixEngine(LegadoTheme.composeEngine)
     val interaction = interactionSource ?: remember { MutableInteractionSource() }
     val hasCustomContentColor = color != Color.Unspecified
 
-    if (isMiuix) {
-        val legadoColorScheme = LegadoTheme.colorScheme
-        val textColor = if (isSelected) legadoColorScheme.primary else legadoColorScheme.onSurface
-        val backgroundColor = legadoColorScheme.surfaceContainer
-        val checkColor = if (isSelected) legadoColorScheme.primary else Color.Transparent
+    when (LegadoTheme.composeEngine) {
+        ComposeEngine.Miuix -> {
+            val legadoColorScheme = LegadoTheme.colorScheme
+            val textColor = if (isSelected) legadoColorScheme.primary else legadoColorScheme.onSurface
+            // Miuix 菜单只有玻璃面板一种形态，行不能自绘不透明底色。
+            val backgroundColor = Color.Transparent
+            val checkColor = if (isSelected) legadoColorScheme.primary else Color.Transparent
 
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween,
-            modifier = modifier
-                .fillMaxWidth()
-                .drawBehind { drawRect(backgroundColor) }
-                .clickable(
-                    interactionSource = interaction,
-                    indication = LocalIndication.current,
-                    enabled = enabled,
-                    onClick = onClick
-                )
-                .padding(horizontal = 20.dp, vertical = 12.dp)
-        ) {
-            CompositionLocalProvider(LocalContentColor provides textColor) {
-                if (leadingIcon != null) {
-                    leadingIcon()
-                    Spacer(Modifier.width(12.dp))
-                }
-
-                Box(
-                    modifier = Modifier.weight(1f),
-                    contentAlignment = Alignment.CenterStart
-                ) {
-                    MiuixText(
-                        modifier = Modifier.widthIn(max = 200.dp),
-                        text = text,
-                        fontSize = MiuixTheme.textStyles.body1.fontSize,
-                        fontWeight = FontWeight.Medium,
-                        color = textColor,
-                    )
-                }
-
-                if (trailingIcon != null) {
-                    Spacer(Modifier.width(12.dp))
-                    trailingIcon()
-                } else {
-                    Spacer(Modifier.width(12.dp))
-                    AppIcon(
-                        imageVector = MiuixIcons.Basic.Check,
-                        contentDescription = null,
-                        modifier = Modifier.size(20.dp),
-                        tint = checkColor
-                    )
-                }
-            }
-        }
-    } else {
-        val legadoColorScheme = LegadoTheme.colorScheme
-        val selectedContentColor = legadoColorScheme.primary
-        val defaultContentColor = legadoColorScheme.onSurface
-        val contentColor = if (enabled) {
-            when {
-                hasCustomContentColor -> color
-                isSelected -> selectedContentColor
-                else -> defaultContentColor
-            }
-        } else {
-            when {
-                hasCustomContentColor -> color.copy(alpha = 0.38f)
-                isSelected -> selectedContentColor.copy(alpha = 0.38f)
-                else -> defaultContentColor.copy(alpha = 0.38f)
-            }
-        }
-        val containerColor = legadoColorScheme.surface
-
-        Surface(
-            onClick = onClick,
-            modifier = modifier
-                .padding(horizontal = 8.dp)
-                .fillMaxWidth(),
-            enabled = enabled,
-            shape = MaterialTheme.shapes.small,
-            color = containerColor,
-            contentColor = contentColor,
-            interactionSource = interaction
-        ) {
             Row(
-                modifier = Modifier
-                    .padding(contentPadding)
-                    .heightIn(min = 48.dp)
-                    .widthIn(min = 120.dp),
-                verticalAlignment = Alignment.CenterVertically
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+                modifier = modifier
+                    .fillMaxWidth()
+                    .drawBehind { drawRect(backgroundColor) }
+                    .clickable(
+                        interactionSource = interaction,
+                        indication = LocalIndication.current,
+                        enabled = enabled,
+                        onClick = onClick
+                    )
+                    .padding(horizontal = 20.dp, vertical = 12.dp)
             ) {
-                if (leadingIcon != null) {
-                    leadingIcon()
-                    Spacer(Modifier.width(12.dp))
-                }
+                CompositionLocalProvider(LocalContentColor provides textColor) {
+                    if (leadingIcon != null) {
+                        leadingIcon()
+                        Spacer(Modifier.width(12.dp))
+                    }
 
-                Box(
-                    modifier = Modifier.weight(1f),
-                    contentAlignment = Alignment.CenterStart
+                    Box(
+                        modifier = Modifier.weight(1f),
+                        contentAlignment = Alignment.CenterStart
+                    ) {
+                        MiuixText(
+                            modifier = Modifier.widthIn(max = 200.dp),
+                            text = text,
+                            fontSize = MiuixTheme.textStyles.body1.fontSize,
+                            fontWeight = FontWeight.Medium,
+                            color = textColor,
+                        )
+                    }
+
+                    if (trailingIcon != null) {
+                        Spacer(Modifier.width(12.dp))
+                        trailingIcon()
+                    } else {
+                        Spacer(Modifier.width(12.dp))
+                        AppIcon(
+                            imageVector = MiuixIcons.Basic.Check,
+                            contentDescription = null,
+                            modifier = Modifier.size(20.dp),
+                            tint = checkColor
+                        )
+                    }
+                }
+            }
+        }
+        ComposeEngine.Mochi -> {
+            val foreground = (if (hasCustomContentColor) color
+                else if (isSelected) LegadoTheme.colorScheme.primary
+                else LegadoTheme.colorScheme.onSurface).let { if (enabled) it else it.copy(alpha = .38f) }
+            Row(
+                modifier.padding(horizontal = 8.dp).fillMaxWidth()
+                    .mochiPressDeform()
+                    .clip(MochiRoundedRectangle(12.dp))
+                    .semantics { selected = isSelected }
+                    .clickable(interactionSource = interaction, indication = LocalIndication.current,
+                        enabled = enabled, onClick = onClick)
+                    .padding(contentPadding).heightIn(min = 48.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                ProvideAppContentColor(foreground) {
+                    if (leadingIcon != null) { leadingIcon(); Spacer(Modifier.width(12.dp)) }
+                    Text(text, Modifier.weight(1f), color = foreground, style = LegadoTheme.typography.labelLarge)
+                    if (trailingIcon != null) { Spacer(Modifier.width(8.dp)); trailingIcon() }
+                    else if (isSelected) AppIcon(Icons.Default.Check, null, Modifier.size(18.dp), tint = foreground)
+                }
+            }
+        }
+        ComposeEngine.Coui -> {
+            val style = CouiMenuDefaults.style()
+            val baseColor = when {
+                hasCustomContentColor -> color
+                isSelected -> style.colors.primary
+                else -> style.colors.onSurface
+            }
+            val foreground = if (enabled) baseColor else baseColor.copy(alpha = minOf(baseColor.alpha, 0.38f))
+            Row(
+                modifier = modifier
+                    .padding(horizontal = 6.dp)
+                    .fillMaxWidth()
+                    .clip(style.itemShape)
+                    .background(if (isSelected) style.colors.primary.copy(alpha = 0.10f) else Color.Transparent)
+                    .semantics { selected = isSelected }
+                    .couiButtonFeedback(interactionSource = interaction, enabled = enabled, list = true)
+                    .clickable(
+                        interactionSource = interaction,
+                        indication = null,
+                        enabled = enabled,
+                        onClick = onClick,
+                    )
+                    .heightIn(min = 40.dp)
+                    .widthIn(min = 120.dp)
+                    .padding(contentPadding),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                ProvideAppContentColor(foreground) {
+                    if (leadingIcon != null) {
+                        leadingIcon()
+                        Spacer(Modifier.width(12.dp))
+                    }
+                    Box(Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
+                        Text(
+                            text = text,
+                            modifier = Modifier.widthIn(max = 200.dp),
+                            color = foreground,
+                            style = style.itemTextStyle,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                    if (trailingIcon != null) {
+                        Spacer(Modifier.width(8.dp))
+                        trailingIcon()
+                    } else if (isSelected) {
+                        Spacer(Modifier.width(8.dp))
+                        AppIcon(Icons.Default.Check, null, Modifier.size(18.dp), tint = foreground)
+                    }
+                }
+            }
+        }
+        ComposeEngine.Material -> {
+            val legadoColorScheme = LegadoTheme.colorScheme
+            val selectedContentColor = legadoColorScheme.primary
+            val defaultContentColor = legadoColorScheme.onSurface
+            val contentColor = if (enabled) {
+                when {
+                    hasCustomContentColor -> color
+                    isSelected -> selectedContentColor
+                    else -> defaultContentColor
+                }
+            } else {
+                when {
+                    hasCustomContentColor -> color.copy(alpha = 0.38f)
+                    isSelected -> selectedContentColor.copy(alpha = 0.38f)
+                    else -> defaultContentColor.copy(alpha = 0.38f)
+                }
+            }
+            val containerColor = legadoColorScheme.surface
+
+            Surface(
+                onClick = onClick,
+                modifier = modifier
+                    .padding(horizontal = 8.dp)
+                    .fillMaxWidth(),
+                enabled = enabled,
+                shape = MaterialTheme.shapes.small,
+                color = containerColor,
+                contentColor = contentColor,
+                interactionSource = interaction
+            ) {
+                Row(
+                    modifier = Modifier
+                        .padding(contentPadding)
+                        .heightIn(min = 48.dp)
+                        .widthIn(min = 120.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(
-                        modifier = Modifier.widthIn(max = 200.dp),
-                        text = text,
-                        style = LegadoTheme.typography.labelLargeEmphasized,
-                        color = contentColor
-                    )
-                }
+                    if (leadingIcon != null) {
+                        leadingIcon()
+                        Spacer(Modifier.width(12.dp))
+                    }
 
-                if (trailingIcon != null) {
-                    Spacer(Modifier.width(8.dp))
-                    trailingIcon()
-                } else {
-                    Spacer(Modifier.width(8.dp))
-                    AppIcon(
-                        imageVector = Icons.Default.Check,
-                        contentDescription = null,
-                        modifier = Modifier.size(18.dp),
-                        tint = if (isSelected) contentColor else Color.Transparent
-                    )
+                    Box(
+                        modifier = Modifier.weight(1f),
+                        contentAlignment = Alignment.CenterStart
+                    ) {
+                        Text(
+                            modifier = Modifier.widthIn(max = 200.dp),
+                            text = text,
+                            style = LegadoTheme.typography.labelLargeEmphasized,
+                            color = contentColor
+                        )
+                    }
+
+                    if (trailingIcon != null) {
+                        Spacer(Modifier.width(8.dp))
+                        trailingIcon()
+                    } else {
+                        Spacer(Modifier.width(8.dp))
+                        AppIcon(
+                            imageVector = Icons.Default.Check,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp),
+                            tint = if (isSelected) contentColor else Color.Transparent
+                        )
+                    }
                 }
             }
         }

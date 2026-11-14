@@ -30,7 +30,7 @@ jobs:
         with:
           ref: ${{ github.event.inputs.branch }}
           fetch-depth: 0
-          # eink 模块经 git 子模块集成（eink/lib 分支）
+          # eink 模块经 git 子模块集成（eink/lib 分支）；上游 UI fork（miuix/coui/mochi）同为子模块
           submodules: recursive
 
       - name: Set up JDK 21
@@ -41,6 +41,9 @@ jobs:
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
+
+      - name: Prepare pinned UI forks
+        uses: ./.github/actions/prepare-ui-forks
 
       - name: Clear 18PlusList.txt
         run: |

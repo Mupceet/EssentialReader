@@ -7,6 +7,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Indication
+import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.combinedClickable
@@ -21,7 +22,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.minimumInteractiveComponentSize
-import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
@@ -63,10 +63,18 @@ internal enum class SeriesIconButtonStyle {
     Outlined
 }
 
+/**
+ * 系列按钮的公共外壳。
+ *
+ * [onClick] 为 `null` 时只画容器与内容，不安装点击节点、涟漪和 `Role.Button` 语义：
+ * 用于 `AppChoiceDropdown` 一类「入口自己包唯一可点节点」的 trigger 槽，
+ * 避免内外两层可点节点（重复播报、锚点触点被吞）。这类调用方必须把锚点
+ * modifier 透传给内容根节点。
+ */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 internal fun SeriesButton(
-    onClick: () -> Unit,
+    onClick: (() -> Unit)?,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
     selected: Boolean = false,
@@ -74,7 +82,7 @@ internal fun SeriesButton(
     size: DpSize? = null,
     enforceMinimumInteractiveSize: Boolean = true,
     clipToShape: Boolean = true,
-    indication: Indication? = ripple(bounded = true),
+    indication: Indication? = LocalIndication.current,
     shape: Shape = IconButtonDefaults.extraSmallRoundShape,
     style: SeriesIconButtonStyle = SeriesIconButtonStyle.Plain,
     contentColor: Color = LegadoTheme.colorScheme.onSurfaceVariant,
@@ -130,14 +138,20 @@ internal fun SeriesButton(
             .then(if (clipToShape) Modifier.clip(shape) else Modifier)
             .background(containerColor, shape)
             .then(if (border != null) Modifier.border(border, shape) else Modifier)
-            .combinedClickable(
-                interactionSource = interactionSource,
-                indication = indication,
-                enabled = enabled,
-                role = Role.Button,
-                onLongClickLabel = onLongClickLabel,
-                onLongClick = onLongClick,
-                onClick = onClick
+            .then(
+                if (onClick != null) {
+                    Modifier.combinedClickable(
+                        interactionSource = interactionSource,
+                        indication = indication,
+                        enabled = enabled,
+                        role = Role.Button,
+                        onLongClickLabel = onLongClickLabel,
+                        onLongClick = onLongClick,
+                        onClick = onClick
+                    )
+                } else {
+                    Modifier
+                }
             )
             .semantics {
                 if (selected) {

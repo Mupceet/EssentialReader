@@ -105,7 +105,6 @@ import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.testTagsAsResourceId
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Dialog
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.legado.app.R
 import io.legado.app.data.entities.BookGroup
@@ -114,13 +113,11 @@ import io.legado.app.help.security.BiometricUnlockLauncher
 import io.legado.app.ui.book.group.GroupEditSheet
 import io.legado.app.ui.book.info.GroupSelectSheet
 import io.legado.app.ui.main.bookCoverSharedElementKey
+import io.legado.app.ui.theme.ComposeEngine
 import io.legado.app.ui.theme.LegadoTheme
 import io.legado.app.ui.theme.LocalBottomOverlayPadding
-import io.legado.app.ui.theme.ProvideAppDensity
-import io.legado.app.ui.theme.ThemeResolver
 import io.legado.app.ui.theme.adaptiveContentPaddingBookshelf
 import io.legado.app.ui.theme.adaptiveHorizontalPadding
-import io.legado.app.ui.theme.adaptiveHorizontalPaddingTab
 import io.legado.app.ui.widget.components.AppPullToRefresh
 import io.legado.app.ui.widget.components.AppScaffold
 import io.legado.app.ui.widget.components.AppTextField
@@ -128,12 +125,10 @@ import io.legado.app.ui.widget.components.EmptyMessage
 import io.legado.app.ui.widget.components.SearchBar
 import io.legado.app.ui.widget.components.alert.AppAlertDialog
 import io.legado.app.ui.widget.components.button.series.SmallPlainButton
-import io.legado.app.ui.widget.components.button.series.SmallToggleButton
-import io.legado.app.ui.widget.components.button.series.ToggleStyle
 import io.legado.app.ui.widget.components.card.NormalCard
 import io.legado.app.ui.widget.components.card.TextCard
 import io.legado.app.ui.widget.components.checkBox.AppCheckbox
-import io.legado.app.ui.widget.components.divider.PillHeaderDivider
+
 import io.legado.app.ui.widget.components.filePicker.FilePickerSheet
 import io.legado.app.ui.widget.components.icon.AppIcon
 import io.legado.app.ui.widget.components.icon.AppIcons
@@ -142,22 +137,26 @@ import io.legado.app.ui.widget.components.importComponents.SourceInputDialog
 import io.legado.app.ui.widget.components.lazylist.FastScrollLazyVerticalGrid
 import io.legado.app.ui.widget.components.list.TopFloatingStickyItem
 import io.legado.app.ui.widget.components.log.AppLogSheet
-import io.legado.app.ui.widget.components.menuItem.RoundDropdownMenu
-import io.legado.app.ui.widget.components.menuItem.RoundDropdownMenuItem
 import io.legado.app.ui.widget.components.privacy.PrivateLockedPage
 import io.legado.app.ui.widget.components.privacy.findFragmentActivity
 import io.legado.app.ui.widget.components.progressIndicator.AppCircularProgressIndicator
 import io.legado.app.ui.widget.components.reorderAccessibility
 import io.legado.app.ui.widget.components.tabRow.AppTabRow
+import io.legado.app.ui.widget.components.tabRow.AppTabRowIconButton
 import io.legado.app.ui.widget.components.text.AppText
 import io.legado.app.ui.widget.components.topbar.GlassMediumFlexibleTopAppBar
 import io.legado.app.ui.widget.components.topbar.GlassTopAppBarDefaults
 import io.legado.app.ui.widget.components.topbar.GlassTopAppBarScrollBehavior
+import io.legado.app.ui.widget.components.menu.AppAction
+import io.legado.app.ui.widget.components.menu.AppActionGroup
+import io.legado.app.ui.widget.components.menu.AppActionMenu
 import io.legado.app.ui.widget.components.topbar.TopBarActionButton
 import io.legado.app.ui.widget.components.topbar.TopBarNavigationButton
+import io.legado.app.ui.theme.isMiuixHyperOs4Enabled
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.ImmutableSet
 import kotlinx.collections.immutable.persistentListOf
+import kotlinx.collections.immutable.toImmutableList
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
@@ -558,7 +557,8 @@ fun BookshelfScreen(
     }
 
     val scrollBehavior = GlassTopAppBarDefaults.defaultScrollBehavior()
-    var showTopBarMenu by remember { mutableStateOf(false) }
+    val showAlternateSearchInMenu = LegadoTheme.composeEngine == ComposeEngine.Coui ||
+            isMiuixHyperOs4Enabled()
     val toggleShelfFilter = {
         toggleBookshelfFilter(
             isSearch = uiState.isSearch,
@@ -574,7 +574,7 @@ fun BookshelfScreen(
             toggleShelfFilter()
         }
     }
-    val onSearchLongClick = {
+    val onAlternateSearch = {
         if (uiState.settings.bookshelfSearchActionDirectToSearch) {
             toggleShelfFilter()
         } else {
@@ -594,11 +594,22 @@ fun BookshelfScreen(
             )
         },
         topBar = {
+            val visibleGroup = uiState.groups.getOrNull(pagerState.currentPage)
+            val isContentScrolled = when {
+                uiState.groups.isEmpty() && !uiState.isSearch -> false
+                isShowingFolderRoot -> folderGridState.canScrollBackward
+                isUsingStandaloneSearchGroup ->
+                    !uiState.selectedGroupLocked && standaloneSearchGridState.canScrollBackward
+                visibleGroup != null && !uiState.isGroupLocked(visibleGroup) ->
+                    groupGridStates[visibleGroup.groupId]?.canScrollBackward == true
+                else -> false
+            }
             BookshelfTopBar(
                 uiState = uiState,
                 scrollBehavior = scrollBehavior,
+                isContentScrolled = isContentScrolled,
                 onSearchClick = onSearchClick,
-                onSearchLongClick = onSearchLongClick,
+                onSearchLongClick = onAlternateSearch.takeUnless { showAlternateSearchInMenu },
                 onSearchQueryChange = { onIntent(BookshelfIntent.SetSearchKey(it)) },
                 onSearchSubmit = { rawQuery ->
                     rawQuery.trim()
@@ -682,239 +693,128 @@ fun BookshelfScreen(
                     }
 
                     if (!isEditMode) {
-                        Box {
-                            TopBarActionButton(
-                                onClick = { showTopBarMenu = true },
-                                imageVector = AppIcons.MoreVert,
-                                contentDescription = stringResource(R.string.more_menu)
-                            )
-                            RoundDropdownMenu(
-                                expanded = showTopBarMenu,
-                                onDismissRequest = { showTopBarMenu = false }
-                            ) { dismiss ->
-                                RoundDropdownMenuItem(
-                                    text = stringResource(R.string.add_remote_book),
-                                    onClick = { onNavigateToRemoteImport(); dismiss() },
-                                    leadingIcon = { AppIcon(Icons.Default.Wifi, null) }
-                                )
-                                RoundDropdownMenuItem(
-                                    text = stringResource(R.string.book_local),
-                                    onClick = { onNavigateToLocalImport(); dismiss() },
-                                    leadingIcon = { AppIcon(Icons.Default.Save, null) }
-                                )
-                                RoundDropdownMenuItem(
-                                    text = stringResource(R.string.update_toc),
-                                    onClick = {
-                                        onIntent(BookshelfIntent.RefreshToc(uiState.items))
-                                        dismiss()
-                                    },
-                                    leadingIcon = { AppIcon(Icons.Default.Refresh, null) }
-                                )
-                                RoundDropdownMenuItem(
-                                    text = stringResource(R.string.layout_setting),
-                                    onClick = {
-                                        onIntent(BookshelfIntent.ShowOverlay(BookshelfOverlay.ConfigSheet))
-                                        dismiss()
-                                    },
-                                    leadingIcon = { AppIcon(Icons.Default.GridView, null) }
-                                )
-                                RoundDropdownMenuItem(
-                                    text = stringResource(R.string.group_manage),
-                                    onClick = {
-                                        onIntent(BookshelfIntent.ShowOverlay(BookshelfOverlay.GroupManageSheet))
-                                        dismiss()
-                                    },
-                                    leadingIcon = { AppIcon(Icons.Outlined.ViewCarousel, null) }
-                                )
-                                RoundDropdownMenuItem(
-                                    text = stringResource(R.string.add_url),
-                                    onClick = {
-                                        onIntent(BookshelfIntent.ShowOverlay(BookshelfOverlay.AddUrlDialog))
-                                        dismiss()
-                                    },
-                                    leadingIcon = { AppIcon(Icons.Default.Link, null) }
-                                )
-                                RoundDropdownMenuItem(
-                                    text = stringResource(R.string.selection_mode),
-                                    onClick = {
-                                        toggleEditMode()
-                                        dismiss()
-                                    },
-                                    leadingIcon = { AppIcon(Icons.Default.Edit, null) }
-                                )
-                                RoundDropdownMenuItem(
-                                    text = stringResource(R.string.bookshelf_management),
-                                    onClick = {
-                                        val groupId =
-                                            uiState.groups.getOrNull(uiState.selectedGroupIndex)?.groupId
-                                                ?: -1L
-                                        onNavigateToCache(groupId)
-                                        dismiss()
-                                    },
-                                    leadingIcon = { AppIcon(Icons.Default.Bookmarks, null) }
-                                )
-                                RoundDropdownMenuItem(
-                                    text = stringResource(R.string.export_bookshelf),
-                                    onClick = {
-                                        onIntent(BookshelfIntent.ShowOverlay(BookshelfOverlay.ExportSheet))
-                                        dismiss()
-                                    },
-                                    leadingIcon = { AppIcon(Icons.Default.UploadFile, null) }
-                                )
-                                RoundDropdownMenuItem(
-                                    text = stringResource(R.string.import_bookshelf),
-                                    onClick = {
-                                        onIntent(BookshelfIntent.ShowOverlay(BookshelfOverlay.ImportSheet))
-                                        dismiss()
-                                    },
-                                    leadingIcon = { AppIcon(Icons.Default.CloudDownload, null) }
-                                )
-                                RoundDropdownMenuItem(
-                                    text = stringResource(R.string.log),
-                                    onClick = {
-                                        onIntent(BookshelfIntent.ShowOverlay(BookshelfOverlay.LogSheet))
-                                        dismiss()
-                                    },
-                                    leadingIcon = { AppIcon(Icons.Default.History, null) }
+                        val moreActions = buildList {
+                            if (showAlternateSearchInMenu) {
+                                val searchFirst = uiState.settings.bookshelfSearchActionDirectToSearch
+                                add(
+                                    AppAction(
+                                        id = "alternate_search",
+                                        label = stringResource(
+                                            if (searchFirst) R.string.bookshelf_filter else R.string.search
+                                        ),
+                                        icon = AppIcons.leadingOrNull(
+                                            if (searchFirst) AppIcons.Filter else AppIcons.Search
+                                        ),
+                                    )
                                 )
                             }
+                            add(AppAction("add_remote", stringResource(R.string.add_remote_book), icon = AppIcons.leadingOrNull(Icons.Default.Wifi)))
+                            add(AppAction("add_local", stringResource(R.string.book_local), icon = AppIcons.leadingOrNull(Icons.Default.Save)))
+                            add(AppAction("update_toc", stringResource(R.string.update_toc), icon = AppIcons.leadingOrNull(Icons.Default.Refresh)))
+                            add(AppAction("layout", stringResource(R.string.layout_setting), icon = AppIcons.leadingOrNull(Icons.Default.GridView)))
+                            add(AppAction("group_manage", stringResource(R.string.group_manage), icon = AppIcons.leadingOrNull(Icons.Outlined.ViewCarousel)))
+                            add(AppAction("add_url", stringResource(R.string.add_url), icon = AppIcons.leadingOrNull(Icons.Default.Link)))
+                            add(AppAction("selection_mode", stringResource(R.string.selection_mode), icon = AppIcons.leadingOrNull(Icons.Default.Edit)))
+                            add(AppAction("bookshelf_management", stringResource(R.string.bookshelf_management), icon = AppIcons.leadingOrNull(Icons.Default.Bookmarks)))
+                            add(AppAction("export", stringResource(R.string.export_bookshelf), icon = AppIcons.leadingOrNull(Icons.Default.UploadFile)))
+                            add(AppAction("import", stringResource(R.string.import_bookshelf), icon = AppIcons.leadingOrNull(Icons.Default.CloudDownload)))
+                            add(AppAction("log", stringResource(R.string.log), icon = AppIcons.leadingOrNull(Icons.Default.History)))
+                        }.toImmutableList()
+                        AppActionMenu(
+                            groups = persistentListOf(
+                                AppActionGroup(id = "bookshelf_more", actions = moreActions)
+                            ),
+                            onAction = { id ->
+                                when (id) {
+                                    "alternate_search" -> onAlternateSearch()
+                                    "add_remote" -> onNavigateToRemoteImport()
+                                    "add_local" -> onNavigateToLocalImport()
+                                    "update_toc" -> onIntent(BookshelfIntent.RefreshToc(uiState.items))
+                                    "layout" -> onIntent(BookshelfIntent.ShowOverlay(BookshelfOverlay.ConfigSheet))
+                                    "group_manage" -> onIntent(BookshelfIntent.ShowOverlay(BookshelfOverlay.GroupManageSheet))
+                                    "add_url" -> onIntent(BookshelfIntent.ShowOverlay(BookshelfOverlay.AddUrlDialog))
+                                    "selection_mode" -> toggleEditMode()
+                                    "bookshelf_management" -> {
+                                        val groupId =
+                                            uiState.groups.getOrNull(uiState.selectedGroupIndex)?.groupId ?: -1L
+                                        onNavigateToCache(groupId)
+                                    }
+                                    "export" -> onIntent(BookshelfIntent.ShowOverlay(BookshelfOverlay.ExportSheet))
+                                    "import" -> onIntent(BookshelfIntent.ShowOverlay(BookshelfOverlay.ImportSheet))
+                                    "log" -> onIntent(BookshelfIntent.ShowOverlay(BookshelfOverlay.LogSheet))
+                                }
+                            },
+                        ) {
+                            AppIcon(
+                                imageVector = AppIcons.MoreVert,
+                                contentDescription = stringResource(R.string.more_menu),
+                                modifier = this.modifier,
+                            )
                         }
                     }
                 },
                 bottomContent = {
                     if (bookGroupStyle == 0 && uiState.groups.isNotEmpty()) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .adaptiveHorizontalPaddingTab(),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            val selectedTabIndex =
-                                pagerState.currentPage.coerceIn(0, uiState.groups.size - 1)
-                            val tabTitles = remember(uiState.groups) {
-                                uiState.groups.map { it.groupName }
-                            }
-
-                            AppTabRow(
-                                tabTitles = tabTitles,
-                                selectedTabIndex = selectedTabIndex,
-                                onTabSelected = { index ->
-                                    scope.launch { pagerState.animateScrollToPage(index) }
-                                },
-                                modifier = Modifier.weight(1f)
-                            )
-
-                            val showExpandButton = uiState.settings.shouldShowExpandButton
-                            if (showExpandButton) {
-                                Box(modifier = Modifier) {
-                                    SmallToggleButton(
-                                        checked = showGroupMenu,
-                                        onCheckedChange = {
-                                            if (it) {
-                                                onIntent(BookshelfIntent.ShowOverlay(BookshelfOverlay.GroupMenu))
-                                            } else {
+                        val selectedTabIndex = pagerState.currentPage.coerceIn(uiState.groups.indices)
+                        val tabTitles = remember(uiState.groups) { uiState.groups.map { it.groupName } }
+                        AppTabRow(
+                            tabTitles = tabTitles,
+                            selectedTabIndex = selectedTabIndex,
+                            onTabSelected = { index ->
+                                scope.launch { pagerState.animateScrollToPage(index) }
+                            },
+                            horizontalPadding = 12.dp,
+                            trailingAction = if (uiState.settings.shouldShowExpandButton) {
+                                {
+                                    val pagerGroups = uiState.groups
+                                    Box {
+                                        AppTabRowIconButton(
+                                            checked = showGroupMenu,
+                                            onClick = {
+                                                if (showGroupMenu) {
+                                                    onIntent(BookshelfIntent.DismissOverlay)
+                                                } else {
+                                                    onIntent(
+                                                        BookshelfIntent.ShowOverlay(BookshelfOverlay.GroupMenu)
+                                                    )
+                                                }
+                                            },
+                                            icon = Icons.AutoMirrored.Filled.FormatListBulleted,
+                                            contentDescription = stringResource(R.string.group_manage),
+                                        )
+                                        BookshelfGroupMenu(
+                                            groups = pagerGroups,
+                                            currentGroupId = currentMenuGroupId,
+                                            expanded = showGroupMenu,
+                                            modifier = Modifier.matchParentSize(),
+                                            onDismiss = {
                                                 onIntent(BookshelfIntent.DismissOverlay)
-                                            }
-                                        },
-                                        style = ToggleStyle.Outlined,
-                                        icon = Icons.AutoMirrored.Filled.FormatListBulleted,
-                                        contentDescription = stringResource(R.string.group_manage)
-                                    )
-                                    RoundDropdownMenu(
-                                        expanded = showGroupMenu,
-                                        onDismissRequest = { onIntent(BookshelfIntent.DismissOverlay) }
-                                    ) { dismiss ->
-                                        uiState.groups.forEachIndexed { index, group ->
-                                            RoundDropdownMenuItem(
-                                                text = group.groupName,
-                                                onClick = {
-                                                    if (uiState.isSearch) {
-                                                        onIntent(BookshelfIntent.ChangeGroup(group.groupId))
-                                                    }
+                                            },
+                                            onSelect = { group ->
+                                                val index = pagerGroups.indexOfFirst {
+                                                    it.groupId == group.groupId
+                                                }
+                                                if (uiState.isSearch) {
+                                                    onIntent(
+                                                        BookshelfIntent.ChangeGroup(group.groupId)
+                                                    )
+                                                }
+                                                if (index >= 0) {
                                                     scope.launch {
-                                                        pagerState.animateScrollToPage(
-                                                            index
-                                                        )
-                                                    }
-                                                    dismiss()
-                                                },
-                                                trailingIcon = {
-                                                    val isSelected = if (uiState.isSearch) {
-                                                        uiState.selectedGroupId == group.groupId
-                                                    } else {
-                                                        selectedTabIndex == index
-                                                    }
-                                                    if (isSelected) {
-                                                        AppIcon(
-                                                            Icons.Default.Check,
-                                                            null,
-                                                            modifier = Modifier.size(18.dp)
-                                                        )
+                                                        pagerState.animateScrollToPage(index)
                                                     }
                                                 }
-                                            )
-                                        }
-
-                                        if (uiState.isSearch) {
-                                            val allGroup = uiState.allGroups.firstOrNull {
-                                                it.groupId == BookGroup.IdAll
-                                            }
-                                            val hiddenGroups = uiState.allGroups.filter {
-                                                !it.show && it.groupId != BookGroup.IdAll
-                                            }
-
-                                            if (allGroup != null || hiddenGroups.isNotEmpty()) {
-                                                PillHeaderDivider(
-                                                    title = "${stringResource(R.string.all)} / ${
-                                                        stringResource(
-                                                            R.string.hide
-                                                        )
-                                                    }"
-                                                )
-
-                                                allGroup?.let { group ->
-                                                    RoundDropdownMenuItem(
-                                                        text = group.groupName,
-                                                        onClick = {
-                                                            onIntent(BookshelfIntent.ChangeGroup(group.groupId))
-                                                            dismiss()
-                                                        },
-                                                        trailingIcon = {
-                                                            if (uiState.selectedGroupId == group.groupId) {
-                                                                AppIcon(
-                                                                    Icons.Default.Check,
-                                                                    null,
-                                                                    modifier = Modifier.size(18.dp)
-                                                                )
-                                                            }
-                                                        }
-                                                    )
-                                                }
-
-                                                hiddenGroups.forEach { group ->
-                                                    RoundDropdownMenuItem(
-                                                        text = group.groupName,
-                                                        onClick = {
-                                                            onIntent(BookshelfIntent.ChangeGroup(group.groupId))
-                                                            dismiss()
-                                                        },
-                                                        trailingIcon = {
-                                                            if (uiState.selectedGroupId == group.groupId) {
-                                                                AppIcon(
-                                                                    Icons.Default.Check,
-                                                                    null,
-                                                                    modifier = Modifier.size(18.dp)
-                                                                )
-                                                            }
-                                                        }
-                                                    )
-                                                }
-                                            }
-                                        }
+                                            },
+                                            extraGroups = if (uiState.isSearch) {
+                                                bookshelfSearchMenuGroups(uiState.allGroups)
+                                            } else {
+                                                emptyList()
+                                            },
+                                        )
                                     }
                                 }
-                            }
-                        }
+                            } else null,
+                        )
                     }
                 }
             )
@@ -1264,43 +1164,32 @@ fun BookshelfScreen(
 
 
                     if (summary.showGroupName) {
-                        RoundDropdownMenu(
+                        BookshelfGroupMenu(
+                            groups = uiState.groups,
+                            currentGroupId = currentMenuGroupId,
                             expanded = showGroupMenu,
-                            onDismissRequest = { onIntent(BookshelfIntent.DismissOverlay) }
-                        ) { dismiss ->
-                            uiState.groups.forEach { group ->
-                                RoundDropdownMenuItem(
-                                    text = group.groupName,
-                                    onClick = {
-                                        val targetIndex =
-                                            uiState.groups.indexOfFirst { it.groupId == group.groupId }
-                                        if (targetIndex >= 0) {
-                                            scope.launch {
-                                                if (pagerState.currentPage != targetIndex) {
-                                                    pagerState.animateScrollToPage(targetIndex)
-                                                }
-                                            }
-                                        }
-                                        if (uiState.isSearch || uiState.selectedGroupId != group.groupId) {
-                                            onIntent(BookshelfIntent.ChangeGroup(group.groupId))
-                                        }
-                                        if (bookGroupStyle == 2) {
-                                            onIntent(BookshelfIntent.SetInFolderRoot(false))
-                                        }
-                                        dismiss()
-                                    },
-                                    trailingIcon = {
-                                        if (currentMenuGroupId == group.groupId) {
-                                            AppIcon(
-                                                Icons.Default.Check,
-                                                null,
-                                                modifier = Modifier.size(18.dp)
-                                            )
+                            modifier = Modifier.matchParentSize(),
+                            onDismiss = { onIntent(BookshelfIntent.DismissOverlay) },
+                            onSelect = { group ->
+                                val targetIndex =
+                                    uiState.groups.indexOfFirst { it.groupId == group.groupId }
+                                if (targetIndex >= 0) {
+                                    scope.launch {
+                                        if (pagerState.currentPage != targetIndex) {
+                                            pagerState.animateScrollToPage(targetIndex)
                                         }
                                     }
-                                )
-                            }
-                        }
+                                }
+                                if (uiState.isSearch ||
+                                    uiState.selectedGroupId != group.groupId
+                                ) {
+                                    onIntent(BookshelfIntent.ChangeGroup(group.groupId))
+                                }
+                                if (bookGroupStyle == 2) {
+                                    onIntent(BookshelfIntent.SetInFolderRoot(false))
+                                }
+                            },
+                        )
                     }
                 }
             }
@@ -1320,6 +1209,69 @@ fun BookshelfScreen(
     )
 }
 
+private const val BookshelfGroupMenuIdPrefix = "group:"
+
+/**
+ * 书架分组切换菜单（顶栏分组按钮与编辑态分组胶囊两处入口共用）。
+ *
+ * 受控模式：开合由 `BookshelfOverlay.GroupMenu` 统一持有，这里只渲染弹层，锚点取调用方给的容器，
+ * 因此两处都必须在外面留一个有尺寸的 `Box`。当前分组用 `AppAction.selected` 表达；
+ * 原菜单里的「全部 / 隐藏」标题按口径降级为组间分段线（第二组存在时才画线）。
+ *
+ * 两处入口的点击语义略有差别（编辑态那处还要退回复层、改分组），所以选中后的动作由
+ * [onSelect] 交给调用方，本组件只负责把 `group:<id>` 还原成 [BookGroupUi]。
+ */
+@Composable
+private fun BookshelfGroupMenu(
+    groups: List<BookGroupUi>,
+    currentGroupId: Long,
+    expanded: Boolean,
+    modifier: Modifier = Modifier,
+    onDismiss: () -> Unit,
+    onSelect: (BookGroupUi) -> Unit,
+    extraGroups: List<BookGroupUi> = emptyList(),
+) {
+    val all = groups + extraGroups
+    val menuGroups = persistentListOf(
+        AppActionGroup(
+            id = "bookshelf_groups",
+            actions = groups.map { group ->
+                AppAction(
+                    id = "$BookshelfGroupMenuIdPrefix${group.groupId}",
+                    label = group.groupName,
+                    selected = currentGroupId == group.groupId,
+                )
+            }.toImmutableList(),
+        ),
+        AppActionGroup(
+            id = "bookshelf_hidden_groups",
+            actions = extraGroups.map { group ->
+                AppAction(
+                    id = "$BookshelfGroupMenuIdPrefix${group.groupId}",
+                    label = group.groupName,
+                    selected = currentGroupId == group.groupId,
+                )
+            }.toImmutableList(),
+        ),
+    )
+    AppActionMenu(
+        groups = menuGroups,
+        onAction = { id ->
+            all.firstOrNull { "$BookshelfGroupMenuIdPrefix${it.groupId}" == id }
+                ?.let(onSelect)
+        },
+        modifier = modifier,
+        embeddedExpanded = expanded,
+        onDismissRequest = onDismiss,
+        trigger = {},
+    )
+}
+
+/** 搜索态的第二组：`全部` + 已隐藏的分组。 */
+private fun bookshelfSearchMenuGroups(allGroups: List<BookGroupUi>): List<BookGroupUi> =
+    listOfNotNull(allGroups.firstOrNull { it.groupId == BookGroup.IdAll }) +
+        allGroups.filter { !it.show && it.groupId != BookGroup.IdAll }
+
 internal fun toggleBookshelfFilter(
     isSearch: Boolean,
     selectedGroupId: Long,
@@ -1337,8 +1289,9 @@ internal fun toggleBookshelfFilter(
 private fun BookshelfTopBar(
     uiState: BookshelfUiState,
     scrollBehavior: GlassTopAppBarScrollBehavior,
+    isContentScrolled: Boolean,
     onSearchClick: () -> Unit,
-    onSearchLongClick: () -> Unit,
+    onSearchLongClick: (() -> Unit)?,
     onSearchQueryChange: (String) -> Unit,
     onSearchSubmit: (String) -> Unit,
     onClearSearch: () -> Unit,
@@ -1369,6 +1322,9 @@ private fun BookshelfTopBar(
         useCharMode = uiState.isLoading,
         subtitle = uiState.subtitle,
         scrollBehavior = scrollBehavior,
+        isContentScrolled = isContentScrolled,
+        // Selection can show seven actions. Preserve their space alongside the close button.
+        compactMiuixActions = uiState.isEditMode,
         actions = {
             TopBarActionButton(
                 onClick = onSearchClick,
@@ -1580,34 +1536,26 @@ private fun BookshelfOverlays(
         )
     }
 
-    if (uiState.isLoading) {
-        val loadingDescription = uiState.loadingText ?: stringResource(R.string.loading)
-        Dialog(onDismissRequest = {}) {
-            ProvideAppDensity {
-                NormalCard(
-                    modifier = Modifier.semantics {
-                        contentDescription = loadingDescription
-                    },
-                    cornerRadius = 12.dp,
-                    containerColor = LegadoTheme.colorScheme.surfaceContainerHigh
-                ) {
-                    Column(
-                        modifier = Modifier.padding(24.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        AppCircularProgressIndicator()
-                        uiState.loadingText?.let {
-                            AppText(
-                                text = it,
-                                modifier = Modifier.padding(top = 16.dp),
-                                style = LegadoTheme.typography.bodyMedium
-                            )
-                        }
-                    }
+    val loadingDescription = uiState.loadingText ?: stringResource(R.string.loading)
+    AppAlertDialog(
+        show = uiState.isLoading,
+        onDismissRequest = {},
+        content = {
+            Column(
+                modifier = Modifier.fillMaxWidth().semantics { contentDescription = loadingDescription },
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                AppCircularProgressIndicator()
+                uiState.loadingText?.let {
+                    AppText(
+                        text = it,
+                        modifier = Modifier.padding(top = 16.dp),
+                        style = LegadoTheme.typography.bodyMedium,
+                    )
                 }
             }
-        }
-    }
+        },
+    )
 }
 
 private data class BookshelfEditStickySummary(
@@ -1737,7 +1685,7 @@ fun BookshelfPage(
     val showFastScroll = uiState.settings.showBookshelfFastScroller
     val listContentDescription = stringResource(R.string.bookshelf)
     val totalHorizontalPadding =
-        if (ThemeResolver.isMiuixEngine(LegadoTheme.composeEngine)) 12.dp else 16.dp
+        if (LegadoTheme.composeEngine == ComposeEngine.Miuix) 12.dp else 16.dp
     val gridContentHorizontalPadding = totalHorizontalPadding / 2
     val gridInnerHorizontalPadding = totalHorizontalPadding / 2
     val hapticFeedback = LocalHapticFeedback.current

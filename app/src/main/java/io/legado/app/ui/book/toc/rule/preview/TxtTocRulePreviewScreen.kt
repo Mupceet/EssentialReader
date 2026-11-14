@@ -63,6 +63,7 @@ import io.legado.app.ui.widget.components.text.AppText
 import io.legado.app.ui.widget.components.topbar.GlassMediumFlexibleTopAppBar
 import io.legado.app.ui.widget.components.topbar.GlassTopAppBarDefaults
 import io.legado.app.ui.widget.components.topbar.TopBarActionButton
+import io.legado.app.ui.theme.isMiuixHyperOs4Enabled
 import io.legado.app.ui.widget.components.topbar.TopBarNavigationButton
 import io.legado.app.utils.toastOnUi
 import org.koin.androidx.compose.koinViewModel
@@ -178,22 +179,24 @@ fun TxtTocRulePreviewScreen(
     }
 
     val scrollBehavior = GlassTopAppBarDefaults.defaultScrollBehavior()
+    val alwaysShowSearch = isMiuixHyperOs4Enabled()
 
     AppScaffold(
         modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
-        topBar = { _ ->
+        topBar = {
             GlassMediumFlexibleTopAppBar(
                 title = stringResource(R.string.select_toc_rule),
                 subtitle = stringResource(R.string.select_rule_to_preview_chapters),
                 scrollBehavior = scrollBehavior,
                 navigationIcon = { TopBarNavigationButton(onBack) },
                 actions = {
-                    // Search button
-                    TopBarActionButton(
-                        onClick = { onIntent(TxtTocRulePreviewIntent.ToggleSearch) },
-                        imageVector = AppIcons.Search,
-                        contentDescription = stringResource(R.string.search),
-                    )
+                    if (!alwaysShowSearch) {
+                        TopBarActionButton(
+                            onClick = { onIntent(TxtTocRulePreviewIntent.ToggleSearch) },
+                            imageVector = AppIcons.Search,
+                            contentDescription = stringResource(R.string.search),
+                        )
+                    }
                     // Layout toggle button
                     TopBarActionButton(
                         onClick = { onIntent(TxtTocRulePreviewIntent.ToggleLayout) },
@@ -216,7 +219,7 @@ fun TxtTocRulePreviewScreen(
                 bottomContent = {
                     AnimatedVisibility(
                         modifier = Modifier.adaptiveHorizontalPadding(),
-                        visible = state.showSearch,
+                        visible = alwaysShowSearch || state.showSearch,
                         enter = expandVertically() + fadeIn(),
                         exit = shrinkVertically() + fadeOut()
                     ) {
@@ -225,6 +228,7 @@ fun TxtTocRulePreviewScreen(
                             onQueryChange = { onIntent(TxtTocRulePreviewIntent.UpdateSearchQuery(it)) },
                             onSearch = {},
                             placeholder = stringResource(R.string.search),
+                            autoFocus = !alwaysShowSearch,
                         )
                     }
                 },

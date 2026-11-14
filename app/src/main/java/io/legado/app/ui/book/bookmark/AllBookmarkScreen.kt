@@ -55,10 +55,12 @@ import io.legado.app.ui.widget.components.EmptyMessage
 import io.legado.app.ui.widget.components.SearchBar
 import io.legado.app.ui.widget.components.bookmark.BookmarkEditSheet
 import io.legado.app.ui.widget.components.card.GlassCard
+import io.legado.app.ui.widget.components.icon.AppIcon
 import io.legado.app.ui.widget.components.icon.AppIcons
 import io.legado.app.ui.widget.components.image.cover.CoilBookCover
-import io.legado.app.ui.widget.components.menuItem.RoundDropdownMenu
-import io.legado.app.ui.widget.components.menuItem.RoundDropdownMenuItem
+import io.legado.app.ui.widget.components.menu.AppAction
+import io.legado.app.ui.widget.components.menu.AppActionGroup
+import io.legado.app.ui.widget.components.menu.AppActionMenu
 import io.legado.app.ui.widget.components.privacy.PrivateLockedCover
 import io.legado.app.ui.widget.components.privacy.rememberPrivateLockedBookUrls
 import io.legado.app.ui.widget.components.tabRow.AppTabRow
@@ -66,7 +68,9 @@ import io.legado.app.ui.widget.components.text.AppText
 import io.legado.app.ui.widget.components.topbar.GlassMediumFlexibleTopAppBar
 import io.legado.app.ui.widget.components.topbar.GlassTopAppBarDefaults
 import io.legado.app.ui.widget.components.topbar.TopBarActionButton
+import io.legado.app.ui.theme.isMiuixHyperOs4Enabled
 import io.legado.app.ui.widget.components.topbar.TopBarNavigationButton
+import kotlinx.collections.immutable.persistentListOf
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.launch
@@ -132,7 +136,7 @@ fun AllBookmarkScreen(
 ) {
     val selectedBook = state.selectedBook
     var showSearch by remember(selectedBook?.key) { mutableStateOf(false) }
-    var showMenu by remember { mutableStateOf(false) }
+    val alwaysShowSearch = isMiuixHyperOs4Enabled()
     val overviewListState = rememberLazyListState()
     val bookmarkListState = rememberLazyListState()
     val noteListState = rememberLazyListState()
@@ -194,36 +198,43 @@ fun AllBookmarkScreen(
                         )
                     },
                     actions = {
-                        TopBarActionButton(
-                            onClick = {
-                                showSearch = !showSearch
-                                if (!showSearch) onIntent(AllBookmarkIntent.SetSearchQuery(""))
-                            },
-                            imageVector = Icons.Default.Search,
-                            contentDescription = stringResource(R.string.search),
-                        )
-                        if (selectedBook != null) {
+                        if (!alwaysShowSearch) {
                             TopBarActionButton(
-                                onClick = { showMenu = true },
-                                imageVector = AppIcons.MoreVert,
-                                contentDescription = stringResource(R.string.more_menu),
+                                onClick = {
+                                    showSearch = !showSearch
+                                    if (!showSearch) onIntent(AllBookmarkIntent.SetSearchQuery(""))
+                                },
+                                imageVector = Icons.Default.Search,
+                                contentDescription = stringResource(R.string.search),
                             )
-                            RoundDropdownMenu(
-                                expanded = showMenu,
-                                onDismissRequest = { showMenu = false }) {
-                                RoundDropdownMenuItem(
-                                    text = stringResource(R.string.export_bookmarks_json),
-                                    onClick = {
-                                        showMenu = false
-                                        onRequestExport(selectedBook.key, false)
-                                    },
-                                )
-                                RoundDropdownMenuItem(
-                                    text = stringResource(R.string.export_bookmarks_markdown),
-                                    onClick = {
-                                        showMenu = false
-                                        onRequestExport(selectedBook.key, true)
-                                    },
+                        }
+                        if (selectedBook != null) {
+                            AppActionMenu(
+                                groups = persistentListOf(
+                                    AppActionGroup(
+                                        id = "bookmark_export",
+                                        actions = persistentListOf(
+                                            AppAction(
+                                                id = "export_json",
+                                                label = stringResource(R.string.export_bookmarks_json),
+                                            ),
+                                            AppAction(
+                                                id = "export_markdown",
+                                                label = stringResource(R.string.export_bookmarks_markdown),
+                                            ),
+                                        ),
+                                    ),
+                                ),
+                                onAction = { id ->
+                                    when (id) {
+                                        "export_json" -> onRequestExport(selectedBook.key, false)
+                                        "export_markdown" -> onRequestExport(selectedBook.key, true)
+                                    }
+                                },
+                            ) {
+                                AppIcon(
+                                    imageVector = AppIcons.MoreVert,
+                                    contentDescription = stringResource(R.string.more_menu),
                                 )
                             }
                         }
@@ -231,7 +242,7 @@ fun AllBookmarkScreen(
                 )
                 AnimatedVisibility(
                     modifier = Modifier.adaptiveHorizontalPadding(),
-                    visible = showSearch,
+                    visible = alwaysShowSearch || showSearch,
                     enter = expandVertically() + fadeIn(),
                     exit = shrinkVertically() + fadeOut(),
                 ) {
@@ -248,6 +259,7 @@ fun AllBookmarkScreen(
                         },
                         scrollState = activeListState,
                         scope = scope,
+                        autoFocus = !alwaysShowSearch,
                     )
                 }
                 if (selectedBook != null) {

@@ -52,9 +52,15 @@ import io.legado.app.ui.book.read.sheet.ReaderBookHeader
 import io.legado.app.ui.book.read.sheet.ReaderBookHeaderState
 import io.legado.app.ui.theme.LegadoTheme
 import io.legado.app.ui.widget.components.card.NormalCard
-import io.legado.app.ui.widget.components.menuItem.RoundDropdownMenu
-import io.legado.app.ui.widget.components.menuItem.RoundDropdownMenuItem
+import io.legado.app.ui.widget.components.card.resolveBaseCardShape
+import io.legado.app.ui.widget.components.menu.AppAction
+import io.legado.app.ui.widget.components.menu.AppActionGroup
+import io.legado.app.ui.widget.components.menu.AppActionMenu
+import io.legado.app.ui.widget.components.menu.AppChoiceDropdown
+import io.legado.app.ui.widget.components.menu.AppChoiceOption
 import io.legado.app.ui.widget.components.modalBottomSheet.AppModalBottomSheet
+import kotlinx.collections.immutable.persistentListOf
+import kotlinx.collections.immutable.toImmutableList
 import io.legado.app.ui.widget.components.reader.ReaderMenuActionSquare
 import io.legado.app.ui.widget.components.text.AppText
 
@@ -142,6 +148,7 @@ internal fun MangaReaderSourceActionsSheet(
         }
         Column(Modifier
             .fillMaxWidth()
+            .verticalScroll(rememberScrollState())
             .padding(horizontal = 16.dp)) {
             actions.chunked(4).forEach { rowActions ->
                 Row(
@@ -170,6 +177,7 @@ private fun MangaSourceActionSquare(
     dispatch: (MangaReaderIntent) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val longClickIntent = action.longClickIntent
     var expanded by remember(action.intent) { mutableStateOf(false) }
     Box(modifier) {
         ReaderMenuActionSquare(
@@ -179,19 +187,35 @@ private fun MangaSourceActionSquare(
             onClick = { dispatch(action.intent) },
             onMoreClick = { expanded = true },
         )
-        RoundDropdownMenu(
-            expanded = expanded,
-            onDismissRequest = { expanded = false },
-        ) { dismiss ->
-            action.longClickIntent?.let { intent ->
-                RoundDropdownMenuItem(
-                    text = stringResource(R.string.source_custom_button_long_action),
-                    onClick = { dismiss(); dispatch(intent) },
-                )
-            }
+        // 只有一条长按动作：没有 longClickIntent 时连弹层都不组合，
+        // 开合仍由动作格的「更多」通道写入 expanded。
+        if (longClickIntent != null) {
+            AppActionMenu(
+                groups = persistentListOf(
+                    AppActionGroup(
+                        id = MangaSourceLongActionGroup,
+                        actions = persistentListOf(
+                            AppAction(
+                                id = MangaSourceLongAction,
+                                label = stringResource(R.string.source_custom_button_long_action),
+                            ),
+                        ),
+                    ),
+                ),
+                onAction = { id ->
+                    if (id == MangaSourceLongAction) dispatch(longClickIntent)
+                },
+                modifier = Modifier.matchParentSize(),
+                embeddedExpanded = expanded,
+                onDismissRequest = { expanded = false },
+                trigger = {},
+            )
         }
     }
 }
+
+private const val MangaSourceLongActionGroup = "manga_source_long_action_group"
+private const val MangaSourceLongAction = "manga_source_long_action"
 
 @Composable
 internal fun MangaReaderPageActionsSheet(
@@ -445,11 +469,22 @@ private fun MangaClickAreaCell(
     onPick: (Int) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    var expanded by remember { mutableStateOf(false) }
-    Box(modifier = modifier) {
+    val choices = MangaClickActionEntries
+        .map { (value, labelRes) ->
+            AppChoiceOption(id = value.toString(), label = stringResource(labelRes))
+        }
+        .toImmutableList()
+    AppChoiceDropdown(
+        options = choices,
+        selectedId = action.toString(),
+        onSelect = { id -> onPick(id.toInt()) },
+        title = stringResource(R.string.manga_reader_click_areas),
+        compact = true,
+        triggerShape = resolveBaseCardShape(),
+        modifier = modifier,
+    ) {
         NormalCard(
-            onClick = { expanded = true },
-            modifier = Modifier.fillMaxSize(),
+            modifier = this.modifier.fillMaxSize(),
             cornerRadius = 16.dp,
             containerColor = LegadoTheme.colorScheme.surfaceContainer.copy(alpha = 0.9f),
         ) {
@@ -461,21 +496,6 @@ private fun MangaClickAreaCell(
                     text = stringResource(mangaClickActionLabelRes(action)),
                     style = LegadoTheme.typography.bodyMedium,
                     textAlign = TextAlign.Center,
-                )
-            }
-        }
-        RoundDropdownMenu(
-            expanded = expanded,
-            onDismissRequest = { expanded = false },
-        ) { dismiss ->
-            MangaClickActionEntries.forEach { (value, labelRes) ->
-                RoundDropdownMenuItem(
-                    text = stringResource(labelRes),
-                    isSelected = value == action,
-                    onClick = {
-                        onPick(value)
-                        dismiss()
-                    },
                 )
             }
         }

@@ -5,6 +5,7 @@ import android.hardware.Sensor
 import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
 import android.hardware.SensorManager
+import android.os.Build
 import android.os.SystemClock
 import android.view.KeyEvent
 import android.view.View
@@ -35,6 +36,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -45,6 +47,7 @@ import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.rememberGraphicsLayer
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
@@ -94,6 +97,7 @@ import io.legado.app.ui.main.AndroidPlatformCapabilities
 import io.legado.app.ui.main.MainActivity
 import io.legado.app.ui.main.readerSharedBounds
 import io.legado.app.ui.replace.ReplaceEditRoute
+import io.legado.app.ui.theme.ComposeEngine
 import io.legado.app.ui.theme.LegadoTheme
 import io.legado.app.ui.theme.LocalAppUiConfiguration
 import io.legado.app.ui.widget.components.text.AppText
@@ -212,6 +216,14 @@ fun ReadBookRouteScreen(
     )
     val effectsReady = remember(viewModel) { CompletableDeferred<Unit>() }
     val menuBackdrop = rememberLayerBackdrop()
+    val selectionBackdrop = if (LegadoTheme.composeEngine == ComposeEngine.Miuix &&
+        appUiConfiguration.theme.useHyperOs4Components &&
+        Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
+    ) {
+        val layer = rememberGraphicsLayer()
+        remember(layer) { ReaderSelectionBackdrop(layer) }
+    } else null
+    val selectionMenuState = controller.textMenuState.collectAsStateWithLifecycle()
     val menuHazeState = remember { HazeState() }
     val useMenuHazeSource = state.menuConfig.readMenuTopBarBlurMode == ReadMenuBlurMode.Haze ||
             state.menuConfig.readMenuBottomBarBlurMode == ReadMenuBlurMode.Haze ||
@@ -259,8 +271,8 @@ fun ReadBookRouteScreen(
 
     LaunchedEffect(viewModel, controller, lifecycleOwner) {
         lifecycleOwner.lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
-            viewModel.readAloudProgress.collect { chapterStart ->
-                chapterStart?.let(controller::updateReadAloudProgress)
+            viewModel.readAloudProgress.collect { position ->
+                position?.let(controller::updateReadAloudProgress)
             }
         }
     }
@@ -730,7 +742,12 @@ fun ReadBookRouteScreen(
                             Modifier
                         }
                     )
-                    .layerBackdrop(menuBackdrop),
+                    .layerBackdrop(menuBackdrop)
+                    .then(
+                        if (selectionBackdrop != null) {
+                            with(selectionBackdrop) { Modifier.recordReaderWhileSelecting(selectionMenuState) }
+                        } else Modifier,
+                    ),
                 onPreviousPage = { controller.completeComposePageTurn(PageDirection.PREV) },
                 onNextPage = { controller.completeComposePageTurn(PageDirection.NEXT) },
                     onPageBoundaryReached = controller::showComposePageBoundary,
@@ -751,6 +768,7 @@ fun ReadBookRouteScreen(
                 onAutoPageStop = controller::stopAutoPage,
                 onShowSelectionMenu = controller::showComposeTextActionMenu,
                 onDismissSelectionMenu = controller::dismissTextActionMenu,
+                onTurnToSelectionPage = { controller.completeComposePageTurn(PageDirection.NEXT, it) },
                 onElementClick = controller::onComposeReaderElementClick,
                 onElementLongPress = controller::onComposeReaderElementLongPress,
                 selectionEnabled = readPreferences.selectText,
@@ -772,6 +790,7 @@ fun ReadBookRouteScreen(
                 noAnimationScrollPage = readPreferences.noAnimScrollPage,
                 externalPageTurns = controller.composePageTurns,
                 externalSelectionCancels = controller.composeSelectionCancels,
+                externalSelectionExtensions = controller.composeSelectionExtensions,
                     externalSelections = controller.composeSelections,
                     onVisibleBodyTextPositionProvider = controller::setComposeVisibleBodyTextPositionProvider,
                 )
@@ -988,16 +1007,21 @@ fun ReadBookRouteScreen(
                 }
             }
             ReaderPerfTrace.marker("compose.selection.begin")
-            ReaderTextSelectionOverlay(
-                controller = controller,
-                viewModel = viewModel,
-                expandTextMenu = readPreferences.expandTextMenu,
-                showSelectMenuIcon = readPreferences.showSelectMenuIcon,
-                lastMarkingStyle = readPreferences.lastMarkingStyle,
-                onOpenManage = {
-                    viewModel.onIntent(ReadBookIntent.ShowSheet(ReadBookSheet.TextSelectMenuConfig))
-                },
-            )
+            CompositionLocalProvider(
+                LocalReaderSelectionBackdrop provides selectionBackdrop.takeIf { hasReadablePage },
+            ) {
+                ReaderTextSelectionOverlay(
+                    controller = controller,
+                    viewModel = viewModel,
+                    textMenuState = selectionMenuState,
+                    expandTextMenu = readPreferences.expandTextMenu,
+                    showSelectMenuIcon = readPreferences.showSelectMenuIcon,
+                    lastMarkingStyle = readPreferences.lastMarkingStyle,
+                    onOpenManage = {
+                        viewModel.onIntent(ReadBookIntent.ShowSheet(ReadBookSheet.TextSelectMenuConfig))
+                    },
+                )
+            }
             ReaderPerfTrace.marker("compose.selection.end")
         }
         ReaderPerfTrace.marker("compose.chrome.end")
@@ -1033,15 +1057,17 @@ private fun sampleReaderSystemBarInsets(
 ): ReaderContentAvoidancePolicy.SystemBarInsets {
     val rootInsets = ViewCompat.getRootWindowInsets(view)
     val cutout = rootInsets?.getInsets(WindowInsetsCompat.Type.displayCutout())
+    val navigationBar = rootInsets?.getInsetsIgnoringVisibility(WindowInsetsCompat.Type.navigationBars())
     return ReaderContentAvoidancePolicy.SystemBarInsets(
         statusBarTopPx = rootInsets
             ?.getInsetsIgnoringVisibility(WindowInsetsCompat.Type.statusBars())?.top ?: 0,
-        navigationBarBottomPx = rootInsets
-            ?.getInsetsIgnoringVisibility(WindowInsetsCompat.Type.navigationBars())?.bottom ?: 0,
+        navigationBarBottomPx = navigationBar?.bottom ?: 0,
         cutoutLeftPx = cutout?.left ?: 0,
         cutoutTopPx = cutout?.top ?: 0,
         cutoutRightPx = cutout?.right ?: 0,
         cutoutBottomPx = cutout?.bottom ?: 0,
+        navigationBarLeftPx = navigationBar?.left ?: 0,
+        navigationBarRightPx = navigationBar?.right ?: 0,
     )
 }
 
@@ -1049,14 +1075,14 @@ private fun sampleReaderSystemBarInsets(
 private fun ReaderTextSelectionOverlay(
     controller: ReadBookController,
     viewModel: ReadBookViewModel,
+    textMenuState: State<TextMenuState?>,
     expandTextMenu: Boolean,
     showSelectMenuIcon: Boolean,
     lastMarkingStyle: String,
     onOpenManage: () -> Unit,
 ) {
-    val textMenuState by controller.textMenuState.collectAsStateWithLifecycle()
     val markingState by viewModel.markingState.collectAsStateWithLifecycle()
-    val currentMenuState = textMenuState
+    val currentMenuState = textMenuState.value
     if (markingState.inlineMode && currentMenuState != null) {
         MarkingSelectionMenu(
             menuState = currentMenuState,
@@ -1073,7 +1099,7 @@ private fun ReaderTextSelectionOverlay(
         )
     } else {
         TextActionSelectionMenu(
-            menuState = textMenuState,
+            menuState = currentMenuState,
             expandTextMenu = expandTextMenu,
             showSelectMenuIcon = showSelectMenuIcon,
             onDismiss = controller::dismissTextActionMenu,

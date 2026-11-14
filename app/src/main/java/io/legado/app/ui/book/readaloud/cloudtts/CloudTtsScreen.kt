@@ -30,6 +30,7 @@ import androidx.compose.material.icons.filled.PlaylistAdd
 import androidx.compose.material.icons.filled.RecordVoiceOver
 import androidx.compose.material.icons.filled.Save
 import androidx.compose.material.icons.filled.SelectAll
+import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -63,11 +64,16 @@ import io.legado.app.ui.widget.components.SearchBar
 import io.legado.app.ui.widget.components.alert.AppAlertDialog
 import io.legado.app.ui.widget.components.button.series.MediumTonalButton
 import io.legado.app.ui.widget.components.filePicker.FilePickerSheet
+import io.legado.app.ui.widget.components.icon.AppIcon
 import io.legado.app.ui.widget.components.icon.AppIcons
 import io.legado.app.ui.widget.components.importComponents.BatchImportDialog
 import io.legado.app.ui.widget.components.importComponents.SourceInputDialog
-import io.legado.app.ui.widget.components.menuItem.RoundDropdownMenu
-import io.legado.app.ui.widget.components.menuItem.RoundDropdownMenuItem
+import io.legado.app.ui.widget.components.menu.AppAction
+import io.legado.app.ui.widget.components.menu.AppActionGroup
+import io.legado.app.ui.widget.components.menu.AppActionMenu
+import io.legado.app.ui.widget.components.menu.AppChoiceDropdown
+import io.legado.app.ui.widget.components.menu.AppChoiceOption
+import io.legado.app.ui.widget.components.menu.AppMenuAnchor
 import io.legado.app.ui.widget.components.modalBottomSheet.AppModalBottomSheet
 import io.legado.app.ui.widget.components.modalBottomSheet.OptionCard
 import io.legado.app.ui.widget.components.modalBottomSheet.OptionSheet
@@ -83,6 +89,8 @@ import io.legado.app.ui.widget.components.topbar.TopBarActionButton
 import io.legado.app.ui.widget.components.topbar.TopBarNavigationButton
 import io.legado.app.utils.GSON
 import io.legado.app.utils.toastOnUi
+import kotlinx.collections.immutable.persistentListOf
+import kotlinx.collections.immutable.toImmutableList
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
@@ -178,37 +186,43 @@ fun CloudTtsScreen(
                         )
                     }
                     if (state.selectedTab == CloudTtsTab.Engines) {
-                        var expanded by remember { mutableStateOf(false) }
-                        Box {
-                            TopBarActionButton(
-                                onClick = { expanded = true },
+                        AppActionMenu(
+                            groups = persistentListOf(
+                                AppActionGroup(
+                                    id = "cloud_tts_engines_menu",
+                                    actions = persistentListOf(
+                                        AppAction(
+                                            id = "import_tts",
+                                            label = stringResource(R.string.import_tts),
+                                        ),
+                                        AppAction(
+                                            id = "export_tts_file",
+                                            label = stringResource(R.string.export),
+                                        ),
+                                        AppAction(
+                                            id = "copy_tts_url",
+                                            label = stringResource(R.string.copy_url),
+                                        ),
+                                        AppAction(
+                                            id = "clear_tts_cache",
+                                            label = stringResource(R.string.clear_cache),
+                                        ),
+                                    ),
+                                ),
+                            ),
+                            onAction = { id ->
+                                when (id) {
+                                    "import_tts" -> showHttpTtsImportSheet = true
+                                    "export_tts_file" -> onIntent(CloudTtsIntent.ExportHttpTtsFile)
+                                    "copy_tts_url" -> onIntent(CloudTtsIntent.ExportHttpTtsUrl)
+                                    "clear_tts_cache" -> onIntent(CloudTtsIntent.ClearTtsCache)
+                                }
+                            },
+                        ) {
+                            AppIcon(
                                 imageVector = AppIcons.MoreVert,
                                 contentDescription = stringResource(R.string.more_menu),
                             )
-                            RoundDropdownMenu(expanded, { expanded = false }) {
-                                RoundDropdownMenuItem(
-                                    text = stringResource(R.string.import_tts),
-                                    onClick = { expanded = false; showHttpTtsImportSheet = true },
-                                )
-                                RoundDropdownMenuItem(
-                                    text = stringResource(R.string.export),
-                                    onClick = {
-                                        expanded = false; onIntent(CloudTtsIntent.ExportHttpTtsFile)
-                                    },
-                                )
-                                RoundDropdownMenuItem(
-                                    text = stringResource(R.string.copy_url),
-                                    onClick = {
-                                        expanded = false; onIntent(CloudTtsIntent.ExportHttpTtsUrl)
-                                    },
-                                )
-                                RoundDropdownMenuItem(
-                                    text = stringResource(R.string.clear_cache),
-                                    onClick = {
-                                        expanded = false; onIntent(CloudTtsIntent.ClearTtsCache)
-                                    },
-                                )
-                            }
                         }
                     }
                 },
@@ -686,53 +700,52 @@ private fun HttpTtsEditorSheet(
         onDismissRequest = { onIntent(CloudTtsIntent.DismissHttpTtsEditor) },
         title = stringResource(R.string.speak_engine),
         startAction = {
-            var expanded by remember { mutableStateOf(false) }
-            Box {
-                MediumTonalButton(
-                    onClick = { expanded = true },
-                    icon = Icons.Default.MoreVert,
-                    contentDescription = stringResource(R.string.more_menu),
-                )
-                RoundDropdownMenu(expanded, { expanded = false }) {
-                    RoundDropdownMenuItem(
-                        text = stringResource(R.string.copy_text),
-                        onClick = {
-                            expanded = false
-                            scope.launch {
-                                clipboard.setClipEntry(
-                                    ClipEntry(
-                                        ClipData.newPlainText(
-                                            "httpTTS",
-                                            GSON.toJson(current())
-                                        )
+            AppActionMenu(
+                groups = persistentListOf(
+                    AppActionGroup(
+                        id = "http_tts_clipboard",
+                        actions = persistentListOf(
+                            AppAction("copy_text", stringResource(R.string.copy_text)),
+                            AppAction("paste_source", stringResource(R.string.paste_source)),
+                        ),
+                    ),
+                ),
+                onAction = { id ->
+                    when (id) {
+                        "copy_text" -> scope.launch {
+                            clipboard.setClipEntry(
+                                ClipEntry(
+                                    ClipData.newPlainText(
+                                        "httpTTS",
+                                        GSON.toJson(current())
                                     )
                                 )
+                            )
+                        }
+                        "paste_source" -> scope.launch {
+                            val text = clipboard.getClipEntry()?.clipData
+                                ?.getItemAt(0)?.coerceToText(context)?.toString()
+                                ?: return@launch
+                            HttpTTS.fromJson(text).getOrNull()?.let { imported ->
+                                name = imported.name; url = imported.url
+                                contentType = imported.contentType.orEmpty()
+                                concurrentRate = imported.concurrentRate ?: "0"
+                                header = imported.header.orEmpty(); loginUrl =
+                                imported.loginUrl.orEmpty()
+                                loginUi = imported.loginUi.orEmpty(); loginCheckJs =
+                                imported.loginCheckJs.orEmpty()
+                                jsLib = imported.jsLib.orEmpty()
+                                speed = (imported.speed ?: 5).toFloat()
                             }
-                        },
-                    )
-                    RoundDropdownMenuItem(
-                        text = stringResource(R.string.paste_source),
-                        onClick = {
-                            expanded = false
-                            scope.launch {
-                                val text = clipboard.getClipEntry()?.clipData
-                                    ?.getItemAt(0)?.coerceToText(context)?.toString()
-                                    ?: return@launch
-                                HttpTTS.fromJson(text).getOrNull()?.let { imported ->
-                                    name = imported.name; url = imported.url
-                                    contentType = imported.contentType.orEmpty()
-                                    concurrentRate = imported.concurrentRate ?: "0"
-                                    header = imported.header.orEmpty(); loginUrl =
-                                    imported.loginUrl.orEmpty()
-                                    loginUi = imported.loginUi.orEmpty(); loginCheckJs =
-                                    imported.loginCheckJs.orEmpty()
-                                    jsLib = imported.jsLib.orEmpty()
-                                    speed = (imported.speed ?: 5).toFloat()
-                                }
-                            }
-                        },
-                    )
-                }
+                        }
+                    }
+                },
+            ) {
+                AppIcon(
+                    imageVector = Icons.Default.MoreVert,
+                    contentDescription = stringResource(R.string.more_menu),
+                    modifier = this.modifier,
+                )
             }
         },
         endAction = {
@@ -883,9 +896,6 @@ private fun CloudTtsEngineEditorContent(
     editor: CloudTtsEngineEditorUi,
     onIntent: (CloudTtsIntent) -> Unit,
 ) {
-    var providerMenu by remember { mutableStateOf(false) }
-    var modelMenu by remember { mutableStateOf(false) }
-    var regionMenu by remember { mutableStateOf(false) }
     var customRegion by remember(editor.provider, editor.editingEngineId) {
         val options = CloudTtsProviderType.entries.firstOrNull {
             it.storageValue == editor.provider
@@ -901,27 +911,45 @@ private fun CloudTtsEngineEditorContent(
             Column(
                 verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
-                MenuButton(profile.displayName) { providerMenu = true }
-                RoundDropdownMenu(providerMenu, { providerMenu = false }) {
-                    CloudTtsProviderType.entries.forEach { option ->
-                        RoundDropdownMenuItem(
-                            text = option.profile.displayName,
-                            onClick = {
-                                providerMenu = false
+                val providerChoices = remember {
+                    CloudTtsProviderType.entries
+                        .map { AppChoiceOption(it.storageValue, it.profile.displayName) }
+                        .toImmutableList()
+                }
+                AppChoiceDropdown(
+                    options = providerChoices,
+                    selectedId = editor.provider,
+                    onSelect = { providerValue ->
+                        CloudTtsProviderType.entries
+                            .firstOrNull { it.storageValue == providerValue }
+                            ?.let { option ->
                                 update(
                                     editor.copy(
                                         provider = option.storageValue,
-                                        name = if (editor.name.isBlank() || editor.name == profile.displayName) {
+                                        name = if (editor.name.isBlank() ||
+                                            editor.name == profile.displayName
+                                        ) {
                                             option.profile.displayName
-                                        } else editor.name,
+                                        } else {
+                                            editor.name
+                                        },
                                         model = option.profile.defaultModel,
                                         region = option.profile.regionOptions.firstOrNull()
                                             .orEmpty(),
                                     )
                                 )
-                            },
-                        )
-                    }
+                            }
+                    },
+                    title = profile.displayName,
+                    modifier = Modifier.fillMaxWidth(),
+                    compact = true,
+                    triggerShape = IconButtonDefaults.extraSmallRoundShape,
+                ) {
+                    MediumTonalButton(
+                        onClick = null,
+                        text = profile.displayName,
+                        modifier = this.modifier.fillMaxWidth(),
+                    )
                 }
                 Field(
                     editor.name,
@@ -942,29 +970,52 @@ private fun CloudTtsEngineEditorContent(
                     )
                 }
                 if (profile.regionOptions.isNotEmpty()) {
-                    MenuButton(
-                        stringResource(
-                            R.string.cloud_tts_region_value,
-                            editor.region.ifBlank { stringResource(R.string.cloud_tts_please_select) })
-                    ) { regionMenu = true }
-                    RoundDropdownMenu(regionMenu, { regionMenu = false }) {
-                        profile.regionOptions.forEach { region ->
-                            RoundDropdownMenuItem(
-                                text = region,
-                                onClick = {
-                                    regionMenu = false
-                                    customRegion = false
-                                    update(editor.copy(region = region))
-                                },
-                            )
-                        }
-                        RoundDropdownMenuItem(
-                            text = stringResource(R.string.cloud_tts_custom_region_action),
-                            onClick = {
-                                regionMenu = false
+                    val regionTitle = stringResource(
+                        R.string.cloud_tts_region_value,
+                        editor.region.ifBlank { stringResource(R.string.cloud_tts_please_select) })
+                    // 区域是「预设单选 + 自定义命令」的混合菜单，不是纯单选，
+                    // 因此走 `AppActionMenu`（能同时承载 checked 项与命令项）。
+                    AppActionMenu(
+                        groups = persistentListOf(
+                            AppActionGroup(
+                                id = "cloud_tts_region",
+                                actions = buildList {
+                                    profile.regionOptions.forEach { region ->
+                                        add(
+                                            AppAction(
+                                                id = "region_$region",
+                                                label = region,
+                                                checked = editor.region == region,
+                                            )
+                                        )
+                                    }
+                                    add(
+                                        AppAction(
+                                            id = "custom_region",
+                                            label = stringResource(
+                                                R.string.cloud_tts_custom_region_action
+                                            ),
+                                        )
+                                    )
+                                }.toImmutableList(),
+                            ),
+                        ),
+                        onAction = { id ->
+                            if (id == "custom_region") {
                                 customRegion = true
                                 update(editor.copy(region = ""))
-                            },
+                            } else {
+                                customRegion = false
+                                update(editor.copy(region = id.removePrefix("region_")))
+                            }
+                        },
+                        anchor = AppMenuAnchor.Row,
+                        title = regionTitle,
+                    ) {
+                        MediumTonalButton(
+                            onClick = null,
+                            text = regionTitle,
+                            modifier = this.modifier.fillMaxWidth(),
                         )
                     }
                     if (customRegion) {
@@ -979,18 +1030,28 @@ private fun CloudTtsEngineEditorContent(
                     Field(editor.appId, { update(editor.copy(appId = it)) }, "App ID")
                 }
                 if (profile.modelOptions.isNotEmpty()) {
-                    MenuButton(
-                        stringResource(
-                            R.string.cloud_tts_model_value,
-                            editor.model.ifBlank { "neural" })
-                    ) { modelMenu = true }
-                    RoundDropdownMenu(modelMenu, { modelMenu = false }) {
-                        profile.modelOptions.forEach { model ->
-                            RoundDropdownMenuItem(
-                                text = model,
-                                onClick = { modelMenu = false; update(editor.copy(model = model)) },
-                            )
-                        }
+                    val modelTitle = stringResource(
+                        R.string.cloud_tts_model_value,
+                        editor.model.ifBlank { "neural" })
+                    val modelChoices = remember(profile) {
+                        profile.modelOptions
+                            .map { AppChoiceOption(it, it) }
+                            .toImmutableList()
+                    }
+                    AppChoiceDropdown(
+                        options = modelChoices,
+                        selectedId = editor.model,
+                        onSelect = { model -> update(editor.copy(model = model)) },
+                        title = modelTitle,
+                        modifier = Modifier.fillMaxWidth(),
+                        compact = true,
+                        triggerShape = IconButtonDefaults.extraSmallRoundShape,
+                        ) {
+                        MediumTonalButton(
+                            onClick = null,
+                            text = modelTitle,
+                            modifier = this.modifier.fillMaxWidth(),
+                        )
                     }
                 } else {
                     Field(editor.model, { update(editor.copy(model = it)) }, profile.modelLabel)
@@ -1052,9 +1113,6 @@ private fun TtsVoicePresetEditorContent(
     editor: TtsVoicePresetEditorUi,
     onIntent: (CloudTtsIntent) -> Unit,
 ) {
-    var styleMenu by remember { mutableStateOf(false) }
-    var roleMenu by remember { mutableStateOf(false) }
-    var formatMenu by remember { mutableStateOf(false) }
     var voiceQuery by remember { mutableStateOf("") }
     var manualVoiceIdVisible by remember(editor.engineId) { mutableStateOf(false) }
     val selectedVoice = state.discoveredVoices.firstOrNull { it.id == editor.voiceId }
@@ -1150,33 +1208,63 @@ private fun TtsVoicePresetEditorContent(
                     Field(editor.voiceName, { update(editor.copy(voiceName = it)) }, stringResource(R.string.cloud_tts_preset_name))
                     if (editor.engineType == ReadAloudVoice.ENGINE_CLOUD) {
                         if (!selectedVoice?.styles.isNullOrEmpty()) {
-                            MenuButton(stringResource(R.string.cloud_tts_style_value, editor.style.ifBlank { stringResource(R.string.cloud_tts_default) })) { styleMenu = true }
-                            RoundDropdownMenu(styleMenu, { styleMenu = false }) {
-                                RoundDropdownMenuItem(
-                                    text = stringResource(R.string.cloud_tts_default),
-                                    onClick = { styleMenu = false; update(editor.copy(style = "")) },
+                            val defaultLabel = stringResource(R.string.cloud_tts_default)
+                            val styleTitle = stringResource(
+                                R.string.cloud_tts_style_value,
+                                editor.style.ifBlank { defaultLabel },
+                            )
+                            val styleChoices = remember(selectedVoice, defaultLabel) {
+                                buildList {
+                                    add(AppChoiceOption("", defaultLabel))
+                                    selectedVoice?.styles.orEmpty().forEach {
+                                        add(AppChoiceOption(it, it))
+                                    }
+                                }.toImmutableList()
+                            }
+                            AppChoiceDropdown(
+                                options = styleChoices,
+                                selectedId = editor.style,
+                                onSelect = { style -> update(editor.copy(style = style)) },
+                                title = styleTitle,
+                                modifier = Modifier.fillMaxWidth(),
+                                compact = true,
+                                triggerShape = IconButtonDefaults.extraSmallRoundShape,
+                            ) {
+                                MediumTonalButton(
+                                    onClick = null,
+                                    text = styleTitle,
+                                    modifier = this.modifier.fillMaxWidth(),
                                 )
-                                selectedVoice.styles.forEach { style ->
-                                    RoundDropdownMenuItem(
-                                        text = style,
-                                        onClick = { styleMenu = false; update(editor.copy(style = style)) },
-                                    )
-                                }
                             }
                         }
                         if (!selectedVoice?.roles.isNullOrEmpty()) {
-                            MenuButton(stringResource(R.string.cloud_tts_role_value, editor.role.ifBlank { stringResource(R.string.cloud_tts_default) })) { roleMenu = true }
-                            RoundDropdownMenu(roleMenu, { roleMenu = false }) {
-                                RoundDropdownMenuItem(
-                                    text = stringResource(R.string.cloud_tts_default),
-                                    onClick = { roleMenu = false; update(editor.copy(role = "")) },
+                            val defaultLabel = stringResource(R.string.cloud_tts_default)
+                            val roleTitle = stringResource(
+                                R.string.cloud_tts_role_value,
+                                editor.role.ifBlank { defaultLabel },
+                            )
+                            val roleChoices = remember(selectedVoice, defaultLabel) {
+                                buildList {
+                                    add(AppChoiceOption("", defaultLabel))
+                                    selectedVoice?.roles.orEmpty().forEach {
+                                        add(AppChoiceOption(it, it))
+                                    }
+                                }.toImmutableList()
+                            }
+                            AppChoiceDropdown(
+                                options = roleChoices,
+                                selectedId = editor.role,
+                                onSelect = { role -> update(editor.copy(role = role)) },
+                                title = roleTitle,
+                                modifier = Modifier.fillMaxWidth(),
+                                compact = true,
+                                triggerShape = IconButtonDefaults.extraSmallRoundShape,
+                            ) {
+                                MediumTonalButton(
+                                    onClick = null,
+                                    text = roleTitle,
+                                    modifier = this.modifier.fillMaxWidth(),
                                 )
-                                selectedVoice.roles.forEach { role ->
-                                    RoundDropdownMenuItem(
-                                        text = role,
-                                        onClick = { roleMenu = false; update(editor.copy(role = role)) },
-                                    )
-                                }
                             }
                         }
                         Field(editor.instructions, { update(editor.copy(instructions = it)) }, stringResource(R.string.cloud_tts_instructions))
@@ -1201,14 +1289,26 @@ private fun TtsVoicePresetEditorContent(
                         Field(editor.speed, { update(editor.copy(speed = it)) }, stringResource(R.string.cloud_tts_speed))
                         Field(editor.pitch, { update(editor.copy(pitch = it)) }, stringResource(R.string.cloud_tts_pitch))
                         Field(editor.volume, { update(editor.copy(volume = it)) }, stringResource(R.string.cloud_tts_volume))
-                        MenuButton(stringResource(R.string.cloud_tts_audio_format, editor.format)) { formatMenu = true }
-                        RoundDropdownMenu(formatMenu, { formatMenu = false }) {
-                            editor.formatOptions.forEach { format ->
-                                RoundDropdownMenuItem(
-                                    text = format,
-                                    onClick = { formatMenu = false; update(editor.copy(format = format)) },
-                                )
-                            }
+                        val formatTitle = stringResource(R.string.cloud_tts_audio_format, editor.format)
+                        val formatChoices = remember(editor.formatOptions) {
+                            editor.formatOptions
+                                .map { AppChoiceOption(it, it) }
+                                .toImmutableList()
+                        }
+                        AppChoiceDropdown(
+                            options = formatChoices,
+                            selectedId = editor.format,
+                            onSelect = { format -> update(editor.copy(format = format)) },
+                            title = formatTitle,
+                            modifier = Modifier.fillMaxWidth(),
+                            compact = true,
+                            triggerShape = IconButtonDefaults.extraSmallRoundShape,
+                        ) {
+                            MediumTonalButton(
+                                onClick = null,
+                                text = formatTitle,
+                                modifier = this.modifier.fillMaxWidth(),
+                            )
                         }
                     } else if (editor.engineType == ReadAloudVoice.ENGINE_SYSTEM) {
                         AppText(stringResource(R.string.cloud_tts_system_defaults_hint))
@@ -1238,18 +1338,6 @@ private fun Field(value: String, onValueChange: (String) -> Unit, label: String)
         label = label,
         modifier = Modifier.fillMaxWidth(),
         singleLine = true,
-    )
-}
-
-@Composable
-private fun MenuButton(
-    text: String,
-    onClick: () -> Unit,
-) {
-    MediumTonalButton(
-        onClick = onClick,
-        modifier = Modifier.fillMaxWidth(),
-        text = text,
     )
 }
 

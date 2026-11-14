@@ -1,6 +1,9 @@
 package io.legado.app.ui.config.bubble
 
+import io.legado.app.feature.settings.search.SearchableSetting
+import io.legado.app.feature.settings.search.SearchableSettingsList
 import android.graphics.Bitmap
+import androidx.annotation.StringRes
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -16,11 +19,10 @@ import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
+import io.legado.app.ui.widget.components.coui.appVerticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
@@ -49,21 +51,24 @@ import io.legado.app.ui.widget.components.AppScaffold
 import io.legado.app.ui.widget.components.AppTextFieldSurface
 import io.legado.app.ui.widget.components.SplicedColumnGroup
 import io.legado.app.ui.widget.components.alert.AppAlertDialog
-import io.legado.app.ui.widget.components.button.AppIconButton
 import io.legado.app.ui.widget.components.button.series.MediumTonalButton
+import io.legado.app.ui.widget.components.button.series.SmallPlainButton
 import io.legado.app.ui.widget.components.dialog.ColorPickerSheet
 import io.legado.app.ui.widget.components.filePicker.FilePickerSheet
-import io.legado.app.ui.widget.components.icon.AppIcon
 import io.legado.app.ui.widget.components.icon.AppIcons
 import io.legado.app.ui.widget.components.importComponents.SourceInputDialog
-import io.legado.app.ui.widget.components.menuItem.RoundDropdownMenu
-import io.legado.app.ui.widget.components.menuItem.RoundDropdownMenuItem
+import io.legado.app.ui.widget.components.menu.AppAction
+import io.legado.app.ui.widget.components.menu.AppActionGroup
+import io.legado.app.ui.widget.components.menu.AppActionMenu
 import io.legado.app.ui.widget.components.modalBottomSheet.AppModalBottomSheet
 import io.legado.app.ui.widget.components.settingItem.ClickableSettingItem
 import io.legado.app.ui.widget.components.settingItem.SwitchSettingItem
 import io.legado.app.ui.widget.components.settingItem.TinyColorSettingItem
 import io.legado.app.ui.widget.components.settingItem.TinySliderSettingItem
 import io.legado.app.ui.widget.components.text.AppText
+import kotlinx.collections.immutable.ImmutableList
+import kotlinx.collections.immutable.persistentListOf
+import kotlinx.collections.immutable.toImmutableList
 import io.legado.app.ui.widget.components.topbar.GlassMediumFlexibleTopAppBar
 import io.legado.app.ui.widget.components.topbar.GlassTopAppBarDefaults
 import io.legado.app.ui.widget.components.topbar.TopBarActionButton
@@ -105,7 +110,7 @@ fun BubbleConfigScreen(
             )
         }
     ) { paddingValues ->
-        LazyColumn(
+        SearchableSettingsList(
             modifier = Modifier.fillMaxSize(),
             contentPadding = adaptiveContentPadding(
                 top = paddingValues.calculateTopPadding(),
@@ -124,14 +129,16 @@ fun BubbleConfigScreen(
 
             item(key = "forceSoftware") {
                 SplicedColumnGroup {
-                    SwitchSettingItem(
-                        title = stringResource(R.string.bubble_force_software),
-                        description = stringResource(R.string.bubble_force_software_desc),
-                        checked = state.forceSoftwareParagraphBubble,
-                        onCheckedChange = {
-                            onIntent(BubbleConfigIntent.ForceSoftwareChanged(it))
-                        },
-                    )
+                    SearchableSetting("bubble.bubble_force_software") {
+                        SwitchSettingItem(
+                            title = stringResource(R.string.bubble_force_software),
+                            description = stringResource(R.string.bubble_force_software_desc),
+                            checked = state.forceSoftwareParagraphBubble,
+                            onCheckedChange = {
+                                onIntent(BubbleConfigIntent.ForceSoftwareChanged(it))
+                            },
+                        )
+                    }
                 }
             }
 
@@ -161,11 +168,13 @@ fun BubbleConfigScreen(
 
             item(key = "create") {
                 SplicedColumnGroup {
-                    ClickableSettingItem(
-                        title = stringResource(R.string.bubble_add_manual),
-                        description = stringResource(R.string.bubble_add_manual_desc),
-                        onClick = { onIntent(BubbleConfigIntent.StartCreate) },
-                    )
+                    SearchableSetting("bubble.bubble_add_manual") {
+                        ClickableSettingItem(
+                            title = stringResource(R.string.bubble_add_manual),
+                            description = stringResource(R.string.bubble_add_manual_desc),
+                            onClick = { onIntent(BubbleConfigIntent.StartCreate) },
+                        )
+                    }
                 }
             }
 
@@ -226,6 +235,30 @@ fun BubbleConfigScreen(
     )
 }
 
+/** 气泡包菜单的稳定 ID：声明与分派共用，避免字面量漂移。 */
+private enum class BubbleEntryMenuAction(val id: String, @StringRes val labelRes: Int) {
+    Apply("bubble_apply", R.string.bubble_apply),
+    Edit("bubble_edit", R.string.bubble_edit),
+    ExportZip("bubble_export_zip", R.string.bubble_export_zip),
+    Delete("bubble_delete", R.string.bubble_delete),
+}
+
+/** 内置包只能「应用」；删除项走 destructive，不再在调用点写死 error 色。 */
+@Composable
+private fun bubbleEntryMenuGroups(isBuiltin: Boolean): ImmutableList<AppActionGroup> {
+    val actions = BubbleEntryMenuAction.entries.mapNotNull { action ->
+        if (isBuiltin && action != BubbleEntryMenuAction.Apply) return@mapNotNull null
+        AppAction(
+            id = action.id,
+            label = stringResource(action.labelRes),
+            destructive = action == BubbleEntryMenuAction.Delete,
+        )
+    }
+    return persistentListOf(
+        AppActionGroup(id = "bubble_entry", actions = actions.toImmutableList()),
+    )
+}
+
 @Composable
 private fun BubbleEntryRow(
     entry: BubblePackageManager.Entry,
@@ -274,48 +307,27 @@ private fun BubbleEntryRow(
             )
         }
         Box {
-            AppIconButton(onClick = { menuExpanded = true }) {
-                AppIcon(
-                    imageVector = AppIcons.MoreVert,
-                    contentDescription = stringResource(R.string.bubble_more),
-                )
-            }
-            RoundDropdownMenu(
-                expanded = menuExpanded,
+            SmallPlainButton(
+                onClick = { menuExpanded = true },
+                icon = AppIcons.MoreVert,
+                contentDescription = stringResource(R.string.bubble_more),
+            )
+            // 开合与 ⋮ 的外观都留在页面，入口只渲染弹层；锚点取这层盒子（⋮ 所在位置）。
+            AppActionMenu(
+                groups = bubbleEntryMenuGroups(isBuiltin = isBuiltin),
+                onAction = { id ->
+                    when (id) {
+                        BubbleEntryMenuAction.Apply.id -> onApply()
+                        BubbleEntryMenuAction.Edit.id -> onEdit()
+                        BubbleEntryMenuAction.ExportZip.id -> onExport()
+                        BubbleEntryMenuAction.Delete.id -> onDelete()
+                    }
+                },
+                modifier = Modifier.matchParentSize(),
+                embeddedExpanded = menuExpanded,
                 onDismissRequest = { menuExpanded = false },
-            ) { dismiss ->
-                RoundDropdownMenuItem(
-                    text = stringResource(R.string.bubble_apply),
-                    onClick = {
-                        dismiss()
-                        onApply()
-                    },
-                )
-                if (!isBuiltin) {
-                    RoundDropdownMenuItem(
-                        text = stringResource(R.string.bubble_edit),
-                        onClick = {
-                            dismiss()
-                            onEdit()
-                        },
-                    )
-                    RoundDropdownMenuItem(
-                        text = stringResource(R.string.bubble_export_zip),
-                        onClick = {
-                            dismiss()
-                            onExport()
-                        },
-                    )
-                    RoundDropdownMenuItem(
-                        text = stringResource(R.string.bubble_delete),
-                        color = LegadoTheme.colorScheme.error,
-                        onClick = {
-                            dismiss()
-                            onDelete()
-                        },
-                    )
-                }
-            }
+                trigger = {},
+            )
         }
     }
 }
@@ -419,7 +431,7 @@ private fun BubbleEditSheet(
             modifier = Modifier
                 .fillMaxWidth()
                 .imePadding()
-                .verticalScroll(rememberScrollState()),
+                .appVerticalScroll(rememberScrollState()),
         ) {
             AppTextFieldSurface(
                 value = config.name,

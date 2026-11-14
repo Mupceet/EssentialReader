@@ -107,19 +107,21 @@ import io.legado.app.ui.widget.components.button.series.SmallToggleButton
 import io.legado.app.ui.widget.components.button.series.ToggleStyle
 import io.legado.app.ui.widget.components.card.NormalCard
 import io.legado.app.ui.widget.components.card.TextCard
-import io.legado.app.ui.widget.components.divider.PillDivider
-import io.legado.app.ui.widget.components.divider.PillHeaderDivider
+import io.legado.app.ui.widget.components.menu.AppAction
+import io.legado.app.ui.widget.components.menu.AppActionGroup
+import io.legado.app.ui.widget.components.menu.AppActionMenu
 import io.legado.app.ui.widget.components.icon.AppIcon
 import io.legado.app.ui.widget.components.lazylist.FastScrollLazyColumn
 import io.legado.app.ui.widget.components.list.TopFloatingStickyItem
-import io.legado.app.ui.widget.components.menuItem.RoundDropdownMenu
-import io.legado.app.ui.widget.components.menuItem.RoundDropdownMenuItem
 import io.legado.app.ui.widget.components.progressIndicator.AppContainedLoadingIndicator
 import io.legado.app.ui.widget.components.progressIndicator.AppLinearProgressIndicator
 import io.legado.app.ui.widget.components.tabRow.AppTabRow
 import io.legado.app.ui.widget.components.text.AppText
 import io.legado.app.ui.widget.components.topbar.DynamicTopAppBar
 import io.legado.app.ui.widget.components.topbar.GlassTopAppBarDefaults
+import kotlinx.collections.immutable.ImmutableList
+import kotlinx.collections.immutable.persistentListOf
+import kotlinx.collections.immutable.toImmutableList
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
@@ -127,6 +129,53 @@ import org.koin.androidx.compose.koinViewModel
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+
+/** 卷管理菜单的稳定 ID：两条整卷命令 + 每个卷一条跳转项。 */
+private enum class VolumeMenuAction(val id: String) {
+    ExpandAll("expand_all_volumes"),
+    CollapseAll("collapse_all_volumes"),
+}
+
+private const val VolumeJumpIdPrefix = "jump_volume_"
+
+/**
+ * 卷管理菜单：整卷命令一组，卷跳转项一组（组间自动补分段线）。
+ *
+ * @param volumes 卷标题与它在 `state.items` 中的下标；跳转按下标滚动。
+ */
+@Composable
+private fun volumeMenuGroups(volumes: List<Pair<Int, String>>): ImmutableList<AppActionGroup> {
+    val groups = mutableListOf(
+        AppActionGroup(
+            id = "toc_volume_commands",
+            actions = persistentListOf(
+                AppAction(VolumeMenuAction.ExpandAll.id, stringResource(R.string.expand_volume)),
+                AppAction(VolumeMenuAction.CollapseAll.id, stringResource(R.string.coll_volume)),
+            ),
+        ),
+    )
+    if (volumes.isNotEmpty()) {
+        groups += AppActionGroup(
+            id = "toc_volume_jump",
+            actions = volumes.map { (index, title) ->
+                AppAction(id = "$VolumeJumpIdPrefix$index", label = title)
+            }.toImmutableList(),
+        )
+    }
+    return groups.toImmutableList()
+}
+
+private fun volumeMenuActionFor(
+    id: String,
+    onIntent: (TocIntent) -> Unit,
+    onJump: (Int) -> Unit,
+) {
+    when (id) {
+        VolumeMenuAction.ExpandAll.id -> onIntent(TocIntent.ExpandAllVolumes)
+        VolumeMenuAction.CollapseAll.id -> onIntent(TocIntent.CollapseAllVolumes)
+        else -> id.removePrefix(VolumeJumpIdPrefix).toIntOrNull()?.let(onJump)
+    }
+}
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -424,113 +473,115 @@ fun TocScreen(
                 onSearchQueryChange = { onIntent(TocIntent.SetSearchQuery(it)) },
                 searchPlaceholder = stringResource(R.string.search_chapters),
                 onClearSelection = { onIntent(TocIntent.ClearSelection) },
-                dropDownMenuContent = { dismiss ->
-                    when (pagerState.currentPage) {
-                        0 -> {
-                            RoundDropdownMenuItem(
-                                text = stringResource(R.string.use_replace_rule),
-                                isSelected = useReplace,
-                                onClick = {
-                                    dismiss()
-                                    onIntent(TocIntent.ToggleUseReplace)
-                                }
+                menuGroups = if (pagerState.currentPage == 0) {
+                    buildList {
+                        add(
+                            AppActionGroup(
+                                id = "toc_display",
+                                actions = persistentListOf(
+                                    AppAction(
+                                        TocMenuAction.UseReplace.id,
+                                        stringResource(TocMenuAction.UseReplace.labelRes),
+                                        selected = useReplace,
+                                    ),
+                                    AppAction(
+                                        TocMenuAction.ShowWordCount.id,
+                                        stringResource(TocMenuAction.ShowWordCount.labelRes),
+                                        selected = showWordCount,
+                                    ),
+                                    AppAction(
+                                        TocMenuAction.ReverseToc.id,
+                                        stringResource(TocMenuAction.ReverseToc.labelRes),
+                                    ),
+                                    AppAction(
+                                        TocMenuAction.UpdateToc.id,
+                                        stringResource(TocMenuAction.UpdateToc.labelRes),
+                                    ),
+                                ),
                             )
-                            RoundDropdownMenuItem(
-                                text = stringResource(R.string.show_word_count),
-                                isSelected = showWordCount,
-                                onClick = {
-                                    dismiss()
-                                    onIntent(TocIntent.ToggleShowWordCount)
-                                }
+                        )
+                        add(
+                            AppActionGroup(
+                                id = "toc_replace",
+                                actions = persistentListOf(
+                                    AppAction(
+                                        TocMenuAction.ReplaceRule.id,
+                                        stringResource(TocMenuAction.ReplaceRule.labelRes),
+                                    ),
+                                    AppAction(
+                                        TocMenuAction.AddReplaceRule.id,
+                                        stringResource(TocMenuAction.AddReplaceRule.labelRes),
+                                    ),
+                                ),
                             )
-                            RoundDropdownMenuItem(
-                                text = stringResource(R.string.reverse_toc),
-                                onClick = {
-                                    dismiss()
-                                    onIntent(TocIntent.ReverseToc)
-                                }
-                            )
-                            RoundDropdownMenuItem(
-                                text = stringResource(R.string.update_toc),
-                                onClick = {
-                                    dismiss()
-                                    onIntent(TocIntent.UpdateToc)
-                                }
-                            )
-                            PillDivider()
-                            RoundDropdownMenuItem(
-                                text = stringResource(R.string.replace_rule_title),
-                                onClick = {
-                                    onOpenReplaceRule(null)
-                                    dismiss()
-                                }
-                            )
-                            RoundDropdownMenuItem(
-                                text = stringResource(R.string.add_replace_rule),
-                                onClick = {
-                                    val scopes = mutableListOf<String>()
-                                    book?.name?.let { scopes.add(it) }
-                                    book?.origin?.let { scopes.add(it) }
-
-                                    val editRoute = ReplaceEditRoute(
-                                        id = -1,
-                                        pattern = "",
-                                        scope = scopes.joinToString(";"),
-                                        isScopeTitle = true,
-                                        isScopeContent = false
-                                    )
-                                    onOpenReplaceRule(editRoute)
-                                    dismiss()
-                                }
-                            )
-                            if (book?.isLocal == true) {
-                                PillHeaderDivider(title = stringResource(R.string.local_book_options))
-                                RoundDropdownMenuItem(
-                                    text = stringResource(R.string.local_book_toc_rule),
-                                    onClick = {
-                                        onEditLocalTocRule(book.tocUrl)
-                                        dismiss()
-                                    }
+                        )
+                        // 原 PillHeaderDivider(local_book_options) 按口径降级为组间纯分段线。
+                        if (book?.isLocal == true) {
+                            add(
+                                AppActionGroup(
+                                    id = "toc_local_book",
+                                    actions = persistentListOf(
+                                        AppAction(
+                                            TocMenuAction.LocalTocRule.id,
+                                            stringResource(TocMenuAction.LocalTocRule.labelRes),
+                                        ),
+                                        AppAction(
+                                            TocMenuAction.SplitLongChapters.id,
+                                            stringResource(TocMenuAction.SplitLongChapters.labelRes),
+                                            selected = uiState.isSplitLongChapter,
+                                        ),
+                                    ),
                                 )
-                                RoundDropdownMenuItem(
-                                    text = stringResource(R.string.split_long_chapters),
-                                    isSelected = uiState.isSplitLongChapter,
-                                    onClick = {
-                                        onIntent(TocIntent.ToggleSplitLongChapter)
-                                        dismiss()
-                                    }
-                                )
-                            }
-                        }
-
-                        else -> {
-                            RoundDropdownMenuItem(
-                                text = stringResource(R.string.export_bookmarks_json),
-                                onClick = {
-                                    val dateFormat = SimpleDateFormat(
-                                        "yyyyMMdd_HHmm",
-                                        Locale.getDefault()
-                                    ).format(Date())
-                                    val initialName =
-                                        "${book?.name ?: bookmarkDefaultFileName}_$dateFormat.json"
-                                    onExportBookmarks(false, initialName)
-                                    dismiss()
-                                }
-                            )
-                            RoundDropdownMenuItem(
-                                text = stringResource(R.string.export_bookmarks_markdown),
-                                onClick = {
-                                    val dateFormat = SimpleDateFormat(
-                                        "yyyyMMdd_HHmm",
-                                        Locale.getDefault()
-                                    ).format(Date())
-                                    val initialName =
-                                        "${book?.name ?: bookmarkDefaultFileName}_$dateFormat.md"
-                                    onExportBookmarks(true, initialName)
-                                    dismiss()
-                                }
                             )
                         }
+                    }.toImmutableList()
+                } else {
+                    persistentListOf(
+                        AppActionGroup(
+                            id = "toc_export",
+                            actions = persistentListOf(
+                                AppAction(
+                                    TocMenuAction.ExportBookmarksJson.id,
+                                    stringResource(TocMenuAction.ExportBookmarksJson.labelRes),
+                                ),
+                                AppAction(
+                                    TocMenuAction.ExportBookmarksMarkdown.id,
+                                    stringResource(TocMenuAction.ExportBookmarksMarkdown.labelRes),
+                                ),
+                            ),
+                        )
+                    )
+                },
+                onMenuAction = { id ->
+                    when (val behavior = tocMenuBehaviorFor(id)) {
+                        is TocMenuBehavior.Dispatch -> onIntent(behavior.intent)
+                        TocMenuBehavior.OpenReplaceRuleList -> onOpenReplaceRule(null)
+                        TocMenuBehavior.OpenNewReplaceRule -> {
+                            val scopes = mutableListOf<String>()
+                            book?.name?.let { scopes.add(it) }
+                            book?.origin?.let { scopes.add(it) }
+                            onOpenReplaceRule(
+                                ReplaceEditRoute(
+                                    id = -1,
+                                    pattern = "",
+                                    scope = scopes.joinToString(";"),
+                                    isScopeTitle = true,
+                                    isScopeContent = false,
+                                )
+                            )
+                        }
+                        TocMenuBehavior.EditLocalTocRule -> onEditLocalTocRule(book?.tocUrl)
+                        is TocMenuBehavior.ExportBookmarks -> {
+                            val dateFormat = SimpleDateFormat(
+                                "yyyyMMdd_HHmm",
+                                Locale.getDefault()
+                            ).format(Date())
+                            val extension = if (behavior.isMarkdown) "md" else "json"
+                            val initialName =
+                                "${book?.name ?: bookmarkDefaultFileName}_$dateFormat.$extension"
+                            onExportBookmarks(behavior.isMarkdown, initialName)
+                        }
+                        null -> Unit
                     }
                 },
                 bottomContent = {
@@ -564,47 +615,36 @@ fun TocScreen(
                                     icon = Icons.AutoMirrored.Filled.FormatListBulleted,
                                     contentDescription = stringResource(R.string.volume_management)
                                 )
-                                RoundDropdownMenu(
-                                    expanded = showVolumeMenu,
-                                    onDismissRequest = { showVolumeMenu = false }
-                                ) {
-                                    RoundDropdownMenuItem(
-                                        text = stringResource(R.string.expand_volume),
-                                        onClick = {
-                                            onIntent(TocIntent.ExpandAllVolumes); showVolumeMenu = false
-                                        }
-                                    )
-                                    RoundDropdownMenuItem(
-                                        text = stringResource(R.string.coll_volume),
-                                        onClick = {
-                                            onIntent(TocIntent.CollapseAllVolumes); showVolumeMenu = false
-                                        }
-                                    )
-
-                                    val volumeItems = remember(state.items) {
-                                        state.items.filter { it.isVolume && it.tocLevel == 0 }
-                                    }
-                                    if (volumeItems.isNotEmpty()) {
-                                        PillHeaderDivider(title = stringResource(R.string.quick_jump))
-                                        volumeItems.forEach { uiItem ->
-                                            RoundDropdownMenuItem(
-                                                text = uiItem.title,
-                                                onClick = {
-                                                    scope.launch {
-                                                        val targetIndex =
-                                                            state.items.indexOf(uiItem)
-                                                        if (targetIndex != -1) {
-                                                            listState.animateScrollToItem(
-                                                                index = targetIndex
-                                                            )
-                                                        }
-                                                    }
-                                                    showVolumeMenu = false
+                                // 卷列表取代原「快速跳转」标题：标题文字按口径不再渲染，
+                                // 卷项单独成组，组间自动补分段线。
+                                AppActionMenu(
+                                    groups = volumeMenuGroups(
+                                        volumes = remember(state.items) {
+                                            state.items.mapIndexedNotNull { index, item ->
+                                                if (item.isVolume && item.tocLevel == 0) {
+                                                    index to item.title
+                                                } else {
+                                                    null
                                                 }
-                                            )
-                                        }
-                                    }
-                                }
+                                            }
+                                        },
+                                    ),
+                                    onAction = { id ->
+                                        volumeMenuActionFor(
+                                            id,
+                                            onIntent = onIntent,
+                                            onJump = { targetIndex ->
+                                                scope.launch {
+                                                    listState.animateScrollToItem(targetIndex)
+                                                }
+                                            },
+                                        )
+                                    },
+                                    modifier = Modifier.matchParentSize(),
+                                    embeddedExpanded = showVolumeMenu,
+                                    onDismissRequest = { showVolumeMenu = false },
+                                    trigger = {},
+                                )
                             }
                         }
                     }
@@ -621,9 +661,9 @@ fun TocScreen(
                 visible = shouldShowFab,
                 focusRequester = focusRequester
             )
-        }
-    ) { padding ->
-        Box(modifier = Modifier.fillMaxSize()) {
+        },
+        // 多选栏是页面级浮层：必须画在正文采样源之外，否则 COUI 玻璃会采样到自己上（native 闪退）。
+        overlay = {
             AnimatedVisibility(
                 visible = isSelectionMode,
                 modifier = Modifier
@@ -648,7 +688,9 @@ fun TocScreen(
                     secondaryActions = selectionSecondaryActions
                 )
             }
-
+        }
+    ) { padding ->
+        Box(modifier = Modifier.fillMaxSize()) {
             HorizontalPager(state = pagerState) { page ->
                 when (page) {
                     0 -> ChapterListContent(
@@ -865,8 +907,12 @@ fun ChapterItem(
     val downloadFailedDescription = stringResource(R.string.a11y_download_failed)
     val notDownloadedDescription = stringResource(R.string.a11y_not_downloaded)
     val assignmentStateDescription = stringResource(R.string.cast_assignment_state)
-    val audioDownloadStateDescription =
-        stringResource(R.string.read_aloud_audio_download_state)
+    val audioDownloadStateDescription = when (item.audioDownloadState) {
+        TocAudioDownloadState.None -> null
+        TocAudioDownloadState.Complete -> stringResource(R.string.read_aloud_audio_download_state)
+        TocAudioDownloadState.Partial -> stringResource(R.string.read_aloud_audio_download_partial_state)
+        TocAudioDownloadState.Unverified -> stringResource(R.string.read_aloud_audio_download_unverified_state)
+    }
     val wordCountDescription = item.wordCount?.let {
         stringResource(R.string.a11y_word_count, it)
     }
@@ -885,7 +931,7 @@ fun ChapterItem(
         if (showWordCount) wordCountDescription?.let(::add)
         downloadStateDescription?.let(::add)
         if (item.hasCastAssignment) add(assignmentStateDescription)
-        if (item.hasAudioDownload) add(audioDownloadStateDescription)
+        audioDownloadStateDescription?.let(::add)
     }.joinToString(", ")
     val canDownload = item.downloadState == DownloadState.NONE ||
             item.downloadState == DownloadState.ERROR

@@ -28,6 +28,7 @@ class SourceLoginJsExtensions(
     activity: AppCompatActivity?, source: BaseSource?,
     private val bookType: Int = 0,
     callback: Callback? = null,
+    private val browserHeightPercent: Int = 0,
     /**
      * [showBrowser] 弹框强制全屏呈现（墨水屏模式用）：默认 false 保持
      * 完整模式的半屏面板 + 上拉交互；true 时无论书源 JS 传入什么
@@ -115,6 +116,7 @@ class SourceLoginJsExtensions(
                 html,
                 preloadJs,
                 if (forceFullscreenBrowser) forcedFullscreenBrowserConfig(config) else config,
+                browserHeightPercent,
                 // 墨水屏：与强制全屏同路径去过渡动画（窗口零动画 + 预置全屏态）
                 noTransition = forceFullscreenBrowser
             )

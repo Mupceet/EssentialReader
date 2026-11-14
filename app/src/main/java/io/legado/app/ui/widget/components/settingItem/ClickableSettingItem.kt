@@ -3,12 +3,11 @@ package io.legado.app.ui.widget.components.settingItem
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import io.legado.app.ui.theme.ComposeEngine
 import io.legado.app.ui.theme.LegadoTheme
-import io.legado.app.ui.theme.ThemeResolver
 import io.legado.app.ui.widget.components.SplicedColumnDivider
 import top.yukonga.miuix.kmp.basic.BasicComponentDefaults
 import top.yukonga.miuix.kmp.preference.ArrowPreference
@@ -27,29 +26,32 @@ fun ClickableSettingItem(
     val composeEngine = LegadoTheme.composeEngine
     SplicedColumnDivider()
 
-    if (ThemeResolver.isMiuixEngine(composeEngine)) {
-        ArrowPreference(
-            title = title,
-            summary = description,
-            insideMargin = BasicComponentDefaults.InsideMargin,
-            onClick = onClick
-        )
-    } else {
-        SettingItem(
-            modifier = modifier,
-            title = title,
-            description = description,
-            option = option,
-            imageVector = imageVector,
-            trailingContent = trailingContent ?: {
-                Icon(
-                    imageVector = Icons.Default.ChevronRight,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            },
-            onClick = onClick,
-            onLongClick = onLongClick
-        )
+    when (composeEngine) {
+        ComposeEngine.Miuix -> {
+            ArrowPreference(
+                title = title,
+                summary = description,
+                insideMargin = BasicComponentDefaults.InsideMargin,
+                onClick = onClick
+            )
+        }
+        ComposeEngine.Material, ComposeEngine.Mochi, ComposeEngine.Coui -> {
+            SettingItem(
+                modifier = modifier,
+                title = title,
+                description = description,
+                option = option,
+                imageVector = imageVector,
+                trailingContent = trailingContent ?: {
+                    Icon(
+                        imageVector = Icons.Default.ChevronRight,
+                        contentDescription = null,
+                        tint = LegadoTheme.colorScheme.onSurfaceVariant
+                    )
+                },
+                onClick = onClick,
+                onLongClick = onLongClick
+            )
+        }
     }
 }

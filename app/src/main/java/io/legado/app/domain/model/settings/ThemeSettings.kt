@@ -44,6 +44,11 @@ data class ThemeSettings(
     val useFlexibleTopAppBar: Boolean = true,
     val topBarButtonStyle: String = "tonal",
     val mergeTopBarActions: Boolean = false,
+    val mochiTopBarLiquidGlass: Boolean = true,
+    val mochiScrollEdgeBlurEnabled: Boolean = true,
+    /** Legacy value for older builds. Current top bars use [useHyperOs4Components]. */
+    val miuixTopBarLiquidGlass: Boolean = false,
+    val useHyperOs4Components: Boolean = false,
     val bookInfoFollowCoverColor: Boolean = true,
     val bookInfoNetworkCoverBackground: String = "on",
     val bookInfoDefaultCoverBackground: String = "on",

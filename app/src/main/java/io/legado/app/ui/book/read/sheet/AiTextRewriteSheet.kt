@@ -47,6 +47,7 @@ import io.legado.app.ui.widget.components.button.series.SmallOutlinedButton
 import io.legado.app.ui.widget.components.button.series.SmallTonalButton
 import io.legado.app.ui.widget.components.card.NormalCard
 import io.legado.app.ui.widget.components.modalBottomSheet.AppModalBottomSheet
+import io.legado.app.ui.widget.components.modalBottomSheet.MochiSheetLayout
 import io.legado.app.ui.widget.components.progressIndicator.AppCircularProgressIndicator
 import io.legado.app.ui.widget.components.tabRow.CardTabRow
 import io.legado.app.ui.widget.components.text.AppText
@@ -65,6 +66,7 @@ fun AiTextRewriteSheet(
         onDismissRequest = {
             if (!state.isApplying) onDismissRequest()
         },
+        mochiLayout = MochiSheetLayout.Compatibility,
         title = stringResource(R.string.ai_text_rewrite),
         startAction = {
             MediumTonalButton(
@@ -183,6 +185,7 @@ fun AiTextRewriteSheet(
                             placeholder = {
                                 AppText(stringResource(R.string.ai_rewrite_temporary_instruction_hint))
                             },
+                            placeholderText = stringResource(R.string.ai_rewrite_temporary_instruction_hint),
                             minLines = 2,
                             maxLines = 5,
                         )

@@ -9,6 +9,7 @@ import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.EaseOut
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.background
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -32,6 +33,8 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
@@ -48,6 +51,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
@@ -74,11 +78,23 @@ import com.kyant.backdrop.highlight.Highlight
 import com.kyant.backdrop.shadow.InnerShadow
 import com.kyant.backdrop.shadow.Shadow
 import com.kyant.capsule.ContinuousCapsule
+import com.itos.coui.shape.CouiCapsuleShape
+import com.itos.coui.theme.CouiTheme
+import com.itos.coui.effect.couiNavigationFeedback
 import io.legado.app.domain.model.settings.customColors
 import io.legado.app.ui.animation.DampedDragAnimation
 import io.legado.app.ui.animation.InteractiveHighlight
 import io.legado.app.ui.theme.LegadoTheme
+import io.legado.app.ui.theme.ComposeEngine
 import io.legado.app.ui.theme.LocalAppUiConfiguration
+import io.legado.app.ui.theme.LocalMiuixBarBackdrop
+import io.legado.app.ui.theme.ThemeResolver
+import io.legado.app.ui.theme.miuixCapsuleGlass
+import io.legado.app.ui.widget.components.coui.LocalCouiFloatingNavigation
+import io.legado.app.ui.widget.components.coui.couiFloatingCapsule
+import ui.feice.mochi.effect.glass.LocalMochiBackdrop
+import ui.feice.mochi.effect.glass.MochiGlassSurface
+import ui.feice.mochi.theme.MochiTheme
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import kotlin.math.abs
@@ -93,22 +109,25 @@ fun RowScope.FloatingBottomBarItem(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
+    selected: Boolean = false,
     content: @Composable ColumnScope.() -> Unit
 ) {
     val scale = LocalFloatingBottomBarTabScale.current
     val interactive = enabled && LocalFloatingBottomBarTabInteractive.current
+    val isCoui = LegadoTheme.composeEngine == ComposeEngine.Coui
+    val interaction = if (isCoui && interactive) {
+        val source = remember { MutableInteractionSource() }
+        Modifier
+            .couiNavigationFeedback(LegadoTheme.isDark, source)
+            .selectable(selected, source, indication = null, role = Role.Tab, onClick = onClick)
+    } else if (interactive) {
+        Modifier.clickable(interactionSource = null, indication = null, role = Role.Tab, onClick = onClick)
+    } else Modifier
     Column(
         modifier
-            .clip(ContinuousCapsule)
+            .clip(if (isCoui) CouiCapsuleShape else ContinuousCapsule)
             // 背景采样副本与隐藏的导航项不能保留触摸节点，alpha=0 不会取消命中。
-            .then(
-                if (interactive) Modifier.clickable(
-                    interactionSource = null,
-                    indication = null,
-                    role = Role.Tab,
-                    onClick = onClick,
-                ) else Modifier
-            )
+            .then(interaction)
             .fillMaxHeight()
             .weight(1f)
             .graphicsLayer {
@@ -116,7 +135,7 @@ fun RowScope.FloatingBottomBarItem(
                 scaleX = currentScale
                 scaleY = currentScale
             },
-        verticalArrangement = Arrangement.spacedBy(1.dp, Alignment.CenterVertically),
+        verticalArrangement = Arrangement.spacedBy(if (isCoui) 2.dp else 1.dp, Alignment.CenterVertically),
         horizontalAlignment = Alignment.CenterHorizontally,
         content = content
     )
@@ -128,7 +147,7 @@ fun FloatingBottomBar(
     selectedIndex: () -> Int,
     onSelected: (index: Int) -> Unit,
     onReselected: (index: Int) -> Unit = {},
-    backdrop: Backdrop,
+    backdrop: Backdrop?,
     tabsCount: Int,
     isBlurEnabled: Boolean = true,
     hasCustomIcons: Boolean = false,
@@ -141,6 +160,15 @@ fun FloatingBottomBar(
     val menuAlpha = ((compactProgress - 0.35f) / 0.65f).coerceIn(0f, 1f)
     val isInLightTheme = !LegadoTheme.isDark
     val themeSettings = LocalAppUiConfiguration.current.theme
+    val engine = LegadoTheme.composeEngine
+    val isCoui = engine == ComposeEngine.Coui
+    val couiNavigation = LocalCouiFloatingNavigation.current
+    val capsuleShape = if (isCoui) CouiCapsuleShape else ContinuousCapsule
+    val horizontalPadding = if (isCoui) 12.dp else 4.dp
+    val barHeight = if (isCoui) lerp(56f, 64f, compactProgress).dp else 64.dp
+    val materialBackdrop = backdrop.takeIf { engine == ComposeEngine.Material && isBlurEnabled }
+    val miuixGlass = engine == ComposeEngine.Miuix && isBlurEnabled && LocalMiuixBarBackdrop.current != null
+    val mochiBackdrop = if (engine == ComposeEngine.Mochi && isBlurEnabled) LocalMochiBackdrop.current else null
     val customColors = themeSettings.customColors(LegadoTheme.isDark)
     val hasCustomColors = themeSettings.appTheme == "12" &&
         themeSettings.enableDeepPersonalization
@@ -153,6 +181,8 @@ fun FloatingBottomBar(
         Color(customColors.secondary).copy(
             alpha = if (isBlurEnabled) themeSettings.bottomBarBlurAlpha / 100f else 1f
         )
+    } else if (engine == ComposeEngine.Coui) {
+        CouiTheme.colorScheme.surface
     } else if (isBlurEnabled) {
         LegadoTheme.colorScheme.surfaceContainer.copy(
             alpha = themeSettings.bottomBarBlurAlpha / 100f
@@ -161,8 +191,14 @@ fun FloatingBottomBar(
         LegadoTheme.colorScheme.surfaceContainer
     }
 
-    val tabsBackdrop = rememberLayerBackdrop()
+    val tabsBackdrop = if (materialBackdrop != null) rememberLayerBackdrop() else null
+    val indicatorColor = when {
+        isCoui -> Color.Transparent
+        isInLightTheme -> Color.Black.copy(alpha = 0.1f)
+        else -> Color.White.copy(alpha = 0.1f)
+    }
     val density = LocalDensity.current
+    val totalPaddingPx = with(density) { (horizontalPadding * 2).toPx() }
     val isLtr = LocalLayoutDirection.current == LayoutDirection.Ltr
     val animationScope = rememberCoroutineScope()
 
@@ -191,7 +227,7 @@ fun FloatingBottomBar(
 
     val holder = remember { DampedDragAnimationHolder() }
 
-    val dampedDragAnimation = remember(animationScope, tabsCount, density, isLtr) {
+    val dampedDragAnimation = remember(animationScope, tabsCount, totalPaddingPx, isLtr) {
         DampedDragAnimation(
             animationScope = animationScope,
             initialValue = selectedIndex().toFloat(),
@@ -205,7 +241,7 @@ fun FloatingBottomBar(
 
                 val currentValue = anim.value
                 val indicatorX = currentValue * tabWidthPx
-                val padding = with(density) { 4.dp.toPx() }
+                val padding = totalPaddingPx / 2f
                 val globalTouchX = if (isLtr) {
                     val touchX = indicatorX + offset.x
                     padding + touchX
@@ -250,7 +286,7 @@ fun FloatingBottomBar(
     }
 
     val interactiveHighlight =
-        if (isBlurEnabled && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+        if (materialBackdrop != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             remember(animationScope, tabWidthPx) {
                 InteractiveHighlight(
                     animationScope = animationScope,
@@ -283,36 +319,48 @@ fun FloatingBottomBar(
                     indication = null,
                     onClick = {}
                 )
-                .drawBackdrop(
-                    backdrop = backdrop,
-                    shape = { ContinuousCapsule },
-                    effects = {
-                        if (isBlurEnabled) {
-                            vibrancy()
-                            blur(themeSettings.bottomBarBlurRadius.toFloat().dp.toPx())
-                            lens(
-                                themeSettings.bottomBarLensRadius.dp.toPx(),
-                                themeSettings.bottomBarLensRadius.dp.toPx()
-                            )
-                        }
-                    },
-                    highlight = {
-                        Highlight.Default.copy(alpha = if (isBlurEnabled) 1f else 0f)
-                    },
-                    shadow = {
-                        Shadow.Default.copy(
-                            color = Color.Black.copy(if (isInLightTheme) 0.1f else 0.2f)
+                .then(
+                    when {
+                        engine == ComposeEngine.Coui && isBlurEnabled && couiNavigation != null &&
+                            ThemeResolver.isCouiSupported() -> couiFloatingCapsule(
+                                backdrop = couiNavigation.backdrop,
+                                renderer = couiNavigation.renderer,
+                            ) { size ->
+                                val scale = with(density) { 16.dp.toPx() } / size.width.coerceAtLeast(1f)
+                                1f + scale * dampedDragAnimation.pressProgress
+                            }
+                        materialBackdrop != null -> Modifier.drawBackdrop(
+                            backdrop = materialBackdrop,
+                            shape = { ContinuousCapsule },
+                            effects = {
+                                vibrancy()
+                                blur(themeSettings.bottomBarBlurRadius.dp.toPx())
+                                val radius = themeSettings.bottomBarLensRadius.dp.toPx()
+                                lens(radius, radius)
+                            },
+                            highlight = { Highlight.Default },
+                            shadow = {
+                                Shadow.Default.copy(
+                                    color = Color.Black.copy(if (isInLightTheme) 0.1f else 0.2f),
+                                )
+                            },
+                            layerBlock = {
+                                val progress = dampedDragAnimation.pressProgress
+                                val scale = lerp(1f, 1f + 16f.dp.toPx() / size.width.coerceAtLeast(1f), progress)
+                                scaleX = scale
+                                scaleY = scale
+                            },
+                            onDrawSurface = { drawRect(containerColor) },
                         )
+                        miuixGlass -> Modifier.miuixCapsuleGlass(
+                            tint = containerColor,
+                            blurRadius = themeSettings.bottomBarBlurRadius.dp,
+                            lensRadius = themeSettings.bottomBarLensRadius.dp,
+                        )
+                        mochiBackdrop != null -> Modifier
+                        else -> Modifier.shadow(4.dp, capsuleShape, clip = false)
+                            .background(containerColor.copy(alpha = 1f), capsuleShape)
                     },
-                    layerBlock = {
-                        if (isBlurEnabled) {
-                            val progress = dampedDragAnimation.pressProgress
-                            val scale = lerp(1f, 1f + 16f.dp.toPx() / size.width, progress)
-                            scaleX = scale
-                            scaleY = scale
-                        }
-                    },
-                    onDrawSurface = { drawRect(containerColor) }
                 )
                 .then(
                     if (isBlurEnabled && interactiveHighlight != null) {
@@ -321,9 +369,12 @@ fun FloatingBottomBar(
                         Modifier
                     }
                 )
-                .height(64.dp)
-                .then(if (compactProgress > 0f) Modifier.clip(ContinuousCapsule) else Modifier),
+                .height(barHeight)
+                .then(if (compactProgress > 0f) Modifier.clip(capsuleShape) else Modifier),
         ) {
+            if (mochiBackdrop != null) {
+                MochiGlassSurface(Modifier.matchParentSize(), material = MochiTheme.materials.bar, backdrop = mochiBackdrop) {}
+            }
             Row(
                 Modifier
                     .then(
@@ -334,20 +385,21 @@ fun FloatingBottomBar(
                             )
                             .requiredWidth(expandedWidth) else Modifier
                     )
-                    .height(64.dp)
+                    .height(barHeight)
                     .onGloballyPositioned { coords ->
                         totalWidthPx = coords.size.width.toFloat()
-                        tabWidthPx = (totalWidthPx - with(density) { 8.dp.toPx() }) / tabsCount
+                        tabWidthPx = (totalWidthPx - totalPaddingPx).coerceAtLeast(0f) / tabsCount
                     }
                     .graphicsLayer { alpha = navigationAlpha }
                     .then(if (compactProgress > 0f) Modifier.clearAndSetSemantics {} else Modifier)
-                    .padding(4.dp),
+                    .then(if (isCoui) Modifier.selectableGroup() else Modifier)
+                    .padding(horizontal = horizontalPadding, vertical = 4.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 content = content,
             )
         }
 
-        CompositionLocalProvider(
+        if (materialBackdrop != null && tabsBackdrop != null) CompositionLocalProvider(
             LocalFloatingBottomBarTabScale provides {
                 if (isBlurEnabled) {
                     lerp(1f, 1.2f, dampedDragAnimation.pressProgress)
@@ -372,7 +424,7 @@ fun FloatingBottomBar(
                     .layerBackdrop(tabsBackdrop)
                     .graphicsLayer { translationX = panelOffset }
                     .drawBackdrop(
-                        backdrop = backdrop,
+                        backdrop = materialBackdrop,
                         shape = { ContinuousCapsule },
                         effects = {
                             if (isBlurEnabled) {
@@ -418,17 +470,15 @@ fun FloatingBottomBar(
             Box(
                 Modifier
                     .matchParentSize()
-                    .then(if (compactProgress > 0f) Modifier.clip(ContinuousCapsule) else Modifier)
+                    .then(if (compactProgress > 0f) Modifier.clip(capsuleShape) else Modifier)
             ) {
                 Box(
                     Modifier
                         .align(Alignment.CenterStart)
-                        .padding(horizontal = 4.dp)
+                        .padding(horizontal = horizontalPadding)
                         .graphicsLayer {
                             alpha = navigationAlpha
-                            val contentWidth = totalWidthPx - with(density) { 8.dp.toPx() }
-                            val singleTabWidth = contentWidth / tabsCount
-                            val progressOffset = dampedDragAnimation.value * singleTabWidth
+                            val progressOffset = dampedDragAnimation.value * tabWidthPx
 
                             translationX = if (isLtr) {
                                 progressOffset + panelOffset
@@ -444,58 +494,38 @@ fun FloatingBottomBar(
                             }
                         )
                         .then(if (compactProgress <= 0f) dampedDragAnimation.modifier else Modifier)
-                        .drawBackdrop(
-                            backdrop = rememberCombinedBackdrop(backdrop, tabsBackdrop),
-                            shape = { ContinuousCapsule },
-                            effects = {
-                                if (isBlurEnabled) {
-                                    val progress = dampedDragAnimation.pressProgress
-                                    lens(10f.dp.toPx() * progress, 14f.dp.toPx() * progress, true)
-                                }
-                            },
-                            highlight = {
-                                Highlight.Default.copy(
-                                    alpha = if (isBlurEnabled) {
-                                        dampedDragAnimation.pressProgress
-                                    } else {
-                                        0f
-                                    }
-                                )
-                            },
-                            shadow = {
-                                Shadow(alpha = if (isBlurEnabled) dampedDragAnimation.pressProgress else 0f)
-                            },
-                            innerShadow = {
-                                InnerShadow(
-                                    radius = 8f.dp * dampedDragAnimation.pressProgress,
-                                    alpha = if (isBlurEnabled) dampedDragAnimation.pressProgress else 0f
-                                )
-                            },
-                            layerBlock = {
-                                if (isBlurEnabled) {
-                                    scaleX = dampedDragAnimation.scaleX
-                                    scaleY = dampedDragAnimation.scaleY
-                                    val velocity = dampedDragAnimation.velocity / 10f
-                                    scaleX /= 1f - (velocity * 0.75f).fastCoerceIn(-0.2f, 0.2f)
-                                    scaleY *= 1f - (velocity * 0.25f).fastCoerceIn(-0.2f, 0.2f)
-                                }
-                            },
-                            onDrawSurface = {
-                                val progress =
-                                    if (isBlurEnabled) dampedDragAnimation.pressProgress else 0f
-                                drawRect(
-                                    color = if (isInLightTheme) {
-                                        Color.Black.copy(0.1f)
-                                    } else {
-                                        Color.White.copy(0.1f)
+                        .then(
+                            if (materialBackdrop != null && tabsBackdrop != null) {
+                                Modifier.drawBackdrop(
+                                    backdrop = rememberCombinedBackdrop(materialBackdrop, tabsBackdrop),
+                                    shape = { ContinuousCapsule },
+                                    effects = {
+                                        val progress = dampedDragAnimation.pressProgress
+                                        lens(10f.dp.toPx() * progress, 14f.dp.toPx() * progress, true)
                                     },
-                                    alpha = 1f - progress
+                                    highlight = { Highlight.Default.copy(alpha = dampedDragAnimation.pressProgress) },
+                                    shadow = { Shadow(alpha = dampedDragAnimation.pressProgress) },
+                                    innerShadow = {
+                                        val progress = dampedDragAnimation.pressProgress
+                                        InnerShadow(radius = 8f.dp * progress, alpha = progress)
+                                    },
+                                    layerBlock = {
+                                        scaleX = dampedDragAnimation.scaleX
+                                        scaleY = dampedDragAnimation.scaleY
+                                        val velocity = dampedDragAnimation.velocity / 10f
+                                        scaleX /= 1f - (velocity * 0.75f).fastCoerceIn(-0.2f, 0.2f)
+                                        scaleY *= 1f - (velocity * 0.25f).fastCoerceIn(-0.2f, 0.2f)
+                                    },
+                                    onDrawSurface = {
+                                        val progress = dampedDragAnimation.pressProgress
+                                        drawRect(color = indicatorColor, alpha = 1f - progress)
+                                        drawRect(Color.Black.copy(alpha = 0.03f * progress))
+                                    },
                                 )
-                                drawRect(Color.Black.copy(alpha = 0.03f * progress))
-                            }
+                            } else Modifier.background(indicatorColor, capsuleShape),
                         )
-                        .height(56.dp)
-                        .width(with(density) { ((totalWidthPx - 8.dp.toPx()) / tabsCount).toDp() })
+                        .height(barHeight - 8.dp)
+                        .width(with(density) { tabWidthPx.toDp() })
                 )
             }
         }
@@ -506,7 +536,7 @@ fun FloatingBottomBar(
                 enabled = compactProgress > 0.35f,
                 modifier = Modifier
                     .align(Alignment.Center)
-                    .size(64.dp)
+                    .size(barHeight)
                     .graphicsLayer { alpha = menuAlpha },
             ) {
                 Icon(

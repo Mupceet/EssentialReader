@@ -13,14 +13,6 @@ Design 3 风格重构版本。
 本项目在对 UI 进行重绘的基础上，加入了多项分支独有功能，并正在逐步从传统 View 迁移至 Jetpack Compose
 框架，目标是提供更加现代、流畅且一致的阅读体验。
 
-> [!CAUTION]
-> **注意事项：**
-> 由于使用 Monet 引擎重构了主题系统，官方版本的主题在此版本中不再可用。
->
-> **Android 12 以下设备：**
-> 暂时无法使用自定义主题与动态取色功能。此限制将在 Jetpack Compose
-> 迁移完成后得到解决（由于开发者精力有限，迁移过程将持续较长时间）。
-
 ---
 
 ## ✨ 分支特性
@@ -46,6 +38,16 @@ Design 3 风格重构版本。
 
 ---
 
+## 从源码构建
+
+首次检出后运行 `git submodule update --init modules/miuix modules/coui modules/mochi`。使用 JDK 21、Python 3.11+，在 `local.properties` 配置 `sdk.dir` 或设置 `ANDROID_HOME`，安装 Android 36、37.0、37.1 平台后执行：
+
+```shell
+python scripts/prepare-ui-forks.py
+```
+
+这会将固定提交的 COUI、Mochi 构建到本项目 `build/ui-forks/maven`，随后可照常运行 Gradle；Miuix 继续通过 `includeBuild` 编译。GitHub 的验证、Release 和手动 APK 工作流自动执行相同步骤，不需要 Maven 发布凭据。具体更新流程见 [UI fork 构建说明](docs/dev/ui-fork-builds.md)。
+
 ## 💬 交流
 
 * **Telegram 群组：** [Legado with MD3](https://t.me/materado)
@@ -61,10 +63,13 @@ Design 3 风格重构版本。
 
 * [gedoor/legado](https://github.com/gedoor/legado) (这个项目最吊的老爹)
 * [Luoyacheng/legado](https://github.com/Luoyacheng/legado) (提供了更多的扩展功能)
-* [komikku-app/komikku](https://github.com/komikku-app/komikku) (提供了界面灵感与一些 Compose
-  的优秀控件)
-* [FoedusProgramme/Gramophone](https://github.com/FoedusProgramme/Gramophone) (提供了界面灵感与 View
-  系统的封面取色方法)
+* [rimvoid/legado](https://github.com/rimvoid/legado) (提供了更多的扩展功能)
+* [ItosEO/COUI-Kit](https://github.com/ItosEO/COUI-Kit) (使用 Compose 复刻和优化 ColorOS 17 UI 风格的UI库)
+* [compose-miuix-ui/miuix](https://github.com/compose-miuix-ui/miuix) (使用 Compose 复刻和优化 HyperOS 4 UI 风格的UI库)
+* [feice11/mochi-compose](https://github.com/feice11/mochi-compose) (软、弹、跟手的 Jetpack Compose 组件库)
+* [Kyant0/AndroidLiquidGlass](https://github.com/Kyant0/AndroidLiquidGlass) (适用于 Compose Multiplatform 的可自定义 Liquid Glass 特效库)
+* [komikku-app/komikku](https://github.com/komikku-app/komikku) (提供了界面灵感与漫画相关实现参考)
+* [FoedusProgramme/Gramophone](https://github.com/FoedusProgramme/Gramophone) (提供了界面灵感)
 * [jordond/MaterialKolor](https://github.com/jordond/MaterialKolor) (基于 Jetpack Compose
   优秀的取色实现)
 * [Calvin-LL/Reorderable](https://github.com/Calvin-LL/Reorderable) (基于 Jetpack Compose
