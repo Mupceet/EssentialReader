@@ -13,6 +13,7 @@ import androidx.lifecycle.SavedStateHandle
 import io.legado.app.R
 import io.legado.app.domain.model.settings.AppShellSettings
 import io.legado.app.domain.model.settings.AppUiConfiguration
+import io.legado.app.domain.model.settings.LabSettings
 import io.legado.app.domain.model.settings.NavigationAnimationStyle
 import io.legado.app.domain.model.settings.TextAnimationLevel
 import io.legado.app.feature.settings.reading.ReadSetting
@@ -255,7 +256,13 @@ class ExtendedSettingsSearchTest {
         compose.setContent {
             AppTheme(AppUiConfiguration()) {
                 SettingsSearchTargetScope(item) {
-                    LabConfigScreen(LabConfigUiState(), { mutations += it }, {})
+                    // 本仓库 LabSettings 默认 enabled=true（新装机直接可见墨水屏模式开关，
+                    // 368fbcb7a）；本测试验证的是「关闭态的引导文案」，显式构造关闭态而非依赖默认值。
+                    LabConfigScreen(
+                        LabConfigUiState(settings = LabSettings(enabled = false)),
+                        { mutations += it },
+                        {},
+                    )
                 }
             }
         }
