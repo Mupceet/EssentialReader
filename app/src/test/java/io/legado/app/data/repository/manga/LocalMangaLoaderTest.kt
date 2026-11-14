@@ -32,7 +32,9 @@ class LocalMangaLoaderTest {
             val url = LocalMangaLoader(cache).use { it.load(book, chapter).pages.single().imageUrl }
 
             assertTrue(url.startsWith("file:///"))
-            assertEquals(image.absolutePath, URI(url).path)
+            // Compare URI-normalized paths: on Windows absolutePath keeps `\` separators
+            // while a file URI path is always `/`-separated, so both sides go through toURI().
+            assertEquals(image.toURI().path, URI(url).path)
         } finally {
             root.deleteRecursively()
             cache.deleteRecursively()

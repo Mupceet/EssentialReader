@@ -22,7 +22,6 @@ import java.io.File
 import java.io.FileNotFoundException
 import java.net.URI
 import java.nio.file.Files
-import java.nio.file.Paths
 
 internal fun isLocalMangaImage(path: String): Boolean =
     path.substringAfterLast('/', path).substringAfterLast('.', "").lowercase() in
@@ -30,9 +29,18 @@ internal fun isLocalMangaImage(path: String): Boolean =
 
 private val localMangaImageExtensions = setOf("jpg", "jpeg", "png", "webp", "gif", "avif", "bmp")
 
-/** Coil needs an explicit file authority separator to keep the path absolute. */
+/**
+ * Coil needs an explicit file authority separator to keep the path absolute.
+ *
+ * [toURI].path normalizes platform separators (Windows `\` becomes `/`), which the
+ * raw [absolutePath] did not — feeding it to `URI("file", "", path, null)` on Windows
+ * produced an invalid URI whose authority swallowed the drive letter
+ * (`file://C:%5C...`), throwing [java.net.URISyntaxException]. Rebuilding the
+ * authority form from the normalized path keeps the `file:///…` output identical on
+ * Unix while making Windows URLs valid.
+ */
 internal fun File.toLocalMangaImageUrl(): String =
-    URI("file", "", absolutePath, null).toASCIIString()
+    URI("file", "", toURI().path, null).toASCIIString()
 
 // A directory import has the image bit without the archive bit. Older CBZ records may have
 // neither bit, so keep the explicit comic extension as a fallback.
@@ -234,19 +242,39 @@ private fun checkMangaDocumentDirectory(uri: Uri) {
     )?.close() ?: throw FileNotFoundException(uri.toString())
 }
 
-/** Normalize the same common parent that the reader strips from extracted images. */
+/**
+ * Normalize the same common parent that the reader strips from extracted images.
+ *
+ * Archive entries are virtual paths that always use `/` separators, so they are
+ * normalized as such instead of going through [java.nio.file.Paths], whose
+ * platform-specific separator corrupts chapter grouping on Windows hosts
+ * (`Comic/Chapter 2/1.png` becomes `Comic\Chapter 2\1.png` and never matches the
+ * `/`-based chapter-title logic).
+ */
 internal fun relativeMangaArchivePaths(entries: List<String>): List<String> {
-    val paths = entries.map { Paths.get(it).normalize() }.distinct()
-    if (paths.any { it.isAbsolute || it.startsWith("..") }) {
-        throw SecurityException("Comic archive entry is outside its root")
+    fun entryParts(entry: String): List<String>? {
+        val parts = mutableListOf<String>()
+        entry.split('/').forEach { part ->
+            when {
+                part.isEmpty() || part == "." -> Unit
+                part == ".." ->
+                    if (parts.isEmpty()) return null else parts.removeAt(parts.lastIndex)
+                else -> parts.add(part)
+            }
+        }
+        return parts
     }
-    var common = paths.firstOrNull()?.parent
-    while (true) {
-        val parent = common ?: break
-        if (paths.all { it.startsWith(parent) }) break
-        common = parent.parent
+    val paths = entries.map { entry ->
+        entryParts(entry) ?: throw SecurityException("Comic archive entry is outside its root")
+    }.distinct()
+    var common = paths.firstOrNull()?.dropLast(1)
+    while (common != null && !paths.all { it.take(common.size) == common }) {
+        common = common.dropLast(1)
     }
-    return paths.map { (common?.relativize(it) ?: it).toString() }
+    return paths.map { path ->
+        (common?.takeIf { it.isNotEmpty() }?.let { path.drop(it.size) } ?: path)
+            .joinToString("/")
+    }
 }
 
 internal fun <T> groupLocalMangaPages(
