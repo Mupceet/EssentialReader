@@ -155,6 +155,10 @@ internal class ReaderProgressSyncer(
             log("进书同步：未加书架，跳过")
             return
         }
+        if (!NetworkUtils.isAvailable()) {
+            log("进书同步：网络不可用，跳过（待网络恢复补拉）")
+            return
+        }
         val book = ReadBook.book ?: run {
             log("进书同步：无会话书，跳过")
             return
