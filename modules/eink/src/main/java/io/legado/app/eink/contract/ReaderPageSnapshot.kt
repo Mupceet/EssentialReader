@@ -46,6 +46,18 @@ class ReaderPageSnapshot(
     val images: List<ReaderImageSlot>,
 
     /**
+     * 页级横线（宿主 `ReaderElement.Rule` 原样透传；缺省空 = 无，旧宿主兼容）。
+     *
+     * 当前两类来源：整页文字下划线（宿主「文字下划线」开关开启时分页器
+     * 逐行产出——完整模式 overlayRules 画的是同一份元素）与章节分隔线
+     * （`<hr>`/分隔段提示，完整模式 contentRules）。此前两者在墨水屏模式
+     * 均被映射器丢弃（不渲染），本字段补齐该降级。坐标为引擎排版坐标系
+     * px 原样拷贝；颜色为宿主灰度换算后的绝对灰（保留 alpha，口径同
+     * [ReaderDecorationRun]），模块按值画线、不做几何推断。
+     */
+    val ruleLines: List<ReaderRuleLine> = emptyList(),
+
+    /**
      * 当前页是否带有书签角标（宿主 page.decoration.bookmarkBadge 原样
      * 拷贝）。模块页角绘制角标，顶栏书签按钮的选中态据此推导——模块不
      * 自持「当前页是否有书签」状态。
@@ -293,6 +305,33 @@ class ReaderDecorationRun(
 
     /** 下划线/删除线/荧光带颜色（宿主灰度换算后；null = 模块主题文字色）。 */
     val underlineColorArgb: Int? = null,
+)
+
+/**
+ * 页级横线（px，引擎排版坐标系）：模块按值绘制一条水平线。几何与完整
+ * 模式 `ReaderRuleDrawCommand` 同源——整页文字下划线的 bounds 是零高
+ * 矩形（top == bottom = 线 y），章节分隔线是线宽高的窄带（模块取窄带
+ * 中点为线 y）。
+ */
+class ReaderRuleLine(
+    /** 左端 x。 */
+    val left: Float,
+    /** 线上沿 y（整页下划线 = 线 y 本身）。 */
+    val top: Float,
+    /** 右端 x。 */
+    val right: Float,
+    /** 下沿 y（整页下划线与 [top] 相等）。 */
+    val bottom: Float,
+    /** 线色（宿主灰度换算后）。 */
+    val colorArgb: Int,
+    /** 线宽。 */
+    val widthPx: Float,
+    /** true = 虚线。 */
+    val dashed: Boolean,
+    /** 虚线墨长。 */
+    val dashOnPx: Float,
+    /** 虚线空长。 */
+    val dashOffPx: Float,
 )
 
 /**

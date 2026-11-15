@@ -3,6 +3,7 @@ package io.legado.app.eink.feature.reader.screensaver
 import io.legado.app.eink.contract.ReaderPageLine
 import io.legado.app.eink.contract.ReaderPageSnapshot
 import io.legado.app.eink.contract.ReaderPaintSpec
+import io.legado.app.eink.contract.ReaderRuleLine
 import io.legado.app.eink.contract.ReaderTextStyle
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -43,6 +44,38 @@ class ReaderScreensaverFingerprintTest {
         assertNotEquals(
             fingerprint(request, settings),
             fingerprint(request.copyWithBookName("another book"), settings),
+        )
+    }
+
+    @Test
+    fun reflectsPageRuleLinesInReadingMode() {
+        // 页级横线（整页文字下划线/分隔线）属于可见内容：开关或几何变化必须重绘
+        val withUnderline = request(
+            text = "same page",
+            ruleLines = listOf(
+                ReaderRuleLine(
+                    left = 20f,
+                    top = 108f,
+                    right = 1840f,
+                    bottom = 108f,
+                    colorArgb = 0xff333333.toInt(),
+                    widthPx = 2f,
+                    dashed = false,
+                    dashOnPx = 6f,
+                    dashOffPx = 6f,
+                ),
+            ),
+        )
+        assertNotEquals(
+            fingerprint(request(text = "same page"), settings),
+            fingerprint(withUnderline, settings),
+        )
+        assertEquals(
+            fingerprint(withUnderline, settings),
+            fingerprint(
+                request(text = "same page", ruleLines = withUnderline.page.ruleLines),
+                settings,
+            ),
         )
     }
 
@@ -141,7 +174,10 @@ class ReaderScreensaverFingerprintTest {
         coverDigest = coverDigest,
     )
 
-    private fun request(text: String): ReaderScreensaverRequest {
+    private fun request(
+        text: String,
+        ruleLines: List<ReaderRuleLine> = emptyList(),
+    ): ReaderScreensaverRequest {
         val spec = ReaderPaintSpec(
             textSizePx = 40f,
             letterSpacing = 0f,
@@ -165,6 +201,7 @@ class ReaderScreensaverFingerprintTest {
                 ),
             ),
             images = emptyList(),
+            ruleLines = ruleLines,
         )
         return ReaderScreensaverRequest(
             page = page,

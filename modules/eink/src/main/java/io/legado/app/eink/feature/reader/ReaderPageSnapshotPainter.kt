@@ -259,6 +259,29 @@ internal class ReaderPageSnapshotPainter {
                 }
             }
         }
+
+        // 页级横线（整页文字下划线/章节分隔线）：宿主 ReaderElement.Rule
+        // 透传，与完整模式 overlayRules/contentRules 同一份几何。画在最后
+        // 与完整模式 overlay 收尾一致——线位于行盒下沿之下或独立行带，
+        // 与字形无重叠。y 取窄带中点：整页下划线 top == bottom（即线 y），
+        // 分隔线窄带中点与完整模式斜线描边的视觉中心一致。
+        for (line in snapshot.ruleLines) {
+            val y = (line.top + line.bottom) / 2f
+            if (line.dashed) {
+                drawDashedLine(
+                    canvas = canvas,
+                    left = line.left,
+                    right = line.right,
+                    y = y,
+                    strokeWidth = line.widthPx,
+                    colorArgb = line.colorArgb,
+                    dashOnPx = line.dashOnPx,
+                    dashOffPx = line.dashOffPx,
+                )
+            } else {
+                drawSolidLine(canvas, line.left, line.right, y, line.widthPx, line.colorArgb)
+            }
+        }
     }
 
     private fun drawSolidLine(

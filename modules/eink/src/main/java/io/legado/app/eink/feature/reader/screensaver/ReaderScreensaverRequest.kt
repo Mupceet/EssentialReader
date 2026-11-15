@@ -173,6 +173,20 @@ internal object ReaderScreensaverFingerprint {
             digest.text(image.source)
             digest.text(image.action ?: "")
         }
+        // 页级横线（整页文字下划线/分隔线）参与指纹：开关下划线或线几何
+        // 变化时屏保须重绘，不能沿用旧壁纸
+        digest.int(page.ruleLines.size)
+        for (line in page.ruleLines) {
+            digest.float(line.left)
+            digest.float(line.top)
+            digest.float(line.right)
+            digest.float(line.bottom)
+            digest.int(line.colorArgb)
+            digest.float(line.widthPx)
+            digest.int(if (line.dashed) 1 else 0)
+            digest.float(line.dashOnPx)
+            digest.float(line.dashOffPx)
+        }
         digest.int(if (page.bookmarkBadge) 1 else 0)
         digest.float(page.contentFillRatio)
 
