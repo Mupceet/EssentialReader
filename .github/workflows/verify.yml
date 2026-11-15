@@ -30,9 +30,12 @@ jobs:
             label: core
     name: Verify (${{ matrix.label }})
     runs-on: ubuntu-latest
-    # 打包段曾在 CI 挂死 4~6 小时（GitHub 6h 上限才杀）；45 分钟足以覆盖
-    # 正常 16~23 分钟的完整验证，超时即失败并保留当时日志。
-    timeout-minutes: 45
+    # 打包段曾在 CI 挂死 4~6 小时（GitHub 6h 上限才杀），超时兜底防挂死。
+    # 2026-11-14 合并 UI fork 构建体系后新常态变长：prepare-ui-forks ~4.5m +
+    # miuix includeBuild 源码编译 + 全量单测（forkEvery=1 逐类）+ 打包，
+    # 实测同类上游 Verify 成功 run 63m；45m 上限首跑即超时（43618596067），
+    # 抬至 90m 留余量，仍远低于挂死量级。
+    timeout-minutes: 90
     # concurrency 放在 job 层：workflow 层的 concurrency 不保证能解析 matrix 上下文。
     concurrency:
       group: verify-${{ github.workflow }}-${{ github.ref }}-${{ matrix.product }}
