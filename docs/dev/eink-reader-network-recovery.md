@@ -78,6 +78,11 @@
 - 防抖：网络恢复事件去抖（4.1）之外，同一自愈目标（`bookUrl to chapterIndex`；Reattach 为
   `bookUrl`）在最小间隔 15s 内不重复；失败后**不设总次数上限**，等下一次网络恢复事件
   ——网络真正稳定后一次即成功，Wi-Fi 抖动时 15s 间隔约束墨水屏刷新成本。
+- 防抖拒绝不丢弃：晚到的 VALIDATED 边沿补试改为窗口到期执行一次（最早在途的补试
+  生效，后续拒绝不叠加）——消解「onAvailable 先到、失败占住窗口，VALIDATED 数秒后
+  被 15s 防抖吞掉」这一重连常态路径（最终审查 Important 修订，2026-11-15）。
+- 恢复动作统一经 viewModelScope 派发主线程执行，网络回调线程只做判定：
+  attach 前置块会改 attachJob/autoPlayJob，回调线程直调存在竞态。
 - 与现有 `scheduleContentAutoRetry`（`autoRetriedFailure` 名额）两套独立，互不消耗。
 - 自愈判定独立于 `ReaderSyncGate`（gate 只约束进度同步的触发语义——进书武装与
   初始装载窗口；自愈由失败态自身门控，装载窗口内通常无失败态，天然不触发）。
