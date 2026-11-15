@@ -11,6 +11,7 @@ import io.legado.app.eink.contract.ReaderImageSlot
 import io.legado.app.eink.contract.ReaderPageLine
 import io.legado.app.eink.contract.ReaderPageSnapshot
 import io.legado.app.eink.contract.ReaderPaintSpec
+import io.legado.app.eink.contract.ReaderRuleLine
 import io.legado.app.eink.contract.ReaderUnderlineGeometry
 import io.legado.app.feature.reader.core.model.ReaderElement
 import io.legado.app.feature.reader.core.model.ReaderPage
@@ -46,6 +47,9 @@ import kotlin.math.roundToInt
  *    （paragraphIndex），同一文本块的折行续行间 0、块末行 1、其后每个
  *    空行/占位块（Spacer 等，不产生行）累加 1——与分页器拼 pageText 的
  *    `append('\n')` 口径（段末/空行各一个）同构。
+ *  - 页级横线（ReaderElement.Rule——整页文字下划线与章节分隔线）原样
+ *    透传为 [ReaderRuleLine]（几何拷贝、颜色灰度换算），Rule 的段末证据
+ *    职责保持不变。
  *
  * 画笔规格只拷贝测量耦合参数（字号/字距/字体/可变字重）——快照坐标
  * 是引擎按这些参数测量的，模块必须按同值绘制才不错位；阴影等纯视觉
@@ -110,6 +114,7 @@ internal object ReaderPageSnapshotMapper {
     ): ReaderPageSnapshot {
         val staged = ArrayList<LineBuffer>()
         val images = ArrayList<ReaderImageSlot>()
+        val ruleLines = ArrayList<ReaderRuleLine>()
         var buffer: LineBuffer? = null
         // 覆盖签名 → 共享实例（页内等值段复用同一覆盖对象，模块画笔缓存按值命中）
         val overrideInterned = HashMap<ChunkOverrideSignature, ReaderChunkPaintOverride>()
@@ -210,10 +215,25 @@ internal object ReaderPageSnapshotMapper {
                     // 累加进上一个文本块的段末边界（空行分隔 = 2）
                     pendingBlankLines++
 
-                is ReaderElement.Rule ->
+                is ReaderElement.Rule -> {
                     // 分隔线是独立块：其前的文本块已收尾（pageText 补过段末 \n），
                     // 自身不产生行也不补 \n，仅作末行段末证据
                     trailingBlockElement = true
+                    // 同一元素顺带透传为页级横线（整页文字下划线/章节分隔线）：
+                    // 几何原样拷贝（完整模式 ReaderRuleDrawCommand 同源），
+                    // 颜色灰度换算（口径同行内装饰）
+                    ruleLines += ReaderRuleLine(
+                        left = element.bounds.left,
+                        top = element.bounds.top,
+                        right = element.bounds.right,
+                        bottom = element.bounds.bottom,
+                        colorArgb = element.colorArgb.toEInkGrayArgb(),
+                        widthPx = element.widthPx,
+                        dashed = element.dashed,
+                        dashOnPx = element.dashOnPx,
+                        dashOffPx = element.dashOffPx,
+                    )
+                }
 
                 else -> Unit // 评论/动作/装饰等元素：E-Ink 不渲染（同 View 画布 else 分支）
             }
@@ -232,6 +252,7 @@ internal object ReaderPageSnapshotMapper {
             contentSpec = contentSpec,
             lines = staged.map { it.toLine() },
             images = images,
+            ruleLines = ruleLines,
             bookmarkBadge = bookmarkBadge,
             contentFillRatio = contentFillRatio,
         )

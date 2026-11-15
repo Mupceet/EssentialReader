@@ -893,4 +893,55 @@ class ReaderPageSnapshotMapperTest {
         )
         assertEquals(1f, full.contentFillRatio, 0.001f)
     }
+
+    @Test
+    fun `整页下划线与分隔线透传为页级横线并灰度换算`() {
+        // 分页器两类 Rule：整页文字下划线（overlayStyledUnderline，零高矩形）
+        // 与章节分隔线（窄带矩形，可能虚线）
+        val underline = ReaderElement.Rule(
+            bounds = ReaderRect(10f, 100f, 990f, 100f),
+            colorArgb = 0xFF3366CC.toInt(),
+            widthPx = 2f,
+            dashed = false,
+            overlayStyledUnderline = true,
+        )
+        val separator = ReaderElement.Rule(
+            bounds = ReaderRect(0f, 200f, 1000f, 202f),
+            colorArgb = 0xFF808080.toInt(),
+            widthPx = 2f,
+            dashed = true,
+            dashOnPx = 6f,
+            dashOffPx = 8f,
+        )
+        val snapshot = mapElements(
+            textElement(0f, 50f, "行"),
+            underline,
+            textElement(0f, 150f, "续"),
+            separator,
+        )
+
+        // 元素顺序即透传顺序；行结构不受 Rule 影响
+        assertEquals(2, snapshot.ruleLines.size)
+        assertEquals(2, snapshot.lines.size)
+        val mappedUnderline = snapshot.ruleLines[0]
+        assertEquals(10f, mappedUnderline.left, 0.001f)
+        assertEquals(990f, mappedUnderline.right, 0.001f)
+        assertEquals(100f, mappedUnderline.top, 0.001f)
+        assertEquals(100f, mappedUnderline.bottom, 0.001f)
+        // 0xFF3366CC → BT.709 亮度 99（0x63），保留 alpha（口径同行内装饰）
+        assertEquals(0xFF636363.toInt(), mappedUnderline.colorArgb)
+        assertEquals(2f, mappedUnderline.widthPx, 0.001f)
+        assertFalse(mappedUnderline.dashed)
+        val mappedSeparator = snapshot.ruleLines[1]
+        assertTrue(mappedSeparator.dashed)
+        assertEquals(6f, mappedSeparator.dashOnPx, 0.001f)
+        assertEquals(8f, mappedSeparator.dashOffPx, 0.001f)
+        // 灰色输入换算后不变
+        assertEquals(0xFF808080.toInt(), mappedSeparator.colorArgb)
+    }
+
+    @Test
+    fun `无 Rule 元素的页不产生页级横线`() {
+        assertEquals(0, mapElements(textElement(0f, 0f, "文")).ruleLines.size)
+    }
 }
