@@ -10,6 +10,11 @@ package io.legado.app.eink.feature.reader
  *
  * 初始即已验证（重注册 callback 的首次上报）算一次边沿：触发动作
  * 幂等（进度同步为拉取+比较，自愈有目标防抖），可接受。
+ *
+ * 线程与生命周期：registerDefaultNetworkCallback 的回调串行到达同一
+ * ConnectivityThread，本类无需同步；边沿状态刻意跨注销/重注册存续——
+ * 重注册时若网络已验证，首次上报不再重复触发边沿（防 ON_RESUME 反复
+ * 重挂网络监听造成重复自愈）。
  */
 internal class NetworkValidationEdge {
 

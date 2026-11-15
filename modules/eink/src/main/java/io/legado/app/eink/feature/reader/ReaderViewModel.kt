@@ -8,6 +8,7 @@ import android.net.Network
 import android.net.NetworkCapabilities
 import android.os.BatteryManager
 import android.os.SystemClock
+import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import io.legado.app.eink.R
@@ -269,6 +270,9 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application),
     /** 网络自愈防抖：目标键（bookUrl to chapterIndex，Reattach 用 -1）。 */
     private var lastRecoveryKey: Pair<String, Int>? = null
     private var lastRecoveryAt = 0L
+
+    /** 防抖窗口到期补试任务（最早一次在途即可，后续拒绝不再叠加）。 */
+    private var deferredRecoveryJob: Job? = null
 
     // ==================== 生命周期与加载 ====================
 
@@ -1468,6 +1472,8 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application),
      * 网络恢复内容自愈：仅失败态动作（判定独立于 [ReaderSyncGate]——
      * gate 只约束进度同步语义，自愈由失败态自身门控）；同一目标
      * 15s 内不重复，失败后等下一次网络恢复事件，不设总次数上限。
+     * 防抖拒绝不丢弃：改为窗口到期补试一次（最早在途的补试生效）；
+     * 恢复动作统一经 viewModelScope 派发主线程执行，网络回调线程只做判定。
      */
     private fun attemptNetworkRecovery() {
         val state = _uiState.value
@@ -1483,13 +1489,35 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application),
             if (action == ReaderRecoveryAction.Reattach) -1 else engine.currentChapterIndex
         val key = bookUrl to chapterIndex
         val now = SystemClock.elapsedRealtime()
-        if (key == lastRecoveryKey && now - lastRecoveryAt < RECOVERY_MIN_INTERVAL_MS) return
+        if (key == lastRecoveryKey) {
+            val sinceLast = now - lastRecoveryAt
+            if (sinceLast < RECOVERY_MIN_INTERVAL_MS) {
+                // 防抖拒绝不丢弃：VALIDATED 边沿常晚于 onAvailable 数秒，先到的
+                // 尝试多半在探测未过时失败，这条晚到事件才是「网络真正可用」的
+                // 补试时机——改为窗口到期补试一次（15s 最低刷新间隔不变）
+                scheduleDeferredRecovery(RECOVERY_MIN_INTERVAL_MS - sinceLast)
+                return
+            }
+        }
         lastRecoveryKey = key
         lastRecoveryAt = now
-        when (action) {
-            ReaderRecoveryAction.RefreshChapter -> refreshChapter()
-            ReaderRecoveryAction.Reattach -> attach(bookUrl)
-            ReaderRecoveryAction.None -> Unit
+        Log.i(RECOVERY_LOG_TAG, "网络恢复自愈：$action")
+        // 动作统一派发主线程（attach 前置块会改 attachJob/autoPlayJob，
+        // 网络回调线程只做判定——CM 回调线程直调存在竞态）
+        viewModelScope.launch {
+            when (action) {
+                ReaderRecoveryAction.RefreshChapter -> refreshChapter()
+                ReaderRecoveryAction.Reattach -> attach(bookUrl)
+                ReaderRecoveryAction.None -> Unit
+            }
+        }
+    }
+
+    private fun scheduleDeferredRecovery(delayMillis: Long) {
+        if (deferredRecoveryJob?.isActive == true) return
+        deferredRecoveryJob = viewModelScope.launch {
+            delay(delayMillis)
+            attemptNetworkRecovery()
         }
     }
 }
@@ -1517,6 +1545,9 @@ internal const val PROGRESS_BACKUP_INTERVAL_MS = 5 * 60 * 1000L
 
 /** 网络自愈同目标最小间隔（毫秒）：Wi-Fi 抖动时约束墨水屏刷新成本。 */
 internal const val RECOVERY_MIN_INTERVAL_MS = 15_000L
+
+/** 网络自愈链路 logcat tag（release 也可观测，真机联调用）。 */
+internal const val RECOVERY_LOG_TAG = "EInkRecovery"
 
 /** 书首/书末边界提示的节流窗口（毫秒），宿主 boundaryMessageIntervalMillis 同值。 */
 internal const val BOUNDARY_MESSAGE_INTERVAL_MS = 1_500L
