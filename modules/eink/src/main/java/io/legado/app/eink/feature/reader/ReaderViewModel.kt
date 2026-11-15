@@ -267,8 +267,16 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application),
     /** VALIDATED 边沿状态机（onCapabilitiesChanged 收敛为单次边沿）。 */
     private val networkValidationEdge = NetworkValidationEdge()
 
-    /** 网络自愈防抖：目标键（bookUrl to chapterIndex，Reattach 用 -1）。 */
+    /**
+     * 网络自愈防抖：目标键（bookUrl to chapterIndex，Reattach 用 -1）。
+     * 事件路径（ConnectivityThread）与补试路径（Main）双线程读写，
+     * @Volatile 保证可见性；窗口判定容忍有界竞态——偶发双发放的动作
+     * 由 attachJob 入口守卫与动作幂等吸收。
+     */
+    @Volatile
     private var lastRecoveryKey: Pair<String, Int>? = null
+
+    @Volatile
     private var lastRecoveryAt = 0L
 
     /** 防抖窗口到期补试任务（最早一次在途即可，后续拒绝不再叠加）。 */
