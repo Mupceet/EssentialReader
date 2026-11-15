@@ -222,6 +222,9 @@ internal object ReaderEngineImpl : ReaderEngine, KoinComponent {
     override val hasLaidOutPages: Boolean
         get() = chapterPager.hasPages
 
+    override val currentChapterDownloadFailed: Boolean
+        get() = ReadBook.downloadFailChapters.containsKey(ReadBook.durChapterIndex)
+
     override val currentChapterPageSize: Int
         get() = chapterPager.currentChapterPageSize
 
