@@ -5,6 +5,7 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.net.ConnectivityManager
 import android.net.Network
+import android.net.NetworkCapabilities
 import android.os.BatteryManager
 import android.os.SystemClock
 import androidx.lifecycle.AndroidViewModel
@@ -261,6 +262,13 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application),
     private val syncGate = ReaderSyncGate()
     private var progressBackupJob: Job? = null
     private var networkWatcher: ConnectivityManager.NetworkCallback? = null
+
+    /** VALIDATED 边沿状态机（onCapabilitiesChanged 收敛为单次边沿）。 */
+    private val networkValidationEdge = NetworkValidationEdge()
+
+    /** 网络自愈防抖：目标键（bookUrl to chapterIndex，Reattach 用 -1）。 */
+    private var lastRecoveryKey: Pair<String, Int>? = null
+    private var lastRecoveryAt = 0L
 
     // ==================== 生命周期与加载 ====================
 
@@ -1404,9 +1412,28 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application),
             .getSystemService(ConnectivityManager::class.java) ?: return
         val watcher = object : ConnectivityManager.NetworkCallback() {
             override fun onAvailable(network: Network) {
-                if (syncGate.allowNetworkSync()) {
-                    engine.syncCloudProgress(ReaderSyncTrigger.NetworkAvailable)
+                onNetworkRecovered()
+            }
+
+            override fun onCapabilitiesChanged(
+                network: Network,
+                networkCapabilities: NetworkCapabilities,
+            ) {
+                // Wi-Fi 重连窗口内 onAvailable 早于实际可通（capability 已
+                // 上报但探测未过）——VALIDATED 边沿是「真正能上网」的补试
+                // 时机；单次连接周期至多各触发一次，防重由动作层承担
+                if (networkValidationEdge.onCapabilities(
+                        networkCapabilities.hasCapability(
+                            NetworkCapabilities.NET_CAPABILITY_VALIDATED
+                        )
+                    )
+                ) {
+                    onNetworkRecovered()
                 }
+            }
+
+            override fun onLost(network: Network) {
+                networkValidationEdge.onLost()
             }
         }
         runCatching { cm.registerDefaultNetworkCallback(watcher) }
@@ -1421,6 +1448,48 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application),
             getApplication<Application>()
                 .getSystemService(ConnectivityManager::class.java)
                 ?.unregisterNetworkCallback(watcher)
+        }
+    }
+
+    /**
+     * 网络恢复事件（onAvailable / VALIDATED 边沿双路）：进度同步沿用
+     * 既有 gate；内容自愈按失败态判定动作（[ReaderRecoveryPolicy]），
+     * 双路触发的防重——同步本身幂等（拉取+比较），自愈受
+     * [RECOVERY_MIN_INTERVAL_MS] 同目标防抖约束。
+     */
+    private fun onNetworkRecovered() {
+        if (syncGate.allowNetworkSync()) {
+            engine.syncCloudProgress(ReaderSyncTrigger.NetworkAvailable)
+        }
+        attemptNetworkRecovery()
+    }
+
+    /**
+     * 网络恢复内容自愈：仅失败态动作（判定独立于 [ReaderSyncGate]——
+     * gate 只约束进度同步语义，自愈由失败态自身门控）；同一目标
+     * 15s 内不重复，失败后等下一次网络恢复事件，不设总次数上限。
+     */
+    private fun attemptNetworkRecovery() {
+        val state = _uiState.value
+        val action = ReaderRecoveryPolicy.evaluate(
+            error = state.error,
+            currentChapterDownloadFailed = engine.currentChapterDownloadFailed,
+            isLocalBook = state.isLocalBook,
+        )
+        if (action == ReaderRecoveryAction.None) return
+        val bookUrl = loadedBookUrl ?: state.bookUrl
+        if (bookUrl.isEmpty()) return
+        val chapterIndex =
+            if (action == ReaderRecoveryAction.Reattach) -1 else engine.currentChapterIndex
+        val key = bookUrl to chapterIndex
+        val now = SystemClock.elapsedRealtime()
+        if (key == lastRecoveryKey && now - lastRecoveryAt < RECOVERY_MIN_INTERVAL_MS) return
+        lastRecoveryKey = key
+        lastRecoveryAt = now
+        when (action) {
+            ReaderRecoveryAction.RefreshChapter -> refreshChapter()
+            ReaderRecoveryAction.Reattach -> attach(bookUrl)
+            ReaderRecoveryAction.None -> Unit
         }
     }
 }
@@ -1445,6 +1514,9 @@ internal const val RELAYOUT_DEBOUNCE_MS = 200L
 
 /** 周期进度备份间隔（毫秒），宿主 startBackupJob 同值。 */
 internal const val PROGRESS_BACKUP_INTERVAL_MS = 5 * 60 * 1000L
+
+/** 网络自愈同目标最小间隔（毫秒）：Wi-Fi 抖动时约束墨水屏刷新成本。 */
+internal const val RECOVERY_MIN_INTERVAL_MS = 15_000L
 
 /** 书首/书末边界提示的节流窗口（毫秒），宿主 boundaryMessageIntervalMillis 同值。 */
 internal const val BOUNDARY_MESSAGE_INTERVAL_MS = 1_500L
