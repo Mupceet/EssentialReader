@@ -850,6 +850,13 @@ class CacheBookModel(
                     (ReadBook.downloadFailChapters[chapter.index] ?: 0) + 1
                 // 不覆盖已展示的正文
             }
+            // 集合清理完成后补收割一次（幂等，无 pending 即空操作）：图片缓存
+            // 窗口内晚到的阅读请求此刻还在 pendingReadRequestMap 里等本任务
+            // 兑现——首次 emit 已过、onDownloadSet 又尚未清理，它们无人再发，
+            // ReadBook.loadingChapters 会残留，该章后续所有加载（含刷新）被
+            // addLoading 静默吞掉，须重启进程才能恢复。与队列路径
+            // completeChapterCache「先清集合后 emit」同效
+            emitPendingReadContent(chapter, content)
         }.onError {
             onError(chapter, it)
             ReadBook.downloadFailChapters[chapter.index] =
