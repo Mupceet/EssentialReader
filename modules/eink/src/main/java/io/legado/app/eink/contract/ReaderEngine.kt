@@ -310,6 +310,14 @@ interface ReaderEngine {
     /** 当前章节是否已完成排版且产出页面（false 时模块显示加载/错误态）。 */
     val hasLaidOutPages: Boolean
 
+    /**
+     * 当前章最近一次正文下载尝试失败且尚未成功（宿主 downloadFailChapters
+     * 信号）。「获取正文失败」类下载失败文案会被当正文排版成页（非
+     * error 态），模块侧凭本信号识别失败页。默认 false：旧宿主无此
+     * 信号，诚实降级为网络恢复不自愈。
+     */
+    val currentChapterDownloadFailed: Boolean get() = false
+
     /** 当前章节总页数（未排版时 0）。 */
     val currentChapterPageSize: Int
 
