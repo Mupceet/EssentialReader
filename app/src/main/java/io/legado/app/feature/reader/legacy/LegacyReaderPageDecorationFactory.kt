@@ -27,7 +27,6 @@ import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
 import splitties.init.appCtx
 import java.io.File
-import java.text.DecimalFormat
 import java.util.Date
 
 /** Android settings adapter for the Canvas reader's page header and footer. */
@@ -112,42 +111,17 @@ object LegacyReaderPageDecorationFactory : KoinComponent {
         contentPaddingBottomPx: Int = 0,
     ): ReaderPageDecoration {
         val settings = readSettings.currentSettings
-        val wholeBook = ReadBook.getWholeBookPageState(page.id.chapterIndex, page.id.pageIndex)
-        val context = ReaderTipValueContext(
+        // 上下文与六槽取值规则在 ReaderTipSlotResolver 与 E-Ink 桥共享一份；
+        // 「时间空则现取」兜底是完整模式调用侧的兼容细节，留在本处
+        val context = ReaderTipSlotResolver.buildContext(
             bookName = ReadBook.book?.name.orEmpty(),
             chapterTitle = page.chapterTitle,
-            time = time.ifBlank { timeFormat.format(Date()) },
-            batteryPercent = batteryPercent.coerceIn(0, 100),
             chapterIndex = page.id.chapterIndex,
-            chapterCount = ReadBook.chapterSize.coerceAtLeast(1),
             pageIndex = page.id.pageIndex,
-            pageCount = chapterPageCount.coerceAtLeast(1),
-            // 章还没排出任何页（占位/消息页）时页数未知，旧 `PageView.setProgress` 给的是 `-`；
-            // 排版中但已有页时旧版给的是**已排出的页数**，所以这里只看计数是否为零。
-            pageCountText = if (chapterPageCount <= 0) {
-                ReaderTipValueFormatter.UNKNOWN_PAGE_COUNT
-            } else {
-                chapterPageCount.toString()
-            },
-            readProgress = readProgress(page.id.chapterIndex, page.id.pageIndex, chapterPageCount),
-            // 对照旧 `PageView.setProgress`/`resolveCustomTemplate`：整书页数文案带本地化前缀，
-            // 精确/估算两种格式，无估算时回落到 `whole_book_page_unavailable`（`全文 - / -`）。
-            wholeBookPageText = when {
-                wholeBook == null -> appCtx.getString(R.string.whole_book_page_unavailable)
-                !wholeBook.estimated && wholeBook.allPreviousChaptersExact -> appCtx.getString(
-                    R.string.whole_book_page_format,
-                    wholeBook.currentPage,
-                    wholeBook.totalPages,
-                )
-
-                else -> appCtx.getString(
-                    R.string.whole_book_page_estimated_format,
-                    wholeBook.currentPage.toString(),
-                    wholeBook.totalPages.toString(),
-                )
-            },
-            wholeBookPageIndex = wholeBook?.currentPage,
-            wholeBookPageCount = wholeBook?.totalPages,
+            chapterPageCount = chapterPageCount,
+            chapterCount = ReadBook.chapterSize,
+            time = time.ifBlank { timeFormat.format(Date()) },
+            batteryPercent = batteryPercent,
         )
         val dividerColor = when (val configured = ReadBookConfig.tipDividerColor) {
             -1 -> ContextCompat.getColor(appCtx, R.color.divider)
@@ -283,54 +257,7 @@ object LegacyReaderPageDecorationFactory : KoinComponent {
     private fun value(config: Pair<Int, String>, context: ReaderTipValueContext): String =
         ReaderTipValueFormatter.format(type(config.first), context, config.second)
 
-    private fun type(type: Int): ReaderTipValueType = when (type) {
-        ReadTipType.tipNone -> ReaderTipValueType.NONE
-        ReadTipType.tipChapterTitle -> ReaderTipValueType.CHAPTER_TITLE
-        ReadTipType.tipTime -> ReaderTipValueType.TIME
-        ReadTipType.tipBattery,
-        ReadTipType.tipBatteryPercentage,
-        ReadTipType.tipBatteryInside,
-        ReadTipType.tipBatteryIcon,
-        ReadTipType.tipBatteryClassic -> ReaderTipValueType.BATTERY
-        ReadTipType.tipPage -> ReaderTipValueType.PAGE
-        ReadTipType.tipTotalProgress -> ReaderTipValueType.TOTAL_PROGRESS
-        ReadTipType.tipPageAndTotal -> ReaderTipValueType.PAGE_AND_TOTAL
-        ReadTipType.tipBookName -> ReaderTipValueType.BOOK_NAME
-        ReadTipType.tipTimeBattery,
-        ReadTipType.tipTimeBatteryPercentage,
-        ReadTipType.tipTimeBatteryClassic -> ReaderTipValueType.TIME_BATTERY
-        ReadTipType.tipTotalProgress1 -> ReaderTipValueType.CHAPTER_INDEX_AND_TOTAL
-        ReadTipType.tipChapterTitleArrow,
-        ReadTipType.tipChapterTitleArrowClassic -> ReaderTipValueType.CHAPTER_TITLE_ARROW
-        ReadTipType.tipCustom -> ReaderTipValueType.CUSTOM
-        ReadTipType.tipWholeBookPage -> ReaderTipValueType.WHOLE_BOOK_PAGE
-        ReadTipType.tipWholeBookPageAndProgress -> ReaderTipValueType.WHOLE_BOOK_PAGE_AND_PROGRESS
-        else -> ReaderTipValueType.NONE
-    }
-
-    /**
-     * 阅读进度，逐条对照旧 `TextPage.readProgress`（`TextPage.kt:249-263`）：
-     * `chapterSize == 0` 或"首页且章还没排出页" → `0.0%`；章还没排出页 → 按章计；
-     * 其余按"章 + 页"计，且未真正读完时不允许显示 100%。
-     */
-    private fun readProgress(chapterIndex: Int, pageIndex: Int, pageCount: Int): String {
-        val chapterCount = ReadBook.chapterSize
-        if (chapterCount == 0 || (pageCount == 0 && chapterIndex == 0)) return ZERO_PROGRESS
-        val formatter = DecimalFormat("0.0%")
-        if (pageCount == 0) {
-            return formatter.format((chapterIndex + 1.0f) / chapterCount.toDouble())
-        }
-        var progress = formatter.format(
-            chapterIndex * 1.0f / chapterCount +
-                    1.0f / chapterCount * (pageIndex + 1) / pageCount.toDouble(),
-        )
-        if (progress == "100.0%" && (chapterIndex + 1 != chapterCount || pageIndex + 1 != pageCount)) {
-            progress = "99.9%"
-        }
-        return progress
-    }
-
-    private const val ZERO_PROGRESS = "0.0%"
+    private fun type(type: Int): ReaderTipValueType = ReaderTipSlotResolver.type(type)
 
     private fun headerVisible(): Boolean = when (ReadBookConfig.headerMode) {
         1 -> true
