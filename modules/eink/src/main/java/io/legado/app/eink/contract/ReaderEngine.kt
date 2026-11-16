@@ -1,6 +1,7 @@
 package io.legado.app.eink.contract
 
 import android.graphics.Typeface
+import androidx.compose.runtime.Stable
 
 
 /**
@@ -42,6 +43,31 @@ data class ReaderHeaderFooterVisibility(
 
     /** true = 显示页脚（章节标题 + 页数进度）。 */
     val footerVisible: Boolean,
+)
+
+/**
+ * 页眉/页脚信息槽位的最终显示文本（完整模式槽位配置解析产物）。
+ *
+ * 宿主实现义务：按完整模式同款槽位规则解析（同型多槽只取首个、空文本
+ * 槽留空、视觉型类型文本化降级——电量图形给 `NN%`、时间+图形电量给
+ * `HH:mm NN%`、箭头给纯章节标题）；空串 = 该槽不绘制。旧宿主不实现
+ * [ReaderEngine.headerFooterTipTexts] 时模块回落自有硬装配（时间左/
+ * 电量右、章节标题左/页数进度右），行为与历史版本一致。
+ */
+@Stable
+data class ReaderTipSlotTexts(
+    /** 页眉左槽文本；空串 = 不绘制。 */
+    val headerLeft: String,
+    /** 页眉中槽文本；空串 = 不绘制。 */
+    val headerMiddle: String,
+    /** 页眉右槽文本；空串 = 不绘制。 */
+    val headerRight: String,
+    /** 页脚左槽文本；空串 = 不绘制。 */
+    val footerLeft: String,
+    /** 页脚中槽文本；空串 = 不绘制。 */
+    val footerMiddle: String,
+    /** 页脚右槽文本；空串 = 不绘制。 */
+    val footerRight: String,
 )
 
 /**
@@ -642,6 +668,15 @@ interface ReaderEngine {
 
     /** 页眉/页脚可见性判定（规则为宿主阅读界面语义，模块不开放设置）。 */
     fun headerFooterVisibility(): ReaderHeaderFooterVisibility
+
+    /**
+     * 页眉/页脚信息槽位文本（完整模式 6 槽配置 + 当前页上下文的解析产物，
+     * 详见 [ReaderTipSlotTexts]）。
+     *
+     * 默认 null = 旧宿主未实现，模块回落自有硬装配。宿主实现应为纯查询、
+     * 不抛异常（电量/时间读不到时给默认值）。
+     */
+    fun headerFooterTipTexts(): ReaderTipSlotTexts? = null
 
     /**
      * 宿主排版在页顶/页底为页眉/页脚装饰预留的高度（px，排版坐标系）。
