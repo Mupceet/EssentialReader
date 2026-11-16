@@ -26,9 +26,9 @@ import org.junit.Test
  * ON_RESUME 重启，但重启后首个刷新被 delay 推迟到下一个分钟边界——锁屏
  * 回前台（或从目录/换源返回阅读）后页眉时间/电量停留在离开前的旧值，
  * 最长一分钟不更新；翻页路径即时调 [ReaderViewModel.updateTipInfo]，观感
- * 即「不刷新，翻页才更新」。宿主同位是 TIME_TICK sticky 广播（onResume
- * 注册即达首值），本用例锁定该语义：时钟任务启动必须先立即对表一次，
- * 再进入分钟对齐循环。
+ * 即「不刷新，翻页才更新」。宿主同位是 ReadBookController.onResume 显式
+ * 派发 UpTime 效果刷首值（TIME_TICK 广播注册不保证立即首送），本用例锁定
+ * 该语义：时钟任务启动必须先立即对表一次，再进入分钟对齐循环。
  *
  * 引擎注入经反射替换注册表 _readerEngine 字段（同 ReaderViewModelStyleBaseTest）；
  * Application 用 mockable stub（build.gradle testOptions returnDefaultValues，

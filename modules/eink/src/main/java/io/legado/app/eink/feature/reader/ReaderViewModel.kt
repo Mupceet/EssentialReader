@@ -488,7 +488,8 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application),
     /**
      * 页眉时钟：启动即对表一次，此后分钟边界对齐周期调用 [updateTipInfo]
      * （时间 HH:mm 随分钟走字，电量顺带跟上）。启动即对表是宿主同位语义——
-     * TIME_TICK sticky 广播在 onResume 注册即达首值，若只等下一分钟边界，
+     * 宿主 View 版 ReadBookController.onResume 显式派发 UpTime 效果即时
+     * 刷首值（TIME_TICK 广播注册不保证立即首送）；若只等下一分钟边界，
      * 锁屏回前台/从目录换源返回（时钟在 ON_PAUSE 已取消、ON_RESUME 重启）
      * 后页眉停留离开前的旧时间/电量最长一分钟，观感「不翻页不更新」。
      * 这里以 Activity RESUMED 门控的协程替代；StateFlow 值去重保证页眉隐藏
