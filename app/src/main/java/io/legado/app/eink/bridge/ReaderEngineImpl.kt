@@ -1,11 +1,15 @@
 package io.legado.app.eink.bridge
 
+import android.content.Intent
+import android.content.IntentFilter
 import android.graphics.Typeface
+import android.os.BatteryManager
 import androidx.core.net.toUri
 import androidx.lifecycle.lifecycleScope
 import com.script.rhino.runScriptWithContext
 import io.legado.app.constant.AppConst
 import io.legado.app.constant.AppLog
+import io.legado.app.constant.AppConst.timeFormat
 import io.legado.app.constant.BookType
 import io.legado.app.data.appDb
 import io.legado.app.data.entities.Book
@@ -29,6 +33,7 @@ import io.legado.app.eink.contract.ReaderSourceInfo
 import io.legado.app.eink.contract.ReaderStyleCatalog
 import io.legado.app.eink.contract.ReaderSyncTrigger
 import io.legado.app.eink.contract.ReaderTextStyle
+import io.legado.app.eink.contract.ReaderTipSlotTexts
 import io.legado.app.eink.contract.ReaderTipTypefaces
 import io.legado.app.exception.NoStackTraceException
 import io.legado.app.help.book.BookHelp
@@ -47,6 +52,7 @@ import io.legado.app.model.cache.ChapterSelection
 import io.legado.app.model.localBook.LocalBook
 import io.legado.app.model.webBook.WebBook
 import io.legado.app.feature.reader.legacy.LegacyReaderPageDecorationFactory
+import io.legado.app.feature.reader.legacy.ReaderTipSlotResolver
 import io.legado.app.model.analyzeRule.AnalyzeRule
 import io.legado.app.model.analyzeRule.AnalyzeRule.Companion.setChapter
 import io.legado.app.model.analyzeRule.AnalyzeRule.Companion.setCoroutineContext
@@ -834,6 +840,50 @@ internal object ReaderEngineImpl : ReaderEngine, KoinComponent {
             },
             footerVisible = ReadBookConfig.footerMode != 1,
         )
+
+    override fun headerFooterTipTexts(): ReaderTipSlotTexts {
+        // 当前页上下文：快照未就绪（排版窗口）时章标题空、页数 0——槽位
+        // 文本按完整模式同一规则取值（页数未知给 `-`、进度按章计）
+        val context = ReaderTipSlotResolver.buildContext(
+            bookName = ReadBook.book?.name.orEmpty(),
+            chapterTitle = chapterPager.currentPageSnapshot()?.title.orEmpty(),
+            chapterIndex = ReadBook.durChapterIndex,
+            pageIndex = ReadBook.durPageIndex,
+            chapterPageCount = chapterPager.currentChapterPageSize,
+            chapterCount = ReadBook.chapterSize,
+            time = timeFormat.format(Date()),
+            batteryPercent = currentBatteryPercent(),
+        )
+        val texts = ReaderTipSlotResolver.sixSlotTexts(
+            context,
+            header = listOf(
+                ReadBookConfig.tipHeaderLeft to ReadBookConfig.customTipHeaderLeft,
+                ReadBookConfig.tipHeaderMiddle to ReadBookConfig.customTipHeaderMiddle,
+                ReadBookConfig.tipHeaderRight to ReadBookConfig.customTipHeaderRight,
+            ),
+            footer = listOf(
+                ReadBookConfig.tipFooterLeft to ReadBookConfig.customTipFooterLeft,
+                ReadBookConfig.tipFooterMiddle to ReadBookConfig.customTipFooterMiddle,
+                ReadBookConfig.tipFooterRight to ReadBookConfig.customTipFooterRight,
+            ),
+        )
+        return ReaderTipSlotTexts(
+            headerLeft = texts.headerLeft,
+            headerMiddle = texts.headerMiddle,
+            headerRight = texts.headerRight,
+            footerLeft = texts.footerLeft,
+            footerMiddle = texts.footerMiddle,
+            footerRight = texts.footerRight,
+        )
+    }
+
+    /** 电量查询（与模块 updateTipInfo 同一机制：sticky BATTERY_CHANGED 查询注册）。 */
+    private fun currentBatteryPercent(): Int {
+        val intent = appCtx.registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
+        val level = intent?.getIntExtra(BatteryManager.EXTRA_LEVEL, -1) ?: -1
+        val scale = intent?.getIntExtra(BatteryManager.EXTRA_SCALE, -1) ?: -1
+        return if (level >= 0 && scale > 0) level * 100 / scale else 100
+    }
 
     override val headerDecorationExtentPx: Float
         get() = LegacyReaderPageDecorationFactory.headerExtentPx()
