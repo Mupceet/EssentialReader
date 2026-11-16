@@ -527,47 +527,47 @@ class BookshelfViewModel(application: Application) : AndroidViewModel(applicatio
             Log.i(TAG, "EInk refresh ignored (job active) trigger=$trigger")
             return
         }
-    refreshJob = viewModelScope.launch(Dispatchers.IO) {
-        val benchStart = SystemClock.elapsedRealtime()
-        benchReset()
-        _isRefreshing.value = true
-        _updatingUrls.value = emptySet()
-        try {
-            // 手动刷新按 UI 当前生效的选中分组（含乐观覆盖），自动刷新
-            // 恒全量（见函数 KDoc）
-            val scopeGroupId =
-                if (trigger == "manual") groupState.selected.first() else BookshelfGroupIds.ALL
-            val books = engine.updatableBooks(scopeGroupId)
-            val concurrency = min(settings.threadCount, MAX_REFRESH_CONCURRENCY)
-            Log.i(
-                TAG,
-                "EInk refresh start trigger=$trigger group=$scopeGroupId " +
-                    "scope=${books.size} concurrency=$concurrency"
-            )
-            books.asFlow()
-                .onEachParallel(concurrency) { book ->
-                    updateToc(book.bookUrl, books)
-                }
-                .collect()
-        } finally {
-            // 无条件复位：旧实现的 `refreshJob === myJob` 守卫存在启动竞态
-            // ——refreshJob 字段在 launch() 返回后才赋值，body 完成快于赋值
-            // 时（空书单等场景）守卫失效、跳过复位，isRefreshing 永久 true
-            // → 刷新按钮永久置灰。无条件复位的安全性与守卫的等价性：refresh()
-            // 在 refreshJob.isActive 时直接忽略新请求，本 job 运行期（含
-            // finally）字段不可能被替换，此间不存在并发的新 job。
-            _isRefreshing.value = false
-            Log.i(
-                TAG,
-                "EInk refresh end elapsedMs=${SystemClock.elapsedRealtime() - benchStart} " +
+        refreshJob = viewModelScope.launch(Dispatchers.IO) {
+            val benchStart = SystemClock.elapsedRealtime()
+            benchReset()
+            _isRefreshing.value = true
+            _updatingUrls.value = emptySet()
+            try {
+                // 手动刷新按 UI 当前生效的选中分组（含乐观覆盖），自动刷新
+                // 恒全量（见函数 KDoc）
+                val scopeGroupId =
+                    if (trigger == "manual") groupState.selected.first() else BookshelfGroupIds.ALL
+                val books = engine.updatableBooks(scopeGroupId)
+                val concurrency = min(settings.threadCount, MAX_REFRESH_CONCURRENCY)
+                Log.i(
+                    TAG,
+                    "EInk refresh start trigger=$trigger group=$scopeGroupId " +
+                        "scope=${books.size} concurrency=$concurrency"
+                )
+                books.asFlow()
+                    .onEachParallel(concurrency) { book ->
+                        updateToc(book.bookUrl, books)
+                    }
+                    .collect()
+            } finally {
+                // 无条件复位：旧实现的 `refreshJob === myJob` 守卫存在启动竞态
+                // ——refreshJob 字段在 launch() 返回后才赋值，body 完成快于赋值
+                // 时（空书单等场景）守卫失效、跳过复位，isRefreshing 永久 true
+                // → 刷新按钮永久置灰。无条件复位的安全性与守卫的等价性：refresh()
+                // 在 refreshJob.isActive 时直接忽略新请求，本 job 运行期（含
+                // finally）字段不可能被替换，此间不存在并发的新 job。
+                _isRefreshing.value = false
+                Log.i(
+                    TAG,
+                    "EInk refresh end elapsedMs=${SystemClock.elapsedRealtime() - benchStart} " +
                         "ok=${benchOk.get()} err=${benchErr.get()} peakInFlight=$benchPeak"
-            )
-            // 兜底触发预缓存泵：刷新被取消时，最后一批入队可能
-            // 落在逐书触发之后；泵幂等复用，重复触发无代价。泵在
-            // 进程级作用域运行，本 VM 随后销毁也不影响其继续消费。
-            startCacheBook()
+                )
+                // 兜底触发预缓存泵：刷新被取消时，最后一批入队可能
+                // 落在逐书触发之后；泵幂等复用，重复触发无代价。泵在
+                // 进程级作用域运行，本 VM 随后销毁也不影响其继续消费。
+                startCacheBook()
+            }
         }
-    }
     }
 
     /**
