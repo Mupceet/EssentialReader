@@ -31,6 +31,7 @@ import io.legado.app.eink.contract.ReaderStyleCatalog
 import io.legado.app.eink.contract.ReaderStyleParamIds as Ids
 import io.legado.app.eink.contract.ReaderSyncTrigger
 import io.legado.app.eink.contract.ReaderTextStyle
+import io.legado.app.eink.contract.ReaderTipSlotTexts
 import io.legado.app.eink.feature.reader.selection.ReaderSelectionUi
 import io.legado.app.eink.feature.reader.selection.toPageBookmarkContent
 import io.legado.app.eink.session.ReaderSessionCache
@@ -110,11 +111,14 @@ data class ReaderUiState(
     val titleSizeFollowBody: Boolean = true,
     // 水平滑动翻页触发距离（px，0 = 系统 touch slop）
     val pageTouchSlop: Int = 0,
-    // 页眉/页脚信息（按 View 版 ReadTipConfig 规则渲染，不开放设置）
+    // 页眉/页脚信息（内容遵从完整模式槽位配置 tipSlots；旧宿主回落硬装配）
     val headerVisible: Boolean = false,
     val footerVisible: Boolean = true,
     val headerTime: String = "",
     val batteryPercent: Int = 100,
+    /** 页眉/页脚槽位文本（引擎按完整模式槽位配置解析）；null = 旧宿主，
+     *  渲染回落自有硬装配（时间左/电量右、章节标题左/页数进度右）。 */
+    val tipSlots: ReaderTipSlotTexts? = null,
     /** 云端进度恢复确认（非 null = 显示确认框；宿主 ConfirmRestoreProgress 同义）。 */
     val cloudProgressPrompt: ReaderCloudProgress? = null,
 ) {
@@ -140,6 +144,16 @@ data class ReaderUiState(
                 append(readProgress)
             }
         }
+
+    /** 页眉槽位文本：引擎解析可用时遵从完整模式配置，否则回落硬装配。 */
+    val headerLeftText: String get() = tipSlots?.headerLeft ?: headerTime
+    val headerMiddleText: String get() = tipSlots?.headerMiddle ?: ""
+    val headerRightText: String get() = tipSlots?.headerRight ?: "${batteryPercent}%"
+
+    /** 页脚槽位文本：同上；中槽无回落来源恒空。 */
+    val footerLeftText: String get() = tipSlots?.footerLeft ?: chapterTitle
+    val footerMiddleText: String get() = tipSlots?.footerMiddle ?: ""
+    val footerRightText: String get() = tipSlots?.footerRight ?: pageAndTotal
 }
 
 /** 最近文件字体历史编码：换行符分隔 path 列表（列表形态留扩展余地），空串 = 无历史。 */
@@ -475,12 +489,14 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application),
         val scale = batteryIntent?.getIntExtra(BatteryManager.EXTRA_SCALE, -1) ?: -1
         val battery = if (level >= 0 && scale > 0) level * 100 / scale else 100
         val tip = engine.headerFooterVisibility()
+        val tipSlots = engine.headerFooterTipTexts()
         _uiState.update {
             it.copy(
                 headerVisible = tip.headerVisible,
                 footerVisible = tip.footerVisible,
                 headerTime = engine.formatTimeNow(),
                 batteryPercent = battery,
+                tipSlots = tipSlots,
             )
         }
     }
