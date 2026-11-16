@@ -74,9 +74,10 @@ internal fun tipRowPaint(
 }
 
 /**
- * 左/右双槽条带绘制——槽位规则镜像宿主 drawTipRow 的三槽约束（本模块
- * 内容项锁定，仅用左+右槽）：右槽右对齐、只在整行宽度处省略；左槽
- * available 压到右槽起始边（barrier）处省略。
+ * 左/右双槽条带绘制——槽位规则镜像宿主 drawTipRow 的三槽约束：右槽
+ * 右对齐、只在整行宽度处省略；左槽 available 压到右槽起始边（barrier）
+ * 处省略。live 阅读页已改用三槽 [drawTipRow]（内容遵从完整模式槽位
+ * 配置）；本函数保留给屏保（内容仍为固定 时间/电量、标题/页数）。
  *
  * @param rowLeftPx  行左缘（条带内左边距，含内容边距左）
  * @param rowRightPx 行右缘（条带宽 − 右边距，含内容边距右）
@@ -112,6 +113,77 @@ internal fun drawTipRowLeftRight(
         val available = (rowRightPx - rowLeftPx).coerceAtLeast(0f)
         val left = TextUtils.ellipsize(leftText, paint, available, TextUtils.TruncateAt.END)
         canvas.drawText(left, 0, left.length, rowLeftPx, baselineY, paint)
+    }
+}
+
+/**
+ * 三槽 barrier：左槽可用右界 = min(可见中槽起始边, 右槽起始边)，槽宽为
+ * null = 该槽不参与；无邻槽 = 行右缘。镜像宿主 ReaderCanvasSurface.
+ * drawTipRow 对照旧 view_book_page.xml 的三槽约束（左槽 weight + barrier
+ * 省略；中/右 wrap_content 不受邻槽约束）。宽度一律传**未省略全宽**
+ * （宿主同款：右槽过长时左槽可用宽直接压到 0 不画）。
+ */
+internal fun tipRowBarrierX(
+    rowLeftPx: Float,
+    rowRightPx: Float,
+    middleWidthPx: Float?,
+    rightWidthPx: Float?,
+): Float {
+    val rowWidth = rowRightPx - rowLeftPx
+    return listOfNotNull(
+        middleWidthPx?.let { rowLeftPx + (rowWidth - it) / 2f },
+        rightWidthPx?.let { rowRightPx - it },
+    ).minOrNull() ?: rowRightPx
+}
+
+/**
+ * 三槽绘制（左 START / 中 CENTER / 右 END）：中槽居中、右槽右对齐，两者
+ * 只在整行宽度处省略（长文案会压到邻槽上，宿主同款不额外让位）；左槽
+ * 在 [tipRowBarrierX] 处省略。空串槽不绘制。行缘/基线口径同
+ * [drawTipRowLeftRight]。
+ */
+internal fun drawTipRow(
+    canvas: Canvas,
+    paint: TextPaint,
+    rowLeftPx: Float,
+    rowRightPx: Float,
+    baselineY: Float,
+    leftText: String,
+    middleText: String,
+    rightText: String,
+) {
+    val rowWidth = (rowRightPx - rowLeftPx).coerceAtLeast(0f)
+    // barrier 用未省略全宽（镜像宿主 tipWidth 语义）
+    val barrier = tipRowBarrierX(
+        rowLeftPx = rowLeftPx,
+        rowRightPx = rowRightPx,
+        middleWidthPx = middleText.takeIf { it.isNotEmpty() }?.let { paint.measureText(it) },
+        rightWidthPx = rightText.takeIf { it.isNotEmpty() }?.let { paint.measureText(it) },
+    )
+    if (middleText.isNotEmpty()) {
+        val text = TextUtils.ellipsize(middleText, paint, rowWidth, TextUtils.TruncateAt.END)
+        if (text.isNotEmpty()) {
+            paint.textAlign = Paint.Align.CENTER
+            canvas.drawText(text, 0, text.length, rowLeftPx + rowWidth / 2f, baselineY, paint)
+            paint.textAlign = Paint.Align.LEFT
+        }
+    }
+    if (rightText.isNotEmpty()) {
+        val text = TextUtils.ellipsize(rightText, paint, rowWidth, TextUtils.TruncateAt.END)
+        if (text.isNotEmpty()) {
+            paint.textAlign = Paint.Align.RIGHT
+            canvas.drawText(text, 0, text.length, rowRightPx, baselineY, paint)
+            paint.textAlign = Paint.Align.LEFT
+        }
+    }
+    if (leftText.isNotEmpty()) {
+        val available = (barrier - rowLeftPx).coerceAtLeast(0f)
+        if (available > 0f) {
+            val text = TextUtils.ellipsize(leftText, paint, available, TextUtils.TruncateAt.END)
+            if (text.isNotEmpty()) {
+                canvas.drawText(text, 0, text.length, rowLeftPx, baselineY, paint)
+            }
+        }
     }
 }
 

@@ -2087,8 +2087,10 @@ private fun forcedStatusBarTop(): Dp {
 }
 
 /**
- * 页眉：时间（左）+ 电量%（右）——**内容项锁定**（不采用宿主三槽可配置
- * tip 项），绘制参数与宿主同源同规则：配置字号/字体（端口解析链
+ * 页眉：内容遵从完整模式槽位配置（uiState.tipSlots，旧宿主回落：时间
+ * 左/电量右），中槽居中、左槽在 barrier 处省略、中/右槽只在整行宽度处
+ * 省略（镜像宿主三槽约束，见 [drawTipRow]）。绘制参数与宿主同源同规则：
+ * 配置字号/字体（端口解析链
  * [io.legado.app.eink.contract.ReaderEngine.headerFooterTypefaces]）、
  * 上下边距、分割线（showHeaderLine：0.5dp 画在条带最底缘、贴正文侧）、
  * 几何基线（文字顶贴上边距，includeFontPadding=false 口径）——经
@@ -2125,14 +2127,15 @@ private fun ReaderHeader(
         )
         val metrics = paint.fontMetrics
         val baseline = ReaderTipRowGeometry.headerBaseline(paddingTopPx, metrics.ascent)
-        drawTipRowLeftRight(
+        drawTipRow(
             canvas = native,
             paint = paint,
             rowLeftPx = rowLeftPx,
             rowRightPx = rowRightPx,
             baselineY = baseline,
-            leftText = state.headerTime,
-            rightText = "${state.batteryPercent}%",
+            leftText = state.headerLeftText,
+            middleText = state.headerMiddleText,
+            rightText = state.headerRightText,
         )
         if (style.headerDivider == true) {
             val dividerY = ReaderTipRowGeometry.extent(
@@ -2154,12 +2157,13 @@ private fun ReaderHeader(
 }
 
 /**
- * 页脚：章节标题（左，右槽边界处省略）/ 页数及进度（右，pageAndTotal
- * 格式）——内容项锁定；绘制参数与宿主同源（配置字号：applyHeaderStyle
- * 跟随页眉档在宿主桥解析、字体、上下边距、文字底贴下边距的基线、
- * 分割线贴正文侧画在条带顶缘）。自动翻页进度条是模块自有 2dp 装饰，
- * 画在分割线之下、**不占文字预算**（宿主 extent 无此项，扣减会让字号
- * 与宿主不一致）。左右行缘由调用方并入内容边距。
+ * 页脚：内容遵从完整模式槽位配置（uiState.tipSlots，旧宿主回落：章节
+ * 标题左/页数及进度右），三槽省略语义同 [drawTipRow]；绘制参数与宿主
+ * 同源（配置字号：applyHeaderStyle 跟随页眉档在宿主桥解析、字体、上下
+ * 边距、文字底贴下边距的基线、分割线贴正文侧画在条带顶缘）。自动翻页
+ * 进度条是模块自有 2dp 装饰，画在分割线之下、**不占文字预算**（宿主
+ * extent 无此项，扣减会让字号与宿主不一致）。左右行缘由调用方并入
+ * 内容边距。
  */
 @Composable
 private fun ReaderFooter(
@@ -2220,14 +2224,15 @@ private fun ReaderFooter(
             paddingBottomPx = paddingBottomPx,
             fontBottomPx = metrics.descent,
         )
-        drawTipRowLeftRight(
+        drawTipRow(
             canvas = native,
             paint = paint,
             rowLeftPx = rowLeftPx,
             rowRightPx = rowRightPx,
             baselineY = baseline,
-            leftText = state.chapterTitle,
-            rightText = state.pageAndTotal,
+            leftText = state.footerLeftText,
+            middleText = state.footerMiddleText,
+            rightText = state.footerRightText,
         )
     }
 }
