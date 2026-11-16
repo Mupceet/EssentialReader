@@ -465,7 +465,8 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application),
      *
      * 时间/电量除页面事件（翻页/出页/样式变更）外，由分钟对齐的页眉时钟
      * 周期刷新（[startHeaderClock]，Activity RESUMED 期间运行）——不翻页
-     * 时页眉时间也会走字。
+     * 时页眉时间也会走字；时钟启动（回前台/返回阅读目的地）即对表一次，
+     * 离开窗口内走掉的时间/变化的电量回前台立即跟上。
      */
     private fun updateTipInfo() {
         val app = getApplication<Application>()
@@ -485,8 +486,11 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application),
     }
 
     /**
-     * 页眉时钟：分钟边界对齐周期调用 [updateTipInfo]（时间 HH:mm 随分钟走字，
-     * 电量顺带跟上）。宿主同位是 TIME_TICK 广播（onResume 注册/onPause 注销），
+     * 页眉时钟：启动即对表一次，此后分钟边界对齐周期调用 [updateTipInfo]
+     * （时间 HH:mm 随分钟走字，电量顺带跟上）。启动即对表是宿主同位语义——
+     * TIME_TICK sticky 广播在 onResume 注册即达首值，若只等下一分钟边界，
+     * 锁屏回前台/从目录换源返回（时钟在 ON_PAUSE 已取消、ON_RESUME 重启）
+     * 后页眉停留离开前的旧时间/电量最长一分钟，观感「不翻页不更新」。
      * 这里以 Activity RESUMED 门控的协程替代；StateFlow 值去重保证页眉隐藏
      * 或字段无变化时不触发重组，e-ink 刷新代价为每分钟至多一次页眉小区域。
      */
@@ -495,6 +499,7 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application),
     private fun startHeaderClock() {
         if (headerClockJob?.isActive == true) return
         headerClockJob = viewModelScope.launch {
+            updateTipInfo()
             while (isActive) {
                 delay(millisUntilNextMinute(System.currentTimeMillis()))
                 updateTipInfo()
