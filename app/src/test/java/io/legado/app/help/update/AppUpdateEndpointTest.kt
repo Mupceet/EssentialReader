@@ -30,8 +30,9 @@ class AppUpdateEndpointTest {
         val repo = "owner/repo"
         val github = githubManifestUrl(repo, "official")
 
+        // AUTO 镜像优先：直连 raw 在国内普遍黑洞，先直连等于每次检查白等一轮超时。
         assertEquals(
-            listOf(github, UPDATE_MIRROR_PREFIX + github),
+            listOf(UPDATE_MIRROR_PREFIX + github, github),
             AppUpdateEndpoint.AUTO.manifestUrls(repo, "official"),
         )
         assertEquals(

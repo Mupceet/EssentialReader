@@ -40,44 +40,23 @@ object AppUpdateGitHub : AppUpdate.AppUpdateInterface {
     private val endpoint: AppUpdateEndpoint
         get() = AppUpdateEndpoint.of(otherSettingsGateway.currentSettings.updateEndpoint)
 
-    private data class ManifestFeed(
-        val releases: List<GithubRelease>,
-        val viaMirror: Boolean
-    )
-
-    private data class ManifestRelease(
-        val release: GithubRelease,
-        val viaMirror: Boolean
-    )
-
-    private data class ReleaseFeed(
-        val releases: List<AppReleaseInfo>,
-        val viaMirror: Boolean
-    )
-
-    private suspend fun getLatestRelease(variant: AppVariant): ReleaseFeed {
+    private suspend fun getLatestRelease(variant: AppVariant): List<AppReleaseInfo> {
         val manifest = getManifestReleases(variant)
         if (manifest != null) {
-            return ReleaseFeed(
-                releases = manifest.releases
-                    .flatMap { it.gitReleaseToAppReleaseInfo() }
-                    .sortedByDescending { it.createdAt },
-                viaMirror = manifest.viaMirror
-            )
+            return manifest
+                .flatMap { it.gitReleaseToAppReleaseInfo() }
+                .sortedByDescending { it.createdAt }
         }
         // 镜像模式只信任镜像清单：连不上时明确报错，不能静默当成“已是最新版本”。
         if (!endpoint.usesGitHubApi) {
             throw NoStackTraceException("无法获取更新信息，请检查网络或更换更新源")
         }
-        return ReleaseFeed(
-            releases = getApiReleases(variant)
-                .flatMap { it.gitReleaseToAppReleaseInfo() }
-                .sortedByDescending { it.createdAt },
-            viaMirror = false
-        )
+        return getApiReleases(variant)
+            .flatMap { it.gitReleaseToAppReleaseInfo() }
+            .sortedByDescending { it.createdAt }
     }
 
-    private suspend fun getManifestReleases(variant: AppVariant): ManifestFeed? {
+    private suspend fun getManifestReleases(variant: AppVariant): List<GithubRelease>? {
         val channels = when (variant) {
             AppVariant.OFFICIAL -> listOf("official" to false)
             AppVariant.BETA_RELEASE -> listOf("beta" to true)
@@ -85,23 +64,18 @@ object AppUpdateGitHub : AppUpdate.AppUpdateInterface {
             else -> return null
         }
         val releases = mutableListOf<GithubRelease>()
-        var viaMirror = false
         for ((channel, expectsPreRelease) in channels) {
-            val release = getManifestRelease(channel, expectsPreRelease) ?: return null
-            releases += release.release
-            // 只要有一份清单来自镜像，安装包也走镜像，避免清单与下载落在两条链路上。
-            viaMirror = viaMirror || release.viaMirror
+            releases += getManifestRelease(channel, expectsPreRelease) ?: return null
         }
-        return ManifestFeed(releases, viaMirror)
+        return releases
     }
 
     private suspend fun getManifestRelease(
         channel: String,
         expectsPreRelease: Boolean
-    ): ManifestRelease? {
+    ): GithubRelease? {
         for (address in endpoint.manifestUrls(repoPath, channel)) {
-            val release = fetchManifest(address, expectsPreRelease) ?: continue
-            return ManifestRelease(release, address.startsWith(UPDATE_MIRROR_PREFIX))
+            fetchManifest(address, expectsPreRelease)?.let { return it }
         }
         return null
     }
@@ -167,22 +141,20 @@ object AppUpdateGitHub : AppUpdate.AppUpdateInterface {
     }
 
     suspend fun getReleaseByTag(tag: String): AppUpdate.UpdateInfo? {
-        val manifestRelease = findManifestRelease(tag)
-        val release = manifestRelease?.release
+        val release = findManifestRelease(tag)
             ?: (if (endpoint.usesGitHubApi) getApiReleaseByTag(tag) else null)
             ?: return null
         val info = release.gitReleaseToAppReleaseInfo().firstOrNull() ?: return null
-        val viaMirror = manifestRelease?.viaMirror == true
 
         return AppUpdate.UpdateInfo(
             tagName = info.versionName,
             updateLog = info.note,
-            downloadUrl = if (viaMirror) mirrorUrl(info.downloadUrl) else info.downloadUrl,
+            downloadUrl = resolveDownloadUrl(info.downloadUrl),
             fileName = info.name
         )
     }
 
-    private suspend fun findManifestRelease(tag: String): ManifestRelease? {
+    private suspend fun findManifestRelease(tag: String): GithubRelease? {
         val channels = if (tag.contains("beta", ignoreCase = true)) {
             listOf("beta" to true, "official" to false)
         } else {
@@ -190,9 +162,20 @@ object AppUpdateGitHub : AppUpdate.AppUpdateInterface {
         }
         for ((channel, expectsPreRelease) in channels) {
             val release = getManifestRelease(channel, expectsPreRelease) ?: continue
-            if (release.release.tagName == tag) return release
+            if (release.tagName == tag) return release
         }
         return null
+    }
+
+    /**
+     * 安装包直链按更新源定型：镜像模式固定走镜像；GitHub 模式不经任何第三方；
+     * 自动模式探测镜像可达、不可达回退直连（[UpdateAccelerator]），避免国内
+     * 用户拿到 github.com 直链后下载黑洞。
+     */
+    private suspend fun resolveDownloadUrl(url: String): String = when (endpoint) {
+        AppUpdateEndpoint.MIRROR -> mirrorUrl(url)
+        AppUpdateEndpoint.GITHUB -> url
+        AppUpdateEndpoint.AUTO -> UpdateAccelerator.resolveDownloadUrl(url)
     }
 
     private suspend fun getApiReleaseByTag(tag: String): GithubRelease? {
@@ -244,8 +227,7 @@ object AppUpdateGitHub : AppUpdate.AppUpdateInterface {
     private suspend fun resolveLatest(): AppUpdate.UpdateInfo {
         val currentVersion = AppConst.appInfo.versionName
         val variant = checkVariant
-        val feed = getLatestRelease(variant)
-        val releases = feed.releases
+        val releases = getLatestRelease(variant)
 
         val filtered = if (variant == AppVariant.ALL) {
             releases
@@ -264,8 +246,7 @@ object AppUpdateGitHub : AppUpdate.AppUpdateInterface {
         return AppUpdate.UpdateInfo(
             latest.versionName,
             latest.note,
-            // 清单来自镜像时安装包也走镜像，否则国内用户仍会卡在 GitHub 下载。
-            if (feed.viaMirror) mirrorUrl(latest.downloadUrl) else latest.downloadUrl,
+            resolveDownloadUrl(latest.downloadUrl),
             latest.name
         )
     }
