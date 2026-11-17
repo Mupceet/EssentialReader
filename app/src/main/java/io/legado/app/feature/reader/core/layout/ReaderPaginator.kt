@@ -401,20 +401,55 @@ internal class ReaderPaginationSession(
         val underline = config.pageUnderline ?: return
         if (elements.size <= underlineElementStart) return
         val rowElements = elements.subList(underlineElementStart, elements.size)
-        val start = if (underline.extendToColumn) columnLeft()
-        else rowElements.minOf { it.bounds.left }
-        val end = if (underline.extendToColumn) columnLeft() + config.contentWidthPx
-        else rowElements.maxOf { it.bounds.right }
+        // 正文线让位于更高优先级的行内下划线：高亮规则与用户笔记都经 style.underline 表达
+        // （笔记区间 priority 10_000+ 天然压过规则 0..n，赢者全取），同一位置再叠一条正文线
+        // 就是两条线并行。被覆盖元素区间挖空，行内其余区间断开成段，整行被覆盖则不发线；
+        // 纯背景带（荧光高亮，无线）不压正文线——带与线不同形态，同屏只有一条线不算冲突。
+        // 段坐标先全部读出再追加：rowElements 是 elements 的 SubList，边扫边 append 会 CME。
+        val segments = ArrayList<Pair<Float, Float>>(2)
+        var runStart = -1
+        for (index in rowElements.indices) {
+            val element = rowElements[index]
+            val covered = element is ReaderElement.Text && element.style.underline != null
+            if (covered) {
+                if (runStart >= 0) {
+                    segments += pageUnderlineSegment(underline, rowElements, runStart, index - 1)
+                    runStart = -1
+                }
+            } else if (runStart < 0) {
+                runStart = index
+            }
+        }
+        if (runStart >= 0) {
+            segments += pageUnderlineSegment(underline, rowElements, runStart, rowElements.lastIndex)
+        }
         val y = lineBottom + underline.offsetPx
-        elements += ReaderElement.Rule(
-            bounds = ReaderRect(start, y, end, y),
-            colorArgb = underline.colorArgb,
-            widthPx = underline.widthPx,
-            dashed = underline.dashed,
-            dashOnPx = underline.dashOnPx,
-            dashOffPx = underline.dashOffPx,
-            overlayStyledUnderline = true,
-        )
+        segments.forEach { (start, end) ->
+            elements += ReaderElement.Rule(
+                bounds = ReaderRect(start, y, end, y),
+                colorArgb = underline.colorArgb,
+                widthPx = underline.widthPx,
+                dashed = underline.dashed,
+                dashOnPx = underline.dashOnPx,
+                dashOffPx = underline.dashOffPx,
+                overlayStyledUnderline = true,
+            )
+        }
+    }
+
+    /** 一段正文线的横坐标；`extendToColumn` 只延伸真正贴着行首/行末的段（不越过让位缺口）。 */
+    private fun pageUnderlineSegment(
+        underline: ReaderPageUnderline,
+        rowElements: List<ReaderElement>,
+        runStart: Int,
+        runEnd: Int,
+    ): Pair<Float, Float> {
+        val start = if (underline.extendToColumn && runStart == 0) columnLeft()
+        else rowElements[runStart].bounds.left
+        val end = if (underline.extendToColumn && runEnd == rowElements.lastIndex)
+            columnLeft() + config.contentWidthPx
+        else rowElements[runEnd].bounds.right
+        return start to end
     }
 
     private fun shiftElement(element: ReaderElement, deltaY: Float): ReaderElement =

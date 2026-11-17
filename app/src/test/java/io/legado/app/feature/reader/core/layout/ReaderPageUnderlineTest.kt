@@ -2,6 +2,7 @@ package io.legado.app.feature.reader.core.layout
 
 import io.legado.app.feature.reader.core.model.ReaderElement
 import io.legado.app.feature.reader.core.model.ReaderTextStyle
+import io.legado.app.feature.reader.core.model.ReaderUnderline
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -128,5 +129,124 @@ class ReaderPageUnderlineTest {
             listOf(10f, 25f, 40f),
             page.elements.filterIsInstance<ReaderElement.Rule>().map { it.bounds.top },
         )
+    }
+
+    // 高亮规则与用户笔记的行内下划线都经 style.underline 表达：正文线让位（正文 < 高亮/笔记）
+    private fun styledItem(char: Char, position: Int, styleOverride: ReaderTextStyle) =
+        ReaderMeasuredInlineItem.Text(char.toString(), 10f, styleOverride, position)
+
+    private fun paragraphWith(vararg items: ReaderMeasuredInlineItem.Text) =
+        ReaderMeasuredBlock.InlineParagraph(
+            items = items.toList(),
+            indentCharacters = 0,
+            alignment = ReaderTextAlignment.START,
+            lineHeightPx = 10f,
+            baselineOffsetPx = 8f,
+            baseTextSizePx = 10f,
+        )
+
+    private val styledUnderlineStyle = style.copy(
+        underline = ReaderUnderline(mode = 1, colorArgb = 0xff880000.toInt(), widthPx = 1f, offsetPx = 2f),
+    )
+
+    @Test fun bodyUnderlineYieldsToStyledUnderlineRanges() {
+        // 甲乙[丙带规则下划线]丁 → 正文线断开成 甲乙、丁 两段，丙下只有规则线
+        val page = ReaderPaginator.paginateBlocks(
+            listOf(
+                paragraphWith(
+                    styledItem('甲', 0, style),
+                    styledItem('乙', 1, style),
+                    styledItem('丙', 2, styledUnderlineStyle),
+                    styledItem('丁', 3, style),
+                ),
+            ),
+            ReaderPaginationConfig(
+                0, "", 60, 40, 0f, 0f, 0f, 0f, 10f, 8f,
+                pageUnderline = ReaderPageUnderline(0xff123456.toInt(), 1f, 0f, false, false),
+            ),
+        ).single()
+        val underlines = page.elements.filterIsInstance<ReaderElement.Rule>()
+
+        assertEquals(listOf(0f to 20f, 30f to 40f), underlines.map { it.bounds.left to it.bounds.right })
+    }
+
+    @Test fun fullyCoveredRowEmitsNoBodyUnderline() {
+        val page = ReaderPaginator.paginateBlocks(
+            listOf(
+                paragraphWith(
+                    styledItem('甲', 0, styledUnderlineStyle),
+                    styledItem('乙', 1, styledUnderlineStyle),
+                ),
+            ),
+            ReaderPaginationConfig(
+                0, "", 40, 40, 0f, 0f, 0f, 0f, 10f, 8f,
+                pageUnderline = ReaderPageUnderline(0xff123456.toInt(), 1f, 0f, false, false),
+            ),
+        ).single()
+
+        assertTrue(page.elements.filterIsInstance<ReaderElement.Rule>().isEmpty())
+    }
+
+    @Test fun backgroundOnlyStyleKeepsBodyUnderline() {
+        // 纯荧光带（背景色无线）不压正文线：带与线不同形态，同屏只有一条线
+        val bandedStyle = style.copy(backgroundArgb = 0x80ffcc00.toInt())
+        val page = ReaderPaginator.paginateBlocks(
+            listOf(
+                paragraphWith(
+                    styledItem('甲', 0, style),
+                    styledItem('乙', 1, bandedStyle),
+                    styledItem('丙', 2, style),
+                ),
+            ),
+            ReaderPaginationConfig(
+                0, "", 40, 40, 0f, 0f, 0f, 0f, 10f, 8f,
+                pageUnderline = ReaderPageUnderline(0xff123456.toInt(), 1f, 0f, false, false),
+            ),
+        ).single()
+        val underlines = page.elements.filterIsInstance<ReaderElement.Rule>()
+
+        assertEquals(listOf(0f to 30f), underlines.map { it.bounds.left to it.bounds.right })
+    }
+
+    @Test fun extendedUnderlineStopsAtCoveredGaps() {
+        val config = ReaderPaginationConfig(
+            0, "", 70, 40, 5f, 0f, 5f, 5f, 10f, 8f,
+            pageUnderline = ReaderPageUnderline(0xff000000.toInt(), 1f, 0f, true, false),
+        )
+        fun pageOf(vararg items: ReaderMeasuredInlineItem.Text) =
+            ReaderPaginator.paginateBlocks(listOf(paragraphWith(*items)), config).single()
+
+        // 行首被覆盖：首段不向左延伸（越过缺口会画到规则线下面）
+        val headCovered = pageOf(
+            styledItem('甲', 0, styledUnderlineStyle),
+            styledItem('乙', 1, style),
+            styledItem('丙', 2, style),
+            styledItem('丁', 3, style),
+            styledItem('戊', 4, style),
+        ).elements.filterIsInstance<ReaderElement.Rule>()
+        assertEquals(listOf(15f to 65f), headCovered.map { it.bounds.left to it.bounds.right })
+
+        // 行中被覆盖：两段各贴自己那端延伸，缺口保持缺口
+        val middleCovered = pageOf(
+            styledItem('甲', 0, style),
+            styledItem('乙', 1, style),
+            styledItem('丙', 2, styledUnderlineStyle),
+            styledItem('丁', 3, style),
+            styledItem('戊', 4, style),
+        ).elements.filterIsInstance<ReaderElement.Rule>()
+        assertEquals(
+            listOf(5f to 25f, 35f to 65f),
+            middleCovered.map { it.bounds.left to it.bounds.right },
+        )
+
+        // 行末被覆盖：末段不向右延伸
+        val tailCovered = pageOf(
+            styledItem('甲', 0, style),
+            styledItem('乙', 1, style),
+            styledItem('丙', 2, style),
+            styledItem('丁', 3, style),
+            styledItem('戊', 4, styledUnderlineStyle),
+        ).elements.filterIsInstance<ReaderElement.Rule>()
+        assertEquals(listOf(5f to 45f), tailCovered.map { it.bounds.left to it.bounds.right })
     }
 }
