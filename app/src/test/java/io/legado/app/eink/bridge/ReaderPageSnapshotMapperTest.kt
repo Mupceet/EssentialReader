@@ -2,6 +2,8 @@ package io.legado.app.eink.bridge
 
 import android.app.Application
 import android.graphics.Bitmap
+import android.graphics.Paint
+import android.graphics.Typeface
 import io.legado.app.data.entities.Book
 import io.legado.app.eink.contract.ReaderDecorationRun
 import io.legado.app.eink.contract.ReaderPaintSpec
@@ -23,6 +25,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -242,6 +245,62 @@ class ReaderPageSnapshotMapperTest {
         assertNotNull(override)
         assertNotNull(override!!.typeface)
         assertNull(override.fontVariationSettings)
+    }
+
+    @Test
+    fun `基线字重非400同参数段不发射覆盖`() {
+        // 字体参数与基线全同：变轴已烘焙进基线 typeface（copyPaintSpec 不跨桥
+        // 字符串），再发射 variation 即模块端对烘焙克隆体二次应用（Cube2 崩溃路径）
+        val snapshot = mapElements(
+            styledTextElement(0f, "常", bodyStyle.copy(fontWeight = 500)),
+            contentBaseline = ReaderChunkBaseline(fontWeight = 500),
+        )
+        assertTrue(snapshot.lines.single().chunkOverrides.isEmpty())
+    }
+
+    @Test
+    fun `基线字重500时段字重400不继承可变字重`() {
+        // 400 段自载 weight-alias typeface、不发射变轴——不再经行规格回落
+        // 继承正文 wght（完整模式同观感）
+        val snapshot = mapElements(
+            styledTextElement(0f, "细", bodyStyle.copy(fontWeight = 400)),
+            contentBaseline = ReaderChunkBaseline(fontWeight = 500),
+        )
+        val override = snapshot.lines.single().chunkOverrides.single()
+        assertNotNull(override)
+        assertNotNull(override!!.typeface)
+        assertNull(override.fontVariationSettings)
+    }
+
+    @Test
+    fun `字体异基线且字重非400发射可变字重`() {
+        // 字体文件异基线的段即使字重与基线同值也自载变轴——新字体未烘焙，
+        // 不能依赖（已移除的）基线字符串回落
+        val snapshot = mapElements(
+            styledTextElement(0f, "换", bodyStyle.copy(fontPath = "/fonts/other.ttf", fontWeight = 500)),
+            contentBaseline = ReaderChunkBaseline(fontPath = "", fontWeight = 500),
+        )
+        val override = snapshot.lines.single().chunkOverrides.single()
+        assertNotNull(override)
+        assertNotNull(override!!.typeface)
+        assertEquals("'wght' 500", override!!.fontVariationSettings)
+    }
+
+    @Test
+    fun `copyPaintSpec不携带可变字重字符串`() {
+        // 工厂写入 `'wght' N` 后变轴已烘焙进 typeface（setFontVariationSettings
+        // 框架语义 = 克隆替换 typeface）；覆写 getter 模拟该画笔状态（native
+        // 路径在 Robolectric 下不可真实置值）——字符串若再跨桥，模块 applySpec
+        // 每次绘制都会对烘焙克隆体二次克隆
+        val paint = object : Paint() {
+            override fun getFontVariationSettings(): String = "'wght' 500"
+        }.apply {
+            textSize = 40f
+            typeface = Typeface.MONOSPACE
+        }
+        val spec = paint.copyPaintSpec()
+        assertSame(Typeface.MONOSPACE, spec.typeface)
+        assertNull(spec.fontVariationSettings)
     }
 
     @Test

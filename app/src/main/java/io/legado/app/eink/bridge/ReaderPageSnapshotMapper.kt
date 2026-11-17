@@ -439,12 +439,19 @@ internal object ReaderPageSnapshotMapper {
  * 引擎画笔 → 渲染规格（只拷贝测量耦合参数；color 由模块主题自涂，
  * 阴影/斜体/linearText 等纯视觉效果不跨桥）。这些 getter 的 API 级别
  * 均 ≤ 26（= :app minSdk），无需门控。
+ *
+ * [fontVariationSettings] 一律不跨桥：工厂写入 `'wght' N` 后
+ * setFontVariationSettings 已把变轴烘焙进 paint.typeface（框架语义 =
+ * createFromTypefaceWithVariation 克隆并替换 typeface），字符串是冗余
+ * 信息——再跨桥会让模块 applySpec 每次绘制对烘焙克隆体二次克隆
+ * （iFlytek Cube2 定制 minikin 二次克隆坏字体族 SIGSEGV，2026-11-09
+ * 崩溃报告；标准平台也是逐帧无谓克隆字体族的纯开销）。
  */
 internal fun Paint.copyPaintSpec(): ReaderPaintSpec = ReaderPaintSpec(
     textSizePx = textSize, // API 1
     letterSpacing = letterSpacing, // API 21
-    typeface = typeface, // API 1
-    fontVariationSettings = fontVariationSettings, // API 26 = minSdk
+    typeface = typeface, // API 1（变轴已烘焙其中，见 KDoc）
+    fontVariationSettings = null,
 )
 
 /** 覆盖判定基线：排版样式工厂的 body/title style 参数（元素无差异时不发射覆盖）。 */
@@ -470,7 +477,9 @@ private data class ChunkOverrideSignature(
  *
  * 与引擎测量同源：typeface 经 [ReaderAndroidPaintFactory.loadTypeface]
  * （斜体恒 false——工厂口径，斜体只经 skewX 不改字宽）；可变字重仅在
- * API 28+ 发射（低版本工厂把字重折进 typeface 的 BOLD 档，镜像同口径）；
+ * API 28+ 且自载 typeface（字体参数异基线）时发射——模块对 weight-alias
+ * 恰好写一次，与完整模式逐段引擎画笔的写入次数同构；低版本工厂把字重折进
+ * typeface 的 BOLD 档不发射（镜像同口径）；
  * 字色做灰度换算（墨水屏等价表达，基线色跳过）；斜体发射
  * [SYNTHETIC_ITALIC_SKEW_X]（bridge 镜像常量）同款合成倾斜。
  */
@@ -482,18 +491,21 @@ private fun ReaderElement.Text.chunkOverride(
 ): ReaderChunkPaintOverride? {
     val style = style
     val textSize = style.fontSizePx.takeIf { it != spec.textSizePx }
-    val typeface = if (style.fontPath != baseline.fontPath ||
+    val fontParamsDiffer = style.fontPath != baseline.fontPath ||
         style.fontWeight != baseline.fontWeight ||
         style.fontFamily != baseline.fontFamily
-    ) {
+    // 自载 typeface 是工厂 weight-alias（变轴未烘焙）
+    val typeface = if (fontParamsDiffer) {
         ReaderAndroidPaintFactory.loadTypeface(style.fontPath, style.fontWeight, false, style.fontFamily)
     } else {
         null
     }
-    val variation = if (sdkInt >= 28) {
-        style.fontWeight.takeIf { it != 400 }
-            ?.let { "'wght' $it" }
-            ?.takeIf { it != spec.fontVariationSettings }
+    // 可变字重只伴随自载 typeface 发射：字体参数同基线的段变轴已烘焙进
+    // 基线 typeface（copyPaintSpec 不跨桥字符串），再发射即模块端二次
+    // 应用（iFlytek Cube2 崩溃路径）；同基线但字重 400 的段不发射，
+    // 不再经行规格回落继承正文 wght（对齐完整模式的 400 观感）。
+    val variation = if (sdkInt >= 28 && fontParamsDiffer) {
+        style.fontWeight.takeIf { it != 400 }?.let { "'wght' $it" }
     } else {
         null
     }
