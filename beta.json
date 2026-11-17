@@ -1,49 +1,49 @@
 {
-  "tag_name": "3.26.17-beta.45",
-  "name": "Pre-release 3.26.17-beta.45",
-  "body": "**此版本为测试版，会存在不稳定问题。**\n\n# 更新日志\n\n墨本阅读——开源阅读 legado 的墨水屏增强发行版：同一本书，两种读法。\n\n## 3.26.17-beta（预发布）\n\n本次更新：合并上游大量更新（设置搜索、跨页选择文字、高亮夜间颜色、Markdown 本地书、漫画导出等）；墨水屏模式新增联网自愈与整页下划线显示。\n\n### 新增\n\n* 设置页新增搜索：输入关键词直接定位到对应设置项，不用层层翻找\n* 本地书新增 Markdown 格式：正文排版、图片、链接可直接阅读\n* 高亮规则支持白天/夜间两套颜色，夜间阅读高亮不再刺眼\n* 长按选择文字支持跨页延续，选中范围不再被一页截断（可在设置中开关）\n* 阅读外观（主题、字号等）对本地 EPUB / MOBI 书籍同样生效\n* 段评弹窗高度可调节，小屏也能舒展看评论\n* 本地漫画支持导出为图片文件夹或 CBZ 文件\n* 完整模式新增 Mochi / Miuix / HyperOS 4 等主题家族，外观选择更丰富\n* 联网自愈：灭屏唤醒、网络恢复后，加载失败的正文自动重新加载；断网时打不开的书联网后自动重试进入；「恢复进度」跳转后不再停在无内容页，无需手动刷新\n\n### 优化\n\n* 保存正文图片不再卡住界面，大图保存也顺滑\n* 横屏阅读时正文避开侧边手势条，不再被遮挡\n* 仿真翻页渲染更省资源\n* 墨水屏模式下整页文字下划线、分隔线能正确显示，划线样式不再缺失\n\n### 修复\n\n* 听书：离线下载的语音优先播放；下载中途出错不再丢失已完成的音频；朗读出错时停在读到的句子，恢复后从原句继续\n* 快速连续切换书籍时，上一本的阅读进度不再串写到新书\n* 视频书源：全屏播放切换剧集不再退出全屏；支持播放本地视频文件\n* 缓存维护运行中可以随时取消，取消后进度不再错乱\n* 多设备恢复书架时，换过源的书本记录不再残留\n* 修复带图片章节加载过程中刷新，会导致该章反复刷新也加载不出、必须完全退出应用重进的问题",
+  "tag_name": "3.26.17-beta.46",
+  "name": "Pre-release 3.26.17-beta.46",
+  "body": "**此版本为测试版，会存在不稳定问题。**\n\n# 更新日志\n\n墨本阅读——开源阅读 legado 的墨水屏增强发行版：同一本书，两种读法。\n\n## 3.26.17-beta（预发布）\n\n本次更新：墨水屏阅读页的页眉页脚内容遵从完整模式的自定义设置；修复书架刷新卡住、锁屏返回后页眉时间不刷新、部分设备阅读闪退等问题。\n\n### 新增\n\n* 墨水屏阅读页的页眉页脚遵从完整模式设置：在完整模式中自定义的页眉页脚信息（书名、章节、进度、时间、电量等）在墨水屏模式同样显示；默认显示保持不变，图形类信息（如进度条）自动转为文字显示\n\n### 修复\n\n* 应用启动后和锁屏返回阅读页时，页眉的时间、电量立即刷新，不再停留旧值等待下一分钟\n* 修复个别书源拖住书架刷新，导致刷新按钮一直转圈、无法再次刷新的问题；单本书籍刷新超过 5 分钟自动放弃，不再卡住整个书架\n* 修复部分墨水屏设备（如讯飞 Cube2）打开书籍闪退的问题\n* 书籍自带下划线样式的文字同时做了高亮或笔记划线时，同一行不再叠画两条线",
   "prerelease": true,
-  "created_at": "2026-11-15T10:15:09Z",
+  "created_at": "2026-11-17T01:45:32Z",
   "assets": [
     {
-      "browser_download_url": "https://github.com/Mupceet/EssentialReader/releases/download/3.26.17-beta.45/mapping-core.txt",
+      "browser_download_url": "https://github.com/Mupceet/EssentialReader/releases/download/3.26.17-beta.46/mapping-core.txt",
       "content_type": "text/plain",
-      "created_at": "2026-11-15T10:41:52Z",
+      "created_at": "2026-11-17T02:08:10Z",
       "download_count": 0,
-      "id": 750661957,
+      "id": 757250963,
       "name": "mapping-core.txt",
       "state": "uploaded",
-      "url": "https://api.github.com/repos/Mupceet/EssentialReader/releases/assets/750661957"
+      "url": "https://api.github.com/repos/Mupceet/EssentialReader/releases/assets/757250963"
     },
     {
-      "browser_download_url": "https://github.com/Mupceet/EssentialReader/releases/download/3.26.17-beta.45/moben-3.26.17-beta.45-core-arm64-v8a.apk",
+      "browser_download_url": "https://github.com/Mupceet/EssentialReader/releases/download/3.26.17-beta.46/moben-3.26.17-beta.46-core-arm64-v8a.apk",
       "content_type": "application/vnd.android.package-archive",
-      "created_at": "2026-11-15T10:41:52Z",
+      "created_at": "2026-11-17T02:08:10Z",
       "download_count": 0,
-      "id": 750661959,
-      "name": "moben-3.26.17-beta.45-core-arm64-v8a.apk",
+      "id": 757250964,
+      "name": "moben-3.26.17-beta.46-core-arm64-v8a.apk",
       "state": "uploaded",
-      "url": "https://api.github.com/repos/Mupceet/EssentialReader/releases/assets/750661959"
+      "url": "https://api.github.com/repos/Mupceet/EssentialReader/releases/assets/757250964"
     },
     {
-      "browser_download_url": "https://github.com/Mupceet/EssentialReader/releases/download/3.26.17-beta.45/moben-3.26.17-beta.45-core-armeabi-v7a.apk",
+      "browser_download_url": "https://github.com/Mupceet/EssentialReader/releases/download/3.26.17-beta.46/moben-3.26.17-beta.46-core-armeabi-v7a.apk",
       "content_type": "application/vnd.android.package-archive",
-      "created_at": "2026-11-15T10:41:52Z",
+      "created_at": "2026-11-17T02:08:10Z",
       "download_count": 0,
-      "id": 750661955,
-      "name": "moben-3.26.17-beta.45-core-armeabi-v7a.apk",
+      "id": 757250961,
+      "name": "moben-3.26.17-beta.46-core-armeabi-v7a.apk",
       "state": "uploaded",
-      "url": "https://api.github.com/repos/Mupceet/EssentialReader/releases/assets/750661955"
+      "url": "https://api.github.com/repos/Mupceet/EssentialReader/releases/assets/757250961"
     },
     {
-      "browser_download_url": "https://github.com/Mupceet/EssentialReader/releases/download/3.26.17-beta.45/moben-3.26.17-beta.45-core-universal.apk",
+      "browser_download_url": "https://github.com/Mupceet/EssentialReader/releases/download/3.26.17-beta.46/moben-3.26.17-beta.46-core-universal.apk",
       "content_type": "application/vnd.android.package-archive",
-      "created_at": "2026-11-15T10:41:52Z",
+      "created_at": "2026-11-17T02:08:10Z",
       "download_count": 0,
-      "id": 750661956,
-      "name": "moben-3.26.17-beta.45-core-universal.apk",
+      "id": 757250959,
+      "name": "moben-3.26.17-beta.46-core-universal.apk",
       "state": "uploaded",
-      "url": "https://api.github.com/repos/Mupceet/EssentialReader/releases/assets/750661956"
+      "url": "https://api.github.com/repos/Mupceet/EssentialReader/releases/assets/757250959"
     }
   ]
 }
