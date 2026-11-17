@@ -601,7 +601,7 @@ object ReadBookConfig {
         val headerFontSize: Int = 12,//页眉字号
         val footerFontSize: Int = 12,//页脚字号
         val applyHeaderStyle: Boolean = true,//页脚是否应用页眉字体样式
-        val textBold: Int = 500,//是否粗体字 0:正常, 1:粗体, 2:细体
+        val textBold: Int = 500,//字重：0:常规/1:粗体/2:细体预设，100..900 自定义值直存；出厂默认 500 即自定义档（渲染解析见 LegacyReaderPaginationStyleFactory.resolveWeight）
         val textSize: Int = 20,//文字大小
         val textItalic: Boolean = false,// 是否启用斜体
         val textShadow: Boolean = false,// 是否启用阴影
@@ -620,7 +620,7 @@ object ReadBookConfig {
         val titleBottomSpacing: Int = 0,
         val titleColor: Int = 0,
         val titleColorNight: Int = 0,
-        val titleBold: Int = 500,//是否粗体字 0:正常, 1:粗体, 2:细体
+        val titleBold: Int = 500,//字重：0:常规/1:粗体/2:细体预设，100..900 自定义值直存；出厂默认 500 即自定义档（渲染解析见 LegacyReaderPaginationStyleFactory.resolveWeight）
         val titleLineSpacingExtra: Int = 12,
         val titleLineSpacingSub: Int = 12,
         val titleSegType: Int = 0,//分段模式
