@@ -37,6 +37,8 @@ class ReaderTextStyleDefaultsTest {
         assertNull(style.titleSegmentDistance)
         assertNull(style.titleSegmentDelimiter)
         assertNull(style.titleSegmentScale)
+        assertNull(style.bodyItalic)
+        assertNull(style.footerFont)
     }
 
     @Test

@@ -158,6 +158,19 @@ data class ReaderTextStyle(
     /** 副标题字号缩放（第二段与第一段的字体大小比例）；null = 不管理。 */
     val titleSegmentScale: Float? = null,
 
+    /**
+     * 正文斜体（0.8.2 起支持：合成斜体 skew 经 ReaderPaintSpec.textSkewX
+     * 跨桥渲染）；null = 不管理。
+     */
+    val bodyItalic: Boolean? = null,
+
+    /**
+     * 页脚字体；null = 不管理（值通道先行，呈现待后续——届时与宿主同构
+     * 支持独立配置，applyHeaderStyle 语义配套处理；当前 eink 侧统一字体
+     * 原则仍为页脚跟随页眉）。
+     */
+    val footerFont: ReaderFontSelection? = null,
+
     /** 正文左边距（dp）。 */
     val paddingLeft: Int = 16,
 

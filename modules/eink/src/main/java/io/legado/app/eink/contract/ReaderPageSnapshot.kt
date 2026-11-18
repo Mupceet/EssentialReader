@@ -192,8 +192,10 @@ class ReaderImageSlot(
  * 参数测量的，模块画布必须按同值绘制才不错位。
  *
  * 刻意排除项（既定产品取舍）：字色不进规格（模块按主题色自涂）；
- * 阴影/斜体等纯视觉效果不跨桥（E-Ink 阅读不渲染这些效果，宿主配置
- * 了也不生效）。
+ * 阴影不跨桥（E-Ink 阅读不渲染，宿主配置了也不生效）。斜体**跨桥**
+ * （0.8.2 起）：合成斜体 skew 只剪切字形轮廓、不改步进宽，无对齐
+ * 风险——基线斜体经本规格 [textSkewX]、高亮规则的斜体经
+ * [ReaderChunkPaintOverride.skewX]。
  */
 @Stable
 class ReaderPaintSpec(
@@ -208,6 +210,13 @@ class ReaderPaintSpec(
 
     /** 可变字重设置（如 "'wght' 700"）；null = 未设置。加粗影响字形宽度，测量耦合。 */
     val fontVariationSettings: String?,
+
+    /**
+     * 基线合成斜体（宿主引擎 `textSkewX` 同值，如 -0.25f；null/0 = 不倾斜）。
+     * 纯视觉参数（skew 不改步进宽），但快照 spec 是分页期固化的——变更
+     * 需重建页快照（目录 body.italic 标 affectsLayout=true 的原因）。
+     */
+    val textSkewX: Float? = null,
 )
 
 /**

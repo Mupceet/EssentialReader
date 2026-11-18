@@ -44,6 +44,10 @@ internal fun styleChangeNeedsRelayout(
         Ids.BODY_UNDERLINE_DASHED to (old.bodyUnderlineDashed != new.bodyUnderlineDashed),
         Ids.BODY_UNDERLINE_DASH_ON to (old.bodyUnderlineDashOn != new.bodyUnderlineDashOn),
         Ids.BODY_UNDERLINE_DASH_OFF to (old.bodyUnderlineDashOff != new.bodyUnderlineDashOff),
+        // 0.8.2：斜体变更需重建页快照（spec 分页期固化）；页脚字体同（快照
+        // 经 headerFooterTypefaces 消费）——均标 affectsLayout 走重排路径
+        Ids.BODY_ITALIC to (old.bodyItalic != new.bodyItalic),
+        Ids.FOOTER_FONT to (old.footerFont != new.footerFont),
         Ids.HEADER_FONT to (old.headerFont != new.headerFont),
         Ids.HEADER_MODE to (old.headerMode != new.headerMode),
         Ids.HEADER_SIZE to (old.headerSize != new.headerSize),

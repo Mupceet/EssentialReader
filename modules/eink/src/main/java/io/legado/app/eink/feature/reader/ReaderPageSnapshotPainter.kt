@@ -103,6 +103,8 @@ internal class ReaderPageSnapshotPainter {
                 letterSpacing = base.letterSpacing,
                 typeface = override.typeface ?: base.typeface,
                 fontVariationSettings = override.fontVariationSettings ?: base.fontVariationSettings,
+                // 覆盖斜体优先；无覆盖沿用基线斜体（0.8.2 起基线 skew 跨桥）
+                textSkewX = override.skewX ?: base.textSkewX,
             )
             val color = override.colorArgb ?: style.textColorArgb
             val key = OverridePaintKey(
@@ -111,13 +113,12 @@ internal class ReaderPageSnapshotPainter {
                 typeface = merged.typeface,
                 fontVariationSettings = merged.fontVariationSettings,
                 colorArgb = color,
-                skewX = override.skewX ?: 0f,
+                skewX = merged.textSkewX ?: 0f,
                 fakeBold = override.fakeBold,
             )
             return overridePaints.getOrPut(key) {
                 Paint().apply {
                     applySpec(merged, color)
-                    textSkewX = override.skewX ?: 0f
                     // 合成加粗：绘制期描边加宽、不改步进宽，选区/装饰测量不受影响
                     isFakeBoldText = override.fakeBold
                 }
@@ -388,6 +389,8 @@ internal fun Paint.applySpec(spec: ReaderPaintSpec, colorArgb: Int) {
     textSize = spec.textSizePx
     letterSpacing = spec.letterSpacing
     typeface = spec.typeface ?: Typeface.DEFAULT
+    // 基线合成斜体（0.8.2 起跨桥；skew 不改步进宽，无对齐风险）
+    textSkewX = spec.textSkewX ?: 0f
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
         // 目标为空且画笔本无 variation 时跳过写入：此前是无条件写 ""（全新画笔为
         // null→"" 的首次写入）。iFlytek EBook Cube2（Android 16，定制
