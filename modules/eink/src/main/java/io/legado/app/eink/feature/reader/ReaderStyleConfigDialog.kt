@@ -1,7 +1,31 @@
 package io.legado.app.eink.feature.reader
 
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateMapOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInParent
+import androidx.compose.ui.unit.dp
+import io.legado.app.eink.contract.ReaderFontOption
+import io.legado.app.eink.contract.ReaderFontSelection
 import io.legado.app.eink.contract.ReaderStyleCatalog
 import io.legado.app.eink.contract.ReaderStyleParamIds as Ids
+import io.legado.app.eink.contract.ReaderTextStyle
+import io.legado.app.eink.designsystem.control.EInkDialog
+import io.legado.app.eink.designsystem.theme.EInkSpacing
+import kotlinx.coroutines.launch
+import kotlin.math.roundToInt
 
 /** 归一弹框聚合轴：按功能（Tab 切换）/ 按区域（分组全景 + 锚点直达）。 */
 internal enum class StyleAxis { FUNCTION, REGION }
@@ -50,4 +74,219 @@ internal fun regionGroupVisible(catalog: ReaderStyleCatalog, group: StyleRegionG
         )
     }
     return ids.any { catalog.available(it) }
+}
+
+/** 归一弹框全部参数写回调（功能轴三内容 + 区域视图共用；spec §4.2 VM 零新增状态）。 */
+internal class ReaderStyleActions(
+    val setTextSize: (Int) -> Unit,
+    val setLetterSpacing: (Int) -> Unit,
+    val setIndent: (Int) -> Unit,
+    val setLineSpacing: (Int) -> Unit,
+    val setParagraphSpacing: (Int) -> Unit,
+    val setReaderFont: (ReaderFontSelection) -> Unit,
+    val setBodyWeight: (Int) -> Unit,
+    val setTitleWeight: (Int) -> Unit,
+    val setChineseConverterType: (Int) -> Unit,
+    val setTitleMode: (Int) -> Unit,
+    val setTitleSizeFollowBody: (Boolean) -> Unit,
+    val setTitleSize: (Int) -> Unit,
+    val setHeaderMode: (Int) -> Unit,
+    val setFooterVisible: (Boolean) -> Unit,
+    val setTipSize: (Int) -> Unit,
+    val setPaddingTop: (Int) -> Unit,
+    val setPaddingBottom: (Int) -> Unit,
+    val setPaddingLeft: (Int) -> Unit,
+    val setPaddingRight: (Int) -> Unit,
+    val setHeaderPaddingTop: (Int) -> Unit,
+    val setHeaderPaddingBottom: (Int) -> Unit,
+    val setHeaderPaddingLeft: (Int) -> Unit,
+    val setHeaderPaddingRight: (Int) -> Unit,
+    val setFooterPaddingTop: (Int) -> Unit,
+    val setFooterPaddingBottom: (Int) -> Unit,
+    val setFooterPaddingLeft: (Int) -> Unit,
+    val setFooterPaddingRight: (Int) -> Unit,
+)
+
+/**
+ * 排版设置归一弹框（spec §4）：居中透明卡片，顶部聚合切换 [按功能|按区域]；
+ * 功能轴 = Tab 行（字体/信息/边距，三入口直达）；区域轴 = 锚点行 + 四分组
+ * 全景滚动（锚点无动画直达）。切轴/切 Tab 不关闭弹框。
+ */
+@Composable
+internal fun ReaderStyleConfigDialog(
+    initialTab: StyleFunctionTab,
+    catalog: ReaderStyleCatalog,
+    style: ReaderTextStyle,
+    titleSizeFollowBody: Boolean,
+    fontOptions: List<ReaderFontOption>,
+    recentFontPaths: List<String>,
+    chineseConverterType: Int,
+    actions: ReaderStyleActions,
+    onOpenFontSettings: () -> Unit,
+    onPickFolder: () -> Unit,
+    onClose: () -> Unit,
+    onBackdropClick: () -> Unit,
+) {
+    var axis by rememberSaveable { mutableStateOf(StyleAxis.FUNCTION) }
+    var functionTab by rememberSaveable { mutableStateOf(initialTab) }
+    EInkDialog(
+        onDismiss = onClose,
+        title = "排版设置",
+        onClose = onClose,
+        onBackdropClick = onBackdropClick,
+        showActions = false,
+    ) {
+        Column {
+            PanelTabRow(
+                labels = listOf("按功能", "按区域"),
+                selected = if (axis == StyleAxis.FUNCTION) 0 else 1,
+                onSelect = { axis = if (it == 0) StyleAxis.FUNCTION else StyleAxis.REGION },
+            )
+            when (axis) {
+                StyleAxis.FUNCTION -> {
+                    PanelTabRow(
+                        labels = StyleFunctionTab.entries.map { it.displayLabel },
+                        selected = functionTab.ordinal,
+                        onSelect = { functionTab = StyleFunctionTab.entries[it] },
+                    )
+                    when (functionTab) {
+                        StyleFunctionTab.FONTS -> ReaderFontConfigContent(
+                            catalog = catalog,
+                            style = style,
+                            fontOptions = fontOptions,
+                            recentFontPaths = recentFontPaths,
+                            chineseConverterType = chineseConverterType,
+                            onSetFont = actions.setReaderFont,
+                            onOpenFontSettings = onOpenFontSettings,
+                            onSetBodyWeight = actions.setBodyWeight,
+                            onSetTitleWeight = actions.setTitleWeight,
+                            onSetChineseConverterType = actions.setChineseConverterType,
+                            onPickFolder = onPickFolder,
+                        )
+                        StyleFunctionTab.INFO -> ReaderInfoConfigContent(
+                            catalog = catalog,
+                            style = style,
+                            titleSizeFollowBody = titleSizeFollowBody,
+                            onSetTitleMode = actions.setTitleMode,
+                            onSetTitleSizeFollowBody = actions.setTitleSizeFollowBody,
+                            onSetTitleSize = actions.setTitleSize,
+                            onSetHeaderMode = actions.setHeaderMode,
+                            onSetFooterVisible = actions.setFooterVisible,
+                            onSetTipSize = actions.setTipSize,
+                        )
+                        StyleFunctionTab.MARGIN -> ReaderMarginConfigContent(
+                            catalog = catalog,
+                            style = style,
+                            onSetPaddingTop = actions.setPaddingTop,
+                            onSetPaddingBottom = actions.setPaddingBottom,
+                            onSetPaddingLeft = actions.setPaddingLeft,
+                            onSetPaddingRight = actions.setPaddingRight,
+                            onSetHeaderPaddingTop = actions.setHeaderPaddingTop,
+                            onSetHeaderPaddingBottom = actions.setHeaderPaddingBottom,
+                            onSetHeaderPaddingLeft = actions.setHeaderPaddingLeft,
+                            onSetHeaderPaddingRight = actions.setHeaderPaddingRight,
+                            onSetFooterPaddingTop = actions.setFooterPaddingTop,
+                            onSetFooterPaddingBottom = actions.setFooterPaddingBottom,
+                            onSetFooterPaddingLeft = actions.setFooterPaddingLeft,
+                            onSetFooterPaddingRight = actions.setFooterPaddingRight,
+                        )
+                    }
+                }
+                StyleAxis.REGION -> ReaderStyleRegionView(
+                    catalog = catalog,
+                    style = style,
+                    titleSizeFollowBody = titleSizeFollowBody,
+                    actions = actions,
+                )
+            }
+        }
+    }
+}
+
+/**
+ * 区域轴视图：锚点行（组可见性过滤后）+ 四分组全景滚动（spec §4.4：
+ * 无动画直达、组标题流内非吸顶、组与锚点同步隐藏、切入回顶部）。
+ */
+@Composable
+private fun ReaderStyleRegionView(
+    catalog: ReaderStyleCatalog,
+    style: ReaderTextStyle,
+    titleSizeFollowBody: Boolean,
+    actions: ReaderStyleActions,
+) {
+    val scrollState = rememberScrollState()
+    val scope = rememberCoroutineScope()
+    val groupOffsets = remember { mutableStateMapOf<StyleRegionGroup, Int>() }
+    val visibleGroups = StyleRegionGroup.entries.filter { regionGroupVisible(catalog, it) }
+    Column {
+        PanelTabRow(
+            labels = visibleGroups.map { it.displayLabel },
+            // 锚点无持久选中态（定位按钮，非当前页标记）
+            selected = -1,
+            onSelect = { index ->
+                val target = visibleGroups.getOrNull(index) ?: return@PanelTabRow
+                scope.launch { scrollState.scrollTo(groupOffsets[target] ?: 0) }
+            },
+        )
+        Column(
+            modifier = Modifier
+                .verticalScroll(scrollState)
+                .heightIn(max = 360.dp),
+            verticalArrangement = Arrangement.spacedBy(EInkSpacing.xs),
+        ) {
+            visibleGroups.forEach { group ->
+                Column(
+                    modifier = Modifier.onGloballyPositioned {
+                        groupOffsets[group] = it.positionInParent().y.roundToInt()
+                    },
+                ) {
+                    GroupHeading(group.displayLabel)
+                    when (group) {
+                        StyleRegionGroup.BODY -> {
+                            BodyBasicRows(
+                                catalog = catalog, style = style,
+                                onSetTextSize = actions.setTextSize,
+                                onSetLetterSpacing = actions.setLetterSpacing,
+                                onSetIndent = actions.setIndent,
+                                onSetLineSpacing = actions.setLineSpacing,
+                                onSetParagraphSpacing = actions.setParagraphSpacing,
+                            )
+                            BodyMarginRows(
+                                catalog, style,
+                                actions.setPaddingTop, actions.setPaddingBottom,
+                                actions.setPaddingLeft, actions.setPaddingRight,
+                            )
+                        }
+                        StyleRegionGroup.TITLE -> TitleInfoRows(
+                            catalog = catalog,
+                            style = style,
+                            titleSizeFollowBody = titleSizeFollowBody,
+                            onSetTitleMode = actions.setTitleMode,
+                            onSetTitleSizeFollowBody = actions.setTitleSizeFollowBody,
+                            onSetTitleSize = actions.setTitleSize,
+                        )
+                        StyleRegionGroup.HEADER -> {
+                            HeaderModeRow(catalog, style, actions.setHeaderMode)
+                            // 页眉页脚字号：同一行组件页眉/页脚组双呈现（spec §4.3 注）
+                            TipSizeRow(catalog, style, actions.setTipSize)
+                            HeaderMarginRows(
+                                catalog, style,
+                                actions.setHeaderPaddingTop, actions.setHeaderPaddingBottom,
+                                actions.setHeaderPaddingLeft, actions.setHeaderPaddingRight,
+                            )
+                        }
+                        StyleRegionGroup.FOOTER -> {
+                            FooterModeRow(catalog, style, actions.setFooterVisible)
+                            TipSizeRow(catalog, style, actions.setTipSize)
+                            FooterMarginRows(
+                                catalog, style,
+                                actions.setFooterPaddingTop, actions.setFooterPaddingBottom,
+                                actions.setFooterPaddingLeft, actions.setFooterPaddingRight,
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
 }
