@@ -653,15 +653,11 @@ fun ReaderRoute(
         }
     }
 
-    // 字体文件列表：字体弹层打开时拉取（SAF 换文件夹后由 VM 刷新）
+    // 字体文件列表与最近字体历史（弹框数据源）：预取由归一弹框在字体
+    // Tab 可见时统一触发（onFontTabShown），SAF 换文件夹后由 VM 刷新
     val fontOptions by viewModel.fontOptions.collectAsStateWithLifecycle()
     // 最近文件字体历史（快捷行数据源；fire-and-forget 写入，VM 乐观状态背书）
     val recentFontPaths by viewModel.recentFontPaths.collectAsStateWithLifecycle()
-    LaunchedEffect(styleTab) {
-        if (styleTab == StyleFunctionTab.FONTS) {
-            viewModel.loadFontOptions()
-        }
-    }
 
     LaunchedEffect(bookUrl) {
         viewModel.attach(bookUrl)
@@ -1128,6 +1124,7 @@ fun ReaderRoute(
                     } ?: false
                     if (!hostHandled) fontFolderLauncher.launch(null)
                 },
+                onFontTabShown = viewModel::loadFontOptions,
                 onClose = { styleTab = null },
                 onBackdropClick = dismissToCleanReading,
             )

@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
@@ -111,6 +112,8 @@ internal class ReaderStyleActions(
  * 排版设置归一弹框（spec §4）：居中透明卡片，顶部聚合切换 [按功能|按区域]；
  * 功能轴 = Tab 行（字体/信息/边距，三入口直达）；区域轴 = 锚点行 + 四分组
  * 全景滚动（锚点无动画直达）。切轴/切 Tab 不关闭弹框。
+ *
+ * [onFontTabShown]：字体 Tab 可见时拉取字体列表（入口直达与框内切换统一预取路径）。
  */
 @Composable
 internal fun ReaderStyleConfigDialog(
@@ -124,11 +127,19 @@ internal fun ReaderStyleConfigDialog(
     actions: ReaderStyleActions,
     onOpenFontSettings: () -> Unit,
     onPickFolder: () -> Unit,
+    onFontTabShown: () -> Unit,
     onClose: () -> Unit,
     onBackdropClick: () -> Unit,
 ) {
     var axis by rememberSaveable { mutableStateOf(StyleAxis.FUNCTION) }
     var functionTab by rememberSaveable { mutableStateOf(initialTab) }
+    // 字体数据预取：功能轴·字体 Tab 可见即拉取（入口直达与框内切换统一路径；
+    // 只在字体 Tab 真正出现时触发，不经字体 Tab 不浪费枚举 IO）
+    LaunchedEffect(axis, functionTab) {
+        if (axis == StyleAxis.FUNCTION && functionTab == StyleFunctionTab.FONTS) {
+            onFontTabShown()
+        }
+    }
     EInkDialog(
         onDismiss = onClose,
         title = "排版设置",
