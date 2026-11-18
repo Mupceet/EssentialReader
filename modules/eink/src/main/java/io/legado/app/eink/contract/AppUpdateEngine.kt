@@ -144,7 +144,9 @@ enum class AppDownloadState {
     /** 传输中。 */
     RUNNING,
 
-    /** 暂停（等待网络/重试等）。 */
+    /** 暂停（等待网络/重试等）。仅宿主下载器内部推进——模块无 pause/
+     *  resume/cancel 端口面（有意取舍：模块只发起与观察，不控制传输；
+     *  失败重试 = FAILED 后再次 startDownload）。 */
     PAUSED,
 
     /** 成功；宿主已/将调起系统安装器。 */

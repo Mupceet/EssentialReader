@@ -96,6 +96,35 @@ sealed interface ReaderPrepareResult {
     ) : ReaderPrepareResult
 }
 
+/** [ReaderEngine.startCache] 的结果（0.8.0 起取代三态 Boolean?）。 */
+sealed interface StartCacheResult {
+
+    /** 已启动缓存下载（模块提示「缓存已开始」）。 */
+    data object Started : StartCacheResult
+
+    /** 无会话书或章节已全部缓存——无操作（模块静默）。 */
+    data object NothingToCache : StartCacheResult
+
+    /** 本地书无需缓存（模块提示本地书不缓存）。 */
+    data object LocalBook : StartCacheResult
+}
+
+/**
+ * [ReaderEngine.addSessionBookToShelf] / [ReaderEngine.removeSessionBookFromShelf]
+ * 的结果（0.8.0 起取代三态 Boolean?）。
+ */
+sealed interface SessionShelfOpResult {
+
+    /** 落库成功。 */
+    data object Success : SessionShelfOpResult
+
+    /** 不适用（无会话书，或书架状态已是目标态）——等效完成，不提示失败。 */
+    data object NotApplicable : SessionShelfOpResult
+
+    /** 保存失败（[cause] 供宿主日志与模块文案，可空）。 */
+    data class Failure(val cause: Throwable? = null) : SessionShelfOpResult
+}
+
 /**
  * 云端进度同步触发时机。同一同步核心按触发点套不同门槛，矩阵复刻宿主
  * 「同步阅读进度 / 同步增强」两设置的行为（`ReadBookViewModel` /
@@ -476,22 +505,21 @@ interface ReaderEngine {
 
     /**
      * 启动章节缓存下载（当前章起向后 [count] 章；[cacheAll] 为全本）。
-     * @return null = 无会话书或章节已全部缓存；false = 本地书无需缓存；
-     * true = 已启动
+     * 结果经 [StartCacheResult] 返回（0.8.0 起以显式分支取代三态 Boolean?）。
      */
-    fun startCache(count: Int, cacheAll: Boolean): Boolean?
+    fun startCache(count: Int, cacheAll: Boolean): StartCacheResult
 
     /**
      * 将当前会话书籍加入书架（仅对未加书架的隐藏行有效）。
-     * @return null = 无会话书或已在书架；true/false = 保存成功/失败
+     * 结果经 [SessionShelfOpResult] 返回（0.8.0 起以显式分支取代三态 Boolean?）。
      */
-    suspend fun addSessionBookToShelf(): Boolean?
+    suspend fun addSessionBookToShelf(): SessionShelfOpResult
 
     /**
      * 将当前会话书籍移出书架（退回隐藏行，不物理删除）。
-     * @return null = 无会话书或本就未在书架；true/false = 保存成功/失败
+     * 结果经 [SessionShelfOpResult] 返回。
      */
-    suspend fun removeSessionBookFromShelf(): Boolean?
+    suspend fun removeSessionBookFromShelf(): SessionShelfOpResult
 
     // ---- 排版 ----
 

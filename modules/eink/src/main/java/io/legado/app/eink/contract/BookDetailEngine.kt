@@ -49,7 +49,8 @@ sealed interface BookDetailPrefetchResult {
 interface BookDetailEngine {
 
     /**
-     * 按导航参数查找书籍，返回「句柄 + 展示模型」序对，找不到返回 null。
+     * 按导航参数查找书籍，返回 [BookDetailResolved]（句柄 + 展示模型，
+     * 0.8.0 起以具名类型取代裸 Pair），找不到返回 null。
      *
      * 查找链义务（**bookUrl 是记录主键，优先级不得颠倒**）：书籍表同名
      * 同作者多记录（不同书源加入同书、换源残留——legado 数据模型下的
@@ -67,7 +68,7 @@ interface BookDetailEngine {
         name: String,
         author: String,
         bookUrl: String
-    ): Pair<BookHandle, BookDetailUiModel>?
+    ): BookDetailResolved?
 
     /** 读取书籍当前展示数据（存储最新值；书籍已不存在返回 null）。 */
     suspend fun loadBookDetail(bookUrl: String): BookDetailUiModel?

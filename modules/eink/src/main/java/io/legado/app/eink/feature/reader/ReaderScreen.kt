@@ -79,6 +79,8 @@ import io.legado.app.eink.app.hubPagingKeyEvent
 import io.legado.app.eink.app.hubWheelPagingEvent
 import io.legado.app.eink.contract.EInkEngineRegistry
 import io.legado.app.eink.contract.EInkHostActivity
+import io.legado.app.eink.contract.MarkingNoteUpdate
+import io.legado.app.eink.contract.PageBookmarkToggle
 import io.legado.app.eink.contract.ReaderEngine
 import io.legado.app.eink.contract.ReaderPageSnapshot
 import io.legado.app.eink.designsystem.content.EInkText
@@ -629,11 +631,11 @@ fun ReaderRoute(
     // 页面书签 toggle（v2 Task 9，设计 §4）：顶栏书签钮与阅读区竖直下拉
     // 共用；端口在位才可达（降级宿主两者皆不渲染/不响应，见 ReaderScreen）；
     // 下拉入口另受「下拉添加书签」开关门控（默认关），顶栏钮不受限。
-    // 三态：null = 端口缺失/无页/无会话书 → toast「操作失败」；true = 本次
-    // 添加、false = 本次移除，均静默——角标变化随宿主重排的新快照即反馈
+    // Unavailable（端口缺失/无页/无会话书）→ toast「操作失败」；Added/Removed
+    // 均静默——角标变化随宿主重排的新快照即反馈
     val onPageBookmarkToggle: () -> Unit = {
         scope.launch {
-            if (viewModel.togglePageBookmark() == null) {
+            if (viewModel.togglePageBookmark() == PageBookmarkToggle.Unavailable) {
                 Toast.makeText(context, "操作失败", Toast.LENGTH_SHORT).show()
             }
         }
@@ -1300,18 +1302,21 @@ fun ReaderRoute(
                                     else -> Toast.makeText(context, "保存失败", Toast.LENGTH_SHORT).show()
                                 }
 
-                                // 更新：按 id 状态转换，锚点不变；null = 标记已失效（清态收层）
-                                else -> when (viewModel.updateMarkingNote(target.markingId, note)) {
-                                    true -> {
+                                // 更新：按 id 状态转换，锚点不变；NotFound = 标记已失效（清态收层）
+                                else -> when (val result =
+                                    viewModel.updateMarkingNote(target.markingId, note)
+                                ) {
+                                    MarkingNoteUpdate.Success -> {
                                         thoughtDraft = null
                                         markingBar = null
                                         selectionFrozen = true
                                         committedSelection = target.selection
                                     }
 
-                                    false -> Toast.makeText(context, "保存失败", Toast.LENGTH_SHORT).show()
+                                    is MarkingNoteUpdate.Failure ->
+                                        Toast.makeText(context, "保存失败", Toast.LENGTH_SHORT).show()
 
-                                    null -> {
+                                    MarkingNoteUpdate.NotFound -> {
                                         thoughtDraft = null
                                         markingBar = null
                                         clearSelectionState()

@@ -183,7 +183,7 @@ class SearchViewModelTest {
         override fun close() = Unit
 
         fun finish() {
-            callback.onSearchFinish(isEmpty = false, hasMore = false)
+            callback.onSearchFinish(isEmpty = false)
         }
     }
 }

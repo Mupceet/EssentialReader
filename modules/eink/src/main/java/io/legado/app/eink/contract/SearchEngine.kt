@@ -53,7 +53,7 @@ interface SearchSession {
  *  └─ onSearchStart
  *      ├─ onSearchProgress(已完成源, 总源数) × N   顶部进度提示
  *      ├─ onSearchSuccess(批次结果) × N ─► VM 合并 + 去重 + 排序
- *      └─ onSearchFinish(空?, 有下一页?)
+ *      └─ onSearchFinish(空?)
  * cancelSearch ─► onSearchCancel(cause?)
  * ```
  *
@@ -78,10 +78,13 @@ interface SearchSessionCallback {
     /**
      * 全部源搜索结束。
      *
+     * 单轮全源搜索语义：一次 [SearchSession.search] 覆盖全部启用源的
+     * 第一页结果，无翻页通路（0.8.0 起移除历史 hasMore 参数——该参数
+     * 自引入起即无对应的下一页请求机制，属死参数）。
+     *
      * @param isEmpty 本次搜索无任何结果。
-     * @param hasMore true = 存在分页（模块可发起下一页搜索）。
      */
-    fun onSearchFinish(isEmpty: Boolean, hasMore: Boolean)
+    fun onSearchFinish(isEmpty: Boolean)
 
     /** 搜索被取消（[exception] 为取消原因，无则 null）。 */
     fun onSearchCancel(exception: Throwable?)

@@ -14,7 +14,7 @@ import io.legado.app.eink.arch.EInkImmutable
  * ```
  *
  * 宿主实现义务：展示类计算在映射时一次完成——[displayAuthor] 与
- * [displayCover] 是宿主规则下的最终值，模块不再加工；[displayIntro]
+ * [coverUrl] 是宿主规则下的最终值，模块不再加工；[intro]
  * 无简介时传 null；[displaySource] 同为映射期终值（本地书传 null）。
  */
 @EInkImmutable
@@ -28,11 +28,11 @@ data class BookDetailUiModel(
     /** 展示作者（已按书源规则清洗）。 */
     val displayAuthor: String,
 
-    /** 展示封面地址（自定义封面优先；null/空走模块占位封面）。 */
-    val displayCover: String?,
+    /** 展示封面地址（自定义封面优先，映射期终值；null/空走模块占位封面；0.8.0 起对齐全契约 coverUrl 命名）。 */
+    val coverUrl: String?,
 
-    /** 展示简介（映射期已清洗；无简介为 null）。 */
-    val displayIntro: String?,
+    /** 展示简介（映射期已清洗，无简介为 null；0.8.0 起对齐全契约 intro 命名）。 */
+    val intro: String?,
 
     /**
      * 展示书源名（originName 优先、回落书源表名与 origin；本地书/解析不出为 null）。
@@ -48,4 +48,17 @@ data class BookDetailUiModel(
 
     /** 书源 origin 标识。 */
     val origin: String,
+)
+
+/**
+ * 书籍详情的解析结果（[BookDetailEngine.findBook] 返回；0.8.0 起以
+ * 具名类型取代裸 `Pair<BookHandle, …>`）。
+ */
+@EInkImmutable
+class BookDetailResolved(
+    /** 书籍的引擎句柄（预取/加架/移架操作回传；可能被预取更新）。 */
+    val handle: BookHandle,
+
+    /** 展示模型。 */
+    val model: BookDetailUiModel,
 )

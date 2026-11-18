@@ -132,7 +132,7 @@ private fun CollageQuadrant(
     Box(modifier = modifier) {
         if (cover != null) {
             EInkBookCover(
-                url = cover.url,
+                url = cover.coverUrl,
                 name = cover.name,
                 author = cover.author,
                 modifier = Modifier.fillMaxSize(),

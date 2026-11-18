@@ -11,6 +11,8 @@ import io.legado.app.eink.contract.ReaderHeaderFooterVisibility
 import io.legado.app.eink.contract.ReaderPageSnapshot
 import io.legado.app.eink.contract.ReaderPrepareResult
 import io.legado.app.eink.contract.ReaderTextStyle
+import io.legado.app.eink.contract.SessionShelfOpResult
+import io.legado.app.eink.contract.StartCacheResult
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.resetMain
@@ -156,9 +158,12 @@ class ReaderHeaderClockResumeTest {
         override val autoReadIntervalSec: Int get() = 10
         override suspend fun setAutoReadIntervalSec(value: Int) = Unit
         override suspend fun refreshCurrentChapter() = Unit
-        override fun startCache(count: Int, cacheAll: Boolean): Boolean? = null
-        override suspend fun addSessionBookToShelf(): Boolean? = null
-        override suspend fun removeSessionBookFromShelf(): Boolean? = null
+        override fun startCache(count: Int, cacheAll: Boolean): StartCacheResult =
+            StartCacheResult.NothingToCache
+        override suspend fun addSessionBookToShelf(): SessionShelfOpResult =
+            SessionShelfOpResult.NotApplicable
+        override suspend fun removeSessionBookFromShelf(): SessionShelfOpResult =
+            SessionShelfOpResult.NotApplicable
         override fun updateViewSize(
             width: Int,
             height: Int,

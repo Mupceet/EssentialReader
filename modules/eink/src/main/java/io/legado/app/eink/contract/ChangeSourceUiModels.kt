@@ -29,10 +29,24 @@ data class ChangeSourceBookUiModel(
     val origin: String,
 
     /** 当前书源显示名快照（书籍记录内的 originName，可为空串，UI 回落 origin）。 */
-    val originName: String = "",
+    val originName: String,
 
     /** 当前书已缓存的最新章节标题（可为 null，UI 回落「无最新章节」）。 */
-    val latestChapterTitle: String? = null,
+    val latestChapterTitle: String?,
+)
+
+/**
+ * 换源页当前书籍的解析结果（[ChangeSourceEngine.currentReadingBook]
+ * 返回；0.8.0 起以具名类型取代裸 `Pair<BookHandle, …>`——位置序对
+ * 的字段含义靠约定，具名后调用点自释）。
+ */
+@EInkImmutable
+class ChangeSourceBook(
+    /** 书籍的引擎句柄（应用换源时回传）。 */
+    val handle: BookHandle,
+
+    /** 展示模型。 */
+    val model: ChangeSourceBookUiModel,
 )
 
 /**
@@ -67,8 +81,8 @@ data class ChangeSourceResultUiModel(
     /** 书源显示名。 */
     val originName: String,
 
-    /** 最新章节标题（搜索结果自带，无则 null）。 */
-    val latestChapter: String?,
+    /** 最新章节标题（搜索结果自带，无则 null；0.8.0 起对齐其它模型的 latestChapterTitle 命名）。 */
+    val latestChapterTitle: String?,
 
     /**
      * 去重键：宿主侧「同书同源」的判定值——模块用它合并跨源重复

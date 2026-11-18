@@ -17,7 +17,7 @@ import org.junit.Test
 class TocUiStateTest {
 
     private fun chapter(index: Int, title: String) = ChapterUiModel(
-        index = index,
+        chapterIndex = index,
         title = title,
         url = "https://example.com/$index",
         isVolume = false,

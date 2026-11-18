@@ -452,7 +452,7 @@ private fun DetailContent(
                     if (coverWidth > 0.dp) {
                         val resolvedHeight = coverWidth / CoverAspectRatio
                         EInkBookCover(
-                            url = book.displayCover,
+                            url = book.coverUrl,
                             name = book.name,
                             author = book.displayAuthor,
                             sourceOrigin = book.origin,
@@ -480,7 +480,7 @@ private fun DetailContent(
                     .onSizeChanged { onIntroHeightChanged(it.height) }
             ) {
                 EInkText(
-                    text = book.displayIntro?.takeIf { it.isNotBlank() }
+                    text = book.intro?.takeIf { it.isNotBlank() }
                         ?: "暂无简介",
                     style = EInkTheme.typography.bodyLarge,
                     color = EInkTheme.colorScheme.onSurfaceVariant,

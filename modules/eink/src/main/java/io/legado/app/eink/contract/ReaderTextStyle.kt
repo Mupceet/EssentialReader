@@ -89,7 +89,11 @@ data class ReaderTextStyle(
     /** 标题行距（0.1 倍档，12 = 1.2 倍）；null = 不管理。 */
     val titleLineSpacing: Int? = null,
 
-    /** 页眉字体；null = 不管理，FollowBody = 跟随正文。 */
+    /** 页眉字体；null = 不管理，FollowBody = 跟随正文。
+     *  页脚字体刻意不进快照/目录（eink 统一字体原则：选字体驱动正文、
+     *  标题/页眉跟随正文、页脚跟随页眉）——宿主完整模式单独设置的页脚
+     *  字体经 ReaderEngine.headerFooterTypefaces() 如实呈现，eink 侧
+     *  不提供独立的页脚字体设置行。 */
     val headerFont: ReaderFontSelection? = null,
 
     /** 页眉模式（0 随状态栏 / 1 显示 / 2 隐藏，宿主 HeaderMode 同构）；

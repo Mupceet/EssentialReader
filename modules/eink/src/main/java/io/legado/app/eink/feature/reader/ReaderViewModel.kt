@@ -15,6 +15,8 @@ import io.legado.app.eink.R
 import io.legado.app.eink.arch.UserMessage
 import io.legado.app.eink.contract.EInkEngineRegistry
 import io.legado.app.eink.contract.FallbackReaderStyleCatalog
+import io.legado.app.eink.contract.MarkingNoteUpdate
+import io.legado.app.eink.contract.PageBookmarkToggle
 import io.legado.app.eink.contract.PageTurnRippleMode
 import io.legado.app.eink.contract.ReaderBookSnapshot
 import io.legado.app.eink.contract.ReaderCloudProgress
@@ -32,6 +34,8 @@ import io.legado.app.eink.contract.ReaderStyleParamIds as Ids
 import io.legado.app.eink.contract.ReaderSyncTrigger
 import io.legado.app.eink.contract.ReaderTextStyle
 import io.legado.app.eink.contract.ReaderTipSlotTexts
+import io.legado.app.eink.contract.SessionShelfOpResult
+import io.legado.app.eink.contract.StartCacheResult
 import io.legado.app.eink.feature.reader.selection.ReaderSelectionUi
 import io.legado.app.eink.feature.reader.selection.toPageBookmarkContent
 import io.legado.app.eink.session.ReaderSessionCache
@@ -802,9 +806,11 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application),
     fun cacheChapters(count: Int) {
         viewModelScope.launch {
             when (engine.startCache(count, cacheAll = count == CACHE_ALL)) {
-                null -> Unit
-                false -> _messages.emit(UserMessage.from(R.string.eink_reader_local_no_cache))
-                true -> _messages.emit(UserMessage.from(R.string.eink_reader_cache_started))
+                StartCacheResult.NothingToCache -> Unit
+                StartCacheResult.LocalBook ->
+                    _messages.emit(UserMessage.from(R.string.eink_reader_local_no_cache))
+                StartCacheResult.Started ->
+                    _messages.emit(UserMessage.from(R.string.eink_reader_cache_started))
             }
         }
     }
@@ -854,11 +860,11 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application),
     /**
      * 加入书架并等待落库完成（退出阅读提示专用）：Route 卸载即 VM 清理，
      * 发即弃的加架协程会在退出导航瞬间被取消，确认路径必须同步等结果。
-     * true = 已加入或无需处理（引擎 null：已在架/无会话书）；false = 落库失败。
+     * true = 已加入或无需处理（NotApplicable：已在架/无会话书）；false = 落库失败。
      * 反馈不走 messages 流——退出后已无收集方，Toast 由调用方直发。
      */
     suspend fun addToBookshelfAwait(): Boolean = withContext(Dispatchers.IO) {
-        engine.addSessionBookToShelf() != false
+        engine.addSessionBookToShelf() !is SessionShelfOpResult.Failure
     }
 
     // ==================== 选区批注 ====================
@@ -885,12 +891,13 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application),
 
     /**
      * 状态转换唯一路径（契约 v2）：按 id 改想法，锚点不变——note 空白 → 划线
-     * （实线），非空白 → 想法（虚线）。null = 标记不存在（换源清理等）；false =
-     * 更新失败。端口未注册理论不可达（弹层仅在选择能力在位时打开），防御性按
-     * 失败处理。
+     * （实线），非空白 → 想法（虚线）。结果三分支见 [MarkingNoteUpdate]
+     * （NotFound = 标记不存在/换源清理；Failure = 更新失败）。端口未注册
+     * 理论不可达（弹层仅在选择能力在位时打开），防御性按失败处理。
      */
-    suspend fun updateMarkingNote(markingId: String, note: String): Boolean? {
-        val port = EInkEngineRegistry.marksEngine ?: return false
+    suspend fun updateMarkingNote(markingId: String, note: String): MarkingNoteUpdate {
+        val port = EInkEngineRegistry.marksEngine
+            ?: return MarkingNoteUpdate.Failure(IllegalStateException("marksEngine 未注册"))
         return port.updateMarkingNote(markingId, note)
     }
 
@@ -916,13 +923,13 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application),
     /**
      * 当前页书签 toggle（v2 Task 9，设计 §4）：显示载荷（章节名 + 页文本摘录）
      * 由模块从当前页快照组装（契约 v2——书签显示语义归模块），宿主只负责同页
-     * 判定、存储与重排。三态：null = 端口未注册（降级宿主）/无会话书/无当前页
-     * 快照；true = 本次添加；false = 本次移除。仅 null 由界面提示「操作失败」，
-     * true/false 均静默成功（角标变化即反馈）。
+     * 判定、存储与重排。结果三分支见 [PageBookmarkToggle]（Unavailable = 端口
+     * 未注册（降级宿主）/无会话书/无当前页快照）。仅 Unavailable 由界面提示
+     * 「操作失败」，Added/Removed 均静默成功（角标变化即反馈）。
      */
-    suspend fun togglePageBookmark(): Boolean? {
-        val port = EInkEngineRegistry.marksEngine ?: return null
-        val page = _uiState.value.page ?: return null
+    suspend fun togglePageBookmark(): PageBookmarkToggle {
+        val port = EInkEngineRegistry.marksEngine ?: return PageBookmarkToggle.Unavailable
+        val page = _uiState.value.page ?: return PageBookmarkToggle.Unavailable
         return port.togglePageBookmark(page.toPageBookmarkContent())
     }
 

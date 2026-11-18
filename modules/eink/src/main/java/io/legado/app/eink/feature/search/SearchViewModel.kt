@@ -170,7 +170,7 @@ class SearchViewModel(application: Application) : AndroidViewModel(application) 
                 }
             }
 
-            override fun onSearchFinish(isEmpty: Boolean, hasMore: Boolean) {
+            override fun onSearchFinish(isEmpty: Boolean) {
                 _uiState.update {
                     it.copy(
                         isSearching = false,

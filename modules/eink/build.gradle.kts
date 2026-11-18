@@ -171,7 +171,8 @@ afterEvaluate {
     //         模块自有版本目录 einkLibs 声明、脱离宿主根目录）——单一
     //         坐标服务新旧宿主，消费门槛 AGP ≥ 8.6.0 / K2.3 / Java 17 /
     //         minSdk 21；
-    // 0.7.1 = ReaderSelectionEngine 契约 v2（待发布）：
+    // 0.7.1 = ReaderSelectionEngine 契约 v2（未单独设版，随 0.8.0 一并发布；
+    //         该端口现已并入 MarksEngine）：
     //         saveMarking 拆为 createMarking（仅新选区）+ updateMarkingNote
     //         (id, note)（唯一状态转换路径，锚点不变，结构性杜绝跨宿主把
     //         划线⇄想法转换实现成重复添加）；thought 字段删除（类型恒由
@@ -186,7 +187,23 @@ afterEvaluate {
     // 孪生坐标 0.5.0-oldstack / 0.6.1-min21（已退役，保留为历史坐标）：
     // 统一前为分开服务旧栈与 minSdk 21 宿主的过渡产物，0.7.0 起主坐标
     // 即覆盖两类消费形态，不再发布孪生；
-                version = "0.7.0"
+    // 0.8.0 = 契约清理轮（破坏性变更——宿主经源码子模块引入，随指针
+    //         重适配；二进制消费方须同步改写）：
+    //         三态 Boolean? 全部 sealed 化（startCache→StartCacheResult、
+    //         加/移书架→SessionShelfOpResult、updateMarkingNote→
+    //         MarkingNoteUpdate、togglePageBookmark→PageBookmarkToggle，
+    //         Failure 分支携带 cause）；findBook/currentReadingBook 裸
+    //         Pair 具名化（BookDetailResolved / ChangeSourceBook）；
+    //         命名统一（ChapterUiModel.index→chapterIndex、
+    //         ChangeSourceResultUiModel.latestChapter→latestChapterTitle、
+    //         BookDetailUiModel.displayCover/displayIntro→coverUrl/intro、
+    //         BookshelfCoverRefUiModel.url→coverUrl、排版目录
+    //         HEADER_VISIBILITY→HEADER_MODE 对齐快照字段）；
+    //         onSearchFinish 移除死参数 hasMore（声明过「可发起下一页
+    //         搜索」但无请求机制，明示单轮全源语义）；ChangeSourceBookUiModel
+    //         撤 originName/latestChapterTitle 默认值（漏回填从静默降级
+    //         变编译错误）；
+                version = "0.8.0"
             }
         }
     }

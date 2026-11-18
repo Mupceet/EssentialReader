@@ -88,8 +88,8 @@ class ChangeSourceViewModel(application: Application) : AndroidViewModel(applica
                 _uiState.update { it.copy(error = "书籍不存在") }
                 return@launch
             }
-            val (handle, book) = found
-            bookHandle = handle
+            val book = found.model
+            bookHandle = found.handle
             _uiState.update { it.copy(book = book, current = book) }
             // 对齐宿主 initData：先读历史搜索缓存，命中即直接展示、不重搜
             //（换源 VM 随导航条目销毁，缓存是跨进入次数的唯一记忆；

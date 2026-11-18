@@ -117,7 +117,8 @@ object ReaderStyleParamIds {
     const val TITLE_BOTTOM_SPACING = "title.bottom-spacing"
     const val TITLE_LINE_SPACING = "title.line-spacing"
     const val HEADER_FONT = "header.font"
-    const val HEADER_VISIBILITY = "header.visibility"
+    /** 0.8.0 起由 header.visibility 更名——对齐快照字段 headerMode（仅常量名与 id 串变更，语义不变）。 */
+    const val HEADER_MODE = "header.mode"
     const val HEADER_SIZE = "header.size"
     const val FOOTER_SIZE = "footer.size"
     const val HEADER_DIVIDER = "header.divider"

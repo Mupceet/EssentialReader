@@ -126,7 +126,7 @@ internal fun ReaderInfoConfigDialog(
                 // 未声明/不可用/非连续档：整行隐藏
                 else -> Unit
             }
-            if (catalog.available(Ids.HEADER_VISIBILITY)) {
+            if (catalog.available(Ids.HEADER_MODE)) {
                 LabeledSettingRow(label = "页眉显示") {
                     ChoiceButtons(
                         options = listOf("显示", "隐藏", "随状态栏"),

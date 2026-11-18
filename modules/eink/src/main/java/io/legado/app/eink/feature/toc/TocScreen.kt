@@ -658,7 +658,7 @@ private fun ChapterList(
     onSwipeLeft: () -> Unit,
     onSwipeRight: () -> Unit,
 ) {
-    // 展示项自带真实章节号（ChapterUiModel.index）：搜索过滤后的列表下标
+    // 展示项自带真实章节号（ChapterUiModel.chapterIndex）：搜索过滤后的列表下标
     // 与真实章节号错位（mapIndexed 给的是过滤列表内位置），倒序只影响
     // 展示顺序不改章节号
     val display: List<ChapterUiModel> = state.displayChapters
@@ -682,12 +682,12 @@ private fun ChapterList(
         items(display, key = { it.url }) { chapter ->
             ChapterItem(
                 chapter = chapter,
-                isCurrent = chapter.index == state.currentChapterIndex,
+                isCurrent = chapter.chapterIndex == state.currentChapterIndex,
                 // 本地书与卷章节视为已缓存（与 View 版一致）
                 cached = state.isLocalBook
                         || chapter.isVolume
                         || state.cachedFileNames.contains(chapter.fileName),
-                onClick = { onChapterClick(chapter.index) }
+                onClick = { onChapterClick(chapter.chapterIndex) }
             )
         }
     }

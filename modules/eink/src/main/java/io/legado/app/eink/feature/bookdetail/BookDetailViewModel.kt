@@ -71,11 +71,11 @@ class BookDetailViewModel(application: Application) : AndroidViewModel(applicati
                 // 句柄同步替换：后续加/移书架作用于新书记录
                 val found = engine.findBook(fresh.name, fresh.displayAuthor, newBookUrl)
                 if (found != null) {
-                    bookHandle = found.first
+                    bookHandle = found.handle
                 }
                 val inShelf = engine.isBookInBookshelf(newBookUrl)
                 _uiState.update {
-                    it.copy(book = found?.second ?: fresh, isInBookshelf = inShelf)
+                    it.copy(book = found?.model ?: fresh, isInBookshelf = inShelf)
                 }
             }
         }
@@ -105,8 +105,8 @@ class BookDetailViewModel(application: Application) : AndroidViewModel(applicati
                 _uiState.update { it.copy(isLoading = false) }
                 return@launch
             }
-            val (handle, book) = found
-            bookHandle = handle
+            val book = found.model
+            bookHandle = found.handle
             val inShelf = engine.isBookInBookshelf(book.bookUrl)
             _uiState.update {
                 it.copy(book = book, isInBookshelf = inShelf, isLoading = false)

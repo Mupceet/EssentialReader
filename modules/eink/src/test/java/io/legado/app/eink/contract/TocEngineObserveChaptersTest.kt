@@ -14,7 +14,7 @@ import org.junit.Test
 class TocEngineObserveChaptersTest {
 
     private fun chapter(index: Int) = ChapterUiModel(
-        index = index, title = "第${index + 1}章",
+        chapterIndex = index, title = "第${index + 1}章",
         url = "u$index", isVolume = false, fileName = "$index.txt",
     )
 

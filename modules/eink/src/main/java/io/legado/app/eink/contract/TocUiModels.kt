@@ -44,8 +44,8 @@ data class TocBookUiModel(
  */
 @EInkImmutable
 data class ChapterUiModel(
-    /** 章节下标（0-based，跳章写回进度时使用）。 */
-    val index: Int,
+    /** 章节下标（0-based，跳章写回进度时使用；0.8.0 起对齐全契约 chapterIndex 命名）。 */
+    val chapterIndex: Int,
 
     /** 章节标题（目录行展示）。 */
     val title: String,

@@ -181,7 +181,7 @@ class TocViewModelTest {
         ) = Unit
 
         private fun chapter(index: Int, title: String) = ChapterUiModel(
-            index = index,
+            chapterIndex = index,
             title = title,
             url = "chapter-$index",
             isVolume = false,

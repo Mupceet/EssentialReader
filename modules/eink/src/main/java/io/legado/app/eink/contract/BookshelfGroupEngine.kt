@@ -30,12 +30,13 @@ data class BookshelfGroupUiModel(
 )
 
 /**
- * 封面引用：url（可空——无图时 UI 用书名+作者文字封面，同普通封面条目）+
- * 书名/作者 + 所属书源 origin（origin 参与加载解析）。
+ * 封面引用：coverUrl（可空——无图时 UI 用书名+作者文字封面，同普通封面
+ * 条目；0.8.0 起对齐全契约 coverUrl 命名）+ 书名/作者 + 所属书源 origin
+ * （origin 参与加载解析）。
  */
 @EInkImmutable
 data class BookshelfCoverRefUiModel(
-    val url: String?,
+    val coverUrl: String?,
     val name: String,
     val author: String?,
     val origin: String?,
@@ -85,7 +86,7 @@ interface BookshelfGroupEngine {
     /** 当前筛选（持久化键 einkShelfFilter 投影；NONE=无筛选文件夹视图，非精选值收敛 NONE）。 */
     val selectedFilter: Flow<Long>
 
-    /** 持久化筛选；仅接受 [BookshelfGroupIds.NONE] 或系统筛选器 id（IdRoot 除外）。 */
+    /** 持久化筛选；仅接受 [BookshelfGroupIds.NONE] 或系统筛选器 id（IdRoot 除外）——违例抛 [IllegalArgumentException]（对齐本接口管理方法惯例）。 */
     suspend fun setSelectedFilter(filterId: Long)
 
     /**
@@ -95,7 +96,7 @@ interface BookshelfGroupEngine {
      */
     val selectedGroup: Flow<Long>
 
-    /** 持久化范围（组视图进入/退出）；仅接受 ALL 或用户组 id。 */
+    /** 持久化范围（组视图进入/退出）；仅接受 ALL 或用户组 id——违例抛 [IllegalArgumentException]。 */
     suspend fun setSelectedGroup(groupId: Long)
 
     /**

@@ -2,6 +2,7 @@ package io.legado.app.eink.feature.changesource
 
 import android.app.Application
 import io.legado.app.eink.contract.BookHandle
+import io.legado.app.eink.contract.ChangeSourceBook
 import io.legado.app.eink.contract.ChangeSourceBookUiModel
 import io.legado.app.eink.contract.ChangeSourceEngine
 import io.legado.app.eink.contract.ChangeSourceResultUiModel
@@ -160,7 +161,7 @@ class ChangeSourceViewModelTest {
         author = "作者",
         origin = origin,
         originName = "书源-$origin",
-        latestChapter = null,
+        latestChapterTitle = null,
         deduplicationKey = "$origin|$bookUrl",
     )
 
@@ -171,7 +172,7 @@ class ChangeSourceViewModelTest {
         author = "作者",
         origin = "origin-new",
         originName = "新书源",
-        latestChapter = null,
+        latestChapterTitle = null,
         deduplicationKey = "origin-new|url-new",
     )
 
@@ -236,14 +237,15 @@ class ChangeSourceViewModelTest {
 
         override suspend fun currentReadingBook(
             bookUrl: String,
-        ): Pair<BookHandle, ChangeSourceBookUiModel> = Pair(
-            OldBookHandle,
-            ChangeSourceBookUiModel(
+        ): ChangeSourceBook = ChangeSourceBook(
+            handle = OldBookHandle,
+            model = ChangeSourceBookUiModel(
                 bookUrl = "url-old",
                 name = "书名",
                 author = "作者",
                 origin = "origin-old",
                 originName = "旧书源",
+                latestChapterTitle = null,
             ),
         )
 

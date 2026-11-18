@@ -56,10 +56,10 @@ interface MarksEngine {
     /**
      * 唯一的状态转换路径：按 id 改想法，锚点与选区不变（宿主不做重定位）。
      * note 空白 → 划线（实线）；非空白 → 想法（虚线）。
-     * null = 标记不存在（换源清理等，模块按标记失效处理）；false = 更新失败；
-     * true = 成功。宿主更新后触发当前章重排（同 createMarking 推送路径）。
+     * 结果经 [MarkingNoteUpdate] 返回（0.8.0 起以显式分支取代三态
+     * Boolean?）。宿主更新后触发当前章重排（同 createMarking 推送路径）。
      */
-    suspend fun updateMarkingNote(markingId: String, note: String): Boolean?
+    suspend fun updateMarkingNote(markingId: String, note: String): MarkingNoteUpdate
 
     /**
      * 删除标记。false = 删除失败（模块提示并保留现场）。**有阅读会话时**
@@ -80,10 +80,10 @@ interface MarksEngine {
      * 对自家渲染占位符的清理属存储规范化，不构成显示语义；同页判定（页
      * 正文区间）与「删最近一条」按宿主分页事实。自动记录：页位置 +
      * content 引用文本，无编辑层。宿主落库后触发当前章重排（角标随新快照
-     * 推送）。null = 无会话书/当前页无法定位；true = 本次添加；false =
-     * 本次移除。
+     * 推送）。结果经 [PageBookmarkToggle] 返回（0.8.0 起以显式分支取代
+     * 三态 Boolean?）。
      */
-    suspend fun togglePageBookmark(content: ReaderPageBookmarkContent): Boolean?
+    suspend fun togglePageBookmark(content: ReaderPageBookmarkContent): PageBookmarkToggle
 
     // —— 目录页：列表 / 跳转 / 导出 ——
 
@@ -130,6 +130,10 @@ interface MarksEngine {
 
     /**
      * 导出当前书全部划线/想法为 Markdown 写入 SAF uri。
+     *
+     * 页面书签**不提供**独立导出（有意取舍，与完整模式口径一致：书签随
+     * 宿主整体备份体系带走，不单独成文）。
+     *
      * @return false = 书籍不存在或无笔记或写失败（模块提示「导出失败」）。
      */
     suspend fun exportMarkingsMarkdown(bookUrl: String, uri: String): Boolean
@@ -185,6 +189,32 @@ sealed interface JumpResolution {
 
     /** 无法解析（记录不存在/数据损坏）：模块 toast [message]，不跳转。 */
     data class Failed(val message: String) : JumpResolution
+}
+
+/** [MarksEngine.updateMarkingNote] 的结果（0.8.0 起取代三态 Boolean?）。 */
+sealed interface MarkingNoteUpdate {
+
+    /** 更新成功（宿主已触发重排，新装饰经内容回调推送）。 */
+    data object Success : MarkingNoteUpdate
+
+    /** 标记不存在（换源清理等）——模块按标记失效处理（清态收层）。 */
+    data object NotFound : MarkingNoteUpdate
+
+    /** 更新失败（[cause] 供宿主日志与模块文案，可空）。 */
+    data class Failure(val cause: Throwable? = null) : MarkingNoteUpdate
+}
+
+/** [MarksEngine.togglePageBookmark] 的结果（0.8.0 起取代三态 Boolean?）。 */
+sealed interface PageBookmarkToggle {
+
+    /** 本次添加了书签（角标随新快照出现，静默成功）。 */
+    data object Added : PageBookmarkToggle
+
+    /** 本次移除了书签（同页已有时删最近一条，静默成功）。 */
+    data object Removed : PageBookmarkToggle
+
+    /** 无法执行（无会话书/当前页无法定位）——模块提示「操作失败」。 */
+    data object Unavailable : PageBookmarkToggle
 }
 
 /** 笔记提交载荷（仅新建路径；已有标记的更新走 updateMarkingNote，不重提交选区）。 */

@@ -44,9 +44,12 @@ class ReaderSyncContractCompatTest {
         override val autoReadIntervalSec: Int get() = 10
         override suspend fun setAutoReadIntervalSec(value: Int) = Unit
         override suspend fun refreshCurrentChapter() = Unit
-        override fun startCache(count: Int, cacheAll: Boolean): Boolean? = null
-        override suspend fun addSessionBookToShelf(): Boolean? = null
-        override suspend fun removeSessionBookFromShelf(): Boolean? = null
+        override fun startCache(count: Int, cacheAll: Boolean): StartCacheResult =
+            StartCacheResult.NothingToCache
+        override suspend fun addSessionBookToShelf(): SessionShelfOpResult =
+            SessionShelfOpResult.NotApplicable
+        override suspend fun removeSessionBookFromShelf(): SessionShelfOpResult =
+            SessionShelfOpResult.NotApplicable
         override fun updateViewSize(
             width: Int,
             height: Int,

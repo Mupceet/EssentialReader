@@ -657,7 +657,7 @@ internal fun ReaderLayoutPanel(
         val fontReady = catalog.available(Ids.BODY_FONT) || catalog.available(Ids.TITLE_FONT) ||
             catalog.available(Ids.HEADER_FONT)
         val infoReady = catalog.available(Ids.TITLE_MODE) || catalog.available(Ids.TITLE_SIZE) ||
-            catalog.available(Ids.HEADER_SIZE) || catalog.available(Ids.HEADER_VISIBILITY) ||
+            catalog.available(Ids.HEADER_SIZE) || catalog.available(Ids.HEADER_MODE) ||
             catalog.available(Ids.FOOTER_SIZE)
         if (fontReady) add("字体配置" to onOpenFonts)
         if (infoReady) add("信息配置" to onOpenInfo)

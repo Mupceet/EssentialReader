@@ -93,9 +93,11 @@
   为稳定展示快照。四条义务：**预计算**（作者清洗、封面挑选、未读数、
   简介清洗在映射期完成，模块组合期零计算）；**稳定**（全基元/不可变
   字段）；**无引擎类型**（不携带宿主实体，引擎身份走句柄）；
-  **默认值非可省略**（带默认值的展示字段按字段 KDoc 回填——默认仅为
-  兼容旧宿主的编译期宽容，省略即静默能力退化：换源页「当前源」行
-  originName 留空会回落显示 origin URL，2026-10-25 LegadoTeam 适配实录）。
+  **默认值非可省略**（带默认值的展示字段按字段 KDoc 回填——省略即
+  静默能力退化：换源页「当前源」行 originName 留空会回落显示 origin
+  URL，2026-10-25 LegadoTeam 适配实录。0.8.0 起 `ChangeSourceBookUiModel`
+  的 originName/latestChapterTitle 已撤默认值——漏回填从静默退化变
+  编译错误；其余带默认值字段仍按本义务回填）。
 - **`EngineHandles.kt`** — `BookHandle` / `SourceHandle` /
   `SearchResultHandle`：引擎实体的不透明句柄。宿主 bridge 包装真实实体，
   模块只持有回传，不解读；实体被替换时的句柄语义见各端口方法 KDoc。
@@ -151,6 +153,22 @@
   `supportsReviewBubbles`——宿主排版引擎的通用能力）；依赖宿主专属管线、
   旧宿主普遍缺席的能力默认 `false`（如 `supportsChineseConverter`——内容
   处理管线）。新增能力位先按此判据选边，降级形态登记进本表。
+
+- **错误通道选型准则**（新增成员按此对号入座；存量四种形态并存
+  ——sealed / `Result` / `@throws` 面向用户 message / null-空态——不强行
+  归一，但同一接口内保持一致）：
+  | 失败性质 | 通道 | 例 |
+  |---|---|---|
+  | 网络管线失败（用户可重试，需要文案） | sealed 结果带 `cause` 或 `Result.failure`（message 面向用户） | `TocFetchResult.Failure`、`changeBookSource` |
+  | 用户触发的破坏性操作失败（须告知） | `@throws`，message 面向最终用户 | `restoreBackup`、`backupNow`、`checkUpdate` |
+  | 后台增强/静默降级（无须告知） | null / 空流 / 空表 | `checkNewBackupOnStart`、`observe*` |
+  | 结果本身是三态及以上语义 | sealed 显式分支（**禁止 nullable Boolean**，0.8.0 起已清除存量） | `PageBookmarkToggle`、`SessionShelfOpResult` |
+- **命名规范**（0.8.0 起统一的概念→规范名，新成员沿用）：
+  章节下标 = `chapterIndex`；最新章节标题 = `latestChapterTitle`；
+  封面地址 = `coverUrl`（映射期终值语义写进 KDoc）；简介 = `intro`；
+  裸 `Pair<BookHandle, UiModel>` 禁止——用具名结果类型
+  （`BookDetailResolved` / `ChangeSourceBook`）；`Flow<String>` 承载
+  bookUrl 的热流/冷流在 KDoc 首行注明载荷语义。
 - **线程约定**：suspend 方法在调用方协程上下文执行；回调线程不限定
   （模块自行切主线程）；标注「主线程同步」的少数方法（如
   `lastReadBookUrl`）在宿主实现中保持单查询轻量。

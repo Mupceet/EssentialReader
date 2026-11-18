@@ -6,7 +6,9 @@ import android.graphics.Typeface
  * 字体取值：系统预设 / 字体文件 / 跟随正文。
  *
  * FollowBody 仅对标题/页眉合法：宿主实现把它展开为正文当前有效字体
- * （正文为系统预设时无路径可写，宿主回落系统默认字体）。
+ * （正文为系统预设时无路径可写，宿主回落系统默认字体）。用于**正文**
+ * 是无意义输入（正文自身即基准）——宿主按 [Sans] 处理；模块 UI 不产生
+ * 该组合（统一字体写径恒给正文一个真实取值）。
  */
 sealed interface ReaderFontSelection {
     data object Sans : ReaderFontSelection

@@ -302,7 +302,7 @@ private fun SourceItem(
 ) {
     SourceRow(
         title = searchBook.originName.ifBlank { searchBook.origin },
-        latestChapter = searchBook.latestChapter,
+        latestChapter = searchBook.latestChapterTitle,
         author = searchBook.author,
         isCurrent = false,
         onClick = onClick,

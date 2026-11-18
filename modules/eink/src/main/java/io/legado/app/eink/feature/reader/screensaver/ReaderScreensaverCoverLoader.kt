@@ -79,7 +79,7 @@ internal class ReaderScreensaverCoverLoader(
             Log.w(TAG, "book detail load failed: ${throwable.javaClass.simpleName}")
             null
         } ?: return null
-        val coverUrl = detail.displayCover?.trim()
+        val coverUrl = detail.coverUrl?.trim()
         if (coverUrl.isNullOrEmpty()) return null
 
         val sourceBytes = readCoverBytes(
