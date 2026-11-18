@@ -599,13 +599,12 @@ internal object ReaderEngineImpl : ReaderEngine, KoinComponent {
         } else {
             durConfig.footerFontSize
         },
-        // 分隔线恒 false：E-Ink 模式不渲染分隔线（模块 tip 绘制按 true 才画，
-        // 目录亦未声明——宿主 showHeaderLine/showFooterLine 与完整模式互不
-        // 影响）。布局尊重配置：header/footerDecorationExtentPx 仍按宿主
-        // 配置计入分隔线厚度，分隔线位留在带内（页眉带底/页脚带顶），文字
-        // 锚点（顶锚/底锚）不受影响，两模式分页一致
-        headerDivider = false,
-        footerDivider = false,
+        // 分隔线读宿主配置真值（0.8.2 起恢复绘制）：模块两渲染面（阅读页
+        // tip 行与屏保）按 headerDivider/footerDivider == true 画线，几何
+        // （厚度计入 extent、分隔线位留在带内）此前已按宿主配置预留——
+        // 恢复仅放开样式值，分页几何两模式始终一致
+        headerDivider = durConfig.showHeaderLine,
+        footerDivider = durConfig.showFooterLine,
         headerMode = when (durConfig.headerMode) {
             1 -> 1
             2 -> 2
@@ -627,6 +626,8 @@ internal object ReaderEngineImpl : ReaderEngine, KoinComponent {
         titleSegmentDistance = durConfig.titleSegDistance,
         titleSegmentDelimiter = durConfig.titleSegFlag,
         titleSegmentScale = durConfig.titleSegScaling,
+        bodyItalic = durConfig.textItalic,
+        footerFont = followBodyIfSame(durConfig.footerFont, durConfig.textFont),
     )
 
     /** 正文正文字体取值：有文件用文件，否则按全局 systemTypefaces 映射系统预设。 */

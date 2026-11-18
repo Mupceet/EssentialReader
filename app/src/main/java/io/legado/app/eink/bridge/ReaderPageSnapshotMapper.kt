@@ -53,8 +53,9 @@ import kotlin.math.roundToInt
  *
  * 画笔规格只拷贝测量耦合参数（字号/字距/字体/可变字重）——快照坐标
  * 是引擎按这些参数测量的，模块必须按同值绘制才不错位；阴影等纯视觉
- * 效果不跨桥（E-Ink 阅读不渲染，既定产品取舍），斜体例外：高亮规则的
- * 合成斜体（skew，不改步进宽、无对齐风险）经逐段覆盖跨桥。
+ * 效果不跨桥（E-Ink 阅读不渲染，既定产品取舍），斜体跨桥（0.8.2 起）：
+ * skew 只剪切字形轮廓、不改步进宽、无对齐风险——基线斜体随规格
+ * （textSkewX）、高亮规则的斜体经逐段覆盖。
  *
  * 在引擎回调线程调用，产物不可变、跨线程安全。
  */
@@ -452,6 +453,9 @@ internal fun Paint.copyPaintSpec(): ReaderPaintSpec = ReaderPaintSpec(
     letterSpacing = letterSpacing, // API 21
     typeface = typeface, // API 1（变轴已烘焙其中，见 KDoc）
     fontVariationSettings = null,
+    // 基线合成斜体（0.8.2 起跨桥；引擎工厂 italic 时写 -0.25f，见
+    // SYNTHETIC_ITALIC_SKEW_X 口径）
+    textSkewX = textSkewX.takeIf { it != 0f },
 )
 
 /** 覆盖判定基线：排版样式工厂的 body/title style 参数（元素无差异时不发射覆盖）。 */

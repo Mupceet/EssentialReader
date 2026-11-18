@@ -86,10 +86,19 @@ internal fun buildStyleMutations(
 
     style.headerSize?.let { int(ReadStyleIntKey.HeaderFontSize, it) }
     style.footerSize?.let { int(ReadStyleIntKey.FooterFontSize, it) }
-    // 分隔线不跨桥（目录未声明，模块不发射）：E-Ink 模式不渲染分隔线，
-    // showHeaderLine/showFooterLine 保留给完整模式
+    // 分隔线 0.8.2 起恢复跨桥写入（目录已重新声明，snapshotStyle 读真值）
+    style.headerDivider?.let {
+        add(ReadStyleMutation.BooleanValue(ReadStyleBooleanKey.ShowHeaderLine, it))
+    }
+    style.footerDivider?.let {
+        add(ReadStyleMutation.BooleanValue(ReadStyleBooleanKey.ShowFooterLine, it))
+    }
     style.headerMode?.let { int(ReadStyleIntKey.HeaderMode, it.coerceIn(0, 2)) }
     style.footerVisible?.let { int(ReadStyleIntKey.FooterMode, if (it) 0 else 1) }
+
+    // 正文斜体（0.8.2 起支持）+ 页脚字体（值通道先行，呈现待后续）
+    style.bodyItalic?.let { add(ReadStyleMutation.BooleanValue(ReadStyleBooleanKey.TextItalic, it)) }
+    style.footerFont?.let { str(ReadStyleStringKey.FooterFont, fontPathForHost(it, effectiveBodyPath)) }
 }
 
 /** FollowBody 展开为正文有效路径；系统预设 → 空串（宿主 = 系统字体）。 */

@@ -12,17 +12,21 @@ class HostStyleCatalogTest {
     private val catalog = HostStyleCatalog.create()
 
     @Test
-    fun `完整目录覆盖全部41个参数且全部可用`() {
-        assertEquals(41, catalog.params.size)
-        assertEquals(41, catalog.params.map { it.id }.toSet().size)
+    fun `完整目录覆盖全部44个参数且全部可用`() {
+        assertEquals(44, catalog.params.size)
+        assertEquals(44, catalog.params.map { it.id }.toSet().size)
         assertTrue(catalog.params.all { it.available })
     }
 
     @Test
-    fun `分隔线不声明_EInk模式不渲染分隔线`() {
+    fun `分隔线已声明_0_8_2起恢复绘制`() {
+        // 2026-11-02 停绘决策撤销：目录重新声明，snapshotStyle 读宿主真值，
+        // 模块两渲染面（tip 行/屏保）按快照样式画线
         listOf(Ids.HEADER_DIVIDER, Ids.FOOTER_DIVIDER).forEach { id ->
-            assertEquals("$id 不应进目录（模块设置整行隐藏，快照样式恒发 false）", null, catalog.find(id))
+            assertTrue("$id 应进目录（恢复绘制）", catalog.find(id) != null)
         }
+        assertEquals(false, (catalog.find(Ids.HEADER_DIVIDER) as ReaderStyleParam.Toggle).default)
+        assertEquals(true, (catalog.find(Ids.FOOTER_DIVIDER) as ReaderStyleParam.Toggle).default)
     }
 
     @Test
@@ -67,11 +71,10 @@ class HostStyleCatalogTest {
         val declaredIds = Ids::class.java.fields
             .filter { it.type == String::class.java } // 排除 object 的 INSTANCE 字段
             .map { it.get(null) as String }
-        assertEquals(44, declaredIds.size)
-        // 目录不收的 id：分隔线两 id（E-Ink 不渲染分隔线，见上）+
-        // 标题分段判断符（文本参数无目录控件类型，仅快照通道）
-        val catalogIds = declaredIds - Ids.HEADER_DIVIDER - Ids.FOOTER_DIVIDER -
-            Ids.TITLE_SEGMENT_DELIMITER
+        assertEquals(46, declaredIds.size)
+        // 目录不收的 id：标题分段判断符（文本参数无目录控件类型）+
+        // 页脚字体（值通道先行，独立配置落地时入目录）——均仅快照通道
+        val catalogIds = declaredIds - Ids.TITLE_SEGMENT_DELIMITER - Ids.FOOTER_FONT
         assertEquals(catalogIds.toSet(), catalog.params.map { it.id }.toSet())
     }
 
