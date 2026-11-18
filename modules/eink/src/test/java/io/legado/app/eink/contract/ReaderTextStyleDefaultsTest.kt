@@ -25,6 +25,18 @@ class ReaderTextStyleDefaultsTest {
         assertNull(style.headerDivider)
         assertNull(style.footerVisible)
         assertNull(style.footerDivider)
+        // 0.8.1 参数总账补全：整页下划线族 + 标题分段族
+        assertNull(style.bodyUnderline)
+        assertNull(style.bodyUnderlineWidth)
+        assertNull(style.bodyUnderlineOffset)
+        assertNull(style.bodyUnderlineExtend)
+        assertNull(style.bodyUnderlineDashed)
+        assertNull(style.bodyUnderlineDashOn)
+        assertNull(style.bodyUnderlineDashOff)
+        assertNull(style.titleSegmentMode)
+        assertNull(style.titleSegmentDistance)
+        assertNull(style.titleSegmentDelimiter)
+        assertNull(style.titleSegmentScale)
     }
 
     @Test

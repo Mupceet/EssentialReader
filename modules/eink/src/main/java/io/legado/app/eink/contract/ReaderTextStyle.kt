@@ -117,6 +117,47 @@ data class ReaderTextStyle(
     /** 页脚分割线；null = 不管理。 */
     val footerDivider: Boolean? = null,
 
+    // ---- 0.8.1 参数总账补全（见 ReaderStyleParamIds 总账 KDoc）----
+
+    /**
+     * 整页文字下划线总开关；null = 不管理。引擎逐行产出页级 Rule 元素、
+     * 经页快照 ruleLines 跨桥，eink 直接渲染。
+     */
+    val bodyUnderline: Boolean? = null,
+
+    /** 整页下划线线粗（px）；null = 不管理。 */
+    val bodyUnderlineWidth: Int? = null,
+
+    /** 整页下划线与文字的间距基准（宿主换算 offset = 值 − 10 的 dp）；null = 不管理。 */
+    val bodyUnderlineOffset: Int? = null,
+
+    /** 整页下划线延伸至栏宽；null = 不管理。 */
+    val bodyUnderlineExtend: Boolean? = null,
+
+    /**
+     * 虚线下划线开关；null = 不管理。宿主排版层当前对 E-Ink 会话恒输出
+     * 实线（既有硬门控）——值通道先行声明，呈现待解禁。
+     */
+    val bodyUnderlineDashed: Boolean? = null,
+
+    /** 虚线墨长（px）；null = 不管理。 */
+    val bodyUnderlineDashOn: Float? = null,
+
+    /** 虚线空长（px）；null = 不管理。 */
+    val bodyUnderlineDashOff: Float? = null,
+
+    /** 标题分段模式（0 关闭 / 1 按位置 / 2 按符号 / 3 按正则，宿主同构）；null = 不管理。 */
+    val titleSegmentMode: Int? = null,
+
+    /** 分段判断位置（第几个字符开始分段）；null = 不管理。 */
+    val titleSegmentDistance: Int? = null,
+
+    /** 分段判断符/正则；null = 不管理。文本参数：目录无控件类型，不声明协商行。 */
+    val titleSegmentDelimiter: String? = null,
+
+    /** 副标题字号缩放（第二段与第一段的字体大小比例）；null = 不管理。 */
+    val titleSegmentScale: Float? = null,
+
     /** 正文左边距（dp）。 */
     val paddingLeft: Int = 16,
 
