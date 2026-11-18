@@ -1,5 +1,6 @@
 package io.legado.app.eink.bridge
 
+import io.legado.app.domain.gateway.ReadStyleBooleanKey
 import io.legado.app.domain.gateway.ReadStyleFloatKey
 import io.legado.app.domain.gateway.ReadStyleIntKey
 import io.legado.app.domain.gateway.ReadStyleMutation
@@ -54,6 +55,25 @@ internal fun buildStyleMutations(
     style.titleLineSpacing?.let { int(ReadStyleIntKey.TitleLineSpacingExtra, it) }
     style.bodyWeight?.let { int(ReadStyleIntKey.TextBold, weightForHost(it)) }
     style.titleWeight?.let { int(ReadStyleIntKey.TitleBold, weightForHost(it)) }
+
+    // 整页文字下划线族 + 标题分段（0.8.1 参数总账补全，见契约总账 KDoc）
+    style.bodyUnderline?.let { add(ReadStyleMutation.BooleanValue(ReadStyleBooleanKey.Underline, it)) }
+    style.bodyUnderlineWidth?.let { int(ReadStyleIntKey.UnderlineHeight, it) }
+    style.bodyUnderlineOffset?.let { int(ReadStyleIntKey.UnderlinePadding, it) }
+    style.bodyUnderlineExtend?.let {
+        add(ReadStyleMutation.BooleanValue(ReadStyleBooleanKey.UnderlineExtend, it))
+    }
+    style.bodyUnderlineDashed?.let {
+        add(ReadStyleMutation.BooleanValue(ReadStyleBooleanKey.DottedLine, it))
+    }
+    style.bodyUnderlineDashOn?.let { add(ReadStyleMutation.FloatValue(ReadStyleFloatKey.DottedBase, it)) }
+    style.bodyUnderlineDashOff?.let { add(ReadStyleMutation.FloatValue(ReadStyleFloatKey.DottedRatio, it)) }
+    style.titleSegmentMode?.let { int(ReadStyleIntKey.TitleSegType, it.coerceIn(0, 3)) }
+    style.titleSegmentDistance?.let { int(ReadStyleIntKey.TitleSegDistance, it) }
+    style.titleSegmentDelimiter?.let { str(ReadStyleStringKey.TitleSegFlag, it) }
+    style.titleSegmentScale?.let {
+        add(ReadStyleMutation.FloatValue(ReadStyleFloatKey.TitleSegScaling, it))
+    }
 
     val effectiveBodyPath = when (val body = style.bodyFont) {
         null -> currentBodyFontPath

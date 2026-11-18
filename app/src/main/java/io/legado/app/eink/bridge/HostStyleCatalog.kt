@@ -48,6 +48,32 @@ internal object HostStyleCatalog {
             stepped(Ids.TITLE_TOP_SPACING, 0f, 200f, 0f),
             stepped(Ids.TITLE_BOTTOM_SPACING, 0f, 200f, 0f),
             stepped(Ids.TITLE_LINE_SPACING, 0f, 20f, 12f),
+            // 标题分段（0.8.1 参数总账补全）：引擎排版级特性，eink 侧标题
+            // 元素自动呈现；delimiter 为文本参数无目录控件类型，仅快照通道
+            ReaderStyleParam.Choice(
+                id = Ids.TITLE_SEGMENT_MODE,
+                available = true,
+                affectsLayout = true,
+                options = listOf(
+                    ReaderStyleParam.Choice.Option(0, "关闭"),
+                    ReaderStyleParam.Choice.Option(1, "按位置"),
+                    ReaderStyleParam.Choice.Option(2, "按符号"),
+                    ReaderStyleParam.Choice.Option(3, "按正则"),
+                ),
+                default = 0,
+            ),
+            stepped(Ids.TITLE_SEGMENT_DISTANCE, 0f, 20f, 4f),
+            stepped(Ids.TITLE_SEGMENT_SCALE, 0.5f, 2f, 1f),
+            // 整页文字下划线族（0.8.1 参数总账补全）：引擎以页级 Rule 元素
+            // 产出、经页快照 ruleLines 跨桥，eink 直接渲染；dashed 当前被
+            // 排版层对 E-Ink 会话硬门控为实线（值通道先行声明）
+            toggle(Ids.BODY_UNDERLINE, default = false),
+            stepped(Ids.BODY_UNDERLINE_WIDTH, 0f, 20f, 1f),
+            stepped(Ids.BODY_UNDERLINE_OFFSET, 0f, 20f, 10f),
+            toggle(Ids.BODY_UNDERLINE_EXTEND, default = false),
+            toggle(Ids.BODY_UNDERLINE_DASHED, default = false),
+            stepped(Ids.BODY_UNDERLINE_DASH_ON, 0f, 20f, 6f),
+            stepped(Ids.BODY_UNDERLINE_DASH_OFF, 0f, 20f, 6f),
             ReaderStyleParam.Font(Ids.HEADER_FONT, available = true, affectsLayout = true),
             ReaderStyleParam.Choice(
                 id = Ids.HEADER_MODE,

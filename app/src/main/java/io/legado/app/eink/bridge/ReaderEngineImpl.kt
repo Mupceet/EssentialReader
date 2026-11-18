@@ -615,6 +615,18 @@ internal object ReaderEngineImpl : ReaderEngine, KoinComponent {
             1 -> false
             else -> true
         },
+        // 0.8.1 参数总账补全（整页下划线族 + 标题分段）：读回宿主配置原值
+        bodyUnderline = durConfig.underline,
+        bodyUnderlineWidth = durConfig.underlineHeight,
+        bodyUnderlineOffset = durConfig.underlinePadding,
+        bodyUnderlineExtend = durConfig.underlineExtend,
+        bodyUnderlineDashed = durConfig.dottedLine,
+        bodyUnderlineDashOn = durConfig.dottedBase,
+        bodyUnderlineDashOff = durConfig.dottedRatio,
+        titleSegmentMode = durConfig.titleSegType,
+        titleSegmentDistance = durConfig.titleSegDistance,
+        titleSegmentDelimiter = durConfig.titleSegFlag,
+        titleSegmentScale = durConfig.titleSegScaling,
     )
 
     /** 正文正文字体取值：有文件用文件，否则按全局 systemTypefaces 映射系统预设。 */

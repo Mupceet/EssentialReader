@@ -12,9 +12,9 @@ class HostStyleCatalogTest {
     private val catalog = HostStyleCatalog.create()
 
     @Test
-    fun `完整目录覆盖全部31个参数且全部可用`() {
-        assertEquals(31, catalog.params.size)
-        assertEquals(31, catalog.params.map { it.id }.toSet().size)
+    fun `完整目录覆盖全部41个参数且全部可用`() {
+        assertEquals(41, catalog.params.size)
+        assertEquals(41, catalog.params.map { it.id }.toSet().size)
         assertTrue(catalog.params.all { it.available })
     }
 
@@ -67,9 +67,11 @@ class HostStyleCatalogTest {
         val declaredIds = Ids::class.java.fields
             .filter { it.type == String::class.java } // 排除 object 的 INSTANCE 字段
             .map { it.get(null) as String }
-        assertEquals(33, declaredIds.size)
-        // 分隔线两 id 声明于契约但目录不收（E-Ink 不渲染分隔线，见上）
-        val catalogIds = declaredIds - Ids.HEADER_DIVIDER - Ids.FOOTER_DIVIDER
+        assertEquals(44, declaredIds.size)
+        // 目录不收的 id：分隔线两 id（E-Ink 不渲染分隔线，见上）+
+        // 标题分段判断符（文本参数无目录控件类型，仅快照通道）
+        val catalogIds = declaredIds - Ids.HEADER_DIVIDER - Ids.FOOTER_DIVIDER -
+            Ids.TITLE_SEGMENT_DELIMITER
         assertEquals(catalogIds.toSet(), catalog.params.map { it.id }.toSet())
     }
 
