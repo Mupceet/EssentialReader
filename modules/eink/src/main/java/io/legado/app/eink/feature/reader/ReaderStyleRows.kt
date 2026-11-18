@@ -13,6 +13,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import io.legado.app.eink.contract.ReaderStyleCatalog
@@ -440,6 +442,8 @@ internal fun GroupHeading(text: String) {
     EInkText(
         text = text,
         style = EInkTheme.typography.titleSmall,
-        modifier = Modifier.padding(top = EInkSpacing.s, bottom = EInkSpacing.xs),
+        modifier = Modifier
+            .semantics { heading() }
+            .padding(top = EInkSpacing.s, bottom = EInkSpacing.xs),
     )
 }

@@ -7,7 +7,10 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -26,8 +29,8 @@ import io.legado.app.eink.designsystem.theme.EInkTheme
 import io.legado.app.eink.designsystem.theme.EInkSpacing
 
 /**
- * 字体配置内容块（去壳版，Task 4 归一容器组合）：固定面板无滚动，
- * 顶层 Column 原样保留——滚动由外层容器统一提供。
+ * 字体配置内容块（去壳版，Task 4 归一容器组合）：内容自带滚动上限
+ * （heightIn+verticalScroll，同信息/边距内容口径）。
  *
  * 统一字体原则——正文/标题/页眉（页脚经 applyHeaderStyle 跟随页眉）
  * 字体完全一致。系统预设一行三钮；条件行反显最近选中的文件字体
@@ -58,6 +61,11 @@ internal fun ReaderFontConfigContent(
     onPickFolder: () -> Unit,
 ) {
     Column(
+        modifier = Modifier
+            // heightIn 必须在 verticalScroll 外侧：钳制视口 ≤360dp；
+            // 顺序颠倒会把滚动内容钳到 360dp（内容截断、maxValue≈0 死滚动）
+            .heightIn(max = 360.dp)
+            .verticalScroll(rememberScrollState()),
         verticalArrangement = Arrangement.spacedBy(EInkSpacing.xs),
     ) {
         // 反显数据源：最近选中的文件字体 ∩ 当前枚举（幽灵 path 剔除）；

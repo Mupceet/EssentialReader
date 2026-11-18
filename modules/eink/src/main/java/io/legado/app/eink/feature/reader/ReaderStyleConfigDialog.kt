@@ -2,7 +2,10 @@ package io.legado.app.eink.feature.reader
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
@@ -17,14 +20,19 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInParent
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import io.legado.app.eink.contract.ReaderFontOption
 import io.legado.app.eink.contract.ReaderFontSelection
 import io.legado.app.eink.contract.ReaderStyleCatalog
 import io.legado.app.eink.contract.ReaderStyleParamIds as Ids
 import io.legado.app.eink.contract.ReaderTextStyle
+import io.legado.app.eink.designsystem.control.EInkButton
 import io.legado.app.eink.designsystem.control.EInkDialog
 import io.legado.app.eink.designsystem.theme.EInkSpacing
+import io.legado.app.eink.designsystem.theme.EInkTheme
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 
@@ -230,15 +238,28 @@ private fun ReaderStyleRegionView(
     val groupOffsets = remember { mutableStateMapOf<StyleRegionGroup, Int>() }
     val visibleGroups = StyleRegionGroup.entries.filter { regionGroupVisible(catalog, it) }
     Column {
-        PanelTabRow(
-            labels = visibleGroups.map { it.displayLabel },
-            // 锚点无持久选中态（定位按钮，非当前页标记）
-            selected = -1,
-            onSelect = { index ->
-                val target = visibleGroups.getOrNull(index) ?: return@PanelTabRow
-                scope.launch { scrollState.scrollTo(groupOffsets[target] ?: 0) }
-            },
-        )
+        // 锚点行：与功能轴 Tab 行同形态（等宽分段按钮），但语义是「跳转到某组」
+        // 的定位动作而非页签选择——按组名给可本地化 contentDescription（spec §4.4）
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = EInkSpacing.s),
+            horizontalArrangement = Arrangement.spacedBy(EInkSpacing.s),
+        ) {
+            visibleGroups.forEach { group ->
+                EInkButton(
+                    text = group.displayLabel,
+                    onClick = {
+                        scope.launch { scrollState.scrollTo(groupOffsets[group] ?: 0) }
+                    },
+                    modifier = Modifier
+                        .weight(1f)
+                        .semantics { contentDescription = "跳转到${group.displayLabel}" },
+                    style = EInkTheme.typography.bodyMedium,
+                    role = Role.Button,
+                )
+            }
+        }
         Column(
             modifier = Modifier
                 // heightIn 必须在 verticalScroll 外侧：钳制视口 ≤360dp；
