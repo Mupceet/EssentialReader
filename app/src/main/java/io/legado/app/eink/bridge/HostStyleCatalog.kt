@@ -50,7 +50,7 @@ internal object HostStyleCatalog {
             stepped(Ids.TITLE_LINE_SPACING, 0f, 20f, 12f),
             ReaderStyleParam.Font(Ids.HEADER_FONT, available = true, affectsLayout = true),
             ReaderStyleParam.Choice(
-                id = Ids.HEADER_VISIBILITY,
+                id = Ids.HEADER_MODE,
                 available = true,
                 affectsLayout = true,
                 options = listOf(

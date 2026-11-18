@@ -9,6 +9,7 @@ import io.legado.app.domain.gateway.ChangeSourceSettingsGateway
 import io.legado.app.domain.usecase.ChangeBookSourceUseCase
 import io.legado.app.domain.usecase.WebDavBackupUseCase
 import io.legado.app.eink.contract.BookHandle
+import io.legado.app.eink.contract.ChangeSourceBook
 import io.legado.app.eink.contract.ChangeSourceBookUiModel
 import io.legado.app.eink.contract.ChangeSourceEngine
 import io.legado.app.eink.contract.ChangeSourceResultUiModel
@@ -63,18 +64,21 @@ internal object ChangeSourceEngineImpl : ChangeSourceEngine, KoinComponent {
 
     override suspend fun currentReadingBook(
         bookUrl: String,
-    ): Pair<BookHandle, ChangeSourceBookUiModel>? {
+    ): ChangeSourceBook? {
         val book = ReadBook.book?.takeIf { it.bookUrl == bookUrl }
             ?: appDb.bookDao.getBook(bookUrl)
             ?: return null
-        return BookHandleImpl(book) to ChangeSourceBookUiModel(
-            bookUrl = book.bookUrl,
-            name = book.name,
-            author = book.author,
-            origin = book.origin,
-            // 常驻首项「当前源」行展示：书源显示名快照与已缓存最新章节
-            originName = book.originName,
-            latestChapterTitle = book.latestChapterTitle,
+        return ChangeSourceBook(
+            handle = BookHandleImpl(book),
+            model = ChangeSourceBookUiModel(
+                bookUrl = book.bookUrl,
+                name = book.name,
+                author = book.author,
+                origin = book.origin,
+                // 常驻首项「当前源」行展示：书源显示名快照与已缓存最新章节
+                originName = book.originName,
+                latestChapterTitle = book.latestChapterTitle,
+            ),
         )
     }
 
@@ -128,7 +132,7 @@ internal object ChangeSourceEngineImpl : ChangeSourceEngine, KoinComponent {
         author = author,
         origin = origin,
         originName = originName,
-        latestChapter = latestChapterTitle,
+        latestChapterTitle = latestChapterTitle,
         deduplicationKey = primaryStr(),
     )
 

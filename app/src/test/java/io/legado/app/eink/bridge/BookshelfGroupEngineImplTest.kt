@@ -176,7 +176,7 @@ class BookshelfGroupEngineImplTest {
         )
         val entry = result.single() as BookshelfShelfEntryUiModel.Group
         assertEquals(7, entry.covers.size)
-        assertEquals("c1", entry.covers.first().url)
+        assertEquals("c1", entry.covers.first().coverUrl)
     }
 
     // ---- 管理/筛选守卫 ----

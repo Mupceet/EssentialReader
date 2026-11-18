@@ -35,6 +35,8 @@ import io.legado.app.eink.contract.ReaderSyncTrigger
 import io.legado.app.eink.contract.ReaderTextStyle
 import io.legado.app.eink.contract.ReaderTipSlotTexts
 import io.legado.app.eink.contract.ReaderTipTypefaces
+import io.legado.app.eink.contract.SessionShelfOpResult
+import io.legado.app.eink.contract.StartCacheResult
 import io.legado.app.exception.NoStackTraceException
 import io.legado.app.help.book.BookHelp
 import io.legado.app.help.book.addType
@@ -430,9 +432,9 @@ internal object ReaderEngineImpl : ReaderEngine, KoinComponent {
         ReadBook.loadContent(ReadBook.durChapterIndex, resetPageOffset = false)
     }
 
-    override fun startCache(count: Int, cacheAll: Boolean): Boolean? {
-        val book = ReadBook.book ?: return null
-        if (book.isLocal) return false
+    override fun startCache(count: Int, cacheAll: Boolean): StartCacheResult {
+        val book = ReadBook.book ?: return StartCacheResult.NothingToCache
+        if (book.isLocal) return StartCacheResult.LocalBook
         val end = if (cacheAll) {
             book.totalChapterNum - 1
         } else {
@@ -448,11 +450,11 @@ internal object ReaderEngineImpl : ReaderEngine, KoinComponent {
             ),
             isLocal = book.isLocal,
         )
-        return true
+        return StartCacheResult.Started
     }
 
-    override suspend fun addSessionBookToShelf(): Boolean? {
-        val book = ReadBook.book ?: return null
+    override suspend fun addSessionBookToShelf(): SessionShelfOpResult {
+        val book = ReadBook.book ?: return SessionShelfOpResult.NotApplicable
         return try {
             if (book.isType(BookType.notShelf)) {
                 book.removeType(BookType.notShelf)
@@ -461,32 +463,32 @@ internal object ReaderEngineImpl : ReaderEngine, KoinComponent {
                 }
                 ReadBook.inBookshelf = true
                 book.save()
-                true
+                SessionShelfOpResult.Success
             } else {
-                null
+                SessionShelfOpResult.NotApplicable
             }
         } catch (e: CancellationException) {
             throw e
-        } catch (_: Throwable) {
-            false
+        } catch (e: Throwable) {
+            SessionShelfOpResult.Failure(e)
         }
     }
 
-    override suspend fun removeSessionBookFromShelf(): Boolean? {
-        val book = ReadBook.book ?: return null
+    override suspend fun removeSessionBookFromShelf(): SessionShelfOpResult {
+        val book = ReadBook.book ?: return SessionShelfOpResult.NotApplicable
         return try {
             if (!book.isType(BookType.notShelf)) {
                 book.addType(BookType.notShelf)
                 ReadBook.inBookshelf = false
                 book.save()
-                true
+                SessionShelfOpResult.Success
             } else {
-                null
+                SessionShelfOpResult.NotApplicable
             }
         } catch (e: CancellationException) {
             throw e
-        } catch (_: Throwable) {
-            false
+        } catch (e: Throwable) {
+            SessionShelfOpResult.Failure(e)
         }
     }
 

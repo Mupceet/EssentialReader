@@ -154,7 +154,7 @@ internal object SearchEngineImpl : SearchEngine, KoinComponent {
                                 }
 
                                 is SearchRunEvent.Finished ->
-                                    callback.onSearchFinish(event.isEmpty, event.hasMore)
+                                    callback.onSearchFinish(event.isEmpty)
                             }
                         }
                 } catch (e: CancellationException) {

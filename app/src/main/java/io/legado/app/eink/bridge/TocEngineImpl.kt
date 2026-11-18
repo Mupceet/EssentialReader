@@ -74,7 +74,7 @@ internal object TocEngineImpl : TocEngine {
     )
 
     private fun BookChapter.toUiModel() = ChapterUiModel(
-        index = index,
+        chapterIndex = index,
         title = title,
         url = url,
         isVolume = isVolume,
@@ -83,7 +83,7 @@ internal object TocEngineImpl : TocEngine {
 
     /** 投影行 → 展示模型：按四元组构造实体取缓存文件名（缓存管理页同款）。 */
     private fun BookChapterCacheInfo.toUiModel() = ChapterUiModel(
-        index = index,
+        chapterIndex = index,
         title = title,
         url = url,
         isVolume = isVolume,

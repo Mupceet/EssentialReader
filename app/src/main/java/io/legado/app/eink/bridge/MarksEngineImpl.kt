@@ -18,8 +18,10 @@ import io.legado.app.domain.usecase.SaveMarkingUseCase
 import io.legado.app.domain.usecase.VerifyBookmarkTargetUseCase
 import io.legado.app.eink.contract.BookmarkUiModel
 import io.legado.app.eink.contract.JumpResolution
+import io.legado.app.eink.contract.MarkingNoteUpdate
 import io.legado.app.eink.contract.MarkingUiModel
 import io.legado.app.eink.contract.MarksEngine
+import io.legado.app.eink.contract.PageBookmarkToggle
 import io.legado.app.eink.contract.ReaderMarkingDetail
 import io.legado.app.eink.contract.ReaderPageBookmarkContent
 import io.legado.app.eink.contract.ReaderSelectionCommit
@@ -399,22 +401,22 @@ object MarksEngineImpl : MarksEngine, KoinComponent {
 
     /**
      * 状态转换唯一路径（契约 v2）：按 id 改 note + 样式，锚点不动、**不做选区
-     * 重定位**（编辑已存标记不再可能因定位失败而保存失败）。null = 无会话书/
-     * 标记不存在；false = 更新失败。成功后 relayout，新快照带新样式装饰推送。
+     * 重定位**（编辑已存标记不再可能因定位失败而保存失败）。NotFound = 无会话
+     * 书/标记不存在；Failure = 更新失败。成功后 relayout，新快照带新样式装饰推送。
      */
-    override suspend fun updateMarkingNote(markingId: String, note: String): Boolean? = try {
-        ReadBook.book ?: return null
-        val mark = bookMarkingGateway.getById(markingId) ?: return null
+    override suspend fun updateMarkingNote(markingId: String, note: String): MarkingNoteUpdate = try {
+        ReadBook.book ?: return MarkingNoteUpdate.NotFound
+        val mark = bookMarkingGateway.getById(markingId) ?: return MarkingNoteUpdate.NotFound
         bookMarkingGateway.upsert(mark.withEinkNote(note, System.currentTimeMillis()))
         ReaderEngineImpl.relayout()
-        true
+        MarkingNoteUpdate.Success
     } catch (e: CancellationException) {
         throw e
     } catch (e: Exception) {
-        // upsert 成功但 relayout 抛异常时误报 false——更新已落库（按 id 幂等，重试安全），
+        // upsert 成功但 relayout 抛异常时误报 Failure——更新已落库（按 id 幂等，重试安全），
         // 将在下次成功重排时呈现
         AppLog.put("eink updateMarkingNote failed: ${e.message}", e)
-        false
+        MarkingNoteUpdate.Failure(e)
     }
 
     /**
@@ -472,13 +474,13 @@ object MarksEngineImpl : MarksEngine, KoinComponent {
      * （页位置 + 页文本为标题，无编辑层），有则删离当前阅读位置最近的一条；
      * 成功后触发当前章重排，角标随新快照推送。显示字段来源改为模块载荷
      * [content]（存储规范化：占位符剥离 + trim）；同页判定（页正文区间）与
-     * 「删最近一条」按宿主分页事实。null = 无会话书/当前页无法定位/落库异常；
-     * true = 本次添加；false = 本次移除。
+     * 「删最近一条」按宿主分页事实。Unavailable = 无会话书/当前页无法定位/
+     * 落库异常；Added = 本次添加；Removed = 本次移除。
      */
-    override suspend fun togglePageBookmark(content: ReaderPageBookmarkContent): Boolean? = try {
+    override suspend fun togglePageBookmark(content: ReaderPageBookmarkContent): PageBookmarkToggle = try {
         toggleMutex.withLock {
-            val book = ReadBook.book ?: return@withLock null
-            val meta = ReaderEngineImpl.currentPageMeta() ?: return@withLock null
+            val book = ReadBook.book ?: return@withLock PageBookmarkToggle.Unavailable
+            val meta = ReaderEngineImpl.currentPageMeta() ?: return@withLock PageBookmarkToggle.Unavailable
             val existing = bookmarkRepository.getByChapterRange(
                 bookName = book.name,
                 bookAuthor = book.author,
@@ -501,20 +503,20 @@ object MarksEngineImpl : MarksEngine, KoinComponent {
                 )
                 // 角标随新快照刷新（保持页内位置）
                 ReaderEngineImpl.relayout()
-                true
+                PageBookmarkToggle.Added
             } else {
                 // 只删离当前阅读位置最近的一条：同一页可能有多条书签，不应整页误删
                 val nearest = existing.minByOrNull { abs(it.chapterPos - ReadBook.durChapterPos) }
-                    ?: return@withLock null
+                    ?: return@withLock PageBookmarkToggle.Unavailable
                 bookmarkRepository.delete(nearest)
                 ReaderEngineImpl.relayout()
-                false
+                PageBookmarkToggle.Removed
             }
         }
     } catch (e: CancellationException) {
         throw e
     } catch (e: Exception) {
         AppLog.put("eink togglePageBookmark failed: ${e.message}", e)
-        null
+        PageBookmarkToggle.Unavailable
     }
 }

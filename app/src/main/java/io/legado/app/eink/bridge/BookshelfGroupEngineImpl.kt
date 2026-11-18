@@ -218,7 +218,7 @@ internal object BookshelfGroupEngineImpl : BookshelfGroupEngine, KoinComponent {
                             .map { refs ->
                                 group.groupId to refs.map { ref ->
                                     BookshelfCoverRefUiModel(
-                                        url = ref.coverUrl,
+                                        coverUrl = ref.coverUrl,
                                         name = ref.name,
                                         author = ref.author,
                                         origin = ref.origin,
