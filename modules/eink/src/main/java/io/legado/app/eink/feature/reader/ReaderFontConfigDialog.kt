@@ -21,69 +21,27 @@ import io.legado.app.eink.contract.ReaderStyleParamIds as Ids
 import io.legado.app.eink.contract.ReaderTextStyle
 import io.legado.app.eink.designsystem.content.EInkText
 import io.legado.app.eink.designsystem.control.EInkButton
-import io.legado.app.eink.designsystem.control.EInkDialog
 import io.legado.app.eink.designsystem.control.EInkSliderRow
 import io.legado.app.eink.designsystem.theme.EInkTheme
 import io.legado.app.eink.designsystem.theme.EInkSpacing
 
 /**
- * 字体配置弹层（一级，固定面板无滚动）：统一字体原则——正文/标题/页眉
- * （页脚经 applyHeaderStyle 跟随页眉）字体完全一致。系统预设一行三钮；
- * 条件行反显最近选中的文件字体（历史 ∩ 当前枚举，幽灵剔除——切回系统
- * 预设后一键可回；无历史不默认展示，入口独占整行）；入口：枚举空（未选
- * 过文件夹/空文件夹）为「选择字体文件夹」（宿主钩子优先的应用内文件浏览
- * 器，回落 SAF——与字体设置页同链），非空为「更多字体…（N）」导航进入
- * 独立字体设置页（EInkScreen.FontSettings）。正文字重与标题字重：预设行
+ * 字体配置内容块（去壳版，Task 4 归一容器组合）：固定面板无滚动，
+ * 顶层 Column 原样保留——滚动由外层容器统一提供。
+ *
+ * 统一字体原则——正文/标题/页眉（页脚经 applyHeaderStyle 跟随页眉）
+ * 字体完全一致。系统预设一行三钮；条件行反显最近选中的文件字体
+ * （历史 ∩ 当前枚举，幽灵剔除——切回系统预设后一键可回；无历史
+ * 不默认展示，入口独占整行）；入口：枚举空（未选过文件夹/空文件夹）
+ * 为「选择字体文件夹」（宿主钩子优先的应用内文件浏览器，回落 SAF
+ * ——与字体设置页同链），非空为「更多字体…（N）」导航进入独立字体
+ * 设置页（EInkScreen.FontSettings）。正文字重与标题字重：预设行
  * 「细体/常规/粗体」三选 + 独立自定义行（点击原地替换为拖动条，点预设
  * 复原，窄屏四枚一行显示不完整），拖动条值域 100..900。简繁转换：三选
  * 按钮行（关闭/繁转简/简转繁——按钮文案 ≤3 字：等分宽度下 4 字以上
  * 截断（真机实测），且应用内字体缩放最高 1.6 倍需留余量；语境由行标签
  * 承担），转发宿主阅读设置——能力门控（supportsChineseConverter），
  * 点选即应用并触发重排。
- */
-@Composable
-internal fun ReaderFontConfigDialog(
-    catalog: ReaderStyleCatalog,
-    style: ReaderTextStyle,
-    fontOptions: List<ReaderFontOption>,
-    recentFontPaths: List<String>,
-    chineseConverterType: Int,
-    onSetFont: (ReaderFontSelection) -> Unit,
-    onOpenFontSettings: () -> Unit,
-    onSetBodyWeight: (Int) -> Unit,
-    onSetTitleWeight: (Int) -> Unit,
-    onSetChineseConverterType: (Int) -> Unit,
-    onPickFolder: () -> Unit,
-    onClose: () -> Unit,
-    onBackdropClick: () -> Unit,
-) {
-    EInkDialog(
-        onDismiss = onClose,
-        title = "字体配置",
-        onClose = onClose,
-        onBackdropClick = onBackdropClick,
-        showActions = false,
-    ) {
-        ReaderFontConfigContent(
-            catalog = catalog,
-            style = style,
-            fontOptions = fontOptions,
-            recentFontPaths = recentFontPaths,
-            chineseConverterType = chineseConverterType,
-            onSetFont = onSetFont,
-            onOpenFontSettings = onOpenFontSettings,
-            onSetBodyWeight = onSetBodyWeight,
-            onSetTitleWeight = onSetTitleWeight,
-            onSetChineseConverterType = onSetChineseConverterType,
-            onPickFolder = onPickFolder,
-        )
-    }
-}
-
-/**
- * 字体配置内容块（去壳版，Task 4 归一容器组合）：固定面板无滚动，
- * 顶层 Column 原样保留——滚动由外层容器统一提供。
- * 行为说明见 [ReaderFontConfigDialog]。
  */
 @Composable
 internal fun ReaderFontConfigContent(

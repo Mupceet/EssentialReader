@@ -46,6 +46,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -125,9 +126,6 @@ import io.legado.app.eink.feature.reader.screensaver.ReaderScreensaverColors
 import io.legado.app.eink.feature.reader.screensaver.ReaderScreensaverPublisher
 import io.legado.app.eink.feature.reader.screensaver.toScreensaverRequest
 import kotlinx.coroutines.launch
-
-/** 排版设置的居中弹层形态。 */
-private enum class ReaderStyleDialog { Fonts, Info, Margin }
 
 /**
  * 点按标记浮条状态（v2 Task 6）：命中 markingId + run 派生选区——浮条
@@ -292,11 +290,11 @@ fun ReaderRoute(
     val keyEventHub = EInkEngineRegistry.keyEventHub
     val wheelHub = EInkEngineRegistry.wheelHub
     var panel by remember { mutableStateOf<ReaderPanel?>(null) }
-    // 排版设置弹层（字体配置/信息配置/边距调整）：居中透明卡片，
+    // 排版设置弹层（归一容器，三入口直达功能轴 Tab）：居中透明卡片，
     // 打开期间面板与操作条隐藏；返回键逐级回退到排版展开态。
     // 字体文件列表选择（原二级浮层）已提取为独立字体设置页（EInkScreen.
     // FontSettings），经 onOpenFontSettings 导航进入，自阅读页进入选完即返回
-    var styleDialog by remember { mutableStateOf<ReaderStyleDialog?>(null) }
+    var styleTab by rememberSaveable { mutableStateOf<StyleFunctionTab?>(null) }
     // 点击区域蒙层（九宫格简化版，其它面板入口）：全屏覆盖含操作条，
     // 自持返回键（蒙层内 BackHandler 后组合优先于 Route 链）；退出即
     // 落盘生效，面板状态保留——关闭后回到其它面板展开态
@@ -659,8 +657,8 @@ fun ReaderRoute(
     val fontOptions by viewModel.fontOptions.collectAsStateWithLifecycle()
     // 最近文件字体历史（快捷行数据源；fire-and-forget 写入，VM 乐观状态背书）
     val recentFontPaths by viewModel.recentFontPaths.collectAsStateWithLifecycle()
-    LaunchedEffect(styleDialog) {
-        if (styleDialog == ReaderStyleDialog.Fonts) {
+    LaunchedEffect(styleTab) {
+        if (styleTab == StyleFunctionTab.FONTS) {
             viewModel.loadFontOptions()
         }
     }
@@ -808,7 +806,7 @@ fun ReaderRoute(
     // （弹层期间排版面板保留，返回即回到排版展开态）
     BackHandler {
         when {
-            styleDialog != null -> styleDialog = null
+            styleTab != null -> styleTab = null
             panel != null -> panel = null
             uiState.controlsVisible -> viewModel.hideControls()
             else -> exitReader()
@@ -837,7 +835,7 @@ fun ReaderRoute(
             // ReaderPanel.keepsTopBar）；底部操作条常驻可见，承载面板期间
             // 的返回与选中态；排版弹层例外：操作条隐藏，保证排版调参实时可见
             topBarVisible = topBarShown,
-            bottomBarVisible = uiState.controlsVisible && styleDialog == null,
+            bottomBarVisible = uiState.controlsVisible && styleTab == null,
             contentPaddingValues = contentPaddingValues,
             contentPaddingPx = contentPadding,
             onPrevPage = viewModel::prevPage,
@@ -889,8 +887,8 @@ fun ReaderRoute(
             onOpenPanel = { target ->
                 // 再次点击已打开的面板按钮 = 关闭（取消选中）；
                 // 排版弹层打开时点击则先收回弹层、回到面板
-                val toggleOff = panel == target && styleDialog == null
-                styleDialog = null
+                val toggleOff = panel == target && styleTab == null
+                styleTab = null
                 panel = if (toggleOff) null else target
             },
             onRetry = { viewModel.attach(bookUrl) },
@@ -983,13 +981,13 @@ fun ReaderRoute(
         // （× 与系统返回、操作条返回仍为逐级回退）
         val dismissToCleanReading = {
             panel = null
-            styleDialog = null
+            styleTab = null
             viewModel.hideControls()
         }
         // 设置面板与阅读内容对齐（Edge-to-Edge 下避免被系统栏遮挡），
         // 底部避开常驻操作条，保持其可见可点；
         // 排版弹层期间面板隐藏（panel 状态保留），关闭弹层后回到展开态
-        panel?.takeIf { styleDialog == null }?.let { current ->
+        panel?.takeIf { styleTab == null }?.let { current ->
             val onClose = { panel = null }
             // 面板与阅读内容对齐（Edge-to-Edge 下避免被系统栏遮挡），
             // 避让与正文同源同值（contentPaddingValues：宿主策略按忽略
@@ -1022,9 +1020,9 @@ fun ReaderRoute(
                             onSetIndent = viewModel::setIndent,
                             onSetLineSpacing = viewModel::setLineSpacing,
                             onSetParagraphSpacing = viewModel::setParagraphSpacing,
-                            onOpenFonts = { styleDialog = ReaderStyleDialog.Fonts },
-                            onOpenInfo = { styleDialog = ReaderStyleDialog.Info },
-                            onOpenMargins = { styleDialog = ReaderStyleDialog.Margin },
+                            onOpenFonts = { styleTab = StyleFunctionTab.FONTS },
+                            onOpenInfo = { styleTab = StyleFunctionTab.INFO },
+                            onOpenMargins = { styleTab = StyleFunctionTab.MARGIN },
                         )
                     }
 
@@ -1080,37 +1078,45 @@ fun ReaderRoute(
             }
         }
 
-        // 排版弹层：居中透明卡片（面板保留不销毁），关闭后回到排版展开态
-        when (styleDialog) {
-            ReaderStyleDialog.Margin -> ReaderMarginDialog(
+        // 排版弹层：归一容器（三入口直达功能轴 Tab，弹框内切轴/切 Tab 不关框）
+        styleTab?.let { tab ->
+            ReaderStyleConfigDialog(
+                initialTab = tab,
                 catalog = viewModel.styleCatalog,
                 style = uiState.style,
-                onSetPaddingTop = viewModel::setPaddingTop,
-                onSetPaddingBottom = viewModel::setPaddingBottom,
-                onSetPaddingLeft = viewModel::setPaddingLeft,
-                onSetPaddingRight = viewModel::setPaddingRight,
-                onSetHeaderPaddingTop = viewModel::setHeaderPaddingTop,
-                onSetHeaderPaddingBottom = viewModel::setHeaderPaddingBottom,
-                onSetHeaderPaddingLeft = viewModel::setHeaderPaddingLeft,
-                onSetHeaderPaddingRight = viewModel::setHeaderPaddingRight,
-                onSetFooterPaddingTop = viewModel::setFooterPaddingTop,
-                onSetFooterPaddingBottom = viewModel::setFooterPaddingBottom,
-                onSetFooterPaddingLeft = viewModel::setFooterPaddingLeft,
-                onSetFooterPaddingRight = viewModel::setFooterPaddingRight,
-                onClose = { styleDialog = null },
-                onBackdropClick = dismissToCleanReading,
-            )
-
-            ReaderStyleDialog.Fonts -> ReaderFontConfigDialog(
-                catalog = viewModel.styleCatalog,
-                style = uiState.style,
+                titleSizeFollowBody = uiState.titleSizeFollowBody,
                 fontOptions = fontOptions,
                 recentFontPaths = recentFontPaths,
                 chineseConverterType = uiState.chineseConverterType,
-                onSetFont = viewModel::setReaderFont,
-                onSetBodyWeight = viewModel::setBodyWeight,
-                onSetTitleWeight = viewModel::setTitleWeight,
-                onSetChineseConverterType = viewModel::setChineseConverterType,
+                actions = ReaderStyleActions(
+                    setTextSize = viewModel::setTextSize,
+                    setLetterSpacing = viewModel::setLetterSpacing,
+                    setIndent = viewModel::setIndent,
+                    setLineSpacing = viewModel::setLineSpacing,
+                    setParagraphSpacing = viewModel::setParagraphSpacing,
+                    setReaderFont = viewModel::setReaderFont,
+                    setBodyWeight = viewModel::setBodyWeight,
+                    setTitleWeight = viewModel::setTitleWeight,
+                    setChineseConverterType = viewModel::setChineseConverterType,
+                    setTitleMode = viewModel::setTitleMode,
+                    setTitleSizeFollowBody = viewModel::setTitleSizeFollowBody,
+                    setTitleSize = viewModel::setTitleSize,
+                    setHeaderMode = viewModel::setHeaderMode,
+                    setFooterVisible = viewModel::setFooterVisible,
+                    setTipSize = viewModel::setTipSize,
+                    setPaddingTop = viewModel::setPaddingTop,
+                    setPaddingBottom = viewModel::setPaddingBottom,
+                    setPaddingLeft = viewModel::setPaddingLeft,
+                    setPaddingRight = viewModel::setPaddingRight,
+                    setHeaderPaddingTop = viewModel::setHeaderPaddingTop,
+                    setHeaderPaddingBottom = viewModel::setHeaderPaddingBottom,
+                    setHeaderPaddingLeft = viewModel::setHeaderPaddingLeft,
+                    setHeaderPaddingRight = viewModel::setHeaderPaddingRight,
+                    setFooterPaddingTop = viewModel::setFooterPaddingTop,
+                    setFooterPaddingBottom = viewModel::setFooterPaddingBottom,
+                    setFooterPaddingLeft = viewModel::setFooterPaddingLeft,
+                    setFooterPaddingRight = viewModel::setFooterPaddingRight,
+                ),
                 onOpenFontSettings = onOpenFontSettings,
                 // 首次选文件夹与字体设置页同链（FontSettingsRoute.onPickFolder）：
                 // 宿主钩子优先——无系统 DocumentsUI 的墨水屏固件由宿主应用内
@@ -1122,23 +1128,9 @@ fun ReaderRoute(
                     } ?: false
                     if (!hostHandled) fontFolderLauncher.launch(null)
                 },
-                onClose = { styleDialog = null },
+                onClose = { styleTab = null },
                 onBackdropClick = dismissToCleanReading,
             )
-            ReaderStyleDialog.Info -> ReaderInfoConfigDialog(
-                catalog = viewModel.styleCatalog,
-                style = uiState.style,
-                titleSizeFollowBody = uiState.titleSizeFollowBody,
-                onSetTitleMode = viewModel::setTitleMode,
-                onSetTitleSizeFollowBody = viewModel::setTitleSizeFollowBody,
-                onSetTitleSize = viewModel::setTitleSize,
-                onSetHeaderMode = viewModel::setHeaderMode,
-                onSetFooterVisible = viewModel::setFooterVisible,
-                onSetTipSize = viewModel::setTipSize,
-                onClose = { styleDialog = null },
-                onBackdropClick = dismissToCleanReading,
-            )
-            null -> Unit
         }
 
         // 点击区域蒙层（九宫格简化版）：全屏覆盖（面板/操作条/阅读手势

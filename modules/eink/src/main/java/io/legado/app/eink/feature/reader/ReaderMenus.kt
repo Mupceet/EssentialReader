@@ -45,7 +45,6 @@ import io.legado.app.eink.designsystem.content.EInkHorizontalDivider
 import io.legado.app.eink.designsystem.content.EInkText
 import io.legado.app.eink.designsystem.control.EInkButton
 import io.legado.app.eink.designsystem.control.EInkCloseButton
-import io.legado.app.eink.designsystem.control.EInkDialog
 import io.legado.app.eink.designsystem.control.EInkSegmentedButton
 import io.legado.app.eink.designsystem.control.EInkSliderRow
 import io.legado.app.eink.designsystem.control.EInkSteppedSlider
@@ -638,65 +637,14 @@ internal fun ReaderLayoutPanel(
 }
 
 // ====================================================================
-// 边距调整弹框（屏幕居中，正文/页眉/页脚 三组分组列表）
+// 边距调整内容（正文/页眉/页脚 三组分组列表）
 // ====================================================================
 
 /**
- * 边距调整弹框：屏幕居中的卡片，四周透明 —— 页眉/页脚/正文边距
- * 调整时实时可见效果（档位滑条，逐 dp 可调）。经 [EInkDialog] 面板
- * 形态承载（关 scrim 透出阅读内容）。
- *
- * 内含正文 / 页眉 / 页脚三组分组列表，每组 4 行档位滑条：上边距、
- * 下边距、左边距、右边距（内容经 [ReaderMarginConfigContent] 承载）。
- * × / 系统返回经 [onClose] 回到排版展开态；点击弹框外空白区域经
- * [onBackdropClick] 一次性收起到干净阅读界面。
+ * 边距内容（去壳版，归一容器组合）：三组分组列表（正文/页眉/页脚），
+ * 消除子 Tab 双层嵌套（spec §4.3）；每组 4 行档位滑条——上边距、
+ * 下边距、左边距、右边距，逐 dp 可调（调整经宿主重排实时可见）。
  */
-@Composable
-internal fun ReaderMarginDialog(
-    catalog: ReaderStyleCatalog,
-    style: ReaderTextStyle,
-    onSetPaddingTop: (Int) -> Unit,
-    onSetPaddingBottom: (Int) -> Unit,
-    onSetPaddingLeft: (Int) -> Unit,
-    onSetPaddingRight: (Int) -> Unit,
-    onSetHeaderPaddingTop: (Int) -> Unit,
-    onSetHeaderPaddingBottom: (Int) -> Unit,
-    onSetHeaderPaddingLeft: (Int) -> Unit,
-    onSetHeaderPaddingRight: (Int) -> Unit,
-    onSetFooterPaddingTop: (Int) -> Unit,
-    onSetFooterPaddingBottom: (Int) -> Unit,
-    onSetFooterPaddingLeft: (Int) -> Unit,
-    onSetFooterPaddingRight: (Int) -> Unit,
-    onClose: () -> Unit,
-    onBackdropClick: () -> Unit,
-) {
-    EInkDialog(
-        onDismiss = onClose,
-        title = "边距调整",
-        onClose = onClose,
-        onBackdropClick = onBackdropClick,
-        showActions = false,
-    ) {
-        ReaderMarginConfigContent(
-            catalog = catalog,
-            style = style,
-            onSetPaddingTop = onSetPaddingTop,
-            onSetPaddingBottom = onSetPaddingBottom,
-            onSetPaddingLeft = onSetPaddingLeft,
-            onSetPaddingRight = onSetPaddingRight,
-            onSetHeaderPaddingTop = onSetHeaderPaddingTop,
-            onSetHeaderPaddingBottom = onSetHeaderPaddingBottom,
-            onSetHeaderPaddingLeft = onSetHeaderPaddingLeft,
-            onSetHeaderPaddingRight = onSetHeaderPaddingRight,
-            onSetFooterPaddingTop = onSetFooterPaddingTop,
-            onSetFooterPaddingBottom = onSetFooterPaddingBottom,
-            onSetFooterPaddingLeft = onSetFooterPaddingLeft,
-            onSetFooterPaddingRight = onSetFooterPaddingRight,
-        )
-    }
-}
-
-/** 边距内容：三组分组列表（正文/页眉/页脚），消除子 Tab 双层嵌套（spec §4.3）。 */
 @Composable
 internal fun ReaderMarginConfigContent(
     catalog: ReaderStyleCatalog,
