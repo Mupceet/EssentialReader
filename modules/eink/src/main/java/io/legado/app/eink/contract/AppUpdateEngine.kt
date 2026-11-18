@@ -3,9 +3,9 @@ package io.legado.app.eink.contract
 import kotlinx.coroutines.flow.StateFlow
 
 /**
- * 应用更新端口 —— 三个**可选**端口之一（其余两个为
- * [MarksEngine] / [BookshelfGroupEngine]；
- * 可选端口与能力裁剪的完整语义见本目录 README §5）。
+ * 应用更新端口——**可选**端口之一（可选端口完整清单以
+ * [EInkEngineRegistry.install] 签名为准，不在各端口 KDoc 逐一枚举；
+ * 能力裁剪的完整语义见本目录 README §5）。
  *
  * ## 职责边界
  *

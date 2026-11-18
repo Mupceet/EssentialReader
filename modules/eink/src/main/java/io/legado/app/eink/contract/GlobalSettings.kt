@@ -17,7 +17,7 @@ package io.legado.app.eink.contract
  * ```
  *
  * 收录 E-Ink VM 编排与「我的」页/阅读菜单真正读写的键——含转发宿主
- * 设置的键（与完整模式共享同一存储）与 E-InK 自有偏好（如
+ * 设置的键（与完整模式共享同一存储）与 E-Ink 自有偏好（如
  * [readerTapZonesEncoding]、[pullDownBookmark]）。嵌入式宿主与完整模式共享
  * 存储（自有偏好键落宿主侧自有 prefs 文件），插件宿主可用自有 DataStore。
  *
@@ -123,7 +123,7 @@ interface GlobalSettings {
     var useDefaultCover: Boolean
 
     /**
-     * 阅读区竖直下拉添加书签（E-InK 自有界面偏好，完整模式无对应设置）。
+     * 阅读区竖直下拉添加书签（E-Ink 自有界面偏好，完整模式无对应设置）。
      *
      * 可写（其它设置面板开关，默认关）：关闭时竖直下拉不认领书签
      * （手势仍被统一仲裁吞并以压掉点按，不产生动作）；读取在阅读 VM
@@ -133,7 +133,7 @@ interface GlobalSettings {
     var pullDownBookmark: Boolean
 
     /**
-     * 阅读界面「书源信息行」开关（E-InK 自有界面偏好，完整模式无对应
+     * 阅读界面「书源信息行」开关（E-Ink 自有界面偏好，完整模式无对应
      * 设置，默认 false）：开启后阅读菜单展开期顶栏下方增加一行——左侧
      * 当前章节名、右侧书源名；书源具备登录/章节付费能力时书源名可点开
      * 下拉菜单执行登录与购买（能力入口按书源条件出现的通用化承载）。
@@ -141,7 +141,7 @@ interface GlobalSettings {
     var readerSourceInfoBar: Boolean
 
     /**
-     * 水波纹翻页档位（E-InK 自有界面偏好，完整模式无对应设置）。
+     * 水波纹翻页档位（E-Ink 自有界面偏好，完整模式无对应设置）。
      *
      * 四档：关闭（默认）/慢速/标准/快速（[PageTurnRippleMode]）。开启
      * 档位下前进/后退翻页分别以不同扫入方向的硬件波纹刷新；能力门控
@@ -191,7 +191,7 @@ interface GlobalSettings {
     val hideNavigationBar: Boolean get() = false
 
     /**
-     * 段评气泡参与排版（E-InK 自有界面偏好：嵌入式宿主以自有键
+     * 段评气泡参与排版（E-Ink 自有界面偏好：嵌入式宿主以自有键
      * `einkShowReviewBubbles` 落宿主侧自有 prefs 文件 eink_preferences；
      * 完整模式排版工厂同值消费，两轨一致；默认 true）。
      *

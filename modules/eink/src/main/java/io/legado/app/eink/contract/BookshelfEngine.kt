@@ -58,11 +58,13 @@ interface BookshelfEngine {
     /**
      * 提交书架显示样式（个性化配置面板的唯一写通道）。
      *
-     * 模块传改后完整快照，宿主经设置网关一次原子 update 写六键
-     * （showUnread / showUnreadNew / bookshelfShowLatestChapter /
-     * bookshelfLayoutModePortrait 竖屏键 / bookshelfGridCoverWidth /
-     * bookshelfTitleMaxLines；横屏键不动）。返回即落库完成，写入成功后
-     * [style] 重发新快照。模块 UI 乐观更新，不等待本方法返回。
+     * 模块传改后完整快照，宿主写入**全部七字段**并持久化：六键经设置
+     * 网关一次原子 update（showUnread / showUnreadNew /
+     * bookshelfShowLatestChapter / bookshelfLayoutModePortrait 竖屏键 /
+     * bookshelfGridCoverWidth / bookshelfTitleMaxLines；横屏键不动），
+     * 分组开关（groupsEnabled）为 E-Ink 自有偏好、落宿主侧自有 prefs
+     * 文件——两路写入在同一调用内先后完成。返回即全部落库完成，写入
+     * 成功后 [style] 重发新快照。模块 UI 乐观更新，不等待本方法返回。
      */
     suspend fun setStyle(style: BookshelfStyle)
 

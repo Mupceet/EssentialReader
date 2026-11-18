@@ -13,8 +13,10 @@ import kotlinx.coroutines.flow.Flow
  * 两种状态**——转换只能走 [updateMarkingNote]（按 id，锚点不变），
  * [createMarking] 仅"新选区"入口可达，结构性杜绝宿主把转换实现成重复
  * 添加。类型恒由 note 派生：note 空白 = 划线（实线）；非空白 = 想法
- * （虚线）——契约没有并列的 thought 字段。书签显示字段（章节名 + 页
- * 文本摘录）由 [ReaderPageBookmarkContent] 携带，宿主不自定显示语义。
+ * （虚线）——提交与详情面没有并列的 thought 字段（[MarkingUiModel.thought]
+ * 是宿主从 styleJson 推导的列表展示位，不是状态输入）。书签显示字段
+ * （章节名 + 页文本摘录）由 [ReaderPageBookmarkContent] 携带，宿主不自定
+ * 显示语义。
  *
  * 能力粒度按**特性**不分表面（0.7.1 合并轮，全有全无）：[supportsMarkings]
  * 同时管阅读内保存（长按选择/选区操作条/点按标记）与目录页笔记 Tab/导出；

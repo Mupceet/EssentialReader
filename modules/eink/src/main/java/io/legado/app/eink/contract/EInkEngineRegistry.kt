@@ -16,7 +16,7 @@ import io.legado.app.eink.contract.EInkEngineRegistry.keyEventHub
  * ```text
  * 宿主入口 attachBaseContext
  *    └─ onInstallEngines() ──► 宿主 bridge（如 EInkBridge.install()）
- *                                └─ install(8 个必填端口实现 + 可选 appUpdateEngine / marksEngine / bookshelfGroupEngine / backupSyncEngine / pageTurnEffectEngine)
+ *                                └─ install(8 个必填端口实现 + 可选 appUpdateEngine / marksEngine / bookshelfGroupEngine / backupSyncEngine / pageTurnEffectEngine / bookSourceEngine)
  *                                      └─ 静态注册表整体替换（last-wins）
  *                                             │ keyEventHub/wheelHub 一并重建
  *                                             ▼

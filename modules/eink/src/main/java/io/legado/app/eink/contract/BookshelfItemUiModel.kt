@@ -36,10 +36,10 @@ data class BookshelfItemUiModel(
     /** 书源 origin 标识（封面请求的源信息）。 */
     val origin: String,
 
-    /** 当前阅读章节标题（进度摘要展示）。 */
+    /** 当前阅读章节标题（进度摘要展示）；无阅读进度（未开卷）为 null。 */
     val currentChapterTitle: String?,
 
-    /** 最新章节标题（有新章时高亮展示）。 */
+    /** 最新章节标题（有新章时高亮展示）；目录未拉到最新章记录为 null。 */
     val latestChapterTitle: String?,
 
     /** 未读章节数（预计算）。 */
