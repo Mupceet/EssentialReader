@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
@@ -24,7 +25,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -638,7 +638,7 @@ internal fun ReaderLayoutPanel(
 }
 
 // ====================================================================
-// 边距调整弹框（屏幕居中，内含 正文/页眉/页脚 三 Tab）
+// 边距调整弹框（屏幕居中，正文/页眉/页脚 三组分组列表）
 // ====================================================================
 
 /**
@@ -646,10 +646,10 @@ internal fun ReaderLayoutPanel(
  * 调整时实时可见效果（档位滑条，逐 dp 可调）。经 [EInkDialog] 面板
  * 形态承载（关 scrim 透出阅读内容）。
  *
- * 内含三个 Tab：正文 / 页眉 / 页脚，每个 Tab 各 4 行档位滑条：
- * 上边距、下边距、左边距、右边距。× / 系统返回经 [onClose] 回到
- * 排版展开态；点击弹框外空白区域经 [onBackdropClick] 一次性收起
- * 到干净阅读界面。
+ * 内含正文 / 页眉 / 页脚三组分组列表，每组 4 行档位滑条：上边距、
+ * 下边距、左边距、右边距（内容经 [ReaderMarginConfigContent] 承载）。
+ * × / 系统返回经 [onClose] 回到排版展开态；点击弹框外空白区域经
+ * [onBackdropClick] 一次性收起到干净阅读界面。
  */
 @Composable
 internal fun ReaderMarginDialog(
@@ -670,7 +670,6 @@ internal fun ReaderMarginDialog(
     onClose: () -> Unit,
     onBackdropClick: () -> Unit,
 ) {
-    var selectedTab by remember { mutableIntStateOf(0) }
     EInkDialog(
         onDismiss = onClose,
         title = "边距调整",
@@ -678,51 +677,53 @@ internal fun ReaderMarginDialog(
         onBackdropClick = onBackdropClick,
         showActions = false,
     ) {
-        PanelTabRow(
-            labels = listOf("正文", "页眉", "页脚"),
-            selected = selectedTab,
-            onSelect = { selectedTab = it }
+        ReaderMarginConfigContent(
+            catalog = catalog,
+            style = style,
+            onSetPaddingTop = onSetPaddingTop,
+            onSetPaddingBottom = onSetPaddingBottom,
+            onSetPaddingLeft = onSetPaddingLeft,
+            onSetPaddingRight = onSetPaddingRight,
+            onSetHeaderPaddingTop = onSetHeaderPaddingTop,
+            onSetHeaderPaddingBottom = onSetHeaderPaddingBottom,
+            onSetHeaderPaddingLeft = onSetHeaderPaddingLeft,
+            onSetHeaderPaddingRight = onSetHeaderPaddingRight,
+            onSetFooterPaddingTop = onSetFooterPaddingTop,
+            onSetFooterPaddingBottom = onSetFooterPaddingBottom,
+            onSetFooterPaddingLeft = onSetFooterPaddingLeft,
+            onSetFooterPaddingRight = onSetFooterPaddingRight,
         )
-        when (selectedTab) {
-            0 -> MarginRows(
-                topDp = style.paddingTop,
-                bottomDp = style.paddingBottom,
-                leftDp = style.paddingLeft,
-                rightDp = style.paddingRight,
-                maxVertical = catalog.intRange(Ids.BODY_PADDING_TOP).last,
-                maxHorizontal = catalog.intRange(Ids.BODY_PADDING_LEFT).last,
-                onSetTop = onSetPaddingTop,
-                onSetBottom = onSetPaddingBottom,
-                onSetLeft = onSetPaddingLeft,
-                onSetRight = onSetPaddingRight,
-            )
+    }
+}
 
-            1 -> MarginRows(
-                topDp = style.headerPaddingTop,
-                bottomDp = style.headerPaddingBottom,
-                leftDp = style.headerPaddingLeft,
-                rightDp = style.headerPaddingRight,
-                maxVertical = catalog.intRange(Ids.HEADER_PADDING_TOP).last,
-                maxHorizontal = catalog.intRange(Ids.HEADER_PADDING_LEFT).last,
-                onSetTop = onSetHeaderPaddingTop,
-                onSetBottom = onSetHeaderPaddingBottom,
-                onSetLeft = onSetHeaderPaddingLeft,
-                onSetRight = onSetHeaderPaddingRight,
-            )
-
-            else -> MarginRows(
-                topDp = style.footerPaddingTop,
-                bottomDp = style.footerPaddingBottom,
-                leftDp = style.footerPaddingLeft,
-                rightDp = style.footerPaddingRight,
-                maxVertical = catalog.intRange(Ids.FOOTER_PADDING_TOP).last,
-                maxHorizontal = catalog.intRange(Ids.FOOTER_PADDING_LEFT).last,
-                onSetTop = onSetFooterPaddingTop,
-                onSetBottom = onSetFooterPaddingBottom,
-                onSetLeft = onSetFooterPaddingLeft,
-                onSetRight = onSetFooterPaddingRight,
-            )
-        }
+/** 边距内容：三组分组列表（正文/页眉/页脚），消除子 Tab 双层嵌套（spec §4.3）。 */
+@Composable
+internal fun ReaderMarginConfigContent(
+    catalog: ReaderStyleCatalog,
+    style: ReaderTextStyle,
+    onSetPaddingTop: (Int) -> Unit,
+    onSetPaddingBottom: (Int) -> Unit,
+    onSetPaddingLeft: (Int) -> Unit,
+    onSetPaddingRight: (Int) -> Unit,
+    onSetHeaderPaddingTop: (Int) -> Unit,
+    onSetHeaderPaddingBottom: (Int) -> Unit,
+    onSetHeaderPaddingLeft: (Int) -> Unit,
+    onSetHeaderPaddingRight: (Int) -> Unit,
+    onSetFooterPaddingTop: (Int) -> Unit,
+    onSetFooterPaddingBottom: (Int) -> Unit,
+    onSetFooterPaddingLeft: (Int) -> Unit,
+    onSetFooterPaddingRight: (Int) -> Unit,
+) {
+    Column(
+        modifier = Modifier.verticalScroll(rememberScrollState()).heightIn(max = 360.dp),
+        verticalArrangement = Arrangement.spacedBy(EInkSpacing.xs),
+    ) {
+        GroupHeading("正文")
+        BodyMarginRows(catalog, style, onSetPaddingTop, onSetPaddingBottom, onSetPaddingLeft, onSetPaddingRight)
+        GroupHeading("页眉")
+        HeaderMarginRows(catalog, style, onSetHeaderPaddingTop, onSetHeaderPaddingBottom, onSetHeaderPaddingLeft, onSetHeaderPaddingRight)
+        GroupHeading("页脚")
+        FooterMarginRows(catalog, style, onSetFooterPaddingTop, onSetFooterPaddingBottom, onSetFooterPaddingLeft, onSetFooterPaddingRight)
     }
 }
 

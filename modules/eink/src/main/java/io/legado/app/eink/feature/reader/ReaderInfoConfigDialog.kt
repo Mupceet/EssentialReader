@@ -50,23 +50,53 @@ internal fun ReaderInfoConfigDialog(
         onBackdropClick = onBackdropClick,
         showActions = false,
     ) {
-        Column(
-            modifier = Modifier
-                .verticalScroll(rememberScrollState())
-                .heightIn(max = 360.dp),
-            verticalArrangement = Arrangement.spacedBy(EInkSpacing.xs),
-        ) {
-            TitleInfoRows(
-                catalog = catalog,
-                style = style,
-                titleSizeFollowBody = titleSizeFollowBody,
-                onSetTitleMode = onSetTitleMode,
-                onSetTitleSizeFollowBody = onSetTitleSizeFollowBody,
-                onSetTitleSize = onSetTitleSize,
-            )
-            HeaderModeRow(catalog = catalog, style = style, onSetHeaderMode = onSetHeaderMode)
-            FooterModeRow(catalog = catalog, style = style, onSetFooterVisible = onSetFooterVisible)
-            TipSizeRow(catalog = catalog, style = style, onSetTipSize = onSetTipSize)
-        }
+        ReaderInfoConfigContent(
+            catalog = catalog,
+            style = style,
+            titleSizeFollowBody = titleSizeFollowBody,
+            onSetTitleMode = onSetTitleMode,
+            onSetTitleSizeFollowBody = onSetTitleSizeFollowBody,
+            onSetTitleSize = onSetTitleSize,
+            onSetHeaderMode = onSetHeaderMode,
+            onSetFooterVisible = onSetFooterVisible,
+            onSetTipSize = onSetTipSize,
+        )
+    }
+}
+
+/**
+ * 信息配置内容块（去壳版，Task 4 归一容器组合）：自带 verticalScroll +
+ * heightIn(max = 360.dp)——信息内容自带滚动，外层容器不再包一层。
+ * 行为说明见 [ReaderInfoConfigDialog]。
+ */
+@Composable
+internal fun ReaderInfoConfigContent(
+    catalog: ReaderStyleCatalog,
+    style: ReaderTextStyle,
+    titleSizeFollowBody: Boolean,
+    onSetTitleMode: (Int) -> Unit,
+    onSetTitleSizeFollowBody: (Boolean) -> Unit,
+    onSetTitleSize: (Int) -> Unit,
+    onSetHeaderMode: (Int) -> Unit,
+    onSetFooterVisible: (Boolean) -> Unit,
+    onSetTipSize: (Int) -> Unit,
+) {
+    Column(
+        modifier = Modifier
+            .verticalScroll(rememberScrollState())
+            .heightIn(max = 360.dp),
+        verticalArrangement = Arrangement.spacedBy(EInkSpacing.xs),
+    ) {
+        TitleInfoRows(
+            catalog = catalog,
+            style = style,
+            titleSizeFollowBody = titleSizeFollowBody,
+            onSetTitleMode = onSetTitleMode,
+            onSetTitleSizeFollowBody = onSetTitleSizeFollowBody,
+            onSetTitleSize = onSetTitleSize,
+        )
+        HeaderModeRow(catalog = catalog, style = style, onSetHeaderMode = onSetHeaderMode)
+        FooterModeRow(catalog = catalog, style = style, onSetFooterVisible = onSetFooterVisible)
+        TipSizeRow(catalog = catalog, style = style, onSetTipSize = onSetTipSize)
     }
 }
