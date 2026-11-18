@@ -53,9 +53,10 @@ import kotlin.math.roundToInt
  *
  * 画笔规格只拷贝测量耦合参数（字号/字距/字体/可变字重）——快照坐标
  * 是引擎按这些参数测量的，模块必须按同值绘制才不错位；阴影等纯视觉
- * 效果不跨桥（E-Ink 阅读不渲染，既定产品取舍），斜体跨桥（0.8.2 起）：
- * skew 只剪切字形轮廓、不改步进宽、无对齐风险——基线斜体随规格
- * （textSkewX）、高亮规则的斜体经逐段覆盖。
+ * 效果不跨桥（E-Ink 阅读不渲染，既定产品取舍），斜体跨桥：skew 只剪切
+ * 字形轮廓、不改步进宽、无对齐风险——基线斜体随规格（textSkewX，
+ * 0.8.2 起；此前经「元素样式 merge 正文基线」的通路逐段覆盖生效），
+ * 规则斜体仅在与基线不同时经逐段覆盖（加斜 / 显式去斜）。
  *
  * 在引擎回调线程调用，产物不可变、跨线程安全。
  */
@@ -516,8 +517,17 @@ private fun ReaderElement.Text.chunkOverride(
     val color = baseline.colorArgb
         ?.let { base -> style.colorArgb.takeIf { it != base }?.toEInkGrayArgb() }
     // 合成斜体：skew 只剪切成字形轮廓、不改步进宽，跨桥无对齐风险
-    // （倾斜量见 SYNTHETIC_ITALIC_SKEW_X，镜像引擎 textSkewX 口径）
-    val skewX = SYNTHETIC_ITALIC_SKEW_X.takeIf { style.italic }
+    // （倾斜量见 SYNTHETIC_ITALIC_SKEW_X，镜像引擎 textSkewX 口径）。
+    // 基线斜体已随行规格（spec.textSkewX）跨桥——覆盖仅在与基线**不同**
+    // 时发射：规则加斜（基线正）/ 规则显式去斜（基线斜，写 0f 表达）；
+    // 与基线一致（含都斜）不发射，斜体正文不再每 chunk 背 skew-only 覆盖。
+    // 注意元素样式是 merge 产物（italic = 规则 ?: 正文基线），故不能用
+    // style.italic 单边判断，须对 spec 差分。
+    val skewX = when {
+        style.italic == true && spec.textSkewX == null -> SYNTHETIC_ITALIC_SKEW_X
+        style.italic == false && spec.textSkewX != null -> 0f
+        else -> null
+    }
     if (textSize == null && typeface == null && variation == null && color == null && skewX == null) {
         return null
     }
