@@ -715,7 +715,9 @@ internal fun ReaderMarginConfigContent(
     onSetFooterPaddingRight: (Int) -> Unit,
 ) {
     Column(
-        modifier = Modifier.verticalScroll(rememberScrollState()).heightIn(max = 360.dp),
+        // heightIn 必须在 verticalScroll 外侧：钳制视口 ≤360dp；
+        // 顺序颠倒会把滚动内容钳到 360dp（内容截断、maxValue≈0 死滚动）
+        modifier = Modifier.heightIn(max = 360.dp).verticalScroll(rememberScrollState()),
         verticalArrangement = Arrangement.spacedBy(EInkSpacing.xs),
     ) {
         GroupHeading("正文")
