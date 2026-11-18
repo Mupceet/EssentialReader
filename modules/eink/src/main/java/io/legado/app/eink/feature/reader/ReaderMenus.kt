@@ -63,7 +63,6 @@ import io.legado.app.eink.designsystem.theme.EInkShapes
 import io.legado.app.eink.designsystem.theme.EInkSpacing
 import io.legado.app.eink.designsystem.theme.EInkTheme
 import kotlin.math.abs
-import kotlin.math.roundToInt
 
 /** 设置面板类型（UI 局部状态，见 Route 中的 remember）。 */
 internal enum class ReaderPanel { LAYOUT, PROGRESS, OTHER, CACHE }
@@ -616,42 +615,14 @@ internal fun ReaderLayoutPanel(
     onOpenInfo: () -> Unit,
     onOpenMargins: () -> Unit,
 ) {
-    EInkSliderRow(
-        label = "字号",
-        value = style.textSize,
-        valueRange = catalog.intRange(Ids.BODY_SIZE),
-        thumbLabel = { "$it" },
-        onSetValue = onSetTextSize,
-    )
-    val lsRange = catalog.floatStepIndexRange(Ids.BODY_LETTER_SPACING, LETTER_SPACING_STEP)
-    EInkSliderRow(
-        label = "字距",
-        value = (style.letterSpacing / LETTER_SPACING_STEP).roundToInt()
-            .coerceIn(lsRange.first, lsRange.last),
-        valueRange = lsRange,
-        thumbLabel = { "%.2f".format(it * LETTER_SPACING_STEP) },
-        onSetValue = onSetLetterSpacing,
-    )
-    EInkSliderRow(
-        label = "缩进",
-        value = style.indentChars,
-        valueRange = catalog.intRange(Ids.BODY_INDENT),
-        thumbLabel = { "${it}字" },
-        onSetValue = onSetIndent,
-    )
-    EInkSliderRow(
-        label = "行距",
-        value = style.lineSpacing,
-        valueRange = catalog.intRange(Ids.BODY_LINE_SPACING),
-        thumbLabel = { "%.1f倍".format(it / 10f) },
-        onSetValue = onSetLineSpacing,
-    )
-    EInkSliderRow(
-        label = "段距",
-        value = style.paragraphSpacing,
-        valueRange = catalog.intRange(Ids.BODY_PARAGRAPH_SPACING),
-        thumbLabel = { "%.1f行".format(it / 10f) },
-        onSetValue = onSetParagraphSpacing,
+    BodyBasicRows(
+        catalog = catalog,
+        style = style,
+        onSetTextSize = onSetTextSize,
+        onSetLetterSpacing = onSetLetterSpacing,
+        onSetIndent = onSetIndent,
+        onSetLineSpacing = onSetLineSpacing,
+        onSetParagraphSpacing = onSetParagraphSpacing,
     )
     val entries = buildList {
         val fontReady = catalog.available(Ids.BODY_FONT) || catalog.available(Ids.TITLE_FONT) ||
@@ -753,50 +724,6 @@ internal fun ReaderMarginDialog(
             )
         }
     }
-}
-
-/** 单个区域的边距 4 行档位滑条：上边距、下边距、左边距、右边距。 */
-@Composable
-private fun MarginRows(
-    topDp: Int,
-    bottomDp: Int,
-    leftDp: Int,
-    rightDp: Int,
-    maxVertical: Int,
-    maxHorizontal: Int,
-    onSetTop: (Int) -> Unit,
-    onSetBottom: (Int) -> Unit,
-    onSetLeft: (Int) -> Unit,
-    onSetRight: (Int) -> Unit,
-) {
-    EInkSliderRow(
-        label = "上边距",
-        value = topDp,
-        valueRange = 0..maxVertical,
-        thumbLabel = { "$it" },
-        onSetValue = onSetTop,
-    )
-    EInkSliderRow(
-        label = "下边距",
-        value = bottomDp,
-        valueRange = 0..maxVertical,
-        thumbLabel = { "$it" },
-        onSetValue = onSetBottom,
-    )
-    EInkSliderRow(
-        label = "左边距",
-        value = leftDp,
-        valueRange = 0..maxHorizontal,
-        thumbLabel = { "$it" },
-        onSetValue = onSetLeft,
-    )
-    EInkSliderRow(
-        label = "右边距",
-        value = rightDp,
-        valueRange = 0..maxHorizontal,
-        thumbLabel = { "$it" },
-        onSetValue = onSetRight,
-    )
 }
 
 /** 面板 Tab 行：选中项反白，按压瞬时反色，零动画直接切换。 */
