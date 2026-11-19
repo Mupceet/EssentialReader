@@ -74,6 +74,8 @@ internal fun buildStyleMutations(
     style.titleSegmentScale?.let {
         add(ReadStyleMutation.FloatValue(ReadStyleFloatKey.TitleSegScaling, it))
     }
+    // 副标题间距（0.8.3 勘误入账）：钳到宿主 UI 同源值域（-30..30）
+    style.titleSegmentSpacing?.let { int(ReadStyleIntKey.TitleLineSpacingSub, it.coerceIn(-30, 30)) }
 
     val effectiveBodyPath = when (val body = style.bodyFont) {
         null -> currentBodyFontPath

@@ -12,9 +12,9 @@ class HostStyleCatalogTest {
     private val catalog = HostStyleCatalog.create()
 
     @Test
-    fun `完整目录覆盖全部44个参数且全部可用`() {
-        assertEquals(44, catalog.params.size)
-        assertEquals(44, catalog.params.map { it.id }.toSet().size)
+    fun `完整目录覆盖全部45个参数且全部可用`() {
+        assertEquals(45, catalog.params.size)
+        assertEquals(45, catalog.params.map { it.id }.toSet().size)
         assertTrue(catalog.params.all { it.available })
     }
 
@@ -41,6 +41,11 @@ class HostStyleCatalogTest {
         assertEquals(500f, stepped(Ids.BODY_WEIGHT).default)
         assertEquals(0f..200f, stepped(Ids.TITLE_TOP_SPACING).let { it.min..it.max })
         assertEquals(12f, stepped(Ids.HEADER_SIZE).default)
+        // 标题分段族：位置 min=1 与宿主 UI 同源（0 走引擎不分割分支，不提供）；
+        // 副标题间距与宿主「副标题间距」滑条同源（-30..30，默认 0）
+        assertEquals(1f..20f, stepped(Ids.TITLE_SEGMENT_DISTANCE).let { it.min..it.max })
+        assertEquals(-30f..30f, stepped(Ids.TITLE_SEGMENT_SPACING).let { it.min..it.max })
+        assertEquals(0f, stepped(Ids.TITLE_SEGMENT_SPACING).default)
     }
 
     @Test
@@ -71,7 +76,7 @@ class HostStyleCatalogTest {
         val declaredIds = Ids::class.java.fields
             .filter { it.type == String::class.java } // 排除 object 的 INSTANCE 字段
             .map { it.get(null) as String }
-        assertEquals(46, declaredIds.size)
+        assertEquals(47, declaredIds.size)
         // 目录不收的 id：标题分段判断符（文本参数无目录控件类型）+
         // 页脚字体（值通道先行，独立配置落地时入目录）——均仅快照通道
         val catalogIds = declaredIds - Ids.TITLE_SEGMENT_DELIMITER - Ids.FOOTER_FONT

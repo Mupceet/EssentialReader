@@ -65,8 +65,15 @@ internal object HostStyleCatalog {
                 ),
                 default = 0,
             ),
-            stepped(Ids.TITLE_SEGMENT_DISTANCE, 0f, 20f, 4f),
+            // 分段位置 min=1 与宿主 UI（TypographyTabs 1..20）同源：引擎对
+            // 0 走不分割分支，0 档语义困惑（模式开着却不分割）不提供
+            stepped(Ids.TITLE_SEGMENT_DISTANCE, 1f, 20f, 4f),
+            // 缩放下限 0.5 为 eink 侧刻意收紧（宿主 UI 0..2）：低于 0.5 的
+            // 副标题趋近不可见，非同源项已知差异
             stepped(Ids.TITLE_SEGMENT_SCALE, 0.5f, 2f, 1f),
+            // 副标题间距（0.8.3 勘误入账）：与宿主「副标题间距」滑条同源
+            //（-30..30，引擎按标题字高 × 值/10 计入分段行距）
+            stepped(Ids.TITLE_SEGMENT_SPACING, -30f, 30f, 0f),
             // 整页文字下划线族（0.8.1 参数总账补全）：引擎以页级 Rule 元素
             // 产出、经页快照 ruleLines 跨桥，eink 直接渲染；dashed 当前被
             // 排版层对 E-Ink 会话硬门控为实线（值通道先行声明）

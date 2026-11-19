@@ -626,6 +626,8 @@ internal object ReaderEngineImpl : ReaderEngine, KoinComponent {
         titleSegmentDistance = durConfig.titleSegDistance,
         titleSegmentDelimiter = durConfig.titleSegFlag,
         titleSegmentScale = durConfig.titleSegScaling,
+        // 副标题间距（0.8.3 勘误入账）：宿主原值，引擎内部按 /10 × 标题字高展开
+        titleSegmentSpacing = durConfig.titleLineSpacingSub,
         bodyItalic = durConfig.textItalic,
         footerFont = followBodyIfSame(durConfig.footerFont, durConfig.textFont),
     )
