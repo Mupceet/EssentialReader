@@ -159,6 +159,13 @@ data class ReaderTextStyle(
     val titleSegmentScale: Float? = null,
 
     /**
+     * 副标题（分段第二段）与主标题的行距基准（0.8.3 勘误入账）：宿主
+     * 「副标题间距」titleLineSpacingSub 原值（-30..30，默认 0），引擎按
+     * 标题字高 × 值/10 计入分段行距；null = 不管理。
+     */
+    val titleSegmentSpacing: Int? = null,
+
+    /**
      * 正文斜体（0.8.2 起支持：合成斜体 skew 经 ReaderPaintSpec.textSkewX
      * 跨桥渲染）；null = 不管理。
      */
@@ -167,7 +174,11 @@ data class ReaderTextStyle(
     /**
      * 页脚字体；null = 不管理（值通道先行，呈现待后续——届时与宿主同构
      * 支持独立配置，applyHeaderStyle 语义配套处理；当前 eink 侧统一字体
-     * 原则仍为页脚跟随页眉）。
+     * 原则仍为页脚跟随页眉）。已知口径差：宿主快照读回按「与正文字体
+     * 比较」归一 FollowBody，而 applyHeaderStyle=true 时实际渲染经
+     * resolveFooterTipFont 跟随**页眉**字体（footerSize 同函数已按页眉
+     * 字号分支）——呈现落地时读回须与 footerSize 同步套 applyHeaderStyle
+     * 口径，写入侧须先处理 applyHeaderStyle 关闭语义。
      */
     val footerFont: ReaderFontSelection? = null,
 

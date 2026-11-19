@@ -37,6 +37,8 @@ internal fun styleChangeNeedsRelayout(
         Ids.TITLE_SEGMENT_DISTANCE to (old.titleSegmentDistance != new.titleSegmentDistance),
         Ids.TITLE_SEGMENT_DELIMITER to (old.titleSegmentDelimiter != new.titleSegmentDelimiter),
         Ids.TITLE_SEGMENT_SCALE to (old.titleSegmentScale != new.titleSegmentScale),
+        // 0.8.3 勘误入账：副标题间距计入分段行距（标题字高 × 值/10），重排路径
+        Ids.TITLE_SEGMENT_SPACING to (old.titleSegmentSpacing != new.titleSegmentSpacing),
         Ids.BODY_UNDERLINE to (old.bodyUnderline != new.bodyUnderline),
         Ids.BODY_UNDERLINE_WIDTH to (old.bodyUnderlineWidth != new.bodyUnderlineWidth),
         Ids.BODY_UNDERLINE_OFFSET to (old.bodyUnderlineOffset != new.bodyUnderlineOffset),

@@ -106,8 +106,9 @@ class ReaderStyleCatalog(val params: List<ReaderStyleParam>) {
  * **① 目录协商参数**——有 id + 宿主目录行 + [ReaderTextStyle] 快照字段
  * （currentStyle 读 / applyStyle 写），模块按目录呈现：
  * 正文五标量/字体/字重/斜体/四边距、标题字体/字重/位置/字号/上下留白/
- * 行距/分段（模式/位置/缩放）、页眉字体/模式/字号/分隔线、页脚字号/
- * 显隐/分隔线、页眉页脚四边距，及**整页文字下划线族**（总开关/线粗/
+ * 行距/分段（模式/位置/缩放/间距）、页眉字体/模式/字号/分隔线、页脚
+ * 字号/显隐/分隔线、页眉页脚四边距，及**整页文字下划线族**（总开关/
+ * 线粗/
  * 间距/延伸/虚线开关/虚线墨长/虚线空长——引擎以页级 Rule 元素产出，
  * 经页快照 ruleLines 跨桥，eink 直接渲染）。
  *
@@ -126,13 +127,18 @@ class ReaderStyleCatalog(val params: List<ReaderStyleParam>) {
  *  - `footer-follow-header`（宿主 applyHeaderStyle）：eink 统一字体原则
  *    ——页脚跟随页眉；FOOTER_FONT 后续独立配置落地时一并评估；
  *  - `title.size-relative`：eink 以「titleSize == textSize 即随正文」表达；
- *  - `title.line-spacing-sub`：宿主遗留键，排版核心测量未消费；
  *  - 翻页动画族 / 状态栏图标 / 菜单外观：非排版参数，不入账。
  *
  * **0.8.2 立场修订**：正文斜体由排除改为**支持**（skew 跨桥，见
  * [BODY_ITALIC]）；页眉/页脚分隔线**恢复绘制**（[HEADER_DIVIDER] /
  * [FOOTER_DIVIDER] 回到目录协商——模块两渲染面按快照样式画线，布局
  * 厚度本就按宿主配置预留）。
+ *
+ * **0.8.3 勘误入账**：[TITLE_SEGMENT_SPACING]（宿主「副标题间距」
+ * titleLineSpacingSub）——0.8.1/0.8.2 总账曾误记为「宿主遗留键，排版
+ * 核心测量未消费」而排除；实为分页测量输入（宿主排版核心以
+ * titleSegmentSpacingPx = 标题字高 × 值/10 计入分段行距，宿主排版
+ * 设置有活跃滑条 -30..30）。本版补全 id/目录行/快照字段/写入映射。
  *
  * ## 高亮规则样式词汇表（per-rule，非全局设置参数）
  *
@@ -199,6 +205,13 @@ object ReaderStyleParamIds {
 
     /** 副标题字号缩放（第二段与第一段的字体大小比例）。 */
     const val TITLE_SEGMENT_SCALE = "title.segment-scale"
+
+    /**
+     * 副标题（分段第二段）与主标题的行距基准（0.8.3 勘误入账，见总账
+     * KDoc）：宿主「副标题间距」titleLineSpacingSub 原值 -30..30，引擎
+     * 按标题字高 × 值/10 计入分段行距（负值收紧）。
+     */
+    const val TITLE_SEGMENT_SPACING = "title.segment-spacing"
     const val HEADER_FONT = "header.font"
     /** 页脚字体（0.8.2 起 id+快照通道先行，呈现待后续——届时与宿主同构支持独立配置，配套 applyHeaderStyle 语义一并处理）。 */
     const val FOOTER_FONT = "footer.font"

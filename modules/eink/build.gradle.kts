@@ -226,9 +226,19 @@ afterEvaluate {
     //         本就在，恢复=宿主 snapshotStyle 放开恒 false + 目录重新
     //         声明两行，几何预留此前从未中断）；页脚字体值通道先行
     //         （FOOTER_FONT id + footerFont 快照字段 + 写入映射，呈现待
-    //         后续与宿主同构支持独立配置、届时配套 applyHeaderStyle
+    //         后续与宿主同构独立配置、届时配套 applyHeaderStyle
     //         语义）；总账三组声明随立场同步修订；
-                version = "0.8.2"
+    // 0.8.3 = 总账勘误入账（非破坏——新增 id/字段均带默认）：
+    //         title.segment-spacing（宿主「副标题间距」titleLineSpacingSub）
+    //         补全 id + 目录协商行 + ReaderTextStyle 快照字段 + 写入映射 +
+    //         路由键——0.8.1/0.8.2 总账曾误记为「宿主遗留键，排版核心测量
+    //         未消费」而排除，实为分页测量输入（宿主排版核心以
+    //         titleSegmentSpacingPx = 标题字高 × 值/10 计入分段行距，
+    //         宿主排版设置有活跃滑条 -30..30）；footerFont 字段 KDoc 补记
+    //         applyHeaderStyle 口径差（读回归一正文 vs 渲染跟随页眉），
+    //         呈现落地时须与 footerSize 同步处理；README §4 协商扩展字段数
+    //         27→30（0.8.2 漏更 29 一并修正）；
+                version = "0.8.3"
             }
         }
     }

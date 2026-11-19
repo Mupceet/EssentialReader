@@ -37,6 +37,8 @@ class ReaderTextStyleDefaultsTest {
         assertNull(style.titleSegmentDistance)
         assertNull(style.titleSegmentDelimiter)
         assertNull(style.titleSegmentScale)
+        // 0.8.3 勘误入账：副标题间距
+        assertNull(style.titleSegmentSpacing)
         assertNull(style.bodyItalic)
         assertNull(style.footerFont)
     }
