@@ -1287,6 +1287,16 @@ class ReaderViewModel(application: Application) : AndroidViewModel(application),
             success?.invoke()
             return
         }
+        // attach 窗口守卫：引擎会话尚未切到本屏装载的书——上一本的排版残留
+        // 在 register 之后、reloadBook 之前可被在途回调映射成快照（表现为
+        // 切书时闪现旧书内容）。丢弃本次回调：attach 的换书分支随即清屏，
+        // 新书装载完成的 upContent 在会话对齐后正常推送。换源同理（回调
+        // 先于 onNotifyBookChanged 到达时 loadedBookUrl 仍为旧值，同样
+        // 丢弃，待同步后的下一轮推送）。
+        if (loadedBookUrl == null || engine.sessionBookUrl != loadedBookUrl) {
+            success?.invoke()
+            return
+        }
         if (!engine.hasLaidOutPages) {
             // 章节尚未挂载或尚未排出任何页面
             val msg = engine.engineMessage
